@@ -260,7 +260,7 @@ defmodule Nebulex.Adapters.Local do
 
   @doc false
   def transaction(cache, key \\ nil, fun) do
-    :global.trans({cache, key}, fun, [node()])
+    :global.trans({{cache, key}, self()}, fun, [node()])
   end
 
   ## Helpers
@@ -310,12 +310,13 @@ defmodule Nebulex.Adapters.Local do
     end
   end
 
+  defp validate_return(nil, _),
+    do: nil
   defp validate_return(object, opts) do
-    case {object, Keyword.get(opts, :return, :value)} do
-      {nil, _}     -> nil
-      {_, :object} -> object
-      {_, :value}  -> object.value
-      {_, :key}    -> object.key
+    case Keyword.get(opts, :return, :value) do
+      :object -> object
+      :value  -> object.value
+      :key    -> object.key
     end
   end
 

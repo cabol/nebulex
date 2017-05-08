@@ -125,6 +125,7 @@ defmodule Nebulex.Adapters.Dist do
         pg2_namespace()
         |> :pg2.get_members()
         |> Enum.map(&node(&1))
+        |> :lists.usort
       end
 
       def new_generation(opts \\ []) do
@@ -185,7 +186,7 @@ defmodule Nebulex.Adapters.Dist do
 
   @doc false
   def transaction(cache, key \\ nil, fun) do
-    :global.trans({cache, key}, fun, cache.nodes)
+    :global.trans({{cache, key}, self()}, fun, cache.nodes)
   end
 
   ## Private Functions

@@ -1,5 +1,6 @@
 # Load shared tests
 Code.require_file "./shared/cache_test.exs", __DIR__
+Code.require_file "./shared/multilevel_test.exs", __DIR__
 
 # Load support files
 required_files = for file <- File.ls!("test/support") do

@@ -18,7 +18,7 @@ defmodule Nebulex.CacheTest do
         @cache.new_generation
         %Object{value: 2, key: 2, version: v2} = @cache.get(2, return: :object)
 
-        1 = @cache.delete(1, return: :key)
+        assert @cache.delete(1, return: :key) == 1
         refute @cache.get(1)
 
         %Object{value: 2, key: 2, version: _} = @cache.delete(2, return: :object, version: v2)

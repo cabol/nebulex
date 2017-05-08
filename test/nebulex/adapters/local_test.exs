@@ -31,13 +31,10 @@ defmodule Nebulex.Adapters.LocalTest do
       if v, do: {v, v * 2}, else: {v, 1}
     end)
 
-    assert {1, 2} == TestCache.get_and_update(1, &({&1, &1 * 2}))
-
-    {2, 6} = TestCache.get_and_update(1, &({&1, &1 * 3}), return: :object)
-
-    assert {6, nil} == TestCache.get_and_update(1, fn _ -> :pop end)
-
-    assert {nil, 3} == TestCache.get_and_update(3, &({&1, 3}))
+    assert TestCache.get_and_update(1, &({&1, &1 * 2})) == {1, 2}
+    assert TestCache.get_and_update(1, &({&1, &1 * 3}), return: :object) == {2, 6}
+    assert TestCache.get_and_update(1, fn _ -> :pop end) == {6, nil}
+    assert TestCache.get_and_update(3, &({&1, 3})) == {nil, 3}
 
     assert {nil, :error} == TestCache.get_and_update(:a, fn v ->
       if v, do: {v, :ok}, else: {v, :error}
@@ -63,12 +60,12 @@ defmodule Nebulex.Adapters.LocalTest do
 
     for x <- 1..2, do: TestCache.set x, x
 
-    assert 2 == TestCache.update(1, 1, &(&1 * 2))
-    assert 4 == TestCache.update(2, 1, &(&1 * 2))
-    assert 1 == TestCache.update(3, 1, &(&1 * 2))
+    assert TestCache.update(1, 1, &(&1 * 2)) == 2
+    assert TestCache.update(2, 1, &(&1 * 2)) == 4
+    assert TestCache.update(3, 1, &(&1 * 2)) == 1
 
-    assert 2 == TestCache.update(3, 3, &(&1 * 2), version: -1, on_conflict: :nothing)
-    assert 3 == TestCache.update(3, 3, &(&1 * 2), version: -1, on_conflict: nil)
+    assert TestCache.update(3, 3, &(&1 * 2), version: -1, on_conflict: :nothing) == 2
+    assert TestCache.update(3, 3, &(&1 * 2), version: -1, on_conflict: nil) == 3
 
     assert_raise Nebulex.VersionConflictError, fn ->
       :a
