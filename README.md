@@ -2,16 +2,15 @@
 
 [![Build Status](https://travis-ci.org/cabol/nebulex.svg?branch=master)](https://travis-ci.org/cabol/nebulex)
 [![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
+[![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
 
 > **Distributed and Local Caching Tool for Elixir**
 
-**Nebulex** includes:
+## Features
 
  - Local Generational Cache
  - Distributed Cache
- - Multilevel Cache (WIP)
-
- > **WIP** – Check progress [HERE](https://github.com/cabol/nebulex/issues/1)
+ - Multilevel Cache
 
 ## Installation
 

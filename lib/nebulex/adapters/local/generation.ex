@@ -25,11 +25,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   ## API
 
-  @doc """
-  Starts the server. This function is called from the the local adapter
-  `Nebulex.Adapters.Local` when the Cache is started, therefore, it
-  MUST NOT be invoked directly.
-  """
+  @doc false
   @spec start_link(Nebulex.Cache.t, Nebulex.Cache.opts) :: GenServer.on_start
   def start_link(cache, opts \\ []) do
     GenServer.start_link(__MODULE__, {cache, opts}, name: server_name(cache))

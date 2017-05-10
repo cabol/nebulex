@@ -21,9 +21,16 @@ defmodule Nebulex.Mixfile do
 
   defp deps do
     [{:ex_shards, "~> 0.2"},
-     {:ex_doc, ">= 0.0.0", only: :dev},
-     {:excoveralls, "~> 0.6.2", only: :test},
-     {:dialyxir, "~> 0.5", only: :dev, runtime: false}]
+
+     # Coverage
+     {:excoveralls, "~> 0.6", only: :test},
+
+     # Dialyzer
+     {:dialyxir, "~> 0.5", only: :dev, runtime: false},
+
+     # Docs
+     {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+     {:inch_ex, "~> 0.5", only: :docs}]
   end
 
   defp package do

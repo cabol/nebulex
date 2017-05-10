@@ -1,15 +1,21 @@
 defmodule Nebulex.TestCache do
+  :ok = Application.put_env(:nebulex, :nodes, [:"node1@127.0.0.1", :"node2@127.0.0.1"])
+
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Local, [n_shards: 2])
+
   defmodule Local do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
   end
 
-  defmodule LocalWithGC do
-    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+  for mod <- [Nebulex.TestCache.LocalWithGC, Nebulex.TestCache.DistLocal] do
+    Application.put_env(:nebulex, mod, [n_shards: 2, gc_interval: 3600])
+
+    defmodule mod do
+      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+    end
   end
 
-  defmodule DistLocal do
-    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
-  end
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Dist, [local: Nebulex.TestCache.DistLocal])
 
   defmodule Dist do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Dist
@@ -23,35 +29,32 @@ defmodule Nebulex.TestCache do
     def update_fun(current) when is_integer(current), do: current * 2
   end
 
-  defmodule Multilevel do
-    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Multilevel
-
-    defmodule L1 do
-      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+  for mod <- [Nebulex.TestCache.Multilevel, Nebulex.TestCache.MultilevelExclusive] do
+    levels = for l <- 1..3 do
+      level = String.to_atom("#{mod}.L#{l}")
+      :ok = Application.put_env(:nebulex, level, [n_shards: 2, gc_interval: 3600])
+      level
     end
-
-    defmodule L2 do
-      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+    config = case mod do
+      Nebulex.TestCache.Multilevel -> [levels: levels]
+      _ -> [cache_model: :exclusive, levels: levels]
     end
+    :ok = Application.put_env(:nebulex, mod, config)
 
-    defmodule L3 do
-      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
-    end
-  end
+    defmodule mod do
+      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Multilevel
 
-  defmodule MultilevelExclusive do
-    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Multilevel
+      defmodule L1 do
+        use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+      end
 
-    defmodule L1 do
-      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
-    end
+      defmodule L2 do
+        use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+      end
 
-    defmodule L2 do
-      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
-    end
-
-    defmodule L3 do
-      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+      defmodule L3 do
+        use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+      end
     end
   end
 end
