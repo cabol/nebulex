@@ -10,6 +10,9 @@ defmodule Nebulex.Adapters.Multilevel do
   (level 2, L2) is checked, and so on, before accessing external
   memory (that can be the latest level).
 
+  Beware that the only added value function here is `get/3`, the other
+  functions works more like a bypass functions.
+
   ## Options
 
   These options should be set in the config file and require
@@ -29,6 +32,21 @@ defmodule Nebulex.Adapters.Multilevel do
       (level 1) and so on; the Nth elemnt will be the LN cache. This option
       is mandatory, if it is not set or empty, an exception will be raised.
 
+    * `:fallback` - Defines a fallback function when a key is not present
+      in any cache level. Function is defined as: `(key -> value)`.
+
+  The `:fallback` can be defined in two ways: at compile-time and at run-time.
+  At compile-time, in the cache config, set the module that implements the
+  function:
+
+      config :my_app, MyApp.MultilevelCache,
+        fallback: &MyMapp.AnyModule/1
+
+  And at run-time, passing the function as an option within the `opts` argument
+  (only valid for `get` function):
+
+      MultilevelCache.get("foo", fallback: fn(key) -> key * 2 end)
+
   ## Example
 
   `Nebulex.Cache` is the wrapper around the Cache. We can define the
@@ -44,6 +62,11 @@ defmodule Nebulex.Adapters.Multilevel do
         defmodule L2 do
           use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Dist
         end
+
+        def fallback(_key) do
+          # maybe fetch the data from Database
+          nil
+        end
       end
 
       defmodule MyApp.LocalCache do
@@ -57,7 +80,8 @@ defmodule Nebulex.Adapters.Multilevel do
         levels: [
           MyApp.MultilevelCache.L1,
           MyApp.MultilevelCache.L2
-        ]
+        ],
+        fallback: &MyApp.MultilevelCache.fallback/1
 
       config :my_app, MyApp.MultilevelCache.L1,
         n_shards: 2,
@@ -74,17 +98,23 @@ defmodule Nebulex.Adapters.Multilevel do
 
   This adapter provides some additional functions to the `Nebulex.Cache` API.
 
-  ### `__levels__/0`
+  ### `__levels__`
 
   This function returns the configured level list.
 
       MyCache.__levels__
 
-  ### `__model__/0`
+  ### `__model__`
 
   This function returns the multi-level cache model.
 
       MyCache.__model__
+
+  ### `__fallback__`
+
+  This function returns the default fallback function.
+
+      MyCache.__fallback__
 
   ## Limitations
 
@@ -96,6 +126,8 @@ defmodule Nebulex.Adapters.Multilevel do
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
 
+  alias Nebulex.Object
+
   ## Adapter Impl
 
   @doc false
@@ -103,6 +135,7 @@ defmodule Nebulex.Adapters.Multilevel do
     otp_app = Module.get_attribute(env.module, :otp_app)
     config = Module.get_attribute(env.module, :config)
     cache_model = Keyword.get(config, :cache_model, :inclusive)
+    fallback = Keyword.get(config, :fallback)
     levels = Keyword.get(config, :levels)
 
     unless levels do
@@ -121,6 +154,8 @@ defmodule Nebulex.Adapters.Multilevel do
       def __levels__, do: unquote(levels)
 
       def __model__, do: unquote(cache_model)
+
+      def __fallback__, do: unquote(fallback)
     end
   end
 
@@ -134,12 +169,13 @@ defmodule Nebulex.Adapters.Multilevel do
     cache.__levels__
     |> Enum.reduce_while({nil, []}, fn(current, {_, prev}) ->
       if object = current.get(key, Keyword.put(opts, :return, :object)) do
-        :ok = maybe_replicate_data(cache.__model__, prev, key, object.value, opts)
-        {:halt, object}
+        {:halt, {object, [current | prev]}}
       else
         {:cont, {nil, [current | prev]}}
       end
     end)
+    |> maybe_fallback(cache, key, opts)
+    |> maybe_replicate_data(cache)
     |> validate_return(opts)
   end
 
@@ -192,8 +228,7 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   defp eval_while(ml_cache, fun, args, init \\ nil) do
-    ml_cache.__levels__
-    |> Enum.reduce_while(init, fn(cache, acc) ->
+    Enum.reduce_while(ml_cache.__levels__, init, fn(cache, acc) ->
       if return = apply(cache, fun, args) do
         {:halt, return}
       else
@@ -202,15 +237,26 @@ defmodule Nebulex.Adapters.Multilevel do
     end)
   end
 
-  defp maybe_replicate_data(:exclusive, _, _, _, _),
-    do: :ok
-  defp maybe_replicate_data(:inclusive, levels, key, value, opts) do
-    Enum.each(levels, fn(cache) ->
-      ^value = cache.set(key, value, Keyword.put(opts, :return, :value))
-    end)
+  defp maybe_fallback({nil, levels}, cache, key, opts) do
+    object = if fallback = opts[:fallback] || cache. __fallback__,
+      do: Object.new(key, fallback.(key)),
+      else: nil
+    {object, levels}
+  end
+  defp maybe_fallback(return, _, _, _), do: return
+
+  defp maybe_replicate_data({nil, _}, _),
+    do: nil
+  defp maybe_replicate_data({object, levels}, cache) do
+    cache.__model__
+    |> case do
+      :exclusive -> []
+      :inclusive -> levels
+    end
+    |> Enum.reduce(object, &(&1.set(&2.key, &2.value, return: :object)))
   end
 
-  defp validate_return({nil, _}, _),
+  defp validate_return(nil, _),
     do: nil
   defp validate_return(object, opts) do
     case Keyword.get(opts, :return, :value) do

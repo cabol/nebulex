@@ -174,6 +174,12 @@ defmodule Nebulex.MultilevelTest do
         end
       end
 
+      test "get with fallback" do
+        assert_for_all_levels(nil, 1)
+        assert @cache.get(1, fallback: fn(key) -> key * 2 end) == 2
+        assert_for_all_levels(2, 1)
+      end
+
       ## Helpers
 
       defp start_levels do
@@ -188,6 +194,15 @@ defmodule Nebulex.MultilevelTest do
           _ = :timer.sleep(10)
           if Process.alive?(pid), do: level.stop(pid, 1)
         end
+      end
+
+      defp assert_for_all_levels(expected, key) do
+        Enum.each(@levels, fn(cache) ->
+          case @cache.__model__ do
+            :inclusive -> ^expected = cache.get(key)
+            :exclusive -> nil = cache.get(key)
+          end
+        end)
       end
     end
   end

@@ -62,7 +62,7 @@ defmodule Nebulex.Adapters.Local do
 
       MyApp.LocalCache.new_generation
 
-  Other additional function that might be useful is: `__metadata__/0`,
+  Other additional function that might be useful is: `__metadata__`,
   which is used to retrieve the Cache Metadata.
 
       MyApp.LocalCache.__metadata__
@@ -120,15 +120,15 @@ defmodule Nebulex.Adapters.Local do
 
   @doc false
   def get(cache, key, opts \\ []) do
-    get(cache.__metadata__.generations, cache, key, opts, &(elem(&1, 1)))
+    get(cache.__metadata__.generations, cache, key, opts, &elem(&1, 1))
   end
 
   defp get([newest | olders], cache, key, opts, post_hook \\ &(&1)) do
-    if ret = do_get(:get, cache, newest, key, opts) do
+    if ret = get_or_pop(:get, cache, newest, key, opts) do
       {newest, ret}
     else
       Enum.reduce_while(olders, {newest, nil}, fn(gen, {newer, _}) ->
-        if object = do_get(:pop, cache, gen, key, ret_obj(opts)) do
+        if object = get_or_pop(:pop, cache, gen, key, ret_obj(opts)) do
           {:halt, {gen, do_set(object, newer, cache, opts)}}
         else
           {:cont, {gen, nil}}
@@ -138,7 +138,7 @@ defmodule Nebulex.Adapters.Local do
     |> post_hook.()
   end
 
-  defp do_get(fun, cache, gen, key, opts) do
+  defp get_or_pop(fun, cache, gen, key, opts) do
     Local
     |> apply(fun, [gen, key, nil, cache.__state__])
     |> validate_vsn(:get, opts)
@@ -153,7 +153,7 @@ defmodule Nebulex.Adapters.Local do
     cond do
       opts[:version] == nil ->
         Object.new(key, value)
-      cached_obj = get(generations, cache, key, [return: :object], &(elem(&1, 1))) ->
+      cached_obj = get(generations, cache, key, [return: :object], &elem(&1, 1)) ->
         validate_vsn(cached_obj, :set, [{:replace_value, value} | opts])
       true ->
         Object.new(key, value, opts[:version])
@@ -181,7 +181,7 @@ defmodule Nebulex.Adapters.Local do
 
     if opts[:version] do
       generations
-      |> get(cache, key, [return: :object, on_conflict: :nothing], &(elem(&1, 1)))
+      |> get(cache, key, [return: :object, on_conflict: :nothing], &elem(&1, 1))
       |> validate_vsn(:delete, opts)
     else
       Object.new(key)
@@ -201,8 +201,7 @@ defmodule Nebulex.Adapters.Local do
 
   @doc false
   def has_key?(cache, key) do
-    cache.__metadata__.generations
-    |> Enum.reduce_while(false, fn(gen, acc) ->
+    Enum.reduce_while(cache.__metadata__.generations, false, fn(gen, acc) ->
       if Local.has_key?(gen, key, cache.__state__) do
         {:halt, true}
       else

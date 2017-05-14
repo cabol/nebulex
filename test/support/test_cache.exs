@@ -36,8 +36,10 @@ defmodule Nebulex.TestCache do
       level
     end
     config = case mod do
-      Nebulex.TestCache.Multilevel -> [levels: levels]
-      _ -> [cache_model: :exclusive, levels: levels]
+      Nebulex.TestCache.Multilevel ->
+        [levels: levels, fallback: &mod.fallback/1]
+      _ ->
+        [cache_model: :exclusive, levels: levels, fallback: &mod.fallback/1]
     end
     :ok = Application.put_env(:nebulex, mod, config)
 
@@ -54,6 +56,11 @@ defmodule Nebulex.TestCache do
 
       defmodule L3 do
         use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+      end
+
+      def fallback(_key) do
+        # maybe fetch the data from Database
+        nil
       end
     end
   end
