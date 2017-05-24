@@ -1,16 +1,13 @@
 # Nebulex
 
 [![Build Status](https://travis-ci.org/cabol/nebulex.svg?branch=master)](https://travis-ci.org/cabol/nebulex)
-[![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
 [![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
+[![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
 
-> **Distributed and Local Caching Tool for Elixir**
+> **Local and Distributed Caching Tool for Elixir**
 
-## Features
-
- - Local Generational Cache
- - Distributed Cache
- - Multilevel Cache
+See the [getting started](https://hexdocs.pm/nebulex/getting-started.html) guide
+and the [online documentation](https://hexdocs.pm/nebulex/Nebulex.html).
 
 ## Installation
 
@@ -28,7 +25,7 @@ end
 
 ```elixir
 defmodule MyApp.LocalCache do
-  use Nebulex.Cache, otp_app: :my_app, adapter: Nebulex.Adapters.Local
+  use Nebulex.Cache, otp_app: :my_app
 end
 ```
 
@@ -60,9 +57,9 @@ config :myapp, MyApp.LocalCache,
   gc_interval: 3600
 ```
 
-Now you're ready to start using it!
+ > **NOTE:** To learn more about the options, check the adapter documentation
 
-## Example
+4. Now you're ready to start using it!
 
 ```elixir
 alias MyApp.LocalCache
@@ -81,6 +78,12 @@ nil = LocalCache.get "foo"
 
 nil = "foo" |> LocalCache.set("bar", return: :key) |> LocalCache.delete
 ```
+
+## Important links
+
+ * [Documentation](https://hexdocs.pm/nebulex/Nebulex.html)
+ * [Examples](https://github.com/cabol/nebulex_examples)
+ * [Ecto Integration](https://github.com/cabol/nebulex_ecto)
 
 ## Testing
 

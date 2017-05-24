@@ -18,5 +18,9 @@ unless :clustered in Keyword.get(ExUnit.configuration(), :exclude, []) do
   end)
 end
 
+# For tasks/generators testing
+Mix.start()
+Mix.shell(Mix.Shell.Process)
+
 # Start ExUnit
 ExUnit.start()

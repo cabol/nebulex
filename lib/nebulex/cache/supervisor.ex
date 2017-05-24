@@ -40,15 +40,13 @@ defmodule Nebulex.Cache.Supervisor do
     adapter = opts[:adapter] || config[:adapter]
 
     unless adapter do
-      raise ArgumentError,
-        "missing :adapter configuration in " <>
-        "config #{inspect otp_app}, #{inspect cache}"
+      raise ArgumentError, "missing :adapter configuration in " <>
+                           "config #{inspect otp_app}, #{inspect cache}"
     end
 
     unless Code.ensure_loaded?(adapter) do
-      raise ArgumentError,
-        "adapter #{inspect adapter} was not compiled, " <>
-        "ensure it is correct and it is included as a project dependency"
+      raise ArgumentError, "adapter #{inspect adapter} was not compiled, " <>
+                           "ensure it is correct and it is included as a project dependency"
     end
 
     {otp_app, adapter, config}

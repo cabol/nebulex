@@ -107,6 +107,7 @@ defmodule Nebulex.Adapters.Dist do
     otp_app = Module.get_attribute(env.module, :otp_app)
     config = Module.get_attribute(env.module, :config)
     node_picker = Keyword.get(config, :node_picker, __MODULE__)
+
     unless local = Keyword.get(config, :local) do
       raise ArgumentError,
         "missing :local configuration in " <>

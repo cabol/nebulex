@@ -82,16 +82,20 @@ defmodule Nebulex.Adapters.Local do
   defmacro __before_compile__(env) do
     cache = env.module
     config = Module.get_attribute(cache, :config)
-    n_shards = Keyword.get(config, :n_shards, :erlang.system_info(:schedulers_online))
+    n_shards = Keyword.get(config, :n_shards, System.schedulers_online())
     r_concurrency = Keyword.get(config, :read_concurrency, true)
     w_concurrency = Keyword.get(config, :write_concurrency, false)
     vsn_generator = Keyword.get(config, :version_generator, Nebulex.Version.Default)
     shards_sup_name = String.to_atom("#{cache}.Local.Supervisor")
 
     quote do
-      def __metadata__, do: Nebulex.Adapters.Local.Metadata.get(__MODULE__)
+      alias ExShards.State
+      alias Nebulex.Adapters.Local.Metadata
+      alias Nebulex.Adapters.Local.Generation
 
-      def __state__, do: ExShards.State.new(unquote(n_shards))
+      def __metadata__, do: Metadata.get(__MODULE__)
+
+      def __state__, do: State.new(unquote(n_shards))
 
       def __shards_sup_name__, do: unquote(shards_sup_name)
 
@@ -104,9 +108,7 @@ defmodule Nebulex.Adapters.Local do
 
       def __version__, do: unquote(vsn_generator)
 
-      def new_generation(opts \\ []) do
-        Nebulex.Adapters.Local.Generation.new(__MODULE__, opts)
-      end
+      def new_generation(opts \\ []), do: Generation.new(__MODULE__, opts)
     end
   end
 
@@ -123,22 +125,17 @@ defmodule Nebulex.Adapters.Local do
     get(cache.__metadata__.generations, cache, key, opts, &elem(&1, 1))
   end
 
-  defp get([newest | olders], cache, key, opts, post_hook \\ &(&1)) do
-    if ret = get_or_pop(:get, cache, newest, key, opts) do
-      {newest, ret}
-    else
-      Enum.reduce_while(olders, {newest, nil}, fn(gen, {newer, _}) ->
-        if object = get_or_pop(:pop, cache, gen, key, ret_obj(opts)) do
-          {:halt, {gen, do_set(object, newer, cache, opts)}}
-        else
-          {:cont, {gen, nil}}
-        end
-      end)
+  defp get([newest | _] = generations, cache, key, opts, post_hook \\ &(&1)) do
+    cache
+    |> do_get(newest, key, opts)
+    |> case do
+      nil -> retrieve(generations, cache, key, opts)
+      ret -> {newest, ret}
     end
     |> post_hook.()
   end
 
-  defp get_or_pop(fun, cache, gen, key, opts) do
+  defp do_get(cache, gen, key, opts, fun \\ :get) do
     Local
     |> apply(fun, [gen, key, nil, cache.__state__])
     |> validate_vsn(:get, opts)
@@ -146,19 +143,31 @@ defmodule Nebulex.Adapters.Local do
     |> validate_return(opts)
   end
 
+  defp retrieve([newest | olders], cache, key, opts) do
+    Enum.reduce_while(olders, {newest, nil}, fn(gen, {newer, _}) ->
+      if object = do_get(cache, gen, key, ret_obj(opts), :pop) do
+        {:halt, {gen, do_set(object, newer, cache, opts)}}
+      else
+        {:cont, {gen, nil}}
+      end
+    end)
+  end
+
   @doc false
   def set(cache, key, value, opts \\ []) do
     generations = cache.__metadata__.generations
 
-    cond do
-      opts[:version] == nil ->
-        Object.new(key, value)
-      cached_obj = get(generations, cache, key, [return: :object], &elem(&1, 1)) ->
-        validate_vsn(cached_obj, :set, [{:replace_value, value} | opts])
-      true ->
-        Object.new(key, value, opts[:version])
-    end
-    |> do_set(hd(generations), cache, opts)
+    object =
+      cond do
+        opts[:version] == nil ->
+          Object.new(key, value)
+        cached_obj = get(generations, cache, key, [return: :object], &elem(&1, 1)) ->
+          validate_vsn(cached_obj, :set, [{:replace_value, value} | opts])
+        true ->
+          Object.new(key, value, opts[:version])
+      end
+
+    do_set(object, hd(generations), cache, opts)
   end
 
   defp do_set(object, gen, cache, opts) do
@@ -179,7 +188,8 @@ defmodule Nebulex.Adapters.Local do
   def delete(cache, key, opts \\ []) do
     generations = cache.__metadata__.generations
 
-    if opts[:version] do
+    opts[:version]
+    |> if do
       generations
       |> get(cache, key, [return: :object, on_conflict: :nothing], &elem(&1, 1))
       |> validate_vsn(:delete, opts)
@@ -323,7 +333,7 @@ defmodule Nebulex.Adapters.Local do
     do: :infinity
   defp seconds_since_epoch(diff) when is_integer(diff) do
     {mega, secs, _} = :os.timestamp()
-    mega * 1000000 + secs + diff
+    mega * 1_000_000 + secs + diff
   end
 
   defp ret_obj(opts), do: Keyword.put(opts, :return, :object)

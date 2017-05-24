@@ -217,11 +217,13 @@ defmodule Nebulex.Adapters.Multilevel do
   ## Helpers
 
   defp eval(ml_cache, fun, args, opts \\ []) do
-    [l1 | next] = case opts[:level] do
-      nil   -> [hd(ml_cache.__levels__)]
-      :all  -> ml_cache.__levels__
-      level -> [:lists.nth(level, ml_cache.__levels__)]
-    end
+    [l1 | next] =
+      case opts[:level] do
+        nil   -> [hd(ml_cache.__levels__)]
+        :all  -> ml_cache.__levels__
+        level -> [:lists.nth(level, ml_cache.__levels__)]
+      end
+
     Enum.reduce(next, apply(l1, fun, args), fn(cache, acc) ->
       ^acc = apply(cache, fun, args)
     end)
@@ -238,9 +240,11 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   defp maybe_fallback({nil, levels}, cache, key, opts) do
-    object = if fallback = opts[:fallback] || cache. __fallback__,
-      do: Object.new(key, fallback.(key)),
-      else: nil
+    object =
+      if fallback = opts[:fallback] || cache. __fallback__,
+        do: Object.new(key, fallback.(key)),
+        else: nil
+
     {object, levels}
   end
   defp maybe_fallback(return, _, _, _), do: return

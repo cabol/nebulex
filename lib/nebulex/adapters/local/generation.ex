@@ -61,10 +61,11 @@ defmodule Nebulex.Adapters.Local.Generation do
   def init({cache, opts}) do
     :ok = init_metadata(cache, opts)
 
-    ref = if gc_interval = opts[:gc_interval] do
-      _ = new_gen(cache)
-      start_timer(gc_interval)
-    end
+    ref =
+      if gc_interval = opts[:gc_interval] do
+        _ = new_gen(cache)
+        start_timer(gc_interval)
+      end
 
     {:ok, %{cache: cache, gc_interval: gc_interval, time_ref: ref}}
   end
@@ -84,6 +85,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   def handle_info(:timeout, %{cache: cache, gc_interval: time} = state) do
     _ = new_gen(cache)
     ref = start_timer(time)
+
     {:noreply, %{state | time_ref: ref}}
   end
 

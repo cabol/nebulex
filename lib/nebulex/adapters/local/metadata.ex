@@ -9,7 +9,7 @@ defmodule Nebulex.Adapters.Local.Metadata do
 
   @spec create(cache :: Nebulex.Cache.t, initial :: Metadata.t) :: Metadata.t
   def create(cache, %Metadata{} = initial \\ %Metadata{}) do
-    _ = :ets.new(cache, [:named_table, {:read_concurrency, true}])
+    ^cache = :ets.new(cache, [:named_table, {:read_concurrency, true}])
     true = :ets.insert(cache, metadata: initial)
     initial
   end
@@ -34,12 +34,14 @@ defmodule Nebulex.Adapters.Local.Metadata do
         metadata
         |> Map.update!(:generations, &([gen | Enum.drop(&1, -1)]))
         |> update(cache)
+
       {new_metadata.generations, List.last(metadata.generations)}
     else
       new_metadata =
         metadata
         |> Map.update!(:generations, &([gen | &1]))
         |> update(cache)
+
       {new_metadata.generations, nil}
     end
   end
