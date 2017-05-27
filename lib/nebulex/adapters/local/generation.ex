@@ -91,7 +91,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   ## Private Functions
 
-  defp server_name(cache), do: String.to_atom("#{cache}.Generation")
+  defp server_name(cache), do: Module.concat([cache, Generation])
 
   defp init_metadata(cache, opts) do
     n_gens = Keyword.get(opts, :n_generations, 2)
@@ -100,7 +100,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   defp new_gen(cache) do
-    "#{cache}.#{:erlang.phash2(:os.timestamp)}"
+    "#{cache}_#{:erlang.phash2(:os.timestamp)}"
     |> String.to_atom()
     |> Local.new(cache.__tab_opts__)
     |> Metadata.new_generation(cache)

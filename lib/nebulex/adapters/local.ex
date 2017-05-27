@@ -86,7 +86,7 @@ defmodule Nebulex.Adapters.Local do
     r_concurrency = Keyword.get(config, :read_concurrency, true)
     w_concurrency = Keyword.get(config, :write_concurrency, false)
     vsn_generator = Keyword.get(config, :version_generator, Nebulex.Version.Default)
-    shards_sup_name = String.to_atom("#{cache}.Local.Supervisor")
+    shards_sup_name = Module.concat([cache, LocalSupervisor])
 
     quote do
       alias ExShards.State
@@ -218,6 +218,27 @@ defmodule Nebulex.Adapters.Local do
         {:cont, acc}
       end
     end)
+  end
+
+  @doc false
+  def all(cache, opts \\ []) do
+    fun =
+      case Keyword.get(opts, :return, :key) do
+        :object -> &Local.values/2
+        :value  -> &all_values/2
+        :key    -> &Local.keys/2
+      end
+
+    cache.__metadata__.generations
+    |> Enum.reduce([], fn(gen, acc) ->
+      fun.(gen, cache.__state__) ++ acc
+    end)
+    |> :lists.usort()
+  end
+
+  defp all_values(gen, state) do
+    ms = [{{:_, %{value: :"$1"}}, [], [:"$1"]}]
+    Local.select(gen, ms, state)
   end
 
   @doc false

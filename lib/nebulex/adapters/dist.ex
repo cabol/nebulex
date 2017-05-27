@@ -171,6 +171,15 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   @doc false
+  def all(cache, opts \\ []) do
+    cache.nodes
+    |> Enum.reduce([], fn(node, acc) ->
+      rpc_call(node, cache.__local__, :all, [opts]) ++ acc
+    end)
+    |> :lists.usort()
+  end
+
+  @doc false
   def pop(cache, key, opts \\ []) do
     call(cache, :pop, [key, opts])
   end

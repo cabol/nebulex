@@ -34,14 +34,12 @@ defmodule Nebulex.Adapters.Local.Metadata do
         metadata
         |> Map.update!(:generations, &([gen | Enum.drop(&1, -1)]))
         |> update(cache)
-
       {new_metadata.generations, List.last(metadata.generations)}
     else
       new_metadata =
         metadata
         |> Map.update!(:generations, &([gen | &1]))
         |> update(cache)
-
       {new_metadata.generations, nil}
     end
   end

@@ -34,7 +34,7 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
     end
 
     cache = Module.concat([cache_str])
-    adapter = Module.concat([parsed[:adapter] || "Nebulex.Adapters.Local"])
+    adapter = Module.concat([parsed[:adapter] || Nebulex.Adapters.Local])
 
     config      = Mix.Project.config
     underscored = Macro.underscore(inspect(cache))

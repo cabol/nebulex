@@ -195,6 +195,15 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @doc false
+  def all(cache, opts \\ []) do
+    cache.__levels__
+    |> Enum.reduce([], fn(cache, acc) ->
+      cache.all(opts) ++ acc
+    end)
+    |> :lists.usort()
+  end
+
+  @doc false
   def pop(cache, key, opts \\ []) do
     eval_while(cache, :pop, [key, opts])
   end

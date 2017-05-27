@@ -117,6 +117,15 @@ defmodule Nebulex.CacheTest do
         refute @cache.has_key?(3)
       end
 
+      test "all" do
+        @cache.new_generation
+        expected = for x <- 1..100, do: @cache.set(x, x, return: :key)
+
+        assert @cache.all == expected
+        assert @cache.all(return: :value) == expected
+        [%Object{} | _] = @cache.all(return: :object)
+      end
+
       test "pop" do
         @cache.new_generation
         for x <- 1..2, do: @cache.set x, x

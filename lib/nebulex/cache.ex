@@ -110,6 +110,10 @@ defmodule Nebulex.Cache do
         @adapter.has_key?(__MODULE__, key)
       end
 
+      def all(opts \\ []) do
+        @adapter.all(__MODULE__, opts)
+      end
+
       def pop(key, opts \\ []) do
         @adapter.pop(__MODULE__, key, opts)
       end
@@ -339,6 +343,24 @@ defmodule Nebulex.Cache do
       false = MyCache.has_key?(:b)
   """
   @callback has_key?(key) :: boolean
+
+  @doc """
+  Returns all keys, values or objects in Cache, depending on the given
+  `:return` option (returns keys by default).
+
+  ## Examples
+
+      for x <- 1..3, do: MyCache.set(x, x*2, return: :key)
+
+      [1, 2, 3] = MyCache.all
+
+      [2, 4, 6] = MyCache.all(return: :value)
+
+      [%Nebulex.Object{key: 1} | _] = MyCache.all(return: :object)
+
+  **WARNING:** This is an expensive operation, try DO NOT USE IT IN PROD.
+  """
+  @callback all(opts) :: [key]
 
   @doc """
   Returns and removes the value/object associated with `key` in Cache.

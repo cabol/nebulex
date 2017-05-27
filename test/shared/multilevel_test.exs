@@ -91,6 +91,14 @@ defmodule Nebulex.MultilevelTest do
         refute @cache.has_key?(4)
       end
 
+      test "all" do
+        expected = for x <- 1..100, do: @cache.set(x, x, return: :key)
+
+        assert @cache.all == expected
+        assert @cache.all(return: :value) == expected
+        [%Object{} | _] = @cache.all(return: :object)
+      end
+
       test "pop" do
         assert @cache.set(1, 1) == 1
         assert @cache.set(2, 2, level: 2) == 2
