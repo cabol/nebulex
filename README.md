@@ -1,4 +1,4 @@
-<img src="http://cdn.wallpapersafari.com/44/53/JeEQGM.jpg" height="150" width="100%" />
+<img src="http://cdn.wallpapersafari.com/44/53/JeEQGM.jpg" height="170" width="100%" />
 
 # Nebulex
 
@@ -68,7 +68,11 @@ defmodule MyApp.Test do
 
     nil = Cache.get "foo"
 
-    nil = "foo" |> Cache.set("bar", return: :key) |> Cache.delete
+    nil =
+      "foo"
+      |> Cache.set("bar", return: :key)
+      |> Cache.delete(return: :key)
+      |> Cache.get
   end
 end
 ```

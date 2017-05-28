@@ -197,12 +197,12 @@ defmodule Nebulex.Adapters.Local do
       Object.new(key)
     end
     |> do_delete(generations, cache.__state__)
-    |> validate_return(opts)
+    |> Map.fetch!(:key)
   end
 
   defp do_delete(nil, _, _),
     do: nil
-  defp do_delete({:skip, cached_obj}, _, _),
+  defp do_delete({:nothing, cached_obj}, _, _),
     do: cached_obj
   defp do_delete(%Object{} = object, generations, state) do
     _ = Enum.each(generations, &Local.remove(&1, object.key, state))
@@ -302,7 +302,7 @@ defmodule Nebulex.Adapters.Local do
   defp on_conflict(:delete, :delete, cached, _),
     do: cached
   defp on_conflict(:nothing, :delete, cached, _),
-    do: {:skip, cached}
+    do: {:nothing, cached}
   defp on_conflict(:nothing, _, cached, _),
     do: cached
   defp on_conflict(:raise, op, cached, object),

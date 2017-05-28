@@ -21,11 +21,11 @@ defmodule Nebulex.CacheTest do
         assert @cache.delete(1, return: :key) == 1
         refute @cache.get(1)
 
-        %Object{value: 2, key: 2, version: _} = @cache.delete(2, return: :object, version: v2)
+        2 = @cache.delete(2, return: :object, version: v2)
         refute @cache.get(2)
 
-        refute @cache.delete(:non_existent)
-        refute :a |> @cache.set(1, return: :key) |> @cache.delete
+        assert @cache.delete(:non_existent) == :non_existent
+        assert :a |> @cache.set(1, return: :key) |> @cache.delete == :a
         refute @cache.get(:a)
 
         assert_raise Nebulex.VersionConflictError, fn ->
@@ -34,12 +34,12 @@ defmodule Nebulex.CacheTest do
 
         assert @cache.set(:a, 1) == 1
         assert @cache.get(:a) == 1
-        assert @cache.delete(:a, version: -1, on_conflict: :delete) == 1
+        assert @cache.delete(:a, version: -1, on_conflict: :delete) == :a
         refute @cache.get(:a)
 
         assert @cache.set(:b, 1) == 1
         assert @cache.get(:b) == 1
-        assert @cache.delete(:b, version: -1, on_conflict: :nothing) == 1
+        assert @cache.delete(:b, version: -1, on_conflict: :nothing) == :b
         assert @cache.get(:b) == 1
       end
 

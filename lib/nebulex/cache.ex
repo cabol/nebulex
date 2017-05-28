@@ -179,9 +179,10 @@ defmodule Nebulex.Cache do
 
   ## Example
 
-      "some value" = :a
-      |> MyCache.set("some value", return: :key)
-      |> MyCache.get
+      "some value" =
+        :a
+        |> MyCache.set("some value", return: :key)
+        |> MyCache.get
 
       nil = MyCache.get :non_existent_key
 
@@ -279,29 +280,28 @@ defmodule Nebulex.Cache do
   @doc """
   Deletes the cached entry in for a specific `key`.
 
-  It returns `value` or `Nebulex.Object.t` (depends on `:return` option)
-  if the value has been successfully deleted. If `:version` option
-  is not provided, then the object value will be `nil`.
+  It always returns the `key`, either it exists or not. It the `key` exists,
+  it's removed from cache, otherwise nothing happens.
 
   ## Options
 
     * `:on_conflict` - It may be one of `:raise` (the default), `:nothing`,
       `:delete`. See the "OnConflict" section for more information.
 
+  Note that for this function `:return` option hasn't any effect
+  since it always returns the `key` either success or not.
+
   See the "Shared options" section at the module documentation.
 
   ## Example
 
-      %Nebulex.Object{key: :a, value: nil} = :a
-      |> MyCache.set(1, return: :key)
-      |> MyCache.delete(return: :object)
-      nil = MyCache.get :a
+      nil =
+        :a
+        |> MyCache.set(1, return: :key)
+        |> MyCache.delete()
+        |> MyCache.get()
 
-      nil = MyCache.delete :non_existent_key
-
-      # If version option is not provided, then the value will be nil
-      1 = MyCache.set :a, 1
-      nil = MyCache.delete :a
+      :non_existent_key = MyCache.delete :non_existent_key
 
   ## OnConflict
 
@@ -318,18 +318,17 @@ defmodule Nebulex.Cache do
 
       # Delete with an invalid version but do nothing on conflicts.
       # Keep in mind that, although this returns successfully, the returned
-      # struct does not reflect the data in the Cache. For instance, in case
-      # of "on_conflict: :nothing", the returned object isn't deleted.
-      %Nebulex.Object{key: :a, value: 1} =
-        MyCache.delete :a, return: :object, version: :invalid, on_conflict: :nothing
+      # `kwy` does not reflect the data in the Cache. For instance, in case
+      # of "on_conflict: :nothing", the returned `key` isn't deleted.
+      :a = MyCache.delete :a, version: :invalid, on_conflict: :nothing
       1 = MyCache.get :a
 
       # Delete with the same invalid version but force to delete the current
       # value on conflicts (if it exist).
-      1 = MyCache.delete :a, version: :invalid, on_conflict: :delete
+      :a = MyCache.delete :a, version: :invalid, on_conflict: :delete
       nil = MyCache.get :a
   """
-  @callback delete(key, opts) :: return | no_return
+  @callback delete(key, opts) :: key | no_return
 
   @doc """
   Returns whether the given `key` exists in Cache.

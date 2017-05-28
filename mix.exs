@@ -1,7 +1,7 @@
 defmodule Nebulex.Mixfile do
   use Mix.Project
 
-  @version "1.0.0-dev"
+  @version "1.0.0-rc.0"
 
   def project do
     [app: :nebulex,
@@ -17,10 +17,7 @@ defmodule Nebulex.Mixfile do
   end
 
   def application do
-    case Mix.env() do
-      :test -> [applications: [:unicode_util_compat]] # fix coveralls.travis issue (because hackney dep)
-      _     -> [applications: []]
-    end
+    [applications: []]
   end
 
   defp deps do

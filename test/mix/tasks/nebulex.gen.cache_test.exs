@@ -19,7 +19,8 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
       use Mix.Config
 
       config :nebulex, Cache,
-        adapter: Nebulex.Adapters.Local
+        adapter: Nebulex.Adapters.Local,
+        gc_interval: 86_400 # 24 hrs
       """
     end
   end
@@ -40,7 +41,8 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
       use Mix.Config
 
       config :nebulex, Cache,
-        adapter: Nebulex.Adapters.Local
+        adapter: Nebulex.Adapters.Local,
+        gc_interval: 86_400 # 24 hrs
 
       # World
       """
@@ -68,6 +70,67 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
         run ["-c", "Cache"]
         assert_file "lib/cache.ex", "defmodule Cache do"
       end
+    end
+  end
+
+  test "generates a new distributed cache" do
+    in_tmp fn _ ->
+      run ["-c", "Cache", "-a", "Nebulex.Adapters.Dist"]
+
+      assert_file "lib/cache.ex", """
+      defmodule Cache do
+        use Nebulex.Cache, otp_app: :nebulex
+      end
+      """
+
+      assert_file "config/config.exs", """
+      use Mix.Config
+
+      config :nebulex, Cache,
+        adapter: Nebulex.Adapters.Dist,
+        local: :YOUR_LOCAL_CACHE,
+        node_picker: Nebulex.Adapters.Dist
+      """
+    end
+  end
+
+  test "generates a new multilevel cache" do
+    in_tmp fn _ ->
+      run ["-c", "Cache", "-a", "Nebulex.Adapters.Multilevel"]
+
+      assert_file "lib/cache.ex", """
+      defmodule Cache do
+        use Nebulex.Cache, otp_app: :nebulex
+      end
+      """
+
+      assert_file "config/config.exs", """
+      use Mix.Config
+
+      config :nebulex, Cache,
+        adapter: Nebulex.Adapters.Multilevel,
+        cache_model: :inclusive,
+        levels: []
+      """
+    end
+  end
+
+  test "generates a new default cache" do
+    in_tmp fn _ ->
+      run ["-c", "Cache", "-a", "MyAdapter"]
+
+      assert_file "lib/cache.ex", """
+      defmodule Cache do
+        use Nebulex.Cache, otp_app: :nebulex
+      end
+      """
+
+      assert_file "config/config.exs", """
+      use Mix.Config
+
+      config :nebulex, Cache,
+        adapter: MyAdapter
+      """
     end
   end
 end

@@ -33,7 +33,7 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
       Mix.raise "nebulex.gen.cache expects the cache to be given as -c MyApp.Cache"
     end
 
-    cache = Module.concat([cache_str])
+    cache   = Module.concat([cache_str])
     adapter = Module.concat([parsed[:adapter] || Nebulex.Adapters.Local])
 
     config      = Mix.Project.config
@@ -74,16 +74,55 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
     end
   end
 
+  defp config_template(opts) do
+    case opts[:adapter] do
+      Nebulex.Adapters.Local ->
+        local_config_template(opts)
+      Nebulex.Adapters.Dist ->
+        dist_config_template(opts)
+      Nebulex.Adapters.Multilevel ->
+        multilevel_config_template(opts)
+      _ ->
+        default_config_template(opts)
+    end
+  end
+
   embed_template :cache, """
   defmodule <%= inspect @mod %> do
     use Nebulex.Cache, otp_app: <%= inspect @app %>
   end
   """
 
-  embed_template :config, """
+  embed_template :default_config, """
   use Mix.Config
 
   config <%= inspect @app %>, <%= inspect @mod %>,
     adapter: <%= inspect @adapter %>
+  """
+
+  embed_template :local_config, """
+  use Mix.Config
+
+  config <%= inspect @app %>, <%= inspect @mod %>,
+    adapter: <%= inspect @adapter %>,
+    gc_interval: 86_400 # 24 hrs
+  """
+
+  embed_template :dist_config, """
+  use Mix.Config
+
+  config <%= inspect @app %>, <%= inspect @mod %>,
+    adapter: <%= inspect @adapter %>,
+    local: :YOUR_LOCAL_CACHE,
+    node_picker: <%= inspect @adapter %>
+  """
+
+  embed_template :multilevel_config, """
+  use Mix.Config
+
+  config <%= inspect @app %>, <%= inspect @mod %>,
+    adapter: <%= inspect @adapter %>,
+    cache_model: :inclusive,
+    levels: []
   """
 end
