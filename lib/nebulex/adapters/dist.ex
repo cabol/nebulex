@@ -4,7 +4,7 @@ defmodule Nebulex.Adapters.Dist do
 
   This adapter depends on a local cache adapter, it adds a thin layer
   on top of it in order to distribute requests across a group of nodes,
-  where is supposed the local cache is running too.
+  where is supposed the local cache is running already.
 
   This adapter uses PG2 to manage the cluster nodes. When the distributed
   cache is started in a node, it creates a PG2 group and joins it (the cache
@@ -151,17 +151,19 @@ defmodule Nebulex.Adapters.Dist do
   def children(_cache, _opts), do: []
 
   @doc false
-  def get(cache, key, opts \\ []) do
+  def get(cache, key, opts) do
     call(cache, :get, [key, opts])
   end
 
   @doc false
-  def set(cache, key, value, opts \\ []) do
+  def set(_cache, _key, nil, _opts),
+    do: nil
+  def set(cache, key, value, opts) do
     call(cache, :set, [key, value, opts])
   end
 
   @doc false
-  def delete(cache, key, opts \\ []) do
+  def delete(cache, key, opts) do
     call(cache, :delete, [key, opts])
   end
 
@@ -171,26 +173,51 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   @doc false
-  def all(cache, opts \\ []) do
+  def size(cache) do
+    Enum.reduce(cache.nodes, 0, fn(node, acc) ->
+      node
+      |> rpc_call(cache.__local__, :size, [])
+      |> Kernel.+(acc)
+    end)
+  end
+
+  @doc false
+  def keys(cache) do
     cache.nodes
     |> Enum.reduce([], fn(node, acc) ->
-      rpc_call(node, cache.__local__, :all, [opts]) ++ acc
+      rpc_call(node, cache.__local__, :keys, []) ++ acc
     end)
     |> :lists.usort()
   end
 
   @doc false
-  def pop(cache, key, opts \\ []) do
+  def reduce(cache, acc_in, fun, opts) do
+    Enum.reduce(cache.nodes, acc_in, fn(node, acc) ->
+      rpc_call(node, cache.__local__, :reduce, [acc, fun, opts])
+    end)
+  end
+
+  @doc false
+  def to_map(cache, opts) do
+    Enum.reduce(cache.nodes, %{}, fn(node, acc) ->
+      node
+      |> rpc_call(cache.__local__, :to_map, [opts])
+      |> Map.merge(acc)
+    end)
+  end
+
+  @doc false
+  def pop(cache, key, opts) do
     call(cache, :pop, [key, opts])
   end
 
   @doc false
-  def get_and_update(cache, key, fun, opts \\ []) when is_function(fun, 1) do
+  def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
     call(cache, :get_and_update, [key, fun, opts])
   end
 
   @doc false
-  def update(cache, key, initial, fun, opts \\ []) do
+  def update(cache, key, initial, fun, opts) do
     call(cache, :update, [key, initial, fun, opts])
   end
 

@@ -39,8 +39,10 @@ defmodule Nebulex.Cache do
 
     * `:return` - selects return type. When `:value` (the default), returns
       the object `value`. When `:object`, returns the `Nebulex.Object.t`.
+
     * `:version` - The version of the object on which the operation will
       take place. The version can be any term (default: `nil`).
+
     * `:ttl` - Time To Live (TTL) or expiration time in milliseconds
       for a key (default: `:infinity`) – applies only to `set/3`.
 
@@ -52,12 +54,13 @@ defmodule Nebulex.Cache do
   it is important to review the adapters documentation.
   """
 
-  @type t      :: module
-  @type key    :: any
-  @type value  :: any
-  @type object :: Nebulex.Object.t
-  @type opts   :: Keyword.t
-  @type return :: key | value | object
+  @type t       :: module
+  @type key     :: any
+  @type value   :: any
+  @type object  :: Nebulex.Object.t
+  @type opts    :: Keyword.t
+  @type return  :: key | value | object
+  @type reducer :: ({key, return}, acc_in :: any -> acc_out :: any)
 
   @doc false
   defmacro __using__(opts) do
@@ -110,8 +113,20 @@ defmodule Nebulex.Cache do
         @adapter.has_key?(__MODULE__, key)
       end
 
-      def all(opts \\ []) do
-        @adapter.all(__MODULE__, opts)
+      def size do
+        @adapter.size(__MODULE__)
+      end
+
+      def keys do
+        @adapter.keys(__MODULE__)
+      end
+
+      def reduce(acc, fun, opts \\ []) do
+        @adapter.reduce(__MODULE__, acc, fun, opts)
+      end
+
+      def to_map(opts \\ []) do
+        @adapter.to_map(__MODULE__, opts)
       end
 
       def pop(key, opts \\ []) do
@@ -344,22 +359,73 @@ defmodule Nebulex.Cache do
   @callback has_key?(key) :: boolean
 
   @doc """
-  Returns all keys, values or objects in Cache, depending on the given
-  `:return` option (returns keys by default).
+  Returns the cache size (total number of cached entries).
+
+  ## Examples
+
+      for x <- 1..10, do: MyCache.set(x, x)
+
+      10 = MyCache.size
+
+      for x <- 1..5, do: MyCache.delete(x)
+
+      5 = MyCache.size
+  """
+  @callback size() :: integer
+
+  @doc """
+  Returns all cached keys.
 
   ## Examples
 
       for x <- 1..3, do: MyCache.set(x, x*2, return: :key)
 
-      [1, 2, 3] = MyCache.all
+      [1, 2, 3] = MyCache.keys
 
-      [2, 4, 6] = MyCache.all(return: :value)
-
-      [%Nebulex.Object{key: 1} | _] = MyCache.all(return: :object)
-
-  **WARNING:** This is an expensive operation, try DO NOT USE IT IN PROD.
+  **WARNING:** This is an expensive operation, beware of using it in prod.
   """
-  @callback all(opts) :: [key]
+  @callback keys() :: [key]
+
+  @doc """
+  Invokes `reducer` for each entry in the cache, passing the key, the return
+  and the accumulator `acc` as arguments. `reducer`’s return value is stored
+  in `acc`.
+
+  Returns the accumulator.
+
+  ## Examples
+
+      for x <- 1..5, do: MyCache.set(x, x)
+
+      15 = MyCache.reduce(0, fn({_key, value}, acc) ->
+        acc + value
+      end)
+
+      MyCache.reduce({%{}, 0}, fn({key, value}, {acc1, acc2}) ->
+        if Map.has_key?(acc1, key),
+          do: {acc1, acc2},
+          else: {Map.put(acc1, key, value), value + acc2}
+      end)
+
+  **WARNING:** This is an expensive operation, beware of using it in prod.
+  """
+  @callback reduce(acc :: any, reducer, opts) :: any
+
+  @doc """
+  Returns a map with all cache entries (key/value). If you want the map values
+  be the cache object, pass the option `:return` set to `:object`.
+
+  ## Examples
+
+      for x <- 1..3, do: MyCache.set(x, x*2)
+
+      %{1 => 2, 2 => 4, 3 => 6} = MyCache.to_map
+
+      %Nebulex.Object{key: 1} = Map.get(MyCache.to_map(return: :object), 1)
+
+  **WARNING:** This is an expensive operation, beware of using it in prod.
+  """
+  @callback to_map(opts) :: map
 
   @doc """
   Returns and removes the value/object associated with `key` in Cache.

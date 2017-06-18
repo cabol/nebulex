@@ -64,8 +64,15 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
     end
   end
 
-  test "generates a new cache for Elixir < 1.4.0" do
+  test "generates a new cache for Elixir <= 1.4.0" do
     with_mock Version, [compare: fn(_, _) -> :lt end] do
+      in_tmp fn _ ->
+        run ["-c", "Cache"]
+        assert_file "lib/cache.ex", "defmodule Cache do"
+      end
+    end
+
+    with_mock Version, [compare: fn(_, _) -> :eq end] do
       in_tmp fn _ ->
         run ["-c", "Cache"]
         assert_file "lib/cache.ex", "defmodule Cache do"

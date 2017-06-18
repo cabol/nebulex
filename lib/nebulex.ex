@@ -15,6 +15,9 @@ defmodule Nebulex do
   how they interact with each other. Feel free to access their respective module
   documentation for more specific examples, options and configuration.
 
+  If you want to quickly check a sample application using Nebulex, please check
+  the [getting started guide](http://hexdocs.pm/nebulex/getting-started.html).
+
   ## Caches
 
   `Nebulex.Cache` is the wrapper around the Cache. We can define a
@@ -53,8 +56,7 @@ defmodule Nebulex do
             supervisor(MyApp.MyCache, [])
           ]
 
-          opts = [strategy: :one_for_one, name: MyApp.Supervisor]
-          Supervisor.start_link(children, opts)
+          ...
         end
       end
 
@@ -72,6 +74,6 @@ defmodule Nebulex do
       iex> MyCache.get "foo", return: :object
       %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: 1493481403098321000}
 
-  See `Nebulex.Object` to get more info.
+  See `Nebulex.Object` to learn more about it.
   """
 end

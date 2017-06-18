@@ -33,6 +33,8 @@ defmodule Nebulex.Adapters.LocalTest do
 
     assert TestCache.get_and_update(1, &({&1, &1 * 2})) == {1, 2}
     assert TestCache.get_and_update(1, &({&1, &1 * 3}), return: :object) == {2, 6}
+    assert TestCache.get_and_update(1, &({&1, nil})) == {6, nil}
+    assert TestCache.get(1) == 6
     assert TestCache.get_and_update(1, fn _ -> :pop end) == {6, nil}
     assert TestCache.get_and_update(3, &({&1, 3})) == {nil, 3}
 
@@ -63,6 +65,8 @@ defmodule Nebulex.Adapters.LocalTest do
     assert TestCache.update(1, 1, &(&1 * 2)) == 2
     assert TestCache.update(2, 1, &(&1 * 2)) == 4
     assert TestCache.update(3, 1, &(&1 * 2)) == 1
+    assert TestCache.update(4, nil, &(&1 * 2)) == nil
+    refute TestCache.get(4)
 
     assert TestCache.update(3, 3, &(&1 * 2), version: -1, on_conflict: :nothing) == 2
     assert TestCache.update(3, 3, &(&1 * 2), version: -1, on_conflict: nil) == 3

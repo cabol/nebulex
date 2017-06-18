@@ -52,6 +52,6 @@ defmodule Nebulex.Mixfile do
 
   defp dialyzer do
     [plt_add_apps: [:ex_shards, :mix, :eex],
-     flags: [:unmatched_returns, :error_handling, :race_conditions, :no_opaque]]
+     flags: [:unmatched_returns, :error_handling, :race_conditions, :no_opaque, :unknown, :no_return]]
   end
 end

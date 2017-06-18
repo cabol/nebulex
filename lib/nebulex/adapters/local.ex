@@ -2,11 +2,12 @@ defmodule Nebulex.Adapters.Local do
   @moduledoc """
   Adapter module for Local Generational Cache.
 
-  It uses `ExShards.Local` as memory backend (it uses ETS tables internally).
+  It uses [ExShards](https://github.com/cabol/ex_shards) as memory backend
+  (ETS tables are used internally).
 
   ## Features
 
-    * Support for multi-generation Cache
+    * Support for generational cache – inspired by [epocxy](https://github.com/duomark/epocxy)
     * Support for Sharding – handled by **ExShards**.
     * Support for garbage collection via `Nebulex.Adapters.Local.Generation`
     * Support for transactions via Erlang global name registration facility
@@ -121,7 +122,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @doc false
-  def get(cache, key, opts \\ []) do
+  def get(cache, key, opts) do
     get(cache.__metadata__.generations, cache, key, opts, &elem(&1, 1))
   end
 
@@ -154,7 +155,9 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @doc false
-  def set(cache, key, value, opts \\ []) do
+  def set(_cache, _key, nil, _opts),
+    do: nil
+  def set(cache, key, value, opts) do
     generations = cache.__metadata__.generations
 
     object =
@@ -170,6 +173,8 @@ defmodule Nebulex.Adapters.Local do
     do_set(object, hd(generations), cache, opts)
   end
 
+  defp do_set(%Object{value: nil}, _gen, _cache, _opts),
+    do: nil
   defp do_set(object, gen, cache, opts) do
     version = cache.__version__.generate(object)
     ttl = seconds_since_epoch(opts[:ttl])
@@ -185,7 +190,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @doc false
-  def delete(cache, key, opts \\ []) do
+  def delete(cache, key, opts) do
     generations = cache.__metadata__.generations
 
     opts[:version]
@@ -221,28 +226,51 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @doc false
-  def all(cache, opts \\ []) do
-    fun =
-      case Keyword.get(opts, :return, :key) do
-        :object -> &Local.values/2
-        :value  -> &all_values/2
-        :key    -> &Local.keys/2
-      end
+  def size(cache) do
+    Enum.reduce(cache.__metadata__.generations, 0, fn(gen, acc) ->
+      gen
+      |> Local.info(:size, cache.__state__)
+      |> Kernel.+(acc)
+    end)
+  end
 
+  @doc false
+  def keys(cache) do
     cache.__metadata__.generations
     |> Enum.reduce([], fn(gen, acc) ->
-      fun.(gen, cache.__state__) ++ acc
+      Local.keys(gen, cache.__state__) ++ acc
     end)
     |> :lists.usort()
   end
 
-  defp all_values(gen, state) do
-    ms = [{{:_, %{value: :"$1"}}, [], [:"$1"]}]
-    Local.select(gen, ms, state)
+  @doc false
+  def reduce(cache, acc_in, fun, opts) do
+    Enum.reduce(cache.__metadata__.generations, acc_in, fn(gen, acc) ->
+      Local.foldl(fn({key, object}, fold_acc) ->
+        return = validate_return(object, opts)
+        fun.({key, return}, fold_acc)
+      end, acc, gen, cache.__state__)
+    end)
   end
 
   @doc false
-  def pop(cache, key, opts \\ []) do
+  def to_map(cache, opts) do
+    match_spec =
+      case Keyword.get(opts, :return, :key) do
+        :object -> [{{:"$1", :"$2"}, [], [{{:"$1", :"$2"}}]}]
+        _       -> [{{:"$1", %{value: :"$2"}}, [], [{{:"$1", :"$2"}}]}]
+      end
+
+    Enum.reduce(cache.__metadata__.generations, %{}, fn(gen, acc) ->
+      gen
+      |> Local.select(match_spec, cache.__state__)
+      |> :maps.from_list()
+      |> Map.merge(acc)
+    end)
+  end
+
+  @doc false
+  def pop(cache, key, opts) do
     generations = cache.__metadata__.generations
 
     generations
@@ -257,7 +285,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @doc false
-  def get_and_update(cache, key, fun, opts \\ []) when is_function(fun, 1) do
+  def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
     generations = cache.__metadata__.generations
     opts = Keyword.delete(opts, :return)
     {gen, current} = get(generations, cache, key, opts)
@@ -276,7 +304,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @doc false
-  def update(cache, key, initial, fun, opts \\ []) do
+  def update(cache, key, initial, fun, opts) do
     generations = cache.__metadata__.generations
     opts = Keyword.delete(opts, :return)
 

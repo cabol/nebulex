@@ -57,6 +57,9 @@ defmodule Nebulex.MultilevelTest do
         assert @l1.get(3) == 3
         assert @l2.get(3) == 3
         assert @l3.get(3) == 3
+
+        assert @cache.set("foo", nil) == nil
+        refute @cache.get("foo")
       end
 
       test "delete" do
@@ -91,12 +94,56 @@ defmodule Nebulex.MultilevelTest do
         refute @cache.has_key?(4)
       end
 
-      test "all" do
-        expected = for x <- 1..100, do: @cache.set(x, x, return: :key)
+      test "size" do
+        for x <- 1..10, do: @l1.set(x, x)
+        for x <- 11..20, do: @l2.set(x, x)
+        for x <- 21..30, do: @l3.set(x, x)
+        assert @cache.size == 30
 
-        assert @cache.all == expected
-        assert @cache.all(return: :value) == expected
-        [%Object{} | _] = @cache.all(return: :object)
+        for x <- [1, 11, 21], do: @cache.delete(x)
+        assert @cache.size == 29
+
+        assert @l1.delete(1) == 1
+        assert @l2.delete(11) == 11
+        assert @l3.delete(21) == 21
+        assert @cache.size == 27
+      end
+
+      test "keys" do
+        l1 = for x <- 1..30, do: @l1.set(x, x)
+        l2 = for x <- 20..60, do: @l2.set(x, x)
+        l3 = for x <- 50..100, do: @l3.set(x, x)
+        expected = :lists.usort(l1 ++ l2 ++ l3)
+
+        assert @cache.keys == expected
+
+        del = for x <- 20..60, do: @cache.delete(x, level: :all)
+
+        assert @cache.keys == :lists.usort(expected -- del)
+      end
+
+      test "reduce" do
+        l1 = for x <- 1..5, do: @l1.set(x, x)
+        l2 = for x <- 3..7, do: @l2.set(x, x)
+        l3 = for x <- 6..10, do: @l3.set(x, x)
+        expected = :maps.from_list(for x <- 1..10, do: {x, x})
+
+        assert @cache.reduce({%{}, 0}, fn({key, value}, {acc1, acc2}) ->
+          if Map.has_key?(acc1, key),
+            do: {acc1, acc2},
+            else: {Map.put(acc1, key, value), value + acc2}
+        end) == {expected, 55}
+      end
+
+      test "to_map" do
+        l1 = for x <- 1..30, do: @l1.set(x, x)
+        l2 = for x <- 20..60, do: @l2.set(x, x)
+        l3 = for x <- 50..100, do: @l3.set(x, x)
+        expected = :maps.from_list(for x <- 1..100, do: {x, x})
+
+        assert @cache.to_map == expected
+        assert @cache.to_map(return: :value) == expected
+        %Object{key: 1} = Map.get(@cache.to_map(return: :object), 1)
       end
 
       test "pop" do

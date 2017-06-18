@@ -100,7 +100,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   defp new_gen(cache) do
-    "#{cache}_#{:erlang.phash2(:os.timestamp)}"
+    "#{cache}.#{:erlang.phash2(:os.timestamp)}"
     |> String.to_atom()
     |> Local.new(cache.__tab_opts__)
     |> Metadata.new_generation(cache)

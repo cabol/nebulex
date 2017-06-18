@@ -29,11 +29,20 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
 
     {parsed, _, _} = OptionParser.parse(args, switches: switches, aliases: aliases)
 
-    unless cache_str = parsed[:cache] do
-      Mix.raise "nebulex.gen.cache expects the cache to be given as -c MyApp.Cache"
+    unless cache = parsed[:cache] do
+      Mix.raise """
+      nebulex.gen.cache expects the cache to be given as -c MyApp.Cache,
+      for example:
+
+          mix nebulex.gen.cache -c MyApp.Cache
+
+      To specify other adapter different than default (Nebulex.Adapters.Local):
+
+          mix nebulex.gen.cache -c MyApp.Cache -a Nebulex.Adapters.Dist
+      """
     end
 
-    cache   = Module.concat([cache_str])
+    cache   = Module.concat([cache])
     adapter = Module.concat([parsed[:adapter] || Nebulex.Adapters.Local])
 
     config      = Mix.Project.config
@@ -69,8 +78,9 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
 
   defp mixfile_loc(app) do
     case Elixir.Version.compare(System.version, "1.4.0") do
+      :gt -> "lib/#{app}/application.ex"
+      :eq -> "lib/#{app}/application.ex"
       :lt -> "lib/#{app}.ex"
-      _   -> "lib/#{app}/application.ex" # greater or equal than
     end
   end
 

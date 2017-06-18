@@ -4,13 +4,14 @@ defmodule Nebulex.Adapter do
   implement.
   """
 
-  @type t      :: module
-  @type cache  :: Nebulex.Cache.t
-  @type key    :: Nebulex.Cache.key
-  @type value  :: Nebulex.Cache.value
-  @type object :: Nebulex.Object.t
-  @type opts   :: Nebulex.Cache.opts
-  @type return :: Nebulex.Cache.return
+  @type t       :: module
+  @type cache   :: Nebulex.Cache.t
+  @type key     :: Nebulex.Cache.key
+  @type value   :: Nebulex.Cache.value
+  @type object  :: Nebulex.Object.t
+  @type opts    :: Nebulex.Cache.opts
+  @type return  :: Nebulex.Cache.return
+  @type reducer :: Nebulex.Cache.reducer
 
   @doc """
   The callback invoked in case the adapter needs to inject code.
@@ -49,6 +50,38 @@ defmodule Nebulex.Adapter do
   See callback `has_key/2` in module `Nebulex.Cache`.
   """
   @callback has_key?(cache, key) :: boolean
+
+  @doc """
+  Returns the cache size (total number of cached entries).
+
+  See callback `size/0` in module `Nebulex.Cache`.
+  """
+  @callback size(cache) :: integer
+
+  @doc """
+  Returns all cached keys.
+
+  See callback `keys/0` in module `Nebulex.Cache`.
+  """
+  @callback keys(cache) :: [key]
+
+  @doc """
+  Invokes `reducer` for each entry in the cache, passing the key, the return
+  and the accumulator `acc` as arguments. `reducer`’s return value is stored
+  in `acc`.
+
+  Returns the accumulator.
+
+  See callback `reduce/2` in module `Nebulex.Cache`.
+  """
+  @callback reduce(cache, acc :: any, reducer, opts) :: any
+
+  @doc """
+  Returns a map with all cache entries.
+
+  See callback `to_map/1` in module `Nebulex.Cache`.
+  """
+  @callback to_map(cache, opts) :: map
 
   @doc """
   Returns and removes a single object from Cache if `key` exists,

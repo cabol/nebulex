@@ -6,12 +6,12 @@ defmodule Nebulex.Adapters.Multilevel do
   implementations that enables to have a cache hierarchy by levels.
   Multi-level caches generally operate by checking the fastest,
   level 1 (L1) cache first; if it hits, the adapter proceeds at
-  high speed. If that smaller cache misses, the next fastest cache
+  high speed. If that first cache misses, the next fastest cache
   (level 2, L2) is checked, and so on, before accessing external
-  memory (that can be the latest level).
+  memory (that can be handled by a `:fallback` function).
 
-  Beware that the only added value function here is `get/3`, the other
-  functions works more like a bypass functions.
+  Beware this behaviour only takes place for `get/3` function, rest of the
+  functions behaves most like a bypass.
 
   ## Options
 
@@ -46,6 +46,15 @@ defmodule Nebulex.Adapters.Multilevel do
   (only valid for `get` function):
 
       MultilevelCache.get("foo", fallback: fn(key) -> key * 2 end)
+
+  ## Shared Options
+
+  Some functions below accept the following options:
+
+    * `:level` - It may be an integer greater than 0 that specifies the cache
+      level where the operation will take place, or it may be also `:all` to
+      execute the operation in all cache levels. By default it's set to `1`,
+      which means the `set` will only be evaluated at the first cache level.
 
   ## Example
 
@@ -164,8 +173,32 @@ defmodule Nebulex.Adapters.Multilevel do
   @doc false
   def children(_cache, _opts), do: []
 
-  @doc false
-  def get(cache, key, opts \\ []) do
+  @doc """
+  Retrieves the requested key (if it exists) checking the fastest,
+  level 1 (L1) cache first; if it hits, the adapter proceeds at
+  high speed. If that first cache misses, the next fastest cache
+  (level 2, L2) is checked, and so on, before accessing external
+  memory (that can be handled by the `:fallback` function).
+
+  If `:cache_model` is `:inclusive`, when the key is found in a level N,
+  that entry is duplicated backwards (to all previous levels: 1..N-1).
+
+  ## Options
+
+    * `:fallback` - Defines a fallback function when a key is not present
+      in any cache level. Function is defined as: `(key -> value)`.
+
+  See the "Shared options" section at the module documentation and alse
+  `Nebulex.Cache`.
+
+  ## Example
+
+      MyCache.get("foo", fallback: fn(_key) ->
+        # Maybe fetch the key from database
+        "initial value"
+      end)
+  """
+  def get(cache, key, opts) do
     cache.__levels__
     |> Enum.reduce_while({nil, []}, fn(current, {_, prev}) ->
       if object = current.get(key, Keyword.put(opts, :return, :object)) do
@@ -179,46 +212,186 @@ defmodule Nebulex.Adapters.Multilevel do
     |> validate_return(opts)
   end
 
-  @doc false
-  def set(cache, key, value, opts \\ []) do
+  @doc """
+  Sets the given `value` under `key` in the Cache.
+
+  ## Options
+
+    * `:level` - Check shared options in module documentation.
+
+  ## Example
+
+      # Entry is set at first cache level
+      MyCache.set("foo", "bar")
+
+      # Entry is set at second cache level
+      MyCache.set("foo", "bar", level: 2)
+
+      # Entry is set in all cache levels
+      MyCache.set("foo", "bar", level: :all)
+  """
+  def set(_cache, _key, nil, _opts),
+    do: nil
+  def set(cache, key, value, opts) do
     eval(cache, :set, [key, value, opts], opts)
   end
 
-  @doc false
-  def delete(cache, key, opts \\ []) do
+  @doc """
+  Deletes the cached entry in for a specific `key`.
+
+  ## Options
+
+    * `:level` - Check shared options in module documentation.
+
+  ## Example
+
+      # Entry is deleted from first cache level
+      MyCache.delete("foo")
+
+      # Entry is deleted from second cache level
+      MyCache.delete("foo", level: 2)
+
+      # Entry is deleted from all cache levels
+      MyCache.delete("foo", level: :all)
+  """
+  def delete(cache, key, opts) do
     eval(cache, :delete, [key, opts], opts)
   end
 
-  @doc false
+  @doc """
+  Evaluates this operation on each cache level until get a non-empty result
+  (different from nil or false), otherwise it returns the latest obtained
+  result (last cache level).
+
+  ## Examples
+
+      MyCache.has_key?(:a)
+  """
   def has_key?(cache, key) do
     eval_while(cache, :has_key?, [key], false)
   end
 
-  @doc false
-  def all(cache, opts \\ []) do
+  @doc """
+  Returns the total number of entries in all cache levels.
+
+  ## Examples
+
+      MyCache.size
+  """
+  def size(cache) do
+    Enum.reduce(cache.__levels__, 0, fn(level_cache, acc) ->
+      level_cache.size() + acc
+    end)
+  end
+
+  @doc """
+  Returns all cached keys in all cache levels.
+
+  ## Examples
+
+      MyCache.keys
+  """
+  def keys(cache) do
     cache.__levels__
-    |> Enum.reduce([], fn(cache, acc) ->
-      cache.all(opts) ++ acc
+    |> Enum.reduce([], fn(level_cache, acc) ->
+      level_cache.keys() ++ acc
     end)
     |> :lists.usort()
   end
 
-  @doc false
-  def pop(cache, key, opts \\ []) do
+  @doc """
+  Execute the reduce function in all cache levels.
+
+  ## Examples
+
+      MyCache.reduce({%{}, 0}, fn({key, value}, {acc1, acc2}) ->
+        if Map.has_key?(acc1, key),
+          do: {acc1, acc2},
+          else: {Map.put(acc1, key, value), value + acc2}
+      end)
+  """
+  def reduce(cache, acc_in, fun, opts) do
+    Enum.reduce(cache.__levels__, acc_in, fn(level_cache, acc) ->
+      level_cache.reduce(acc, fun, opts)
+    end)
+  end
+
+  @doc """
+  Returns a map with all cached entries in all cache levels.
+
+  ## Examples
+
+      MyCache.to_map
+  """
+  def to_map(cache, opts) do
+    Enum.reduce(cache.__levels__, %{}, fn(level_cache, acc) ->
+      opts
+      |> level_cache.to_map()
+      |> Map.merge(acc)
+    end)
+  end
+
+  @doc """
+  Evaluates this operation on each cache level until get a non-empty result
+  (different from nil or false), otherwise it returns the latest obtained
+  result (last cache level).
+
+  ## Examples
+
+      MyCache.pop(:a)
+  """
+  def pop(cache, key, opts) do
     eval_while(cache, :pop, [key, opts])
   end
 
-  @doc false
-  def get_and_update(cache, key, fun, opts \\ []) when is_function(fun, 1) do
+  @doc """
+  Gets the value from `key` and updates it, all in one pass.
+
+  ## Options
+
+    * `:level` - Check shared options in module documentation.
+
+  ## Example
+
+      {nil, "value!"} = MyCache.get_and_update(:a, fn current_value ->
+        {current_value, "value!"}
+      end, level: :all)
+  """
+  def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
     eval(cache, :get_and_update, [key, fun, opts], opts)
   end
 
-  @doc false
-  def update(cache, key, initial, fun, opts \\ []) do
+  @doc """
+  Updates the cached `key` with the given function.
+
+  ## Options
+
+    * `:level` - Check shared options in module documentation.
+
+  ## Example
+
+      MyCache.update(:a, 1, &(&1 * 2), level: :all)
+  """
+  def update(cache, key, initial, fun, opts) do
     eval(cache, :update, [key, initial, fun, opts], opts)
   end
 
-  @doc false
+  @doc """
+  Sets a lock on the caller Cache and `key`. If this succeeds, `fun` is
+  evaluated and the result is returned.
+
+  ## Options
+
+    * `:level` - Check shared options in module documentation.
+
+  ## Example
+
+      MyCache.transaction(fn ->
+        1 = MyCache.set(:a, 1)
+        true = MyCache.has_key?(:a)
+        MyCache.get(:a)
+      end)
+  """
   def transaction(cache, key, fun) do
     eval(cache, :transaction, [key, fun])
   end
@@ -259,6 +432,8 @@ defmodule Nebulex.Adapters.Multilevel do
   defp maybe_fallback(return, _, _, _), do: return
 
   defp maybe_replicate_data({nil, _}, _),
+    do: nil
+  defp maybe_replicate_data({%Object{value: nil}, _}, _),
     do: nil
   defp maybe_replicate_data({object, levels}, cache) do
     cache.__model__

@@ -51,6 +51,7 @@ defmodule Nebulex.CacheTest do
         @cache.new_generation
         assert @cache.get(2) == 2
         refute @cache.get(3)
+        refute @cache.get(3, return: :object)
 
         %Object{value: 1, key: 1, version: v1} = @cache.get(1, return: :object)
         %Object{value: 2, key: 2, version: _} = @cache.get(2, return: :object)
@@ -106,6 +107,9 @@ defmodule Nebulex.CacheTest do
         assert_raise ArgumentError, fn ->
           @cache.set(:a, 1, version: -1, on_conflict: :invalid) == 1
         end
+
+        assert @cache.set("foo", nil) == nil
+        refute @cache.get("foo")
       end
 
       test "has_key?" do
@@ -117,13 +121,70 @@ defmodule Nebulex.CacheTest do
         refute @cache.has_key?(3)
       end
 
-      test "all" do
+      test "size" do
         @cache.new_generation
-        expected = for x <- 1..100, do: @cache.set(x, x, return: :key)
+        for x <- 1..100, do: @cache.set(x, x)
+        assert @cache.size == 100
 
-        assert @cache.all == expected
-        assert @cache.all(return: :value) == expected
-        [%Object{} | _] = @cache.all(return: :object)
+        for x <- 1..50, do: @cache.delete(x)
+        assert @cache.size == 50
+
+        @cache.new_generation
+        for x <- 51..60, do: assert @cache.get(x) == x
+        assert @cache.size == 50
+      end
+
+      test "keys" do
+        @cache.new_generation
+        set1 = for x <- 1..50, do: @cache.set(x, x)
+
+        @cache.new_generation
+        set2 = for x <- 51..100, do: @cache.set(x, x)
+        for x <- 1..30, do: assert @cache.get(x) == x
+        expected = :lists.usort(set1 ++ set2)
+
+        assert @cache.keys == expected
+
+        set3 = for x <- 20..60, do: @cache.delete(x)
+
+        assert @cache.keys == :lists.usort(expected -- set3)
+      end
+
+      test "reduce" do
+        reducer_fun =
+          case @cache.__adapter__ do
+            Nebulex.Adapters.Dist ->
+              &(@cache.reducer_fun/2)
+            _ ->
+              fn({key, value}, {acc1, acc2}) ->
+                if Map.has_key?(acc1, key),
+                  do: {acc1, acc2},
+                  else: {Map.put(acc1, key, value), value + acc2}
+              end
+          end
+
+        @cache.new_generation
+        set1 = for x <- 1..3, do: @cache.set(x, x)
+
+        @cache.new_generation
+        set2 = for x <- 2..5, do: @cache.set(x, x)
+        expected = :maps.from_list(for x <- 1..5, do: {x, x})
+
+        assert @cache.reduce({%{}, 0}, reducer_fun) == {expected, 15}
+      end
+
+      test "to_map" do
+        @cache.new_generation
+        set1 = for x <- 1..50, do: @cache.set(x, x)
+
+        @cache.new_generation
+        set2 = for x <- 51..100, do: @cache.set(x, x)
+        for x <- 1..30, do: assert @cache.get(x) == x
+        expected = :maps.from_list(for x <- 1..100, do: {x, x})
+
+        assert @cache.to_map == expected
+        assert @cache.to_map(return: :value) == expected
+        %Object{key: 1} = Map.get(@cache.to_map(return: :object), 1)
       end
 
       test "pop" do

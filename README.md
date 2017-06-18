@@ -1,15 +1,13 @@
-<img src="http://cdn.wallpapersafari.com/44/53/JeEQGM.jpg" height="170" width="100%" />
-
 # Nebulex
 
 [![Build Status](https://travis-ci.org/cabol/nebulex.svg?branch=master)](https://travis-ci.org/cabol/nebulex)
-[![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
 [![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
+[![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
 
 > **Local and Distributed Caching Tool for Elixir**
 
-See the [getting started](https://hexdocs.pm/nebulex/getting-started.html) guide
-and the [online documentation](https://hexdocs.pm/nebulex/Nebulex.html).
+See the [getting started](http://hexdocs.pm/nebulex/getting-started.html) guide
+and the [online documentation](http://hexdocs.pm/nebulex/Nebulex.html).
 
 ## Installation
 
@@ -79,7 +77,7 @@ end
 
 ## Important links
 
- * [Documentation](https://hexdocs.pm/nebulex/Nebulex.html)
+ * [Documentation](http://hexdocs.pm/nebulex/Nebulex.html)
  * [Examples](https://github.com/cabol/nebulex_examples)
  * [Ecto Integration](https://github.com/cabol/nebulex_ecto)
 

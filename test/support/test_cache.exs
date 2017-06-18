@@ -20,6 +20,12 @@ defmodule Nebulex.TestCache do
   defmodule Dist do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Dist
 
+    def reducer_fun({key, value}, {acc1, acc2}) do
+      if Map.has_key?(acc1, key),
+        do: {acc1, acc2},
+        else: {Map.put(acc1, key, value), value + acc2}
+    end
+
     def get_and_update_fun(nil), do: {nil, 1}
     def get_and_update_fun(current) when is_integer(current), do: {current, current * 2}
 
