@@ -58,7 +58,11 @@ defmodule Nebulex.Cache.Supervisor do
   def init({cache, otp_app, adapter, opts}) do
     case runtime_config(cache, otp_app, opts) do
       {:ok, opts} ->
-        children = adapter.children(cache, opts)
+        children = [
+          worker(Nebulex.Cache.Stats, [cache])
+          | adapter.children(cache, opts)
+        ]
+
         supervise(children, strategy: :one_for_one)
       :ignore ->
         :ignore

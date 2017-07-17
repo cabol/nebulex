@@ -26,42 +26,49 @@ defmodule Nebulex.Adapter do
   @doc """
   Retrieves a single object from Cache.
 
-  See callback `get/2` in module `Nebulex.Cache`.
+  See `Nebulex.Cache.get/2`.
   """
   @callback get(cache, key, opts) :: nil | return | no_return
 
   @doc """
   Stores a single object in the Cache.
 
-  See callback `set/3` in module `Nebulex.Cache`.
+  See `Nebulex.Cache.set/3`.
   """
   @callback set(cache, key, value, opts) :: return | no_return
 
   @doc """
   Deletes a single object from Cache.
 
-  See callback `delete/2` in module `Nebulex.Cache`.
+  See `Nebulex.Cache.delete/2`.
   """
   @callback delete(cache, key, opts) :: return | no_return
 
   @doc """
   Returns whether the given `key` exists in Cache.
 
-  See callback `has_key/2` in module `Nebulex.Cache`.
+  See `Nebulex.Cache.has_key/2`.
   """
   @callback has_key?(cache, key) :: boolean
 
   @doc """
   Returns the cache size (total number of cached entries).
 
-  See callback `size/0` in module `Nebulex.Cache`.
+  See `Nebulex.Cache.size/0`.
   """
   @callback size(cache) :: integer
 
   @doc """
+  Flushes the cache.
+
+  See `Nebulex.Cache.flush/0`.
+  """
+  @callback flush(cache) :: :ok | no_return
+
+  @doc """
   Returns all cached keys.
 
-  See callback `keys/0` in module `Nebulex.Cache`.
+  See `Nebulex.Cache.keys/0`.
   """
   @callback keys(cache) :: [key]
 
@@ -72,14 +79,14 @@ defmodule Nebulex.Adapter do
 
   Returns the accumulator.
 
-  See callback `reduce/2` in module `Nebulex.Cache`.
+  See `Nebulex.Cache.reduce/2`.
   """
   @callback reduce(cache, acc :: any, reducer, opts) :: any
 
   @doc """
   Returns a map with all cache entries.
 
-  See callback `to_map/1` in module `Nebulex.Cache`.
+  See `Nebulex.Cache.to_map/1`.
   """
   @callback to_map(cache, opts) :: map
 
@@ -87,14 +94,14 @@ defmodule Nebulex.Adapter do
   Returns and removes a single object from Cache if `key` exists,
   otherwise returns `nil`.
 
-  See callback `pop/2` in module `Nebulex.Cache`.
+  See `Nebulex.Cache.pop/2`.
   """
   @callback pop(cache, key, opts) :: return | no_return
 
   @doc """
   Gets the value from `key` and updates it, all in one pass.
 
-  See callback `get_and_update/3` in module `Nebulex.Cache`.
+  See `Nebulex.Cache.get_and_update/3`.
   """
   @callback get_and_update(cache, key, (value -> {get, update} | :pop), opts) ::
             no_return | {get, update} when get: value, update: value
@@ -102,15 +109,7 @@ defmodule Nebulex.Adapter do
   @doc """
   Updates the cached `key` with the given function.
 
-  See callback `update/4` in module `Nebulex.Cache`.
+  See `Nebulex.Cache.update/4`.
   """
   @callback update(cache, key, initial :: value, (value -> value), opts) :: value | no_return
-
-  @doc """
-  Sets a lock on the caller Cache and `key`. If this succeeds, `fun` is
-  evaluated and the result is returned.
-
-  See callback `transaction/2` in module `Nebulex.Cache`.
-  """
-  @callback transaction(cache, key, (... -> any)) :: any
 end

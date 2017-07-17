@@ -97,6 +97,9 @@ defmodule Nebulex.Adapters.Dist do
   # Inherit default node picker function
   use Nebulex.Adapters.Dist.NodePicker
 
+  # Inherit default transaction implementation
+  use Nebulex.Adapter.Transaction
+
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
 
@@ -137,7 +140,9 @@ defmodule Nebulex.Adapters.Dist do
 
       def init(config) do
         :ok = :pg2.create(pg2_namespace())
-        :ok = :pg2.join(pg2_namespace(), self())
+        unless self() in :pg2.get_members(pg2_namespace()) do
+          :ok = :pg2.join(pg2_namespace(), self())
+        end
         {:ok, config}
       end
 
@@ -182,6 +187,13 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   @doc false
+  def flush(cache) do
+    Enum.each(cache.nodes, fn(node) ->
+      rpc_call(node, cache.__local__, :flush, [])
+    end)
+  end
+
+  @doc false
   def keys(cache) do
     cache.nodes
     |> Enum.reduce([], fn(node, acc) ->
@@ -219,11 +231,6 @@ defmodule Nebulex.Adapters.Dist do
   @doc false
   def update(cache, key, initial, fun, opts) do
     call(cache, :update, [key, initial, fun, opts])
-  end
-
-  @doc false
-  def transaction(cache, key \\ nil, fun) do
-    :global.trans({{cache, key}, self()}, fun, cache.nodes)
   end
 
   ## Private Functions

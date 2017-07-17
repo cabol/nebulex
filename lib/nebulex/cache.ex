@@ -27,11 +27,37 @@ defmodule Nebulex.Cache do
 
     * `:adapter` - a compile-time option that specifies the adapter itself
 
+    * `:stats` - a compile-time option that specifies if cache statistics
+      is enabled or not (defaults to `false`).
+
+    * `:pre_hooks_strategy` - a compile-time option that determinates the
+      strategy how pre-hooks will be executed – see hooks strategies.
+
+    * `:post_hooks_strategy` - a compile-time option that determinates the
+      strategy how post-hooks will be executed – see hooks strategies.
+
     * `:version_generator` - this option specifies the module that
       implements the `Nebulex.Version` interface. This interface
       defines only one callback `generate/1` that is invoked by
       the adapters to generate new object versions. If this option
-      is not set, the default will be: `Nebulex.Version.Default`.
+      is not set, it defaults to `Nebulex.Version.Default`.
+
+  ## Pre/Post hooks strategies
+
+  It is possible to configure the strategy how the hooks are evaluated,
+  the available strategies are:
+
+    * `:async` - (the default) all hooks are evaluated asynchronously
+      (in parallel) and their results are ignored.
+
+    * `:sync` - hooks are evaluated synchronously (sequentially) and their
+      results are ignored.
+
+    * `:pipe` - similar to `:sync` but each hook result is passed to the
+      next one and so on, until the last hook evaluation is returned.
+
+  These strategy values applies to the compile-time options
+  `:pre_hooks_strategy` and `:post_hooks_strategy`.
 
   ## Shared options
 
@@ -61,6 +87,7 @@ defmodule Nebulex.Cache do
   @type opts    :: Keyword.t
   @type return  :: key | value | object
   @type reducer :: ({key, return}, acc_in :: any -> acc_out :: any)
+  @type hook    :: (result :: any, {t, action :: atom, args :: [any]} -> any)
 
   @doc false
   defmacro __using__(opts) do
@@ -91,7 +118,7 @@ defmodule Nebulex.Cache do
       end
 
       def get(key, opts \\ []) do
-        @adapter.get(__MODULE__, key, opts)
+        execute(:get, [key, opts])
       end
 
       def get!(key, opts \\ []) do
@@ -102,57 +129,132 @@ defmodule Nebulex.Cache do
       end
 
       def set(key, value, opts \\ []) do
-        @adapter.set(__MODULE__, key, value, opts)
+        execute(:set, [key, value, opts])
       end
 
       def delete(key, opts \\ []) do
-        @adapter.delete(__MODULE__, key, opts)
+        execute(:delete, [key, opts])
       end
 
       def has_key?(key) do
-        @adapter.has_key?(__MODULE__, key)
+        execute(:has_key?, [key])
       end
 
       def size do
-        @adapter.size(__MODULE__)
+        execute(:size, [])
+      end
+
+      def flush do
+        execute(:flush, [])
       end
 
       def keys do
-        @adapter.keys(__MODULE__)
+        execute(:keys, [])
       end
 
       def reduce(acc, fun, opts \\ []) do
-        @adapter.reduce(__MODULE__, acc, fun, opts)
+        execute(:reduce, [acc, fun, opts])
       end
 
       def to_map(opts \\ []) do
-        @adapter.to_map(__MODULE__, opts)
+        execute(:to_map, [opts])
       end
 
       def pop(key, opts \\ []) do
-        @adapter.pop(__MODULE__, key, opts)
+        execute(:pop, [key, opts])
       end
 
       def get_and_update(key, fun, opts \\ []) do
-        @adapter.get_and_update(__MODULE__, key, fun, opts)
+        execute(:get_and_update, [key, fun, opts])
       end
 
       def update(key, initial, fun, opts \\ []) do
-        @adapter.update(__MODULE__, key, initial, fun, opts)
+        execute(:update, [key, initial, fun, opts])
       end
 
-      def transaction(key \\ nil, fun) do
-        @adapter.transaction(__MODULE__, key, fun)
+      if function_exported?(@adapter, :transaction, 3) do
+        def transaction(fun, opts \\ []) do
+          execute(:transaction, [opts, fun])
+        end
+
+        def in_transaction? do
+          execute(:in_transaction?, [])
+        end
       end
+
+      def pre_hooks do
+        []
+      end
+
+      def post_hooks do
+        []
+      end
+
+      ## Helpers
+
+      defp execute(action, args) do
+        action
+        |> eval_pre_hooks(args, pre_hooks())
+        |> apply(action, [__MODULE__ | args])
+        |> eval_post_hooks(action, args)
+      end
+
+      @pre_hooks_strategy Keyword.get(@config, :pre_hooks_strategy, :async)
+      @post_hooks_strategy Keyword.get(@config, :post_hooks_strategy, :async)
+
+      defp eval_pre_hooks(action, args, hooks) do
+        _ = eval_hooks(hooks, @pre_hooks_strategy, action, args, nil)
+        @adapter
+      end
+
+      if @config[:stats] == true do
+        @stats_hook &Nebulex.Cache.Stats.post_hook/2
+
+        defp eval_post_hooks(result, action, args) do
+          eval_hooks([@stats_hook | post_hooks()], @post_hooks_strategy, action, args, result)
+        end
+      else
+        defp eval_post_hooks(result, action, args) do
+          eval_hooks(post_hooks(), @post_hooks_strategy, action, args, result)
+        end
+      end
+
+      defp eval_hooks([], _eval, _action, _args, result),
+        do: result
+      defp eval_hooks(hooks, eval, action, args, result) do
+        Enum.reduce(hooks, result, fn
+          (hook, acc) when is_function(hook, 2) and eval == :pipe ->
+            hook.(acc, {__MODULE__, action, args})
+          (hook, ^result) when is_function(hook, 2) and eval == :sync ->
+            _ = hook.(result, {__MODULE__, action, args})
+            result
+          (hook, ^result) when is_function(hook, 2) ->
+            _ = Task.start_link(:erlang, :apply, [hook, [result, {__MODULE__, action, args}]])
+            result
+          (_, acc) when eval == :pipe ->
+            acc
+          (_, _) ->
+            result
+        end)
+      end
+
+      defoverridable [pre_hooks: 0, post_hooks: 0]
     end
   end
 
-  @optional_callbacks [init: 1]
+  @optional_callbacks [init: 1, transaction: 2, in_transaction?: 0, pre_hooks: 0, post_hooks: 0]
 
   @doc """
   Returns the adapter tied to the cache.
   """
   @callback __adapter__ :: Nebulex.Adapter.t
+
+  @doc """
+  Returns the adapter configuration stored in the `:otp_app` environment.
+
+  If the `c:init/2` callback is implemented in the cache, it will be invoked.
+  """
+  @callback config() :: Keyword.t
 
   @doc """
   Starts a supervision and return `{:ok, pid}` or just `:ok` if nothing
@@ -374,6 +476,19 @@ defmodule Nebulex.Cache do
   @callback size() :: integer
 
   @doc """
+  Flushes the cache.
+
+  ## Examples
+
+      for x <- 1..5, do: MyCache.set(x, x)
+
+      :ok = MyCache.flush
+
+      for x <- 1..5, do: nil = MyCache.get(x)
+  """
+  @callback flush() :: :ok | no_return
+
+  @doc """
   Returns all cached keys.
 
   ## Examples
@@ -392,6 +507,10 @@ defmodule Nebulex.Cache do
   in `acc`.
 
   Returns the accumulator.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
 
   ## Examples
 
@@ -414,6 +533,10 @@ defmodule Nebulex.Cache do
   @doc """
   Returns a map with all cache entries (key/value). If you want the map values
   be the cache object, pass the option `:return` set to `:object`.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
 
   ## Examples
 
@@ -521,25 +644,79 @@ defmodule Nebulex.Cache do
   @callback update(key, initial :: value, (value -> value), opts) :: value | no_return
 
   @doc """
-  Sets a lock on the caller Cache and `key`. If this succeeds, `fun` is
-  evaluated and the result is returned.
+  Runs the given function inside a transaction.
 
-  If `key` is not provided, it is set to `nil` by default.
+  A successful transaction returns the value returned by the function.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
 
   ## Examples
 
-      1 = MyCache.transaction fn ->
+      MyCache.transaction fn ->
         1 = MyCache.set(:a, 1)
         true = MyCache.has_key?(:a)
         MyCache.get(:a)
       end
+  """
+  @callback transaction(function :: fun, opts) :: any
 
-      :ok = MyCache.transaction :a, fn ->
-        1 = MyCache.set(:a, 1)
-        true = MyCache.has_key?(:a)
-        false = MyCache.has_key?(:b)
-        :ok
+  @doc """
+  Returns `true` if the current process is inside a transaction.
+
+  ## Examples
+
+      MyCache.in_transaction?
+      #=> false
+
+      MyCache.transaction(fn ->
+        MyCache.in_transaction? #=> true
+      end)
+  """
+  @callback in_transaction?() :: boolean
+
+  @doc """
+  Returns a list of hook functions that will be executed before invoke the
+  cache action.
+
+  ## Examples
+
+      defmodule MyCache do
+        use Nebulex.Cache, adapter: Nebulex.Adapters.Local
+
+        def pre_hooks do
+          pre_hook =
+            fn
+              (result, {_, :get, _} = call) ->
+                # do your stuff ...
+              (result, _) ->
+                result
+            end
+          [pre_hook]
+        end
       end
   """
-  @callback transaction(key, (... -> any)) :: any
+  @callback pre_hooks() :: [hook]
+
+  @doc """
+  Returns a list of hook functions that will be executed after invoke the
+  cache action.
+
+  ## Examples
+
+      defmodule MyCache do
+        use Nebulex.Cache, adapter: Nebulex.Adapters.Local
+
+        def post_hooks do
+          [&post_hook/2]
+        end
+
+        def post_hook(result, {_, :set, _} = call),
+          do: send(:hooked_cache, call)
+        def post_hook(_, _),
+          do: :noop
+      end
+  """
+  @callback post_hooks() :: [hook]
 end

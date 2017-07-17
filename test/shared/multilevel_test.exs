@@ -15,11 +15,13 @@ defmodule Nebulex.MultilevelTest do
       @l3 :lists.nth(3, @levels)
 
       setup do
+        {:ok, ml_cache} = @cache.start_link
         levels_and_pids = start_levels()
         :ok
 
         on_exit fn ->
           stop_levels(levels_and_pids)
+          if Process.alive?(ml_cache), do: @cache.stop(ml_cache, 1)
         end
       end
 
@@ -107,6 +109,17 @@ defmodule Nebulex.MultilevelTest do
         assert @l2.delete(11) == 11
         assert @l3.delete(21) == 21
         assert @cache.size == 27
+      end
+
+      test "flush" do
+        for x <- 1..10, do: @l1.set(x, x)
+        for x <- 11..20, do: @l2.set(x, x)
+        for x <- 21..30, do: @l3.set(x, x)
+
+        assert @cache.flush == :ok
+        _ = :timer.sleep(500)
+
+        for x <- 1..30, do: refute @cache.get(x)
       end
 
       test "keys" do
@@ -221,11 +234,46 @@ defmodule Nebulex.MultilevelTest do
       end
 
       test "transaction" do
-        refute @cache.transaction 1, fn ->
+        refute @cache.transaction fn ->
           @cache.set(1, 11, return: :key)
           |> @cache.get!(return: :key)
           |> @cache.delete(return: :key)
           |> @cache.get
+        end
+
+        assert_raise MatchError, fn ->
+          @cache.transaction fn ->
+            res =
+              @cache.set(1, 11, return: :key)
+              |> @cache.get!(return: :key)
+              |> @cache.delete(return: :key)
+              |> @cache.get
+            :ok = res
+          end
+        end
+      end
+
+      test "transaction aborted" do
+        spawn_link fn ->
+          @cache.transaction(fn ->
+            :timer.sleep(1100)
+          end, keys: [1], retries: 1)
+        end
+        :timer.sleep(200)
+
+        assert_raise RuntimeError, "transaction aborted", fn ->
+          @cache.transaction(fn ->
+            @cache.get(1)
+          end, keys: [1], retries: 1)
+        end
+      end
+
+      test "in_transaction?" do
+        refute @cache.in_transaction?
+
+        _ = @cache.transaction fn ->
+          _ = @cache.set(1, 11, return: :key)
+          true = @cache.in_transaction?
         end
       end
 

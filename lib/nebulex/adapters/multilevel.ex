@@ -134,6 +134,7 @@ defmodule Nebulex.Adapters.Multilevel do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Transaction
 
   alias Nebulex.Object
 
@@ -285,6 +286,19 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @doc """
+  Flushes all cache levels.
+
+  ## Examples
+
+      MyCache.flush
+  """
+  def flush(cache) do
+    Enum.each(cache.__levels__, fn(level_cache) ->
+      level_cache.flush()
+    end)
+  end
+
+  @doc """
   Returns all cached keys in all cache levels.
 
   ## Examples
@@ -377,8 +391,9 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @doc """
-  Sets a lock on the caller Cache and `key`. If this succeeds, `fun` is
-  evaluated and the result is returned.
+  Runs the given function inside a transaction.
+
+  A successful transaction returns the value returned by the function.
 
   ## Options
 
@@ -392,24 +407,38 @@ defmodule Nebulex.Adapters.Multilevel do
         MyCache.get(:a)
       end)
   """
-  def transaction(cache, key, fun) do
-    eval(cache, :transaction, [key, fun])
+  def transaction(cache, opts, fun) do
+    eval(cache, :transaction, [fun, opts])
+  end
+
+  @doc """
+  Returns `true` if the given process is inside a transaction in any of the
+  cache levels.
+  """
+  def in_transaction?(cache) do
+    results =
+      Enum.reduce(cache.__levels__, [], fn(level, acc) ->
+        [level.in_transaction?() | acc]
+      end)
+    true in results
   end
 
   ## Helpers
 
   defp eval(ml_cache, fun, args, opts \\ []) do
-    [l1 | next] =
-      case opts[:level] do
-        nil   -> [hd(ml_cache.__levels__)]
-        :all  -> ml_cache.__levels__
-        level -> [:lists.nth(level, ml_cache.__levels__)]
-      end
+    [l1 | next] = eval_levels(opts[:level], ml_cache)
 
     Enum.reduce(next, apply(l1, fun, args), fn(cache, acc) ->
       ^acc = apply(cache, fun, args)
     end)
   end
+
+  defp eval_levels(nil, cache),
+    do: [hd(cache.__levels__)]
+  defp eval_levels(:all, cache),
+    do: cache.__levels__
+  defp eval_levels(level, cache),
+    do: [:lists.nth(level, cache.__levels__)]
 
   defp eval_while(ml_cache, fun, args, init \\ nil) do
     Enum.reduce_while(ml_cache.__levels__, init, fn(cache, acc) ->

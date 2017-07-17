@@ -8,9 +8,11 @@ as Ecto, developers can provide their own Cache implementations.
 
 Additionally, Nebulex provides three adapter implementations built-in:
 
-  * Local Generational Cache - `Nebulex.Adapters.Local`
-  * Distributed Cache - `Nebulex.Adapters.Dist`
-  * Multilevel Cache - `Nebulex.Adapters.Multilevel`
+Nebulex Adapter               | Description
+:---------------------------- | :-----------------------
+`Nebulex.Adapters.Local`      | Local Generational Cache
+`Nebulex.Adapters.Dist`       | Distributed Cache
+`Nebulex.Adapters.Multilevel` | Multilevel Cache
 
 In this guide, we're going to learn some basics about Nebulex, such as setting,
 retrieving and destroying cache entries (key/value pairs).
@@ -33,7 +35,7 @@ changing the `deps` definition in that file to this:
 
 ```elixir
 defp deps do
-  [{:nebulex, "~> 1.0"}]
+  [{:nebulex, "~> 1.0.0-rc.1"}]
 end
 ```
 

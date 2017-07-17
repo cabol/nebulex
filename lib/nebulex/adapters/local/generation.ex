@@ -55,6 +55,22 @@ defmodule Nebulex.Adapters.Local.Generation do
     |> GenServer.call({:new_generation, opts})
   end
 
+  @doc """
+  Flushes the cache (including all its generations).
+
+    * `cache` - Cache Module
+
+  ## Example
+
+      flush(MyCache)
+  """
+  @spec flush(Nebulex.Cache.t) :: :ok
+  def flush(cache) do
+    cache
+    |> server_name()
+    |> GenServer.call(:flush)
+  end
+
   ## GenServer Callbacks
 
   @doc false
@@ -79,6 +95,11 @@ defmodule Nebulex.Adapters.Local.Generation do
       |> maybe_reset_timeout(state)
 
     {:reply, gen_list, state}
+  end
+
+  @doc false
+  def handle_call(:flush, _from, %{cache: cache} = state) do
+    {:reply, do_flush(cache), state}
   end
 
   @doc false
@@ -126,5 +147,10 @@ defmodule Nebulex.Adapters.Local.Generation do
   defp maybe_reset_timeout(true, %{gc_interval: time, time_ref: ref} = state) do
     {:ok, :cancel} = :timer.cancel(ref)
     %{state | time_ref: start_timer(time)}
+  end
+
+  defp do_flush(cache) do
+    _ = Metadata.update(%{cache.__metadata__ | generations: []}, cache)
+    Enum.each(cache.__metadata__.generations, &Local.delete/1)
   end
 end

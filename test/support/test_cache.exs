@@ -1,9 +1,65 @@
 defmodule Nebulex.TestCache do
   :ok = Application.put_env(:nebulex, :nodes, [:"node1@127.0.0.1", :"node2@127.0.0.1"])
 
+  defmodule Hooks do
+    defmacro __using__(_opts) do
+      quote do
+        def pre_hooks do
+          pre_hook =
+            fn
+              (result, {_, :get, _} = call) ->
+                send(:hooked_cache, call)
+              (_, _) ->
+                :noop
+            end
+          [pre_hook]
+        end
+
+        def post_hooks do
+          wrong_hook = fn(var) -> var end
+          [wrong_hook, &post_hook/2]
+        end
+
+        def post_hook(result, {_, :set, _} = call) do
+          _ = send(:hooked_cache, call)
+          result
+        end
+        def post_hook(nil, {_, :get, _}), do: "hello"
+        def post_hook(result, _), do: result
+      end
+    end
+  end
+
   :ok = Application.put_env(:nebulex, Nebulex.TestCache.Local, [n_shards: 2])
 
   defmodule Local do
+    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+  end
+
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C1, [n_shards: 2, post_hooks_strategy: :async])
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C2, [n_shards: 2, post_hooks_strategy: :pipe])
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C3, [n_shards: 2, post_hooks_strategy: :sync])
+
+  defmodule Hooked do
+    defmodule C1 do
+      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+      use Hooks
+    end
+
+    defmodule C2 do
+      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+      use Hooks
+    end
+
+    defmodule C3 do
+      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+      use Hooks
+    end
+  end
+
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.CacheStats, [n_shards: 2, stats: true, post_hooks_strategy: :pipe])
+
+  defmodule CacheStats do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
   end
 

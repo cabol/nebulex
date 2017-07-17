@@ -134,6 +134,16 @@ defmodule Nebulex.CacheTest do
         assert @cache.size == 50
       end
 
+      test "flush" do
+        @cache.new_generation
+        for x <- 1..100, do: @cache.set(x, x)
+
+        assert @cache.flush == :ok
+        _ = :timer.sleep(500)
+
+        for x <- 1..100, do: refute @cache.get(x)
+      end
+
       test "keys" do
         @cache.new_generation
         set1 = for x <- 1..50, do: @cache.set(x, x)
@@ -225,11 +235,50 @@ defmodule Nebulex.CacheTest do
       test "transaction" do
         @cache.new_generation
 
-        refute @cache.transaction 1, fn ->
+        refute @cache.transaction fn ->
           @cache.set(1, 11, return: :key)
           |> @cache.get!(return: :key)
           |> @cache.delete(return: :key)
           |> @cache.get
+        end
+
+        assert_raise MatchError, fn ->
+          @cache.transaction fn ->
+            res =
+              @cache.set(1, 11, return: :key)
+              |> @cache.get!(return: :key)
+              |> @cache.delete(return: :key)
+              |> @cache.get
+            :ok = res
+          end
+        end
+      end
+
+      test "transaction aborted" do
+        @cache.new_generation
+
+        spawn_link fn ->
+          @cache.transaction(fn ->
+            :timer.sleep(1100)
+          end, keys: [1], retries: 1)
+        end
+        :timer.sleep(200)
+
+        assert_raise RuntimeError, "transaction aborted", fn ->
+          @cache.transaction(fn ->
+            @cache.get(1)
+          end, keys: [1], retries: 1)
+        end
+      end
+
+      test "in_transaction?" do
+        @cache.new_generation
+
+        refute @cache.in_transaction?
+
+        _ = @cache.transaction fn ->
+          _ = @cache.set(1, 11, return: :key)
+          true = @cache.in_transaction?
         end
       end
 

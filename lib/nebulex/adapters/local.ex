@@ -71,11 +71,15 @@ defmodule Nebulex.Adapters.Local do
   The rest of the functions as we mentioned before, are for internal use.
   """
 
+  # Inherit default transaction implementation
+  use Nebulex.Adapter.Transaction
+
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
 
   alias Nebulex.Object
   alias ExShards.Local
+  alias Nebulex.Adapters.Local.Generation
 
   ## Adapter Impl
 
@@ -235,6 +239,13 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @doc false
+  def flush(cache) do
+    :ok = Generation.flush(cache)
+    _ = cache.new_generation()
+    :ok
+  end
+
+  @doc false
   def keys(cache) do
     cache.__metadata__.generations
     |> Enum.reduce([], fn(gen, acc) ->
@@ -317,8 +328,11 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @doc false
-  def transaction(cache, key \\ nil, fun) do
-    :global.trans({{cache, key}, self()}, fun, [node()])
+  def transaction(cache, opts, fun) do
+    keys  = opts[:keys] || []
+    nodes = opts[:nodes] || [node()]
+    retries = opts[:retries] || :infinity
+    do_transaction(cache, keys, nodes, retries, fun)
   end
 
   ## Helpers

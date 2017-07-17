@@ -9,7 +9,7 @@ defmodule Nebulex.Adapters.Local.Metadata do
 
   @spec create(cache :: Nebulex.Cache.t, initial :: Metadata.t) :: Metadata.t
   def create(cache, %Metadata{} = initial \\ %Metadata{}) do
-    ^cache = :ets.new(cache, [:named_table, {:read_concurrency, true}])
+    ^cache = :ets.new(cache, [:named_table, read_concurrency: true])
     true = :ets.insert(cache, metadata: initial)
     initial
   end

@@ -1,10 +1,22 @@
 # Nebulex
+> **Fast, flexible and powerful cache wrapper for Elixir.**
 
 [![Build Status](https://travis-ci.org/cabol/nebulex.svg?branch=master)](https://travis-ci.org/cabol/nebulex)
 [![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
 [![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
 
-> **Local and Distributed Caching Tool for Elixir**
+## Features
+
+* Built-in adapters
+  - [Local generational cache](http://hexdocs.pm/nebulex/Nebulex.Adapters.Local.html)
+  - [Distributed cache](http://hexdocs.pm/nebulex/Nebulex.Adapters.Dist.html)
+  - [Multi-level cache](http://hexdocs.pm/nebulex/Nebulex.Adapters.Multilevel.html)
+* Support for different cache topologies setup (Partitioned, Near, ...)
+* Time-based expiration
+* Pre/post execution hooks
+* Transactions (key-locking)
+* Key versioning – support for [optimistic offline locks](https://martinfowler.com/eaaCatalog/optimisticOfflineLock.html)
+* Optional statistics gathering
 
 See the [getting started](http://hexdocs.pm/nebulex/getting-started.html) guide
 and the [online documentation](http://hexdocs.pm/nebulex/Nebulex.html).
@@ -15,7 +27,7 @@ Add `nebulex` to your list dependencies in `mix.exs`:
 
 ```elixir
 def deps do
-  [{:nebulex, github: "cabol/nebulex"}]
+  [{:nebulex, "~> 1.0.0-rc.1"}]
 end
 ```
 
