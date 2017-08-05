@@ -27,17 +27,3 @@ defmodule Nebulex.VersionConflictError do
     %__MODULE__{message: msg, cached_vsn: cached.version, requested_vsn: version}
   end
 end
-
-defmodule Nebulex.RemoteProcedureCallError do
-  @moduledoc """
-  Raised at runtime when a RPC error occurs and forwards the remote
-  original exception.
-  """
-  defexception [:message]
-
-  @doc false
-  def exception(opts) do
-    {:EXIT, {remote_exception, _}} = Keyword.fetch!(opts, :exception)
-    remote_exception
-  end
-end

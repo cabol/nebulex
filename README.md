@@ -1,5 +1,6 @@
 # Nebulex
-> **Fast, flexible and powerful cache wrapper for Elixir.**
+> ### A fast, flexible and powerful caching library for Elixir.
+> – Not only local but also distributed!
 
 [![Build Status](https://travis-ci.org/cabol/nebulex.svg?branch=master)](https://travis-ci.org/cabol/nebulex)
 [![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
@@ -9,11 +10,11 @@
 
 * Built-in adapters
   - [Local generational cache](http://hexdocs.pm/nebulex/Nebulex.Adapters.Local.html)
-  - [Distributed cache](http://hexdocs.pm/nebulex/Nebulex.Adapters.Dist.html)
+  - [Distributed/Partitioned cache](http://hexdocs.pm/nebulex/Nebulex.Adapters.Dist.html)
   - [Multi-level cache](http://hexdocs.pm/nebulex/Nebulex.Adapters.Multilevel.html)
 * Support for different cache topologies setup (Partitioned, Near, ...)
 * Time-based expiration
-* Pre/post execution hooks
+* [Pre/post execution hooks](http://hexdocs.pm/nebulex/hooks.html)
 * Transactions (key-locking)
 * Key versioning – support for [optimistic offline locks](https://martinfowler.com/eaaCatalog/optimisticOfflineLock.html)
 * Optional statistics gathering

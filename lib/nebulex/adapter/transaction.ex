@@ -21,7 +21,7 @@ defmodule Nebulex.Adapter.Transaction  do
         if Process.get(cache), do: true, else: false
       end
 
-      defoverridable [transaction: 3]
+      defoverridable [transaction: 3, in_transaction?: 1]
 
       ## Helpers
 
@@ -43,13 +43,16 @@ defmodule Nebulex.Adapter.Transaction  do
       end
 
       defp set_locks(ids, nodes, retries) do
-        ids
-        |> Enum.reduce_while({:ok, []}, fn id, {:ok, acc} ->
-          case :global.set_lock(id, nodes, retries) do
-            true  -> {:cont, {:ok, [id | acc]}}
-            false -> {:halt, {:error, acc}}
+        maybe_set_lock =
+          fn(id, {:ok, acc}) ->
+            case :global.set_lock(id, nodes, retries) do
+              true  -> {:cont, {:ok, [id | acc]}}
+              false -> {:halt, {:error, acc}}
+            end
           end
-        end)
+
+        ids
+        |> Enum.reduce_while({:ok, []}, maybe_set_lock)
         |> case do
           {:ok, _} ->
             true

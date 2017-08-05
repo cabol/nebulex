@@ -1,12 +1,20 @@
 defmodule Nebulex.Adapters.Dist do
   @moduledoc """
-  Adapter module for Distributed Cache.
+  Adapter module for distributed or partitioned cache.
+
+  A distributed, or partitioned, cache is a clustered, fault-tolerant cache
+  that has linear scalability. Data is partitioned among all the machines
+  of the cluster. For fault-tolerance, partitioned caches can be configured
+  to keep each piece of data on one or more unique machines within a cluster.
+  This adapter in particular hasn't fault-tolerance built-in, each piece of
+  data is kept in a single node/machine (sharding), therefore, if a node fails,
+  the data kept by this node won't be available for the rest of the cluster.
 
   This adapter depends on a local cache adapter, it adds a thin layer
   on top of it in order to distribute requests across a group of nodes,
   where is supposed the local cache is running already.
 
-  This adapter uses PG2 to manage the cluster nodes. When the distributed
+  PG2 is used by the adapter to manage the cluster nodes. When the distributed
   cache is started in a node, it creates a PG2 group and joins it (the cache
   supervisor PID is joined to the group). Then, when a function is invoked,
   the adapter picks a node from the node list (using the PG2 group members),
@@ -118,6 +126,8 @@ defmodule Nebulex.Adapters.Dist do
     end
 
     quote do
+      alias Nebulex.Adapters.Local.Generation
+
       def __local__, do: unquote(local)
 
       def pick_node(key) do
@@ -133,16 +143,17 @@ defmodule Nebulex.Adapters.Dist do
       end
 
       def new_generation(opts \\ []) do
-        generations_handler = Nebulex.Adapters.Local.Generation
-        {res, _} = :rpc.multicall(nodes(), generations_handler, :new, [unquote(local), opts])
+        {res, _} = :rpc.multicall(nodes(), Generation, :new, [unquote(local), opts])
         res
       end
 
       def init(config) do
         :ok = :pg2.create(pg2_namespace())
+
         unless self() in :pg2.get_members(pg2_namespace()) do
           :ok = :pg2.join(pg2_namespace(), self())
         end
+
         {:ok, config}
       end
 
@@ -196,9 +207,7 @@ defmodule Nebulex.Adapters.Dist do
   @doc false
   def keys(cache) do
     cache.nodes
-    |> Enum.reduce([], fn(node, acc) ->
-      rpc_call(node, cache.__local__, :keys, []) ++ acc
-    end)
+    |> Enum.reduce([], fn(node, acc) -> rpc_call(node, cache.__local__, :keys, []) ++ acc end)
     |> :lists.usort()
   end
 
@@ -247,8 +256,10 @@ defmodule Nebulex.Adapters.Dist do
 
   defp rpc_call(node, mod, fun, args) do
     case :rpc.call(node, mod, fun, args) do
-      {:badrpc, ex} -> raise Nebulex.RemoteProcedureCallError, exception: ex
-      response      -> response
+      {:badrpc, {:EXIT, {remote_ex, _}}} ->
+        raise remote_ex
+      response ->
+        response
     end
   end
 end

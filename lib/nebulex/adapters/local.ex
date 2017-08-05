@@ -130,17 +130,20 @@ defmodule Nebulex.Adapters.Local do
     get(cache.__metadata__.generations, cache, key, opts, &elem(&1, 1))
   end
 
-  defp get([newest | _] = generations, cache, key, opts, post_hook \\ &(&1)) do
-    cache
-    |> do_get(newest, key, opts)
-    |> case do
-      nil -> retrieve(generations, cache, key, opts)
-      ret -> {newest, ret}
-    end
+  defp get(generations, cache, key, opts, post_hook \\ &(&1)) do
+    generations
+    |> do_get(cache, key, opts)
     |> post_hook.()
   end
 
-  defp do_get(cache, gen, key, opts, fun \\ :get) do
+  defp do_get([newest | _] = generations, cache, key, opts) do
+    case fetch(cache, newest, key, opts) do
+      nil -> retrieve(generations, cache, key, opts)
+      ret -> {newest, ret}
+    end
+  end
+
+  defp fetch(cache, gen, key, opts, fun \\ :get) do
     Local
     |> apply(fun, [gen, key, nil, cache.__state__])
     |> validate_vsn(:get, opts)
@@ -150,7 +153,7 @@ defmodule Nebulex.Adapters.Local do
 
   defp retrieve([newest | olders], cache, key, opts) do
     Enum.reduce_while(olders, {newest, nil}, fn(gen, {newer, _}) ->
-      if object = do_get(cache, gen, key, ret_obj(opts), :pop) do
+      if object = fetch(cache, gen, key, ret_obj(opts), :pop) do
         {:halt, {gen, do_set(object, newer, cache, opts)}}
       else
         {:cont, {gen, nil}}
@@ -198,15 +201,17 @@ defmodule Nebulex.Adapters.Local do
     generations = cache.__metadata__.generations
 
     opts[:version]
-    |> if do
-      generations
-      |> get(cache, key, [return: :object, on_conflict: :nothing], &elem(&1, 1))
-      |> validate_vsn(:delete, opts)
-    else
-      Object.new(key)
-    end
+    |> maybe_validate_vsn(generations, cache, key, opts)
     |> do_delete(generations, cache.__state__)
     |> Map.fetch!(:key)
+  end
+
+  defp maybe_validate_vsn(nil, _, _, key, _),
+    do: Object.new(key)
+  defp maybe_validate_vsn(_version, generations, cache, key, opts) do
+    generations
+    |> get(cache, key, [return: :object, on_conflict: :nothing], &elem(&1, 1))
+    |> validate_vsn(:delete, opts)
   end
 
   defp do_delete(nil, _, _),
@@ -248,9 +253,7 @@ defmodule Nebulex.Adapters.Local do
   @doc false
   def keys(cache) do
     cache.__metadata__.generations
-    |> Enum.reduce([], fn(gen, acc) ->
-      Local.keys(gen, cache.__state__) ++ acc
-    end)
+    |> Enum.reduce([], fn(gen, acc) -> Local.keys(gen, cache.__state__) ++ acc end)
     |> :lists.usort()
   end
 

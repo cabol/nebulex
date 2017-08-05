@@ -3,8 +3,8 @@ defmodule Nebulex.Cache do
   Cache Main Interface.
 
   A Cache maps to an underlying implementation, controlled by the
-  adapter. For example, Nebulex ships with a defaukt adapter that
-  implements a Generational Cache.
+  adapter. For example, Nebulex ships with a default adapter that
+  implements a local generational cache.
 
   When used, the Cache expects the `:otp_app` as option.
   The `:otp_app` should point to an OTP application that has
@@ -25,16 +25,18 @@ defmodule Nebulex.Cache do
   for more information. However, some configuration is shared across
   all adapters, they are:
 
-    * `:adapter` - a compile-time option that specifies the adapter itself
+    * `:adapter` - a compile-time option that specifies the adapter itself.
+      As a compile-time option, it may also be given as an option to
+      `use Nebulex.Cache`.
 
     * `:stats` - a compile-time option that specifies if cache statistics
       is enabled or not (defaults to `false`).
 
     * `:pre_hooks_strategy` - a compile-time option that determinates the
-      strategy how pre-hooks will be executed – see hooks strategies.
+      strategy how pre-hooks will be executed – see pre/post hooks below.
 
     * `:post_hooks_strategy` - a compile-time option that determinates the
-      strategy how post-hooks will be executed – see hooks strategies.
+      strategy how post-hooks will be executed – see pre/post hooks below.
 
     * `:version_generator` - this option specifies the module that
       implements the `Nebulex.Version` interface. This interface
@@ -42,9 +44,13 @@ defmodule Nebulex.Cache do
       the adapters to generate new object versions. If this option
       is not set, it defaults to `Nebulex.Version.Default`.
 
-  ## Pre/Post hooks strategies
+  ## Pre/Post hooks
 
-  It is possible to configure the strategy how the hooks are evaluated,
+  The cache can also provide its own pre/post hooks implementation; see
+  `Nebulex.Cache.Hook` behaviour. By default, pre/post hooks are empty lists,
+  but again, you can override the functions of `Nebulex.Cache.Hook` behaviour.
+
+  Besides, it is possible to configure the strategy how the hooks are evaluated,
   the available strategies are:
 
     * `:async` - (the default) all hooks are evaluated asynchronously
@@ -87,12 +93,12 @@ defmodule Nebulex.Cache do
   @type opts    :: Keyword.t
   @type return  :: key | value | object
   @type reducer :: ({key, return}, acc_in :: any -> acc_out :: any)
-  @type hook    :: (result :: any, {t, action :: atom, args :: [any]} -> any)
 
   @doc false
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       @behaviour Nebulex.Cache
+      @behaviour Nebulex.Cache.Hook
 
       {otp_app, adapter, config} = Nebulex.Cache.Supervisor.compile_config(__MODULE__, opts)
       @otp_app otp_app
@@ -194,7 +200,7 @@ defmodule Nebulex.Cache do
 
       defp execute(action, args) do
         action
-        |> eval_pre_hooks(args, pre_hooks())
+        |> eval_pre_hooks(args)
         |> apply(action, [__MODULE__ | args])
         |> eval_post_hooks(action, args)
       end
@@ -202,8 +208,8 @@ defmodule Nebulex.Cache do
       @pre_hooks_strategy Keyword.get(@config, :pre_hooks_strategy, :async)
       @post_hooks_strategy Keyword.get(@config, :post_hooks_strategy, :async)
 
-      defp eval_pre_hooks(action, args, hooks) do
-        _ = eval_hooks(hooks, @pre_hooks_strategy, action, args, nil)
+      defp eval_pre_hooks(action, args) do
+        _ = eval_hooks(pre_hooks(), @pre_hooks_strategy, action, args, nil)
         @adapter
       end
 
@@ -242,7 +248,7 @@ defmodule Nebulex.Cache do
     end
   end
 
-  @optional_callbacks [init: 1, transaction: 2, in_transaction?: 0, pre_hooks: 0, post_hooks: 0]
+  @optional_callbacks [init: 1, transaction: 2, in_transaction?: 0]
 
   @doc """
   Returns the adapter tied to the cache.
@@ -675,48 +681,4 @@ defmodule Nebulex.Cache do
       end)
   """
   @callback in_transaction?() :: boolean
-
-  @doc """
-  Returns a list of hook functions that will be executed before invoke the
-  cache action.
-
-  ## Examples
-
-      defmodule MyCache do
-        use Nebulex.Cache, adapter: Nebulex.Adapters.Local
-
-        def pre_hooks do
-          pre_hook =
-            fn
-              (result, {_, :get, _} = call) ->
-                # do your stuff ...
-              (result, _) ->
-                result
-            end
-          [pre_hook]
-        end
-      end
-  """
-  @callback pre_hooks() :: [hook]
-
-  @doc """
-  Returns a list of hook functions that will be executed after invoke the
-  cache action.
-
-  ## Examples
-
-      defmodule MyCache do
-        use Nebulex.Cache, adapter: Nebulex.Adapters.Local
-
-        def post_hooks do
-          [&post_hook/2]
-        end
-
-        def post_hook(result, {_, :set, _} = call),
-          do: send(:hooked_cache, call)
-        def post_hook(_, _),
-          do: :noop
-      end
-  """
-  @callback post_hooks() :: [hook]
 end

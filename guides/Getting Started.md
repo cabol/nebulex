@@ -12,10 +12,10 @@ Nebulex Adapter               | Description
 :---------------------------- | :-----------------------
 `Nebulex.Adapters.Local`      | Local Generational Cache
 `Nebulex.Adapters.Dist`       | Distributed Cache
-`Nebulex.Adapters.Multilevel` | Multilevel Cache
+`Nebulex.Adapters.Multilevel` | Multi-level Cache
 
-In this guide, we're going to learn some basics about Nebulex, such as setting,
-retrieving and destroying cache entries (key/value pairs).
+In this guide, we're going to learn some basics about Nebulex, such as set,
+retrieve and destroy cache entries (key/value pairs).
 
 ## Adding Nebulex to an application
 
@@ -325,6 +325,10 @@ def start(_type, _args) do
 
 Now we are ready to start using our distributed cache!
 
+To learn more about how distributed cache works, please check
+`Nebulex.Adapters.Dist` documentation, and also it is recommended see the
+[partitioned cache example](https://github.com/cabol/nebulex_examples/tree/master/partitioned_cache)
+
 ## Multilevel Cache
 
 Nebulex also provides the adapter `Nebulex.Adapters.Multilevel`, which allows to
@@ -410,4 +414,9 @@ As you can see the date is now cached in out local cache `Blog.Cache`, the
 multi-level cache did the work.
 
 To learn more about how multilevel-cache works, please check
-`Nebulex.Adapters.Multilevel` documentation.
+`Nebulex.Adapters.Multilevel` documentation, and also it is recommended see the
+[near cache example](https://github.com/cabol/nebulex_examples/tree/master/near_cache)
+
+## Pre/Post Hooks
+
+See [hooks documentation](http://hexdocs.pm/nebulex/hooks.html).

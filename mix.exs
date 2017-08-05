@@ -1,7 +1,7 @@
 defmodule Nebulex.Mixfile do
   use Mix.Project
 
-  @version "1.0.0-rc.1"
+  @version "1.0.0-rc.2"
 
   def project do
     [app: :nebulex,
@@ -13,7 +13,7 @@ defmodule Nebulex.Mixfile do
      test_coverage: [tool: ExCoveralls],
      preferred_cli_env: ["coveralls": :test, "coveralls.detail": :test, "coveralls.post": :test, "coveralls.html": :test],
      dialyzer: dialyzer(),
-     description: "Local and Distributed Caching Tool for Elixir"]
+     description: "Fast, flexible and powerful cache wrapper for Elixir"]
   end
 
   def application do
@@ -47,7 +47,7 @@ defmodule Nebulex.Mixfile do
     [source_ref: "v#{@version}", main: "Nebulex",
      canonical: "http://hexdocs.pm/nebulex",
      source_url: "https://github.com/cabol/nebulex",
-     extras: ["guides/Getting Started.md"]]
+     extras: ["guides/Getting Started.md", "guides/Hooks.md"]]
   end
 
   defp dialyzer do

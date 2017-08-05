@@ -200,14 +200,17 @@ defmodule Nebulex.Adapters.Multilevel do
       end)
   """
   def get(cache, key, opts) do
-    cache.__levels__
-    |> Enum.reduce_while({nil, []}, fn(current, {_, prev}) ->
-      if object = current.get(key, Keyword.put(opts, :return, :object)) do
-        {:halt, {object, [current | prev]}}
-      else
-        {:cont, {nil, [current | prev]}}
+    fun =
+      fn(current, {_, prev}) ->
+        if object = current.get(key, Keyword.put(opts, :return, :object)) do
+          {:halt, {object, [current | prev]}}
+        else
+          {:cont, {nil, [current | prev]}}
+        end
       end
-    end)
+
+    cache.__levels__
+    |> Enum.reduce_while({nil, []}, fun)
     |> maybe_fallback(cache, key, opts)
     |> maybe_replicate_data(cache)
     |> validate_return(opts)
@@ -307,9 +310,7 @@ defmodule Nebulex.Adapters.Multilevel do
   """
   def keys(cache) do
     cache.__levels__
-    |> Enum.reduce([], fn(level_cache, acc) ->
-      level_cache.keys() ++ acc
-    end)
+    |> Enum.reduce([], fn(level_cache, acc) -> level_cache.keys() ++ acc end)
     |> :lists.usort()
   end
 
@@ -420,6 +421,7 @@ defmodule Nebulex.Adapters.Multilevel do
       Enum.reduce(cache.__levels__, [], fn(level, acc) ->
         [level.in_transaction?() | acc]
       end)
+
     true in results
   end
 
@@ -465,12 +467,13 @@ defmodule Nebulex.Adapters.Multilevel do
   defp maybe_replicate_data({%Object{value: nil}, _}, _),
     do: nil
   defp maybe_replicate_data({object, levels}, cache) do
-    cache.__model__
-    |> case do
-      :exclusive -> []
-      :inclusive -> levels
-    end
-    |> Enum.reduce(object, &(&1.set(&2.key, &2.value, return: :object)))
+    replicas =
+      case cache.__model__ do
+        :exclusive -> []
+        :inclusive -> levels
+      end
+
+    Enum.reduce(replicas, object, &(&1.set(&2.key, &2.value, return: :object)))
   end
 
   defp validate_return(nil, _),
