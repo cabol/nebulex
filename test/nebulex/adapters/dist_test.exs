@@ -11,7 +11,6 @@ defmodule Nebulex.Adapters.DistTest do
   setup do
     {:ok, local} = Local.start_link
     {:ok, dist} = Dist.start_link
-
     node_pid_list = start_caches(Node.list(), [Local, Dist])
     :ok
 
@@ -19,7 +18,6 @@ defmodule Nebulex.Adapters.DistTest do
       _ = :timer.sleep(100)
       if Process.alive?(local), do: Local.stop(local, 1)
       if Process.alive?(dist), do: Dist.stop(dist, 1)
-
       stop_caches(node_pid_list)
     end
   end

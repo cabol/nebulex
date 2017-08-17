@@ -271,7 +271,7 @@ defmodule Nebulex.MultilevelTest do
       test "in_transaction?" do
         refute @cache.in_transaction?
 
-        _ = @cache.transaction fn ->
+        @cache.transaction fn ->
           _ = @cache.set(1, 11, return: :key)
           true = @cache.in_transaction?
         end

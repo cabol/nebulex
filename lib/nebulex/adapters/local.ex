@@ -28,7 +28,7 @@ defmodule Nebulex.Adapters.Local do
       creates uses `:read_concurrency` or not (default: true).
 
     * `:write_concurrency` - Indicates whether the tables that `ExShards`
-      creates uses `:write_concurrency` or not (default: false).
+      creates uses `:write_concurrency` or not (default: true).
 
     * `:gc_interval` - Interval time in seconds to garbage collection to run,
       delete the oldest generation and create a new one. If this option is
@@ -89,8 +89,8 @@ defmodule Nebulex.Adapters.Local do
     config = Module.get_attribute(cache, :config)
     n_shards = Keyword.get(config, :n_shards, System.schedulers_online())
     r_concurrency = Keyword.get(config, :read_concurrency, true)
-    w_concurrency = Keyword.get(config, :write_concurrency, false)
-    vsn_generator = Keyword.get(config, :version_generator, Nebulex.Version.Default)
+    w_concurrency = Keyword.get(config, :write_concurrency, true)
+    vsn_generator = Keyword.get(config, :version_generator)
     shards_sup_name = Module.concat([cache, LocalSupervisor])
 
     quote do
@@ -111,9 +111,15 @@ defmodule Nebulex.Adapters.Local do
          write_concurrency: unquote(w_concurrency)]
       end
 
-      def __version__, do: unquote(vsn_generator)
-
       def new_generation(opts \\ []), do: Generation.new(__MODULE__, opts)
+
+      if unquote(vsn_generator) do
+        def generate_vsn(obj) do
+          unquote(vsn_generator).generate(obj)
+        end
+      else
+        def generate_vsn(_), do: nil
+      end
     end
   end
 
@@ -183,7 +189,7 @@ defmodule Nebulex.Adapters.Local do
   defp do_set(%Object{value: nil}, _gen, _cache, _opts),
     do: nil
   defp do_set(object, gen, cache, opts) do
-    version = cache.__version__.generate(object)
+    version = cache.generate_vsn(object)
     ttl = seconds_since_epoch(opts[:ttl])
 
     %{object | version: version, ttl: ttl}
