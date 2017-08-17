@@ -178,19 +178,16 @@ It returns `true` if the ket exist and `false` otherwise.
 
 ### Fetching all entries
 
-To fetch all entries from cache, Nebulex provides the `all` function:
+To fetch all entries from cache, Nebulex provides `to_map` function:
 
 ```elixir
-Blog.Cache.all
+Blog.Cache.to_map
 ```
 
-By default, it returns all keys, but gain, you can request to return either the
-key, value or object.
+By default, it returns all values, but gain, you can request to return the objects.
 
 ```elixir
-Blog.Cache.all(return: :value)
-
-Blog.Cache.all(return: :object)
+Blog.Cache.to_map(return: :object)
 ```
 
 ## Updating entries
