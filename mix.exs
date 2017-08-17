@@ -1,3 +1,5 @@
+Enum.each Path.wildcard("bench/tasks/*.exs"), &Code.require_file/1
+
 defmodule Nebulex.Mixfile do
   use Mix.Project
 
@@ -26,6 +28,7 @@ defmodule Nebulex.Mixfile do
      # Test
      {:excoveralls, "~> 0.6", only: :test},
      {:mock, "~> 0.2", only: :test},
+     {:benchfella, "~> 0.3", optional: true, only: [:dev, :test]},
 
      # Code Analysis
      {:dialyxir, "~> 0.5", only: :dev, runtime: false},

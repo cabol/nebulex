@@ -22,7 +22,7 @@ defmodule Mix.Tasks.Nebulex do
   defp general do
     {:ok, _} = Application.ensure_all_started(:nebulex)
     Mix.shell.info "Nebulex v#{Application.spec(:nebulex, :vsn)}"
-    Mix.shell.info "Local and Distributed Caching Tool for Elixir."
+    Mix.shell.info "A fast, flexible and powerful caching library for Elixir."
     Mix.shell.info "\nAvailable tasks:\n"
     Mix.Tasks.Help.run(["--search", "nebulex."])
   end

@@ -8,6 +8,8 @@
 
 ## Features
 
+* Simple and fluent API inspired by [Ecto](https://github.com/elixir-ecto/ecto)
+* Flexible and pluggable architecture like Ecto – based on [adapter pattern](https://en.wikipedia.org/wiki/Adapter_pattern)
 * Built-in adapters
   - [Local generational cache](http://hexdocs.pm/nebulex/Nebulex.Adapters.Local.html)
   - [Distributed/Partitioned cache](http://hexdocs.pm/nebulex/Nebulex.Adapters.Dist.html)
@@ -110,3 +112,20 @@ $ epmd -daemon
 ```
 
 before running the tests.
+
+## Benchmarks
+
+Simple and/or basic benchmarks were added using [benchfella](https://github.com/alco/benchfella);
+to learn more, see the [bench](./bench) directory.
+
+To run the benchmarks:
+
+```
+$ mix nebulex.bench
+```
+
+## Copyright and License
+
+Copyright (c) 2017, Carlos Bolaños.
+
+Nebulex source code is licensed under the [MIT License](LICENSE).

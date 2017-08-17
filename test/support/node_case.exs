@@ -51,14 +51,15 @@ defmodule Nebulex.NodeCase do
     parent = self()
     ref = make_ref()
 
-    pid = Node.spawn_link(node, fn ->
-      result = func.()
-      send parent, {ref, result}
-      ref = Process.monitor(parent)
-      receive do
-        {:DOWN, ^ref, :process, _, _} -> :ok
-      end
-    end)
+    pid =
+      Node.spawn_link(node, fn ->
+        result = func.()
+        send parent, {ref, result}
+        ref = Process.monitor(parent)
+        receive do
+          {:DOWN, ^ref, :process, _, _} -> :ok
+        end
+      end)
 
     receive do
       {^ref, result} -> {pid, result}

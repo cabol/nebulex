@@ -135,13 +135,15 @@ defmodule Nebulex.CacheTest do
       end
 
       test "flush" do
-        @cache.new_generation
-        for x <- 1..100, do: @cache.set(x, x)
+        Enum.each(1..2, fn _ ->
+          @cache.new_generation
+          for x <- 1..100, do: @cache.set(x, x)
 
-        assert @cache.flush == :ok
-        _ = :timer.sleep(500)
+          assert @cache.flush == :ok
+          _ = :timer.sleep(500)
 
-        for x <- 1..100, do: refute @cache.get(x)
+          for x <- 1..100, do: refute @cache.get(x)
+        end)
       end
 
       test "keys" do
@@ -276,7 +278,7 @@ defmodule Nebulex.CacheTest do
 
         refute @cache.in_transaction?
 
-        _ = @cache.transaction fn ->
+        @cache.transaction fn ->
           _ = @cache.set(1, 11, return: :key)
           true = @cache.in_transaction?
         end

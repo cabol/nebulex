@@ -42,7 +42,7 @@ defmodule Nebulex.Cache do
       implements the `Nebulex.Version` interface. This interface
       defines only one callback `generate/1` that is invoked by
       the adapters to generate new object versions. If this option
-      is not set, it defaults to `Nebulex.Version.Default`.
+      is not set, then the version is set to `nil` by default.
 
   ## Pre/Post hooks
 
@@ -128,7 +128,7 @@ defmodule Nebulex.Cache do
       end
 
       def get!(key, opts \\ []) do
-        case get(key, opts) do
+        case execute(:get, [key, opts]) do
           nil -> raise KeyError, key: key, term: __MODULE__
           val -> val
         end

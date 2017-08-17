@@ -30,7 +30,7 @@ defmodule Nebulex.TestCache do
     end
   end
 
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Local, [n_shards: 2])
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Local, [n_shards: 2, version_generator: Nebulex.Version.Timestamp])
 
   defmodule Local do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
@@ -64,7 +64,7 @@ defmodule Nebulex.TestCache do
   end
 
   for mod <- [Nebulex.TestCache.LocalWithGC, Nebulex.TestCache.DistLocal] do
-    Application.put_env(:nebulex, mod, [n_shards: 2, gc_interval: 3600])
+    :ok = Application.put_env(:nebulex, mod, [n_shards: 2, gc_interval: 3600, version_generator: Nebulex.Version.Timestamp])
 
     defmodule mod do
       use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
@@ -92,17 +92,21 @@ defmodule Nebulex.TestCache do
   end
 
   for mod <- [Nebulex.TestCache.Multilevel, Nebulex.TestCache.MultilevelExclusive] do
-    levels = for l <- 1..3 do
-      level = String.to_atom("#{mod}.L#{l}")
-      :ok = Application.put_env(:nebulex, level, [n_shards: 2, gc_interval: 3600])
-      level
-    end
-    config = case mod do
-      Nebulex.TestCache.Multilevel ->
-        [levels: levels, fallback: &mod.fallback/1]
-      _ ->
-        [cache_model: :exclusive, levels: levels, fallback: &mod.fallback/1]
-    end
+    levels =
+      for l <- 1..3 do
+        level = String.to_atom("#{mod}.L#{l}")
+        :ok = Application.put_env(:nebulex, level, [n_shards: 2, gc_interval: 3600])
+        level
+      end
+
+    config =
+      case mod do
+        Nebulex.TestCache.Multilevel ->
+          [levels: levels, fallback: &mod.fallback/1]
+        _ ->
+          [cache_model: :exclusive, levels: levels, fallback: &mod.fallback/1]
+      end
+
     :ok = Application.put_env(:nebulex, mod, config)
 
     defmodule mod do
