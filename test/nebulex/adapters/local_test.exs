@@ -2,6 +2,7 @@ defmodule Nebulex.Adapters.LocalTest do
   use ExUnit.Case, async: true
   use Nebulex.CacheTest, cache: Nebulex.TestCache.Local
 
+  alias Nebulex.Object
   alias Nebulex.TestCache.Local, as: TestCache
 
   setup do
@@ -78,6 +79,24 @@ defmodule Nebulex.Adapters.LocalTest do
     end
   end
 
+  test "incr with update" do
+    TestCache.new_generation
+
+    assert TestCache.update_counter(:counter) == 1
+    assert TestCache.update_counter(:counter) == 2
+
+    assert TestCache.get_and_update(:counter, &({&1, &1 * 2})) == {2, 4}
+    assert TestCache.update_counter(:counter) == 5
+
+    assert TestCache.update(:counter, 1, &(&1 * 2)) == 10
+    assert TestCache.update_counter(:counter, -10) == 0
+
+    TestCache.set("foo", "bar")
+    assert_raise ArgumentError, fn ->
+      TestCache.update_counter("foo")
+    end
+  end
+
   test "push generations" do
     # create 1st generation
     TestCache.new_generation
@@ -135,5 +154,10 @@ defmodule Nebulex.Adapters.LocalTest do
     |> get_from(key)
   end
 
-  defp get_from(gen, key), do: ExShards.Local.get(gen, key, nil, TestCache.__state__)
+  defp get_from(gen, key) do
+    case ExShards.Local.lookup(gen, key, TestCache.__state__) do
+      []                      -> nil
+      [{^key, val, vsn, ttl}] -> %Object{key: key, value: val, version: vsn, ttl: ttl}
+    end
+  end
 end

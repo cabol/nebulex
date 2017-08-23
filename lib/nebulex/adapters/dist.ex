@@ -242,6 +242,11 @@ defmodule Nebulex.Adapters.Dist do
     call(cache, :update, [key, initial, fun, opts])
   end
 
+  @doc false
+  def update_counter(cache, key, incr, opts) do
+    call(cache, :update_counter, [key, incr, opts])
+  end
+
   ## Private Functions
 
   defp call(cache, fun, [key | _] = args) do

@@ -392,6 +392,22 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @doc """
+  Updates (increment or decrement) the counter mapped to the given `key`.
+
+  ## Options
+
+    * `:level` - Check shared options in module documentation.
+
+  ## Example
+
+      # Counter is incremented at first cache level
+      MyCache.update_counter("foo", "bar")
+  """
+  def update_counter(cache, key, incr, opts) do
+    eval(cache, :update_counter, [key, incr, opts], opts)
+  end
+
+  @doc """
   Runs the given function inside a transaction.
 
   A successful transaction returns the value returned by the function.

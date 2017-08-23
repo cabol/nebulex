@@ -85,4 +85,9 @@ defmodule DistBench do
     Dist.update(:non_existent, 1, &Dist.update_fun/1)
     :ok
   end
+
+  bench "update_counter" do
+    Dist.update_counter(bench_context, 1)
+    :ok
+  end
 end

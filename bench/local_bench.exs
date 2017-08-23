@@ -84,4 +84,9 @@ defmodule LocalBench do
     Cache.update(bench_context, 1, &(&1))
     :ok
   end
+
+  bench "update_counter" do
+    Cache.update_counter(bench_context, 1)
+    :ok
+  end
 end

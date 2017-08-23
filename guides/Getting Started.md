@@ -220,6 +220,23 @@ end)
 Blog.Cache.update(1, initial, &(%{&1 | first_name: "Y"}))
 ```
 
+## Updating counters
+
+Nebulex also provides the function `update_counter` in order to handle counters,
+increments and decrements; by default, a counter is set/initialized to `0`.
+Let's see how counters works:
+
+```elixir
+# by default, the counter is incremented by 1
+Blog.Cache.update_counter(:my_counter)
+
+# but we can also provide a custom increment value
+Blog.Cache.update_counter(:my_counter, 5)
+
+# to decrement the counter, just pass a negative value
+Blog.Cache.update_counter(:my_counter, -5)
+```
+
 ## Deleting entries
 
 We’ve now covered inserting (`set`), reading (`get`, `get!`, `all`) and updating

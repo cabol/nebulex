@@ -112,4 +112,11 @@ defmodule Nebulex.Adapter do
   See `Nebulex.Cache.update/4`.
   """
   @callback update(cache, key, initial :: value, (value -> value), opts) :: value | no_return
+
+  @doc """
+  Updates (increment or decrement) the counter mapped to the given `key`.
+
+  See `Nebulex.Cache.update_counter/3`.
+  """
+  @callback update_counter(cache, key, incr :: integer, opts) :: integer | no_return
 end

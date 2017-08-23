@@ -221,6 +221,36 @@ defmodule Nebulex.CacheTest do
         end
       end
 
+      test "update_counter" do
+        @cache.new_generation
+
+        assert @cache.update_counter(:counter) == 1
+        assert @cache.update_counter(:counter) == 2
+        assert @cache.update_counter(:counter, 2) == 4
+        assert @cache.update_counter(:counter, 3) == 7
+        assert @cache.update_counter(:counter, 0) == 7
+
+        assert @cache.get(:counter) == 7
+
+        assert @cache.update_counter(:counter, -1) == 6
+        assert @cache.update_counter(:counter, -1) == 5
+        assert @cache.update_counter(:counter, -2) == 3
+        assert @cache.update_counter(:counter, -3) == 0
+
+        expected_counter_obj = %Object{key: :counter, value: 0, ttl: :infinity}
+        assert @cache.get(:counter, return: :object) == expected_counter_obj
+
+        assert @cache.update_counter(:counter_with_ttl, 1, ttl: 1) == 1
+        assert @cache.update_counter(:counter_with_ttl) == 2
+        assert @cache.get(:counter_with_ttl) == 2
+        _ = :timer.sleep(1010)
+        refute @cache.get(:counter_with_ttl)
+
+        assert_raise ArgumentError, fn ->
+          @cache.update_counter(:counter, "foo")
+        end
+      end
+
       test "key expiration with ttl" do
         @cache.new_generation
 
@@ -229,8 +259,7 @@ defmodule Nebulex.CacheTest do
           |> @cache.set(11, ttl: 1, return: :key)
           |> @cache.get!
 
-        _ = :timer.sleep 1010
-
+        _ = :timer.sleep(1010)
         refute @cache.get(1)
       end
 

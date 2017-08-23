@@ -233,6 +233,29 @@ defmodule Nebulex.MultilevelTest do
         assert @l3.get(2) == 4
       end
 
+      test "update_counter" do
+        assert @cache.update_counter(1) == 1
+        assert @l1.get(1) == 1
+        refute @l2.get(1)
+        refute @l3.get(1)
+
+        assert @cache.update_counter(2, 2, level: 2) == 2
+        assert @l2.get(2) == 2
+        refute @l1.get(2)
+        refute @l3.get(2)
+
+        assert @cache.update_counter(3, 3, level: :all) == 3
+        assert @l1.get(3) == 3
+        assert @l2.get(3) == 3
+        assert @l3.get(3) == 3
+
+        assert @cache.update_counter(4, 5, level: :all) == 5
+        assert @cache.update_counter(4, -5, level: :all) == 0
+        assert @l1.get(4) == 0
+        assert @l2.get(4) == 0
+        assert @l3.get(4) == 0
+      end
+
       test "transaction" do
         refute @cache.transaction fn ->
           @cache.set(1, 11, return: :key)
