@@ -149,9 +149,9 @@ defmodule Nebulex.Adapters.Local do
     end
   end
 
-  defp fetch(cache, gen, key, opts, fun \\ :get) do
-    Local
-    |> apply(fun, [gen, key, nil, cache.__state__])
+  defp fetch(cache, gen, key, opts, fun \\ &local_get/4) do
+    fun
+    |> apply([gen, key, nil, cache.__state__])
     |> validate_vsn(:get, opts)
     |> validate_ttl(gen, cache)
     |> validate_return(opts)
@@ -159,7 +159,7 @@ defmodule Nebulex.Adapters.Local do
 
   defp retrieve([newest | olders], cache, key, opts) do
     Enum.reduce_while(olders, {newest, nil}, fn(gen, {newer, _}) ->
-      if object = fetch(cache, gen, key, ret_obj(opts), :pop) do
+      if object = fetch(cache, gen, key, ret_obj(opts), &local_pop/4) do
         {:halt, {gen, do_set(object, newer, cache, opts)}}
       else
         {:cont, {gen, nil}}
@@ -197,9 +197,9 @@ defmodule Nebulex.Adapters.Local do
     |> validate_return(opts)
   end
 
-  defp set_object(object, gen, cache) do
-    _ = Local.put(gen, object.key, object, cache.__state__)
-    object
+  defp set_object(obj, gen, cache) do
+    _ = Local.insert(gen, {obj.key, obj.value, obj.version, obj.ttl}, cache.__state__)
+    obj
   end
 
   @doc false
@@ -258,16 +258,20 @@ defmodule Nebulex.Adapters.Local do
 
   @doc false
   def keys(cache) do
+    ms = [{{:"$1", :_, :_, :_}, [], [:"$1"]}]
+
     cache.__metadata__.generations
-    |> Enum.reduce([], fn(gen, acc) -> Local.keys(gen, cache.__state__) ++ acc end)
+    |> Enum.reduce([], fn(gen, acc) -> Local.select(gen, ms, cache.__state__) ++ acc end)
     |> :lists.usort()
   end
 
   @doc false
   def reduce(cache, acc_in, fun, opts) do
     Enum.reduce(cache.__metadata__.generations, acc_in, fn(gen, acc) ->
-      Local.foldl(fn({key, object}, fold_acc) ->
-        return = validate_return(object, opts)
+      Local.foldl(fn({key, val, vsn, ttl}, fold_acc) ->
+        return =
+          %Object{key: key, value: val, version: vsn, ttl: ttl}
+          |> validate_return(opts)
         fun.({key, return}, fold_acc)
       end, acc, gen, cache.__state__)
     end)
@@ -277,8 +281,11 @@ defmodule Nebulex.Adapters.Local do
   def to_map(cache, opts) do
     match_spec =
       case Keyword.get(opts, :return, :key) do
-        :object -> [{{:"$1", :"$2"}, [], [{{:"$1", :"$2"}}]}]
-        _       -> [{{:"$1", %{value: :"$2"}}, [], [{{:"$1", :"$2"}}]}]
+        :object ->
+          object_match = %Object{key: :"$1", value: :"$2", version: :"$3", ttl: :"$4"}
+          [{{:"$1", :"$2", :"$3", :"$4"}, [], [{{:"$1", object_match}}]}]
+        _ ->
+          [{{:"$1", :"$2", :_, :_}, [], [{{:"$1", :"$2"}}]}]
       end
 
     Enum.reduce(cache.__metadata__.generations, %{}, fn(gen, acc) ->
@@ -337,6 +344,19 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @doc false
+  def update_counter(cache, key, incr, opts) do
+    ttl = seconds_since_epoch(opts[:ttl])
+
+    try do
+      cache.__metadata__.generations
+      |> hd()
+      |> Local.update_counter(key, {2, incr}, {key, 0, nil, ttl}, cache.__state__)
+    rescue
+      _e -> raise ArgumentError, "key #{inspect(key)} has not a valid integer value"
+    end
+  end
+
+  @doc false
   def transaction(cache, opts, fun) do
     keys  = opts[:keys] || []
     nodes = opts[:nodes] || [node()]
@@ -345,6 +365,20 @@ defmodule Nebulex.Adapters.Local do
   end
 
   ## Helpers
+
+  defp local_get(tab, key, default, state) do
+    case Local.lookup(tab, key, state) do
+      []                      -> default
+      [{^key, val, vsn, ttl}] -> %Object{key: key, value: val, version: vsn, ttl: ttl}
+    end
+  end
+
+  def local_pop(tab, key, default, state) do
+    case Local.take(tab, key, state) do
+      []                      -> default
+      [{^key, val, vsn, ttl}] -> %Object{key: key, value: val, version: vsn, ttl: ttl}
+    end
+  end
 
   defp on_conflict(nil, :get, _, _),
     do: nil
@@ -393,7 +427,7 @@ defmodule Nebulex.Adapters.Local do
 
   defp validate_return(nil, _),
     do: nil
-  defp validate_return(object, opts) do
+  defp validate_return(%Object{} = object, opts) do
     case Keyword.get(opts, :return, :value) do
       :object -> object
       :value  -> object.value

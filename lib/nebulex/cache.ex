@@ -128,7 +128,7 @@ defmodule Nebulex.Cache do
       end
 
       def get!(key, opts \\ []) do
-        case execute(:get, [key, opts]) do
+        case get(key, opts) do
           nil -> raise KeyError, key: key, term: __MODULE__
           val -> val
         end
@@ -177,6 +177,12 @@ defmodule Nebulex.Cache do
       def update(key, initial, fun, opts \\ []) do
         execute(:update, [key, initial, fun, opts])
       end
+
+      def update_counter(key, incr \\ 1, opts \\ [])
+      def update_counter(key, incr, opts) when is_integer(incr),
+        do: execute(:update_counter, [key, incr, opts])
+      def update_counter(_key, incr, _opts),
+        do: raise ArgumentError, "the incr must be a valid integer, got: #{inspect incr}"
 
       if function_exported?(@adapter, :transaction, 3) do
         def transaction(fun, opts \\ []) do
@@ -648,6 +654,31 @@ defmodule Nebulex.Cache do
       2 = MyCache.update(:a, 1, &(&1 * 2))
   """
   @callback update(key, initial :: value, (value -> value), opts) :: value | no_return
+
+  @doc """
+  Updates (increment or decrement) the counter mapped to the given `key`.
+
+  If `incr >= 0` then the current value is incremented by that amount,
+  otherwise the current value is decremented.
+
+  If `incr` is not a valid integer, then an `ArgumentError` exception
+  is raised.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
+
+  ## Examples
+
+      1 = MyCache.update_counter(:a)
+
+      3 = MyCache.update_counter(:a, 2)
+
+      2 = MyCache.update_counter(:a, -1)
+
+      %Nebulex.Object{key: :a, value: 2} = MyCache.update_counter(:a, 0, return: :object)
+  """
+  @callback update_counter(key, incr :: integer, opts) :: integer | no_return
 
   @doc """
   Runs the given function inside a transaction.
