@@ -21,8 +21,10 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       assert length(TestCache.__metadata__.generations) == i
     end
 
-    _ = :timer.sleep(1010)
-    assert length(TestCache.__metadata__.generations) == 3
+    for _ <- 1..12 do
+      _ = :timer.sleep(1010)
+      assert length(TestCache.__metadata__.generations) == 3
+    end
   end
 
   test "create new generation and reset timeout" do

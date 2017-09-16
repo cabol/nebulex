@@ -16,7 +16,7 @@ defmodule Nebulex.Cache.HooksTest do
 
   test "pre_hooks async" do
     true = Process.register(self(), :hooked_cache)
-    Hooked1.new_generation
+    Hooked1.new_generation()
 
     refute Hooked1.get("foo")
     assert_receive {Hooked1, :get, ["foo", []]}, 200
@@ -31,7 +31,7 @@ defmodule Nebulex.Cache.HooksTest do
 
   test "post_hooks async" do
     true = Process.register(self(), :hooked_cache)
-    Hooked1.new_generation
+    Hooked1.new_generation()
 
     assert Hooked1.set("foo", "bar") == "bar"
     assert_receive {Hooked1, :set, ["foo", "bar", []]}, 200
@@ -43,7 +43,7 @@ defmodule Nebulex.Cache.HooksTest do
 
   test "post_hooks pipe" do
     true = Process.register(self(), :hooked_cache)
-    Hooked2.new_generation
+    Hooked2.new_generation()
 
     assert Hooked2.get("foo") == "hello"
     assert_receive {Hooked2, :get, ["foo", []]}, 200
@@ -55,7 +55,7 @@ defmodule Nebulex.Cache.HooksTest do
 
   test "post_hooks sync" do
     true = Process.register(self(), :hooked_cache)
-    Hooked3.new_generation
+    Hooked3.new_generation()
 
     refute Hooked3.get("foo")
     assert_receive {Hooked3, :get, ["foo", []]}, 200

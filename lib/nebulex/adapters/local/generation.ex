@@ -75,39 +75,36 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   @doc false
   def init({cache, opts}) do
-    :ok = init_metadata(cache, opts)
+    _ = init_metadata(cache, opts)
 
-    ref =
-      if gc_interval = opts[:gc_interval] do
-        _ = new_gen(cache)
-        start_timer(gc_interval)
-      end
+    {{_, gen_index}, ref} =
+      if gc_interval = opts[:gc_interval],
+        do: {new_gen(cache, 0), start_timer(gc_interval)},
+        else: {{nil, 0}, nil}
 
-    {:ok, %{cache: cache, gc_interval: gc_interval, time_ref: ref}}
+    {:ok, %{cache: cache, gc_interval: gc_interval, time_ref: ref, gen_index: gen_index}}
   end
 
   @doc false
-  def handle_call({:new_generation, opts}, _from, %{cache: cache} = state) do
-    gen_list = new_gen(cache)
+  def handle_call({:new_generation, opts}, _from, %{cache: cache, gen_index: gen_index} = state) do
+    {generations, gen_index} = new_gen(cache, gen_index)
     state =
       opts
       |> Keyword.get(:reset_timeout, true)
       |> maybe_reset_timeout(state)
 
-    {:reply, gen_list, state}
+    {:reply, generations, %{state | gen_index: gen_index}}
   end
 
   @doc false
   def handle_call(:flush, _from, %{cache: cache} = state) do
-    {:reply, do_flush(cache), state}
+    {:reply, do_flush(cache), %{state | gen_index: 0}}
   end
 
   @doc false
-  def handle_info(:timeout, %{cache: cache, gc_interval: time} = state) do
-    _ = new_gen(cache)
-    ref = start_timer(time)
-
-    {:noreply, %{state | time_ref: ref}}
+  def handle_info(:timeout, %{cache: cache, gc_interval: time, gen_index: gen_index} = state) do
+    {_, gen_index} = new_gen(cache, gen_index)
+    {:noreply, %{state | gen_index: gen_index, time_ref: start_timer(time)}}
   end
 
   ## Private Functions
@@ -116,16 +113,27 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp init_metadata(cache, opts) do
     n_gens = Keyword.get(opts, :n_generations, 2)
-    _ = Metadata.create(cache, %Metadata{n_generations: n_gens})
-    :ok
+    cache
+    |> Metadata.create(%Metadata{n_generations: n_gens})
+    |> init_indexes(cache)
   end
 
-  defp new_gen(cache) do
-    "#{cache}.#{:erlang.phash2(:os.timestamp)}"
-    |> String.to_atom()
-    |> Local.new(cache.__tab_opts__)
-    |> Metadata.new_generation(cache)
-    |> maybe_delete_gen()
+  defp init_indexes(metadata, cache) do
+    Enum.each(0..(metadata.n_generations), fn(index) ->
+      String.to_atom("#{cache}.#{index}")
+    end)
+    metadata
+  end
+
+  defp new_gen(cache, gen_index) do
+    gens =
+      "#{cache}.#{gen_index}"
+      |> String.to_existing_atom()
+      |> Local.new(cache.__tab_opts__)
+      |> Metadata.new_generation(cache)
+      |> maybe_delete_gen()
+
+    {gens, incr_gen_index(cache, gen_index)}
   end
 
   defp maybe_delete_gen({generations, nil}),
@@ -133,6 +141,12 @@ defmodule Nebulex.Adapters.Local.Generation do
   defp maybe_delete_gen({generations, dropped_gen}) do
     _ = Local.delete(dropped_gen)
     generations
+  end
+
+  defp incr_gen_index(cache, gen_index) do
+    if gen_index < cache.__metadata__.n_generations,
+      do: gen_index + 1,
+      else: 0
   end
 
   defp start_timer(time) do
@@ -150,7 +164,8 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   defp do_flush(cache) do
+    :ok = Enum.each(cache.__metadata__.generations, &Local.delete/1)
     _ = Metadata.update(%{cache.__metadata__ | generations: []}, cache)
-    Enum.each(cache.__metadata__.generations, &Local.delete/1)
+    :ok
   end
 end

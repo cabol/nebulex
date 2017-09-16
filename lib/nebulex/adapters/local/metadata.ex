@@ -29,17 +29,20 @@ defmodule Nebulex.Adapters.Local.Metadata do
         {generations :: [atom], dropped_generation :: atom | nil}
   def new_generation(gen, cache) do
     metadata = get(cache)
+
     if length(metadata.generations) >= metadata.n_generations do
       new_metadata =
         metadata
         |> Map.update!(:generations, &([gen | Enum.drop(&1, -1)]))
         |> update(cache)
+
       {new_metadata.generations, List.last(metadata.generations)}
     else
       new_metadata =
         metadata
         |> Map.update!(:generations, &([gen | &1]))
         |> update(cache)
+
       {new_metadata.generations, nil}
     end
   end

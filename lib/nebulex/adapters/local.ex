@@ -352,7 +352,8 @@ defmodule Nebulex.Adapters.Local do
       |> hd()
       |> Local.update_counter(key, {2, incr}, {key, 0, nil, ttl}, cache.__state__)
     rescue
-      _e -> raise ArgumentError, "key #{inspect(key)} has not a valid integer value"
+      _exception ->
+        reraise ArgumentError, System.stacktrace()
     end
   end
 
