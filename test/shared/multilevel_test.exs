@@ -15,7 +15,7 @@ defmodule Nebulex.MultilevelTest do
       @l3 :lists.nth(3, @levels)
 
       setup do
-        {:ok, ml_cache} = @cache.start_link
+        {:ok, ml_cache} = @cache.start_link()
         levels_and_pids = start_levels()
         :ok
 
@@ -100,15 +100,15 @@ defmodule Nebulex.MultilevelTest do
         for x <- 1..10, do: @l1.set(x, x)
         for x <- 11..20, do: @l2.set(x, x)
         for x <- 21..30, do: @l3.set(x, x)
-        assert @cache.size == 30
+        assert @cache.size() == 30
 
         for x <- [1, 11, 21], do: @cache.delete(x)
-        assert @cache.size == 29
+        assert @cache.size() == 29
 
         assert @l1.delete(1) == 1
         assert @l2.delete(11) == 11
         assert @l3.delete(21) == 21
-        assert @cache.size == 27
+        assert @cache.size() == 27
       end
 
       test "flush" do
@@ -116,7 +116,7 @@ defmodule Nebulex.MultilevelTest do
         for x <- 11..20, do: @l2.set(x, x)
         for x <- 21..30, do: @l3.set(x, x)
 
-        assert @cache.flush == :ok
+        assert @cache.flush() == :ok
         _ = :timer.sleep(500)
 
         for x <- 1..30, do: refute @cache.get(x)
@@ -128,11 +128,11 @@ defmodule Nebulex.MultilevelTest do
         l3 = for x <- 50..100, do: @l3.set(x, x)
         expected = :lists.usort(l1 ++ l2 ++ l3)
 
-        assert @cache.keys == expected
+        assert @cache.keys() == expected
 
         del = for x <- 20..60, do: @cache.delete(x, level: :all)
 
-        assert @cache.keys == :lists.usort(expected -- del)
+        assert @cache.keys() == :lists.usort(expected -- del)
       end
 
       test "reduce" do
@@ -154,7 +154,7 @@ defmodule Nebulex.MultilevelTest do
         l3 = for x <- 50..100, do: @l3.set(x, x)
         expected = :maps.from_list(for x <- 1..100, do: {x, x})
 
-        assert @cache.to_map == expected
+        assert @cache.to_map() == expected
         assert @cache.to_map(return: :value) == expected
         %Object{key: 1} = Map.get(@cache.to_map(return: :object), 1)
       end

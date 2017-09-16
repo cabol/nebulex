@@ -15,7 +15,7 @@ defmodule Nebulex.Cache.StatsTest do
   end
 
   test "test counters" do
-    CacheStats.new_generation
+    CacheStats.new_generation()
 
     for x <- 1..5, do: CacheStats.set x, x
     assert Stats.get_counter(CacheStats, :set) == 5
