@@ -6,7 +6,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   The only way to create new generations is through this module (this
   server is the metadata owner) calling `new/2` function. When a Cache
   is created, a generations handler associated to that Cache is started
-  as well, therefore, this server MUST NOT be started directly.
+  at the same time, therefore, this server MUST NOT be started directly.
 
   See `Nebulex.Adapters.Local.children/2`.
 
