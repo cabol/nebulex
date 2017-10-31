@@ -124,6 +124,11 @@ To run the benchmarks:
 $ mix nebulex.bench
 ```
 
+However, if you are interested to run more sophisticated load tests, perhaps you
+should take a look at the [Nebulex Bench Project](https://github.com/cabol/nebulex_examples/tree/master/nebulex_bench).
+This project allows you to run your own performance/load tests against
+`Nebulex` – additionally it also includes some load tests results.
+
 ## Copyright and License
 
 Copyright (c) 2017, Carlos Bolaños.

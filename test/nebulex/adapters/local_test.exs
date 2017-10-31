@@ -16,9 +16,10 @@ defmodule Nebulex.Adapters.LocalTest do
   end
 
   test "fail with ArgumentError because cache was stopped" do
-    :ok = TestCache
-    |> Process.whereis
-    |> TestCache.stop(1)
+    :ok =
+      TestCache
+      |> Process.whereis
+      |> TestCache.stop(1)
 
     assert_raise ArgumentError, fn -> TestCache.set 1, 13, return: :object end
     assert_raise ArgumentError, fn -> TestCache.get 1 end
