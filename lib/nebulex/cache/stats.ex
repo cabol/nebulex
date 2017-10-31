@@ -54,6 +54,7 @@ defmodule Nebulex.Cache.Stats do
     _ = incr_counter(cache, :get_miss_count)
     nil
   end
+
   def post_hook(result, {cache, action, _args}) do
     _ = incr_counter(cache, action)
     result

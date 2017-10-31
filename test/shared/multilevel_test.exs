@@ -304,6 +304,7 @@ defmodule Nebulex.MultilevelTest do
         assert_for_all_levels(nil, 1)
         assert @cache.get(1, fallback: fn(key) -> key * 2 end) == 2
         assert_for_all_levels(2, 1)
+        refute @cache.get("foo", fallback: {@cache, :fallback})
       end
 
       ## Helpers
