@@ -212,7 +212,7 @@ defmodule Nebulex.Adapters.Multilevel do
     cache.__levels__
     |> Enum.reduce_while({nil, []}, fun)
     |> maybe_fallback(cache, key, opts)
-    |> maybe_replicate_data(cache)
+    |> maybe_replicate_data(cache, opts)
     |> validate_return(opts)
   end
 
@@ -483,18 +483,20 @@ defmodule Nebulex.Adapters.Multilevel do
   defp eval_fallback({m, f}, key) when is_atom(m) and is_atom(f),
     do: apply(m, f, [key])
 
-  defp maybe_replicate_data({nil, _}, _),
+  defp maybe_replicate_data({nil, _}, _, _),
     do: nil
-  defp maybe_replicate_data({%Object{value: nil}, _}, _),
+  defp maybe_replicate_data({%Object{value: nil}, _}, _, _),
     do: nil
-  defp maybe_replicate_data({object, levels}, cache) do
+  defp maybe_replicate_data({object, levels}, cache, opts) do
+    opts = Keyword.put(opts, :return, :object)
+
     replicas =
       case cache.__model__ do
         :exclusive -> []
         :inclusive -> levels
       end
 
-    Enum.reduce(replicas, object, &(&1.set(&2.key, &2.value, return: :object)))
+    Enum.reduce(replicas, object, &(&1.set(&2.key, &2.value, opts)))
   end
 
   defp validate_return(nil, _),

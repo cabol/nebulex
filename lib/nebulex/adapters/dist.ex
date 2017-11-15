@@ -263,6 +263,8 @@ defmodule Nebulex.Adapters.Dist do
     case :rpc.call(node, mod, fun, args) do
       {:badrpc, {:EXIT, {remote_ex, _}}} ->
         raise remote_ex
+      {:badrpc, _} = err ->
+        {:error, err}
       response ->
         response
     end

@@ -75,8 +75,8 @@ defmodule Nebulex.Cache do
     * `:version` - The version of the object on which the operation will
       take place. The version can be any term (default: `nil`).
 
-    * `:ttl` - Time To Live (TTL) or expiration time in milliseconds
-      for a key (default: `:infinity`) – applies only to `set/3`.
+    * `:ttl` - Time To Live (TTL) or expiration time in seconds for a key 
+      (default: `:infinity`) – applies only to `set/3`.
 
   Such cases will be explicitly documented as well as any extra option.
 
