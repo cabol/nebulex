@@ -439,11 +439,11 @@ defmodule Nebulex.Adapters.Local do
     end
   end
 
-  defp seconds_since_epoch(nil),
-    do: :infinity
-  defp seconds_since_epoch(diff) when is_integer(diff) do
+  defp seconds_since_epoch(diff) when is_number(diff) do
     unix_time() + diff
   end
+  defp seconds_since_epoch(_),
+    do: :infinity
 
   defp diff_epoch(other) when is_number(other) do
     other - unix_time()
