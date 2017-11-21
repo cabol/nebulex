@@ -445,9 +445,12 @@ defmodule Nebulex.Adapters.Local do
     unix_time() + diff
   end
 
-  defp diff_epoch(other) do
+  defp diff_epoch(other) when is_number(other) do
     other - unix_time()
   end
+
+  defp diff_epoch(_),
+    do: :infinity
 
   defp unix_time() do
     {mega, secs, _} = :os.timestamp()
