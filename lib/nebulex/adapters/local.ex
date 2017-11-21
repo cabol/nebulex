@@ -160,6 +160,9 @@ defmodule Nebulex.Adapters.Local do
   defp retrieve([newest | olders], cache, key, opts) do
     Enum.reduce_while(olders, {newest, nil}, fn(gen, {newer, _}) ->
       if object = fetch(cache, gen, key, ret_obj(opts), &local_pop/4) do
+        # make sure we take the old timestamp since it will get set to
+        # the default :infinity otherwise.
+        opts = Keyword.put_new(opts, :ttl, diff_epoch(object.ttl))
         {:halt, {gen, do_set(object, newer, cache, opts)}}
       else
         {:cont, {gen, nil}}
@@ -439,8 +442,16 @@ defmodule Nebulex.Adapters.Local do
   defp seconds_since_epoch(nil),
     do: :infinity
   defp seconds_since_epoch(diff) when is_integer(diff) do
+    unix_time() + diff
+  end
+
+  defp diff_epoch(other) do
+    other - unix_time()
+  end
+
+  defp unix_time() do
     {mega, secs, _} = :os.timestamp()
-    mega * 1_000_000 + secs + diff
+    mega * 1_000_000 + secs
   end
 
   defp ret_obj(opts), do: Keyword.put(opts, :return, :object)
