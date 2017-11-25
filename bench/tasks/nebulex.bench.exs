@@ -27,7 +27,7 @@ defmodule Mix.Tasks.Nebulex.Bench do
     Enum.each(required_files, fn({file, loaded}) ->
       Enum.each(loaded, fn({mod, bin}) ->
         expected = List.duplicate({:module, mod}, length(nodes))
-        {^expected, []} = :rpc.multicall(nodes, :code, :load_binary, [mod, to_char_list(file), bin])
+        {^expected, []} = :rpc.multicall(nodes, :code, :load_binary, [mod, to_charlist(file), bin])
       end)
     end)
   end

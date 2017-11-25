@@ -256,11 +256,26 @@ defmodule Nebulex.CacheTest do
 
         assert 11 ==
           1
-          |> @cache.set(11, ttl: 1, return: :key)
+          |> @cache.set(11, ttl: 2, return: :key)
           |> @cache.get!()
 
-        _ = :timer.sleep(1010)
+        _ = :timer.sleep(500)
+        assert 11 == @cache.get(1)
+        _ = :timer.sleep(1510)
         refute @cache.get(1)
+
+        assert "bar" == @cache.set("foo", "bar", ttl: 2)
+        _ = :timer.sleep(900)
+        assert "bar" == @cache.get("foo")
+        _ = :timer.sleep(1200)
+        refute @cache.get("foo")
+
+        assert "bar" == @cache.set("foo", "bar", ttl: 2)
+        @cache.new_generation()
+        _ = :timer.sleep(900)
+        assert "bar" == @cache.get("foo")
+        _ = :timer.sleep(1200)
+        refute @cache.get("foo")
       end
 
       test "transaction" do

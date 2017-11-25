@@ -439,23 +439,17 @@ defmodule Nebulex.Adapters.Local do
     end
   end
 
-  defp seconds_since_epoch(diff) when is_number(diff) do
-    unix_time() + diff
-  end
+  defp seconds_since_epoch(diff) when is_number(diff),
+    do: unix_time() + diff
   defp seconds_since_epoch(_),
     do: :infinity
 
-  defp diff_epoch(other) when is_number(other) do
-    other - unix_time()
-  end
-
+  defp diff_epoch(current_ttl) when is_number(current_ttl),
+    do: current_ttl - unix_time()
   defp diff_epoch(_),
     do: :infinity
 
-  defp unix_time() do
-    {mega, secs, _} = :os.timestamp()
-    mega * 1_000_000 + secs
-  end
+  defp unix_time(), do: DateTime.to_unix(DateTime.utc_now())
 
   defp ret_obj(opts), do: Keyword.put(opts, :return, :object)
 end
