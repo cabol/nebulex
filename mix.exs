@@ -49,7 +49,7 @@ defmodule Nebulex.Mixfile do
       {:credo, "~> 0.7", only: [:dev, :test]},
 
       # Docs
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.17", only: :docs},
       {:inch_ex, "~> 0.5", only: :docs}
     ]
   end
@@ -59,17 +59,20 @@ defmodule Nebulex.Mixfile do
       name: :nebulex,
       maintainers: ["Carlos A Bolanos"],
       licenses: ["MIT"],
-      links: %{github: "https://github.com/cabol/nebulex"}
+      links: %{"GitHub" => "https://github.com/cabol/nebulex"}
     ]
   end
 
   defp docs do
     [
-      main: "Nebulex",
+      main: "getting-started",
       source_ref: "v#{@version}",
       canonical: "http://hexdocs.pm/nebulex",
       source_url: "https://github.com/cabol/nebulex",
-      extras: ["guides/Getting Started.md", "guides/Hooks.md"]
+      extras: [
+        "guides/getting-started.md",
+        "guides/hooks.md"
+      ]
     ]
   end
 

@@ -120,7 +120,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp init_indexes(metadata, cache) do
     Enum.each(0..(metadata.n_generations), fn(index) ->
-      String.to_atom("#{cache}.#{index}")
+      _ = String.to_atom("#{cache}.#{index}")
     end)
     metadata
   end

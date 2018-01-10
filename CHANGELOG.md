@@ -1,17 +1,30 @@
 # Change Log
 
-## [v1.0.0-rc.2](https://github.com/cabol/nebulex/tree/v1.0.0-rc.2) (2017-10-15)
+## [v1.0.0-rc.3](https://github.com/cabol/nebulex/tree/v1.0.0-rc.3) (2018-01-10)
+[Full Changelog](https://github.com/cabol/nebulex/compare/v1.0.0-rc.2...v1.0.0-rc.3)
+
+**Closed issues:**
+
+- Add stream [\#10](https://github.com/cabol/nebulex/issues/10)
+
+## [v1.0.0-rc.2](https://github.com/cabol/nebulex/tree/v1.0.0-rc.2) (2017-11-25)
 [Full Changelog](https://github.com/cabol/nebulex/compare/v1.0.0-rc.1...v1.0.0-rc.2)
 
 **Closed issues:**
 
 - Atom exhaustion from generations [\#8](https://github.com/cabol/nebulex/issues/8)
 - Custom ttl for every cache record? [\#7](https://github.com/cabol/nebulex/issues/7)
+- Load/Stress Tests [\#6](https://github.com/cabol/nebulex/issues/6)
 - Update Getting Started guide [\#4](https://github.com/cabol/nebulex/issues/4)
 - Add counters support – increments and decrements by a given amount [\#3](https://github.com/cabol/nebulex/issues/3)
 
 **Merged pull requests:**
 
+- Copy the TTL from the previous generation [\#14](https://github.com/cabol/nebulex/pull/14) ([frekw](https://github.com/frekw))
+- Update :ttl docs from ms to s [\#13](https://github.com/cabol/nebulex/pull/13) ([fredr](https://github.com/fredr))
+- forward opts in fallback \(for :ttl etc\) [\#12](https://github.com/cabol/nebulex/pull/12) ([fredr](https://github.com/fredr))
+- return error tuple when rpc.call fails [\#11](https://github.com/cabol/nebulex/pull/11) ([fredr](https://github.com/fredr))
+- Allow fallback to be a {module, function} tuple [\#9](https://github.com/cabol/nebulex/pull/9) ([frekw](https://github.com/frekw))
 - replacing Cache.all by Cache.to\_map documentation [\#5](https://github.com/cabol/nebulex/pull/5) ([ferigis](https://github.com/ferigis))
 
 ## [v1.0.0-rc.1](https://github.com/cabol/nebulex/tree/v1.0.0-rc.1) (2017-07-30)
