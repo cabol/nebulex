@@ -41,6 +41,9 @@ defmodule Nebulex.Adapters.DistTest do
     assert Dist.get_and_update(1, &Dist.get_and_update_fun/1) == {1, 2}
     assert Dist.get_and_update(1, &Dist.get_and_update_fun/1) == {2, 4}
 
+    {4, %Object{key: 1, value: 8, ttl: _, version: _}} =
+      Dist.get_and_update(1, &Dist.get_and_update_fun/1, return: :object)
+
     assert_raise ArgumentError, fn ->
       Dist.get_and_update(1, &Dist.wrong_get_and_update_fun/1)
     end
@@ -58,6 +61,9 @@ defmodule Nebulex.Adapters.DistTest do
     assert Dist.update(1, 1, &Dist.update_fun/1) == 2
     assert Dist.update(2, 1, &Dist.update_fun/1) == 4
     assert Dist.update(3, 1, &Dist.update_fun/1) == 1
+
+    %Object{key: 11, value: 1, ttl: _, version: _} =
+      Dist.update(11, 1, &Dist.update_fun/1, return: :object)
 
     assert_raise Nebulex.VersionConflictError, fn ->
       :a

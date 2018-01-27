@@ -30,7 +30,7 @@ Add `nebulex` to your list dependencies in `mix.exs`:
 
 ```elixir
 def deps do
-  [{:nebulex, "~> 1.0.0-rc.2"}]
+  [{:nebulex, "~> 1.0.0-rc.3"}]
 end
 ```
 

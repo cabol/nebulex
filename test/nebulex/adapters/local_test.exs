@@ -34,7 +34,8 @@ defmodule Nebulex.Adapters.LocalTest do
     end)
 
     assert TestCache.get_and_update(1, &({&1, &1 * 2})) == {1, 2}
-    assert TestCache.get_and_update(1, &({&1, &1 * 3}), return: :object) == {2, 6}
+    {2, %Object{key: 1, value: 6, ttl: _, version: _}} =
+      TestCache.get_and_update(1, &({&1, &1 * 3}), return: :object)
     assert TestCache.get_and_update(1, &({&1, nil})) == {6, nil}
     assert TestCache.get(1) == 6
     assert TestCache.get_and_update(1, fn _ -> :pop end) == {6, nil}
@@ -48,14 +49,14 @@ defmodule Nebulex.Adapters.LocalTest do
       if v, do: {v, :ok}, else: {v, :error}
     end, version: -1, on_conflict: :nothing)
 
-    assert_raise ArgumentError, fn ->
-      TestCache.get_and_update(1, fn _ -> :other end)
-    end
-
     assert_raise Nebulex.VersionConflictError, fn ->
       1
       |> TestCache.set(1, return: :key)
       |> TestCache.get_and_update(&({&1, -1}), version: -1)
+    end
+
+    assert_raise ArgumentError, fn ->
+      TestCache.get_and_update(1, fn _ -> :other end)
     end
   end
 
@@ -67,8 +68,11 @@ defmodule Nebulex.Adapters.LocalTest do
     assert TestCache.update(1, 1, &(&1 * 2)) == 2
     assert TestCache.update(2, 1, &(&1 * 2)) == 4
     assert TestCache.update(3, 1, &(&1 * 2)) == 1
-    assert TestCache.update(4, nil, &(&1 * 2)) == nil
+    refute TestCache.update(4, nil, &(&1 * 2))
     refute TestCache.get(4)
+
+    %Object{key: 11, value: 1, ttl: _, version: _} =
+      TestCache.update(11, 1, &(&1 * 2), return: :object)
 
     assert TestCache.update(3, 3, &(&1 * 2), version: -1, on_conflict: :nothing) == 2
     assert TestCache.update(3, 3, &(&1 * 2), version: -1, on_conflict: nil) == 3

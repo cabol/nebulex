@@ -108,7 +108,7 @@ defmodule Nebulex.CacheTest do
           @cache.set(:a, 1, version: -1, on_conflict: :invalid) == 1
         end
 
-        assert @cache.set("foo", nil) == nil
+        refute @cache.set("foo", nil)
         refute @cache.get("foo")
       end
 
@@ -276,6 +276,30 @@ defmodule Nebulex.CacheTest do
         assert "bar" == @cache.get("foo")
         _ = :timer.sleep(1200)
         refute @cache.get("foo")
+      end
+
+      test "object ttl" do
+        @cache.new_generation()
+
+        obj =
+          1
+          |> @cache.set(11, ttl: 3, return: :key)
+          |> @cache.get!(return: :object)
+
+        for x <- 3..0 do
+          assert x == Object.ttl(obj)
+          :timer.sleep(1000)
+        end
+
+        assert :infinity ==
+          1
+          |> @cache.set(11, return: :object)
+          |> Object.ttl()
+
+        assert 3 ==
+          1
+          |> @cache.update(nil, &:erlang.phash2/1, ttl: 3, return: :object)
+          |> Object.ttl()
       end
 
       test "transaction" do

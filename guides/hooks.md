@@ -5,8 +5,9 @@ before or after particular methods. Hooks mechanism is very powerful but
 dangerous at the same time, so you have to be careful.
 
 When we define a cache, we are able to override `pre_hooks/0` and `post_hooks/0`
-functions by providing ours. But there isn't better way to understand than with
-an example.
+functions by providing ours; these callbacks are defined by `Nebulex.Cache.Hook`
+behaviour. Let's check the example just below in order to understand better
+how it works.
 
 ## Logging Hooks Example
 
@@ -89,8 +90,8 @@ For example:
 config :my_app, MyApp.MyCache,
   adapter: Nebulex.Adapters.Local,
   n_shards: 2,
-  pre_hooks_strategy: :async,
-  post_hooks_strategy: :pipe
+  pre_hooks_mode: :async,
+  post_hooks_mode: :pipe
 ```
 
 You have to be careful with `:pipe` option, because the result of the hook is

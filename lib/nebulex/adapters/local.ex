@@ -105,10 +105,12 @@ defmodule Nebulex.Adapters.Local do
       def __shards_sup_name__, do: unquote(shards_sup_name)
 
       def __tab_opts__ do
-        [n_shards: unquote(n_shards),
-         sup_name: unquote(shards_sup_name),
-         read_concurrency: unquote(r_concurrency),
-         write_concurrency: unquote(w_concurrency)]
+        [
+          n_shards: unquote(n_shards),
+          sup_name: unquote(shards_sup_name),
+          read_concurrency: unquote(r_concurrency),
+          write_concurrency: unquote(w_concurrency)
+        ]
       end
 
       def new_generation(opts \\ []), do: Generation.new(__MODULE__, opts)
@@ -127,8 +129,10 @@ defmodule Nebulex.Adapters.Local do
   def children(cache, opts) do
     import Supervisor.Spec
 
-    [supervisor(:shards_sup, [cache.__shards_sup_name__]),
-     worker(Nebulex.Adapters.Local.Generation, [cache, opts])]
+    [
+      supervisor(:shards_sup, [cache.__shards_sup_name__]),
+      worker(Nebulex.Adapters.Local.Generation, [cache, opts])
+    ]
   end
 
   @doc false
@@ -179,11 +183,11 @@ defmodule Nebulex.Adapters.Local do
     object =
       cond do
         opts[:version] == nil ->
-          Object.new(key, value)
+          %Object{key: key, value: value}
         cached_obj = get(generations, cache, key, [return: :object], &elem(&1, 1)) ->
           validate_vsn(cached_obj, :set, [{:replace_value, value} | opts])
         true ->
-          Object.new(key, value, opts[:version])
+          %Object{key: key, value: value, version: opts[:version]}
       end
 
     do_set(object, hd(generations), cache, opts)
@@ -216,7 +220,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp maybe_validate_vsn(nil, _, _, key, _),
-    do: Object.new(key)
+    do: %Object{key: key}
   defp maybe_validate_vsn(_version, generations, cache, key, opts) do
     generations
     |> get(cache, key, [return: :object, on_conflict: :nothing], &elem(&1, 1))
@@ -275,6 +279,7 @@ defmodule Nebulex.Adapters.Local do
         return =
           %Object{key: key, value: val, version: vsn, ttl: ttl}
           |> validate_return(opts)
+
         fun.({key, return}, fold_acc)
       end, acc, gen, cache.__state__)
     end)
@@ -309,7 +314,7 @@ defmodule Nebulex.Adapters.Local do
       {_, nil} ->
         nil
       {_, ret} ->
-        _ = do_delete(Object.new(key), generations, cache.__state__)
+        _ = do_delete(%Object{key: key}, generations, cache.__state__)
         ret
     end
   end
@@ -317,14 +322,13 @@ defmodule Nebulex.Adapters.Local do
   @doc false
   def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
     generations = cache.__metadata__.generations
-    opts = Keyword.delete(opts, :return)
-    {gen, current} = get(generations, cache, key, opts)
+    {gen, current} = get(generations, cache, key, Keyword.delete(opts, :return))
 
     case fun.(current) do
       {get, update} ->
-        {get, do_set(Object.new(key, update), gen, cache, opts)}
+        {get, do_set(%Object{key: key, value: update}, gen, cache, opts)}
       :pop ->
-        _ = do_delete(Object.new(key), generations, cache.__state__)
+        _ = do_delete(%Object{key: key}, generations, cache.__state__)
         {current, nil}
       other ->
         raise ArgumentError,
@@ -336,13 +340,12 @@ defmodule Nebulex.Adapters.Local do
   @doc false
   def update(cache, key, initial, fun, opts) do
     generations = cache.__metadata__.generations
-    opts = Keyword.delete(opts, :return)
 
-    case get(generations, cache, key, opts) do
+    case get(generations, cache, key, Keyword.delete(opts, :return)) do
       {gen, nil} ->
-        do_set(Object.new(key, initial), gen, cache, opts)
+        do_set(%Object{key: key, value: initial}, gen, cache, opts)
       {gen, val} ->
-        do_set(Object.new(key, fun.(val)), gen, cache, opts)
+        do_set(%Object{key: key, value: fun.(val)}, gen, cache, opts)
     end
   end
 
@@ -372,15 +375,19 @@ defmodule Nebulex.Adapters.Local do
 
   defp local_get(tab, key, default, state) do
     case Local.lookup(tab, key, state) do
-      []                      -> default
-      [{^key, val, vsn, ttl}] -> %Object{key: key, value: val, version: vsn, ttl: ttl}
+      [] ->
+        default
+      [{^key, val, vsn, ttl}] ->
+        %Object{key: key, value: val, version: vsn, ttl: ttl}
     end
   end
 
   def local_pop(tab, key, default, state) do
     case Local.take(tab, key, state) do
-      []                      -> default
-      [{^key, val, vsn, ttl}] -> %Object{key: key, value: val, version: vsn, ttl: ttl}
+      [] ->
+        default
+      [{^key, val, vsn, ttl}] ->
+        %Object{key: key, value: val, version: vsn, ttl: ttl}
     end
   end
 
@@ -412,7 +419,7 @@ defmodule Nebulex.Adapters.Local do
     else
       opts
       |> Keyword.get(:on_conflict, :raise)
-      |> on_conflict(op, cached, Object.new(cached.key, value, version))
+      |> on_conflict(op, cached, %Object{key: cached.key, value: value, version: version})
     end
   end
 
@@ -439,13 +446,13 @@ defmodule Nebulex.Adapters.Local do
     end
   end
 
-  defp seconds_since_epoch(diff) when is_number(diff),
+  defp seconds_since_epoch(diff) when is_integer(diff),
     do: unix_time() + diff
   defp seconds_since_epoch(_),
     do: :infinity
 
-  defp diff_epoch(current_ttl) when is_number(current_ttl),
-    do: current_ttl - unix_time()
+  defp diff_epoch(ttl) when is_integer(ttl),
+    do: ttl - unix_time()
   defp diff_epoch(_),
     do: :infinity
 

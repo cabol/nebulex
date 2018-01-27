@@ -32,11 +32,11 @@ defmodule Nebulex.Cache do
     * `:stats` - a compile-time option that specifies if cache statistics
       is enabled or not (defaults to `false`).
 
-    * `:pre_hooks_strategy` - a compile-time option that determinates the
-      strategy how pre-hooks will be executed – see pre/post hooks below.
+    * `:pre_hooks_mode` - a compile-time option that determinates the
+      mode how pre-hooks will be executed – see pre/post hooks below.
 
-    * `:post_hooks_strategy` - a compile-time option that determinates the
-      strategy how post-hooks will be executed – see pre/post hooks below.
+    * `:post_hooks_mode` - a compile-time option that determinates the
+      mode how post-hooks will be executed – see pre/post hooks below.
 
     * `:version_generator` - this option specifies the module that
       implements the `Nebulex.Version` interface. This interface
@@ -48,22 +48,12 @@ defmodule Nebulex.Cache do
 
   The cache can also provide its own pre/post hooks implementation; see
   `Nebulex.Cache.Hook` behaviour. By default, pre/post hooks are empty lists,
-  but again, you can override the functions of `Nebulex.Cache.Hook` behaviour.
+  but you can override the functions of `Nebulex.Cache.Hook` behaviour.
 
-  Besides, it is possible to configure the strategy how the hooks are evaluated,
-  the available strategies are:
+  Additionally, it is possible to configure the mode how the hooks are
+  evaluated (synchronous, asynchronous and pipeline).
 
-    * `:async` - (the default) all hooks are evaluated asynchronously
-      (in parallel) and their results are ignored.
-
-    * `:sync` - hooks are evaluated synchronously (sequentially) and their
-      results are ignored.
-
-    * `:pipe` - similar to `:sync` but each hook result is passed to the
-      next one and so on, until the last hook evaluation is returned.
-
-  These strategy values applies to the compile-time options
-  `:pre_hooks_strategy` and `:post_hooks_strategy`.
+  For more information about the usage, check `Nebulex.Cache.Hook`.
 
   ## Shared options
 
@@ -75,7 +65,7 @@ defmodule Nebulex.Cache do
     * `:version` - The version of the object on which the operation will
       take place. The version can be any term (default: `nil`).
 
-    * `:ttl` - Time To Live (TTL) or expiration time in seconds for a key 
+    * `:ttl` - Time To Live (TTL) or expiration time in seconds for a key
       (default: `:infinity`) – applies only to `set/3`.
 
   Such cases will be explicitly documented as well as any extra option.
@@ -98,7 +88,7 @@ defmodule Nebulex.Cache do
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       @behaviour Nebulex.Cache
-      @behaviour Nebulex.Cache.Hook
+      use Nebulex.Cache.Hook
 
       {otp_app, adapter, config} = Nebulex.Cache.Supervisor.compile_config(__MODULE__, opts)
       @otp_app otp_app
@@ -194,14 +184,6 @@ defmodule Nebulex.Cache do
         end
       end
 
-      def pre_hooks do
-        []
-      end
-
-      def post_hooks do
-        []
-      end
-
       ## Helpers
 
       defp execute(action, args) do
@@ -211,11 +193,11 @@ defmodule Nebulex.Cache do
         |> eval_post_hooks(action, args)
       end
 
-      @pre_hooks_strategy Keyword.get(@config, :pre_hooks_strategy, :async)
-      @post_hooks_strategy Keyword.get(@config, :post_hooks_strategy, :async)
+      @pre_hooks_mode Keyword.get(@config, :pre_hooks_mode, :async)
+      @post_hooks_mode Keyword.get(@config, :post_hooks_mode, :async)
 
       defp eval_pre_hooks(action, args) do
-        _ = eval_hooks(pre_hooks(), @pre_hooks_strategy, action, args, nil)
+        _ = eval_hooks(pre_hooks(), @pre_hooks_mode, {__MODULE__, action, args}, nil)
         @adapter
       end
 
@@ -223,34 +205,14 @@ defmodule Nebulex.Cache do
         @stats_hook &Nebulex.Cache.Stats.post_hook/2
 
         defp eval_post_hooks(result, action, args) do
-          eval_hooks([@stats_hook | post_hooks()], @post_hooks_strategy, action, args, result)
+          [@stats_hook | post_hooks()]
+          |> eval_hooks(@post_hooks_mode, {__MODULE__, action, args}, result)
         end
       else
         defp eval_post_hooks(result, action, args) do
-          eval_hooks(post_hooks(), @post_hooks_strategy, action, args, result)
+          eval_hooks(post_hooks(), @post_hooks_mode, {__MODULE__, action, args}, result)
         end
       end
-
-      defp eval_hooks([], _eval, _action, _args, result),
-        do: result
-      defp eval_hooks(hooks, eval, action, args, result) do
-        Enum.reduce(hooks, result, fn
-          (hook, acc) when is_function(hook, 2) and eval == :pipe ->
-            hook.(acc, {__MODULE__, action, args})
-          (hook, ^result) when is_function(hook, 2) and eval == :sync ->
-            _ = hook.(result, {__MODULE__, action, args})
-            result
-          (hook, ^result) when is_function(hook, 2) ->
-            _ = Task.start_link(:erlang, :apply, [hook, [result, {__MODULE__, action, args}]])
-            result
-          (_, acc) when eval == :pipe ->
-            acc
-          (_, _) ->
-            result
-        end)
-      end
-
-      defoverridable [pre_hooks: 0, post_hooks: 0]
     end
   end
 
@@ -301,10 +263,11 @@ defmodule Nebulex.Cache do
 
   ## Options
 
+  Besides the "Shared options" section at the module documentation,
+  it accepts:
+
     * `:on_conflict` - It may be one of `:raise` (the default), `:nothing`,
       `nil`. See the "OnConflict" section for more information.
-
-  See the "Shared options" section at the module documentation.
 
   ## Example
 
@@ -363,17 +326,26 @@ defmodule Nebulex.Cache do
   It returns `value` or `Nebulex.Object.t` (depends on `:return` option)
   if the value has been successfully inserted.
 
+  If the given `value` is `nil`, it is not stored in the cache and `nil` is
+  returned.
+
   ## Options
+
+  Besides the "Shared options" section at the module documentation,
+  it accepts:
 
     * `:on_conflict` - It may be one of `:raise` (the default), `:nothing`,
       `:replace`. See the "OnConflict" section for more information.
 
-  See the "Shared options" section at the module documentation.
-
   ## Example
 
-      %Nebulex.Object{key: :a} =
-        MyCache.set :a, "anything", ttl: 100000, return: :object
+      "bar" = MyCache.set "foo", "bar"
+
+      %Nebulex.Object{key: "foo"} =
+        MyCache.set "foo", "bar", ttl: 100000, return: :object
+
+      # if the value is nil, then it is not stored (operation is skipped)
+      nil = MyCache.set "foo", nil
 
   ## OnConflict
 
@@ -414,13 +386,14 @@ defmodule Nebulex.Cache do
 
   ## Options
 
+  Besides the "Shared options" section at the module documentation,
+  it accepts:
+
     * `:on_conflict` - It may be one of `:raise` (the default), `:nothing`,
       `:delete`. See the "OnConflict" section for more information.
 
   Note that for this function `:return` option hasn't any effect
   since it always returns the `key` either success or not.
-
-  See the "Shared options" section at the module documentation.
 
   ## Example
 
@@ -569,9 +542,10 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-    * `:on_conflict` - same as callback `get/2`.
+  Besides the "Shared options" section at the module documentation,
+  it accepts:
 
-  See the "Shared options" section at the module documentation.
+    * `:on_conflict` - same as callback `get/2`.
 
   ## Examples
 
@@ -586,7 +560,7 @@ defmodule Nebulex.Cache do
   @callback pop(key, opts) :: return | no_return
 
   @doc """
-  Gets the value from `key` and updates it, all in one pass.
+  Gets the object/value from `key` and updates it, all in one pass.
 
   `fun` is called with the current cached value under `key` (or `nil`
   if `key` hasn't been cached) and must return a two-element tuple:
@@ -600,34 +574,41 @@ defmodule Nebulex.Cache do
 
   ## Options
 
+  Besides the "Shared options" section at the module documentation,
+  it accepts:
+
     * `:on_conflict` - same as callback `get/2`.
-
-  Note that for this function `:return` option hasn't any effect,
-  since it always returns a tuple `{get :: value, update :: value}`
-  in case of success.
-
-  See the "Shared options" section at the module documentation.
 
   ## Examples
 
-      # update a nonexistent key
-      {nil, "value!"} = MyCache.get_and_update(:a, fn current_value ->
-        {current_value, "value!"}
-      end)
+      # update nonexistent key
+      {nil, "value!"} =
+        MyCache.get_and_update(:a, fn current_value ->
+          {current_value, "value!"}
+        end)
 
-      # update a existent key
-      {"value!", "new value!"} = MyCache.get_and_update(:a, fn current_value ->
-        {current_value, "new value!"}
-      end)
+      # update existing key
+      {"value!", "new value!"} =
+        MyCache.get_and_update(:a, fn current_value ->
+          {current_value, "new value!"}
+        end)
 
       # pop/remove value if it exists
       {"new value!", nil} = MyCache.get_and_update(:a, fn _ -> :pop end)
 
-      # pop/remove a nonexistent key
+      # pop/remove nonexistent key
       {nil, nil} = MyCache.get_and_update(:b, fn _ -> :pop end)
+
+      # update existing key but returning the object
+      {"hello", %Object{key: :a, value: "hello world", ttl: _, version: _}} =
+        :a
+        |> MyCache.set("hello", return: :key)
+        |> MyCache.get_and_update(fn current_value ->
+          {current_value, "hello world"}
+        end, return: :object)
   """
   @callback get_and_update(key, (value -> {get, update} | :pop), opts) ::
-            no_return | {get, update} when get: value, update: value
+            no_return | {get, update} when get: value, update: return
 
   @doc """
   Updates the cached `key` with the given function.
@@ -640,20 +621,21 @@ defmodule Nebulex.Cache do
 
   ## Options
 
+  Besides the "Shared options" section at the module documentation,
+  it accepts:
+
     * `:on_conflict` - same as callback `get/2`.
-
-  Note that for this function `:return` option hasn't any effect,
-  since it always returns the object value.
-
-  See the "Shared options" section at the module documentation.
 
   ## Examples
 
       1 = MyCache.update(:a, 1, &(&1 * 2))
 
       2 = MyCache.update(:a, 1, &(&1 * 2))
+
+      %Nebulex.Object{value: 4} =
+        MyCache.update(:a, 1, &(&1 * 2), return: :object)
   """
-  @callback update(key, initial :: value, (value -> value), opts) :: value | no_return
+  @callback update(key, initial :: value, (value -> value), opts) :: return | no_return
 
   @doc """
   Updates (increment or decrement) the counter mapped to the given `key`.

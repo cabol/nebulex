@@ -12,6 +12,7 @@ defmodule Nebulex.TestCache do
               (_, _) ->
                 :noop
             end
+
           [pre_hook]
         end
 
@@ -36,9 +37,9 @@ defmodule Nebulex.TestCache do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
   end
 
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C1, [n_shards: 2, post_hooks_strategy: :async])
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C2, [n_shards: 2, post_hooks_strategy: :pipe])
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C3, [n_shards: 2, post_hooks_strategy: :sync])
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C1, [n_shards: 2, post_hooks_mode: :async])
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C2, [n_shards: 2, post_hooks_mode: :pipe])
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C3, [n_shards: 2, post_hooks_mode: :sync])
 
   defmodule Hooked do
     defmodule C1 do
@@ -57,7 +58,7 @@ defmodule Nebulex.TestCache do
     end
   end
 
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.CacheStats, [n_shards: 2, stats: true, post_hooks_strategy: :pipe])
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.CacheStats, [n_shards: 2, stats: true, post_hooks_mode: :pipe])
 
   defmodule CacheStats do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local

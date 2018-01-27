@@ -10,38 +10,18 @@ defmodule Nebulex.Object do
   @type t :: %__MODULE__{key: any, value: any, version: any, ttl: timeout}
 
   @doc """
-  Creates a new `Nebulex.Object` with the given `key`.
+  Returns the remaining time to live for the given object.
 
   ## Example
 
-      Nebulex.Object.new("mykey")
+      obj = MyCache.set("foo", "bar", return: :object, ttl: 3)
+      Object.ttl(obj)
   """
-  @spec new(key :: any) :: Nebulex.Object.t
-  def new(key) do
-    %Nebulex.Object{key: key}
-  end
-
-  @doc """
-  Creates a new `Nebulex.Object` with the given `key` and `value`.
-
-  ## Example
-
-      Nebulex.Object.new("foo", "bar")
-  """
-  @spec new(key :: any, value :: any) :: Nebulex.Object.t
-  def new(key, value) do
-    %Nebulex.Object{key: key, value: value}
-  end
-
-  @doc """
-  Creates a new `Nebulex.Object` with the given `key`, `value` and `version`.
-
-  ## Example
-
-      Nebulex.Object.new("foo", "bar", "v1")
-  """
-  @spec new(key :: any, value :: any, version :: any) :: Nebulex.Object.t
-  def new(key, value, version) do
-    %Nebulex.Object{key: key, value: value, version: version}
+  @spec ttl(Nebulex.Object.t) :: timeout
+  def ttl(%Nebulex.Object{ttl: :infinity}),
+    do: :infinity
+  def ttl(%Nebulex.Object{ttl: ttl}) when is_integer(ttl) do
+    remaining = ttl - DateTime.to_unix(DateTime.utc_now())
+    if remaining >= 0, do: remaining, else: 0
   end
 end

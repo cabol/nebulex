@@ -104,14 +104,14 @@ defmodule Nebulex.Adapter do
   See `Nebulex.Cache.get_and_update/3`.
   """
   @callback get_and_update(cache, key, (value -> {get, update} | :pop), opts) ::
-            no_return | {get, update} when get: value, update: value
+            no_return | {get, update} when get: value, update: return
 
   @doc """
   Updates the cached `key` with the given function.
 
   See `Nebulex.Cache.update/4`.
   """
-  @callback update(cache, key, initial :: value, (value -> value), opts) :: value | no_return
+  @callback update(cache, key, initial :: value, (value -> value), opts) :: return | no_return
 
   @doc """
   Updates (increment or decrement) the counter mapped to the given `key`.

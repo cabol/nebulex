@@ -1,12 +1,15 @@
 defmodule Nebulex.Cache.Hook do
   @moduledoc """
-  Specifies pre/post hooks callbacks. These are functions that you define
-  and that you direct to execute before or after particular cache action.
+  This module specifies the behaviour for pre/post hooks callbacks.
+  These functions are defined in order to intercept any cache operation
+  and be able to execute a set of actions before and/or after the operation
+  takes place.
 
-  ## Execution strategies
+  ## Execution modes
 
-  It is possible to configure the strategy how the hooks are evaluated,
-  the available strategies are:
+  It is possible to configure the `mode` how the hooks are evaluated, using the
+  compile-time options `:pre_hooks_mode` and `:post_hooks_mode`. The
+  available modes are:
 
     * `:async` - (the default) all hooks are evaluated asynchronously
       (in parallel) and their results are ignored.
@@ -17,16 +20,13 @@ defmodule Nebulex.Cache.Hook do
     * `:pipe` - similar to `:sync` but each hook result is passed to the
       next one and so on, until the last hook evaluation is returned.
 
-  These strategy values applies to the compile-time options
-  `:pre_hooks_strategy` and `:post_hooks_strategy`.
-
   ## Example
 
       config :my_app, MyApp.MyCache,
         adapter: Nebulex.Adapters.Local,
         n_shards: 2,
-        pre_hooks_strategy: :async,
-        post_hooks_strategy: :pipe
+        pre_hooks_mode: :async,
+        post_hooks_mode: :pipe
 
       defmodule MyApp.MyCache do
         use Nebulex.Cache, adapter: Nebulex.Adapters.Local
@@ -41,7 +41,47 @@ defmodule Nebulex.Cache.Hook do
       end
   """
 
-  @type hook_fun :: (result :: any, {Nebulex.Cache.t, action :: atom, args :: [any]} -> any)
+  @type cache_op :: {Nebulex.Cache.t, action :: atom, args :: [any]}
+  @type hook_fun :: (result :: any, cache_op -> any)
+
+  @doc false
+  defmacro __using__(_opts) do
+    quote do
+      @behaviour Nebulex.Cache.Hook
+
+      @doc false
+      def eval_hooks([], _eval, {_cache, _action, _args}, result),
+        do: result
+      def eval_hooks(hooks, eval, {_cache, _action, _args} = cache_op, result) do
+        Enum.reduce(hooks, result, fn
+          (hook, acc) when is_function(hook, 2) and eval == :pipe ->
+            hook.(acc, cache_op)
+          (hook, ^result) when is_function(hook, 2) and eval == :sync ->
+            _ = hook.(result, cache_op)
+            result
+          (hook, ^result) when is_function(hook, 2) ->
+            _ = Task.start_link(:erlang, :apply, [hook, [result, cache_op]])
+            result
+          (_, acc) when eval == :pipe ->
+            acc
+          (_, _) ->
+            result
+        end)
+      end
+
+      @doc false
+      def pre_hooks do
+        []
+      end
+
+      @doc false
+      def post_hooks do
+        []
+      end
+
+      defoverridable [pre_hooks: 0, post_hooks: 0]
+    end
+  end
 
   @doc """
   Returns a list of hook functions that will be executed before invoke the
@@ -60,6 +100,7 @@ defmodule Nebulex.Cache.Hook do
               (result, _) ->
                 result
             end
+
           [pre_hook]
         end
       end

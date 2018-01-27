@@ -471,7 +471,7 @@ defmodule Nebulex.Adapters.Multilevel do
   defp maybe_fallback({nil, levels}, cache, key, opts) do
     object =
       if fallback = opts[:fallback] || cache. __fallback__,
-        do: Object.new(key, eval_fallback(fallback, key)),
+        do: %Object{key: key, value: eval_fallback(fallback, key)},
         else: nil
 
     {object, levels}

@@ -113,6 +113,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp init_metadata(cache, opts) do
     n_gens = Keyword.get(opts, :n_generations, 2)
+
     cache
     |> Metadata.create(%Metadata{n_generations: n_gens})
     |> init_indexes(cache)
