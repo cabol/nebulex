@@ -47,18 +47,13 @@ defmodule Nebulex.MultilevelTest do
       test "set" do
         assert @cache.set(1, 1) == 1
         assert @l1.get(1) == 1
-        refute @l2.get(1)
-        refute @l3.get(1)
+        assert @l2.get(1) == 1
+        assert @l3.get(1) == 1
 
         assert @cache.set(2, 2, level: 2) == 2
         assert @l2.get(2) == 2
         refute @l1.get(2)
         refute @l3.get(2)
-
-        assert @cache.set(3, 3, level: :all) == 3
-        assert @l1.get(3) == 3
-        assert @l2.get(3) == 3
-        assert @l3.get(3) == 3
 
         assert @cache.set("foo", nil) == nil
         refute @cache.get("foo")
@@ -67,7 +62,6 @@ defmodule Nebulex.MultilevelTest do
       test "delete" do
         assert @cache.set(1, 1) == 1
         assert @cache.set(2, 2, level: 2) == 2
-        assert @cache.set(3, 3, level: :all) == 3
 
         assert @cache.delete(1, return: :key) == 1
         refute @l1.get(1)
@@ -78,17 +72,12 @@ defmodule Nebulex.MultilevelTest do
         refute @l1.get(2)
         refute @l2.get(2)
         refute @l3.get(2)
-
-        assert @cache.delete(3, return: :key, level: :all) == 3
-        refute @l1.get(3)
-        refute @l2.get(3)
-        refute @l3.get(3)
       end
 
       test "has_key?" do
         assert @cache.set(1, 1) == 1
         assert @cache.set(2, 2, level: 2) == 2
-        assert @cache.set(3, 3, level: :all) == 3
+        assert @cache.set(3, 3, level: 3) == 3
 
         assert @cache.has_key?(1)
         assert @cache.has_key?(2)
@@ -102,7 +91,7 @@ defmodule Nebulex.MultilevelTest do
         for x <- 21..30, do: @l3.set(x, x)
         assert @cache.size() == 30
 
-        for x <- [1, 11, 21], do: @cache.delete(x)
+        for x <- [1, 11, 21], do: @cache.delete(x, level: 1)
         assert @cache.size() == 29
 
         assert @l1.delete(1) == 1
@@ -130,7 +119,7 @@ defmodule Nebulex.MultilevelTest do
 
         assert @cache.keys() == expected
 
-        del = for x <- 20..60, do: @cache.delete(x, level: :all)
+        del = for x <- 20..60, do: @cache.delete(x)
 
         assert @cache.keys() == :lists.usort(expected -- del)
       end
@@ -162,25 +151,15 @@ defmodule Nebulex.MultilevelTest do
       test "pop" do
         assert @cache.set(1, 1) == 1
         assert @cache.set(2, 2, level: 2) == 2
-        assert @cache.set(3, 3, level: :all) == 3
+        assert @cache.set(3, 3, level: 3) == 3
 
         assert @cache.pop(1) == 1
         assert @cache.pop(2) == 2
         assert @cache.pop(3) == 3
         refute @l1.get(1)
+        assert @l2.get(1)
+        assert @l3.get(1)
         refute @l2.get(2)
-        refute @l1.get(3)
-        assert @l2.get(3)
-        assert @l3.get(3)
-
-        assert @cache.pop(3) == 3
-        refute @l1.get(3)
-        refute @l2.get(3)
-        assert @l3.get(3)
-
-        assert @cache.pop(3) == 3
-        refute @l1.get(3)
-        refute @l2.get(3)
         refute @l3.get(3)
 
         %Object{value: "hello", key: :a} =
@@ -196,38 +175,38 @@ defmodule Nebulex.MultilevelTest do
       end
 
       test "get_and_update" do
-        assert @cache.set(1, 1) == 1
-        assert @cache.set(2, 2, level: :all) == 2
+        assert @cache.set(1, 1, level: 1) == 1
+        assert @cache.set(2, 2) == 2
 
-        assert @cache.get_and_update(1, &({&1, &1 * 2})) == {1, 2}
+        assert @cache.get_and_update(1, &({&1, &1 * 2}), level: 1) == {1, 2}
         assert @l1.get(1) == 2
         refute @l2.get(1)
         refute @l3.get(1)
 
-        assert @cache.get_and_update(2, &({&1, &1 * 2}), level: :all) == {2, 4}
+        assert @cache.get_and_update(2, &({&1, &1 * 2})) == {2, 4}
         assert @l1.get(2) == 4
         assert @l2.get(2) == 4
         assert @l3.get(2) == 4
 
-        assert @cache.get_and_update(1, fn _ -> :pop end) == {2, nil}
+        assert @cache.get_and_update(1, fn _ -> :pop end, level: 1) == {2, nil}
         refute @l1.get(1)
 
-        assert @cache.get_and_update(2, fn _ -> :pop end, level: :all) == {4, nil}
+        assert @cache.get_and_update(2, fn _ -> :pop end) == {4, nil}
         refute @l1.get(2)
         refute @l2.get(2)
         refute @l3.get(2)
       end
 
       test "update" do
-        assert @cache.set(1, 1) == 1
-        assert @cache.set(2, 2, level: :all) == 2
+        assert @cache.set(1, 1, level: 1) == 1
+        assert @cache.set(2, 2) == 2
 
-        assert @cache.update(1, 1, &(&1 * 2)) == 2
+        assert @cache.update(1, 1, &(&1 * 2), level: 1) == 2
         assert @l1.get(1) == 2
         refute @l2.get(1)
         refute @l3.get(1)
 
-        assert @cache.update(2, 1, &(&1 * 2), level: :all) == 4
+        assert @cache.update(2, 1, &(&1 * 2)) == 4
         assert @l1.get(2) == 4
         assert @l2.get(2) == 4
         assert @l3.get(2) == 4
@@ -236,21 +215,21 @@ defmodule Nebulex.MultilevelTest do
       test "update_counter" do
         assert @cache.update_counter(1) == 1
         assert @l1.get(1) == 1
-        refute @l2.get(1)
-        refute @l3.get(1)
+        assert @l2.get(1) == 1
+        assert @l3.get(1) == 1
 
         assert @cache.update_counter(2, 2, level: 2) == 2
         assert @l2.get(2) == 2
         refute @l1.get(2)
         refute @l3.get(2)
 
-        assert @cache.update_counter(3, 3, level: :all) == 3
+        assert @cache.update_counter(3, 3) == 3
         assert @l1.get(3) == 3
         assert @l2.get(3) == 3
         assert @l3.get(3) == 3
 
-        assert @cache.update_counter(4, 5, level: :all) == 5
-        assert @cache.update_counter(4, -5, level: :all) == 0
+        assert @cache.update_counter(4, 5) == 5
+        assert @cache.update_counter(4, -5) == 0
         assert @l1.get(4) == 0
         assert @l2.get(4) == 0
         assert @l3.get(4) == 0

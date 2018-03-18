@@ -21,7 +21,7 @@ defmodule Nebulex.Adapter do
   @doc """
   Returns the children specs that starts the adapter process.
   """
-  @callback children(cache, opts) :: [Supervisor.Spec.spec]
+  @callback children_specs(cache, opts) :: [Supervisor.Spec.spec]
 
   @doc """
   Retrieves a single object from Cache.

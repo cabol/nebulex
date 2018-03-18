@@ -10,8 +10,11 @@ defmodule Nebulex.Adapters.Multilevel do
   (level 2, L2) is checked, and so on, before accessing external
   memory (that can be handled by a `:fallback` function).
 
-  Beware this behaviour only takes place for `get/3` function, rest of the
-  functions behaves most like a bypass.
+  For write functions, the "Write Through" policy is applied by default;
+  this policy ensures that the data is stored safely as it is written
+  throughout the hierarchy. However, it is possible to force the write
+  operation in a specific level (although it is not recommended) via
+  `level` option, where the value is a positive integer greater than 0.
 
   ## Options
 
@@ -52,9 +55,8 @@ defmodule Nebulex.Adapters.Multilevel do
   Some functions below accept the following options:
 
     * `:level` - It may be an integer greater than 0 that specifies the cache
-      level where the operation will take place, or it may be also `:all` to
-      execute the operation in all cache levels. By default it's set to `1`,
-      which means the `set` will only be evaluated at the first cache level.
+      level where the operation will take place. By default, the evaluation
+      is performed throughout the whole cache hierarchy (all levels).
 
   ## Example
 
@@ -172,7 +174,7 @@ defmodule Nebulex.Adapters.Multilevel do
   ## Adapter Impl
 
   @doc false
-  def children(_cache, _opts), do: []
+  def children_specs(_cache, _opts), do: []
 
   @doc """
   Retrieves the requested key (if it exists) checking the fastest,
@@ -225,14 +227,11 @@ defmodule Nebulex.Adapters.Multilevel do
 
   ## Example
 
-      # Entry is set at first cache level
+      # Entry is set in all cache levels
       MyCache.set("foo", "bar")
 
       # Entry is set at second cache level
       MyCache.set("foo", "bar", level: 2)
-
-      # Entry is set in all cache levels
-      MyCache.set("foo", "bar", level: :all)
   """
   def set(_cache, _key, nil, _opts),
     do: nil
@@ -249,14 +248,11 @@ defmodule Nebulex.Adapters.Multilevel do
 
   ## Example
 
-      # Entry is deleted from first cache level
+      # Entry is deleted from all cache levels
       MyCache.delete("foo")
 
       # Entry is deleted from second cache level
       MyCache.delete("foo", level: 2)
-
-      # Entry is deleted from all cache levels
-      MyCache.delete("foo", level: :all)
   """
   def delete(cache, key, opts) do
     eval(cache, :delete, [key, opts], opts)
@@ -370,7 +366,7 @@ defmodule Nebulex.Adapters.Multilevel do
 
       {nil, "value!"} = MyCache.get_and_update(:a, fn current_value ->
         {current_value, "value!"}
-      end, level: :all)
+      end)
   """
   def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
     eval(cache, :get_and_update, [key, fun, opts], opts)
@@ -385,7 +381,7 @@ defmodule Nebulex.Adapters.Multilevel do
 
   ## Example
 
-      MyCache.update(:a, 1, &(&1 * 2), level: :all)
+      MyCache.update(:a, 1, &(&1 * 2))
   """
   def update(cache, key, initial, fun, opts) do
     eval(cache, :update, [key, initial, fun, opts], opts)
@@ -400,7 +396,7 @@ defmodule Nebulex.Adapters.Multilevel do
 
   ## Example
 
-      # Counter is incremented at first cache level
+      # Counter is incremented in all cache levels
       MyCache.update_counter("foo", "bar")
   """
   def update_counter(cache, key, incr, opts) do
@@ -452,10 +448,8 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   defp eval_levels(nil, cache),
-    do: [hd(cache.__levels__)]
-  defp eval_levels(:all, cache),
     do: cache.__levels__
-  defp eval_levels(level, cache),
+  defp eval_levels(level, cache) when is_integer(level),
     do: [:lists.nth(level, cache.__levels__)]
 
   defp eval_while(ml_cache, fun, args, init \\ nil) do

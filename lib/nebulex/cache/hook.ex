@@ -70,14 +70,10 @@ defmodule Nebulex.Cache.Hook do
       end
 
       @doc false
-      def pre_hooks do
-        []
-      end
+      def pre_hooks, do: []
 
       @doc false
-      def post_hooks do
-        []
-      end
+      def post_hooks, do: []
 
       defoverridable [pre_hooks: 0, post_hooks: 0]
     end

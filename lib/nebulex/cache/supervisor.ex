@@ -60,7 +60,7 @@ defmodule Nebulex.Cache.Supervisor do
       {:ok, opts} ->
         children = [
           worker(Nebulex.Cache.Stats, [cache])
-          | adapter.children(cache, opts)
+          | adapter.children_specs(cache, opts)
         ]
 
         supervise(children, strategy: :one_for_one)

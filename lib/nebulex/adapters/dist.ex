@@ -164,7 +164,7 @@ defmodule Nebulex.Adapters.Dist do
   ## Adapter Impl
 
   @doc false
-  def children(_cache, _opts), do: []
+  def children_specs(_cache, _opts), do: []
 
   @doc false
   def get(cache, key, opts) do

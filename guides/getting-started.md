@@ -35,7 +35,7 @@ changing the `deps` definition in that file to this:
 
 ```elixir
 defp deps do
-  [{:nebulex, "~> 1.0.0-rc.2"}]
+  [{:nebulex, "~> 1.0.0-rc.3"}]
 end
 ```
 

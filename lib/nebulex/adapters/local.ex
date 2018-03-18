@@ -126,7 +126,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @doc false
-  def children(cache, opts) do
+  def children_specs(cache, opts) do
     import Supervisor.Spec
 
     [
