@@ -14,39 +14,39 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
   end
 
   test "garbage collection" do
-    assert length(TestCache.__metadata__.generations) == 1
+    assert 1 == length(TestCache.__metadata__.generations)
 
     for i <- 2..3 do
       _ = :timer.sleep(1010)
-      assert length(TestCache.__metadata__.generations) == i
+      assert i == length(TestCache.__metadata__.generations)
     end
 
     for _ <- 1..12 do
       _ = :timer.sleep(1010)
-      assert length(TestCache.__metadata__.generations) == 3
+      assert 3 == length(TestCache.__metadata__.generations)
     end
   end
 
   test "create new generation and reset timeout" do
-    assert length(TestCache.__metadata__.generations) == 1
+    assert 1 == length(TestCache.__metadata__.generations)
 
     _ = :timer.sleep(800)
-    assert length(TestCache.new_generation()) == 2
+    assert 2 == length(TestCache.new_generation())
 
     _ = :timer.sleep(500)
-    assert length(TestCache.__metadata__.generations) == 2
+    assert 2 == length(TestCache.__metadata__.generations)
 
     _ = :timer.sleep(510)
-    assert length(TestCache.__metadata__.generations) == 3
+    assert 3 == length(TestCache.__metadata__.generations)
   end
 
   test "create new generation without reset timeout" do
-    assert length(TestCache.__metadata__.generations) == 1
+    assert 1 == length(TestCache.__metadata__.generations)
 
     _ = :timer.sleep(800)
-    assert length(TestCache.new_generation(reset_timeout: false)) == 2
+    assert 2 == length(TestCache.new_generation(reset_timeout: false))
 
     _ = :timer.sleep(500)
-    assert length(TestCache.__metadata__.generations) == 3
+    assert 3 == length(TestCache.__metadata__.generations)
   end
 end

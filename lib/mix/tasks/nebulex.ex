@@ -1,6 +1,8 @@
 defmodule Mix.Tasks.Nebulex do
   use Mix.Task
 
+  alias Mix.Tasks.Help
+
   @shortdoc "Prints Nebulex help information"
 
   @moduledoc """
@@ -24,6 +26,6 @@ defmodule Mix.Tasks.Nebulex do
     Mix.shell.info "Nebulex v#{Application.spec(:nebulex, :vsn)}"
     Mix.shell.info "A fast, flexible and powerful caching library for Elixir."
     Mix.shell.info "\nAvailable tasks:\n"
-    Mix.Tasks.Help.run(["--search", "nebulex."])
+    Help.run(["--search", "nebulex."])
   end
 end

@@ -197,7 +197,11 @@ defmodule Nebulex.Adapters.Local do
     do: nil
   defp do_set(object, gen, cache, opts) do
     version = cache.generate_vsn(object)
-    ttl = seconds_since_epoch(opts[:ttl])
+
+    ttl =
+      if ttl_opt = opts[:ttl],
+        do: seconds_since_epoch(ttl_opt),
+        else: object.ttl
 
     %{object | version: version, ttl: ttl}
     |> set_object(gen, cache)
@@ -279,7 +283,6 @@ defmodule Nebulex.Adapters.Local do
         return =
           %Object{key: key, value: val, version: vsn, ttl: ttl}
           |> validate_return(opts)
-
         fun.({key, return}, fold_acc)
       end, acc, gen, cache.__state__)
     end)
@@ -322,14 +325,15 @@ defmodule Nebulex.Adapters.Local do
   @doc false
   def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
     generations = cache.__metadata__.generations
-    {gen, current} = get(generations, cache, key, Keyword.delete(opts, :return))
+    {gen, current} = get(generations, cache, key, Keyword.put(opts, :return, :object))
+    current = current || %Object{}
 
-    case fun.(current) do
+    case fun.(current.value) do
       {get, update} ->
-        {get, do_set(%Object{key: key, value: update}, gen, cache, opts)}
+        {get, do_set(%{current | key: key, value: update}, gen, cache, opts)}
       :pop ->
         _ = do_delete(%Object{key: key}, generations, cache.__state__)
-        {current, nil}
+        {current.value, nil}
       other ->
         raise ArgumentError,
           "the given function must return a two-element tuple or :pop, " <>
@@ -341,11 +345,11 @@ defmodule Nebulex.Adapters.Local do
   def update(cache, key, initial, fun, opts) do
     generations = cache.__metadata__.generations
 
-    case get(generations, cache, key, Keyword.delete(opts, :return)) do
+    case get(generations, cache, key, Keyword.put(opts, :return, :object)) do
       {gen, nil} ->
         do_set(%Object{key: key, value: initial}, gen, cache, opts)
-      {gen, val} ->
-        do_set(%Object{key: key, value: fun.(val)}, gen, cache, opts)
+      {gen, obj} ->
+        do_set(%{obj | key: key, value: fun.(obj.value)}, gen, cache, opts)
     end
   end
 
@@ -456,7 +460,7 @@ defmodule Nebulex.Adapters.Local do
   defp diff_epoch(_),
     do: :infinity
 
-  defp unix_time(), do: DateTime.to_unix(DateTime.utc_now())
+  defp unix_time, do: DateTime.to_unix(DateTime.utc_now())
 
   defp ret_obj(opts), do: Keyword.put(opts, :return, :object)
 end

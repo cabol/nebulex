@@ -433,7 +433,6 @@ defmodule Nebulex.Adapters.Multilevel do
       Enum.reduce(cache.__levels__, [], fn(level, acc) ->
         [level.in_transaction?() | acc]
       end)
-
     true in results
   end
 

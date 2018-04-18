@@ -9,10 +9,10 @@ defmodule Nebulex.Adapters.MultilevelExclusiveTest do
     2 = @l2.set 2, 2
     3 = @l3.set 3, 3
 
-    assert Multilevel.get(1) == 1
-    assert Multilevel.get(2, return: :key) == 2
+    assert 1 == Multilevel.get(1)
+    assert 2 == Multilevel.get(2, return: :key)
     %Object{value: 2, key: 2, version: _} = Multilevel.get(2, return: :object)
-    assert Multilevel.get(3) == 3
+    assert 3 == Multilevel.get(3)
     refute @l1.get(2)
     refute @l1.get(3)
     refute @l2.get(1)

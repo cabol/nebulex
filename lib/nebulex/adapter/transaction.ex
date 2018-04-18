@@ -3,6 +3,9 @@ defmodule Nebulex.Adapter.Transaction  do
   Specifies the adapter transactions API.
   """
 
+  @type cache :: Nebulex.Cache.t
+  @type opts  :: Nebulex.Cache.opts
+
   @doc false
   defmacro __using__(_opts) do
     quote do
@@ -82,10 +85,10 @@ defmodule Nebulex.Adapter.Transaction  do
 
   See `Nebulex.Cache.transaction/2`.
   """
-  @callback transaction(cache :: Nebulex.Cache.t, opts :: Nebulex.Cache.opts, function :: fun) :: any
+  @callback transaction(cache, opts, function :: fun) :: any
 
   @doc """
   Returns `true` if the given process is inside a transaction.
   """
-  @callback in_transaction?(cache :: Nebulex.Cache.t) :: boolean
+  @callback in_transaction?(cache) :: boolean
 end

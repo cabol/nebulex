@@ -33,13 +33,13 @@ defmodule Nebulex.Adapters.LocalTest do
       if v, do: {v, v * 2}, else: {v, 1}
     end)
 
-    assert TestCache.get_and_update(1, &({&1, &1 * 2})) == {1, 2}
+    assert {1, 2} == TestCache.get_and_update(1, &({&1, &1 * 2}))
     {2, %Object{key: 1, value: 6, ttl: _, version: _}} =
       TestCache.get_and_update(1, &({&1, &1 * 3}), return: :object)
-    assert TestCache.get_and_update(1, &({&1, nil})) == {6, nil}
-    assert TestCache.get(1) == 6
-    assert TestCache.get_and_update(1, fn _ -> :pop end) == {6, nil}
-    assert TestCache.get_and_update(3, &({&1, 3})) == {nil, 3}
+    assert {6, nil} == TestCache.get_and_update(1, &({&1, nil}))
+    assert 6 == TestCache.get(1)
+    assert {6, nil} == TestCache.get_and_update(1, fn _ -> :pop end)
+    assert {nil, 3} == TestCache.get_and_update(3, &({&1, 3}))
 
     assert {nil, :error} == TestCache.get_and_update(:a, fn v ->
       if v, do: {v, :ok}, else: {v, :error}
@@ -60,41 +60,17 @@ defmodule Nebulex.Adapters.LocalTest do
     end
   end
 
-  test "update" do
-    TestCache.new_generation()
-
-    for x <- 1..2, do: TestCache.set x, x
-
-    assert TestCache.update(1, 1, &(&1 * 2)) == 2
-    assert TestCache.update(2, 1, &(&1 * 2)) == 4
-    assert TestCache.update(3, 1, &(&1 * 2)) == 1
-    refute TestCache.update(4, nil, &(&1 * 2))
-    refute TestCache.get(4)
-
-    %Object{key: 11, value: 1, ttl: _, version: _} =
-      TestCache.update(11, 1, &(&1 * 2), return: :object)
-
-    assert TestCache.update(3, 3, &(&1 * 2), version: -1, on_conflict: :nothing) == 2
-    assert TestCache.update(3, 3, &(&1 * 2), version: -1, on_conflict: nil) == 3
-
-    assert_raise Nebulex.VersionConflictError, fn ->
-      :a
-      |> TestCache.set(1, return: :key)
-      |> TestCache.update(0, &(&1 * 2), version: -1)
-    end
-  end
-
   test "incr with update" do
     TestCache.new_generation()
 
-    assert TestCache.update_counter(:counter) == 1
-    assert TestCache.update_counter(:counter) == 2
+    assert 1 == TestCache.update_counter(:counter)
+    assert 2 == TestCache.update_counter(:counter)
 
-    assert TestCache.get_and_update(:counter, &({&1, &1 * 2})) == {2, 4}
-    assert TestCache.update_counter(:counter) == 5
+    assert {2, 4} == TestCache.get_and_update(:counter, &({&1, &1 * 2}))
+    assert 5 == TestCache.update_counter(:counter)
 
-    assert TestCache.update(:counter, 1, &(&1 * 2)) == 10
-    assert TestCache.update_counter(:counter, -10) == 0
+    assert 10 == TestCache.update(:counter, 1, &(&1 * 2))
+    assert 0 == TestCache.update_counter(:counter, -10)
 
     TestCache.set("foo", "bar")
     assert_raise ArgumentError, fn ->
@@ -113,7 +89,7 @@ defmodule Nebulex.Adapters.LocalTest do
     for x <- 1..2, do: TestCache.set x, x
 
     # fetch one entry from new generation
-    assert TestCache.get(1) == 1
+    assert 1 == TestCache.get(1)
 
     # fetch non-existent entries
     refute TestCache.get(3)
@@ -125,15 +101,15 @@ defmodule Nebulex.Adapters.LocalTest do
     # both entries should be in the old generation
     refute get_from_new(1)
     refute get_from_new(2)
-    assert (get_from_old(1)).value == 1
-    assert (get_from_old(2)).value == 2
+    assert 1 == (get_from_old(1)).value
+    assert 2 == (get_from_old(2)).value
 
     # fetch entry 1 to set it into the new generation
-    assert TestCache.get(1) == 1
-    assert (get_from_new(1)).value == 1
+    assert 1 == TestCache.get(1)
+    assert 1 == (get_from_new(1)).value
     refute get_from_new(2)
     refute get_from_old(1)
-    assert (get_from_old(2)).value == 2
+    assert 2 == (get_from_old(2)).value
 
     # create a new generation, the old generation should be deleted
     TestCache.new_generation()
@@ -141,7 +117,7 @@ defmodule Nebulex.Adapters.LocalTest do
     # entry 1 should be into the old generation and entry 2 deleted
     refute get_from_new(1)
     refute get_from_new(2)
-    assert (get_from_old(1)).value == 1
+    assert 1 == (get_from_old(1)).value
     refute get_from_old(2)
   end
 

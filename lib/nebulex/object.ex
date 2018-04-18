@@ -5,7 +5,7 @@ defmodule Nebulex.Object do
   This is the struct used by the caches to store and retrieve data.
   """
 
-  defstruct [:key, :value, :version, ttl: :infinity]
+  defstruct [:key, :value, :version, :ttl]
 
   @type t :: %__MODULE__{key: any, value: any, version: any, ttl: timeout}
 
@@ -18,6 +18,8 @@ defmodule Nebulex.Object do
       Object.ttl(obj)
   """
   @spec ttl(Nebulex.Object.t) :: timeout
+  def ttl(%Nebulex.Object{ttl: nil}),
+    do: :infinity
   def ttl(%Nebulex.Object{ttl: :infinity}),
     do: :infinity
   def ttl(%Nebulex.Object{ttl: ttl}) when is_integer(ttl) do

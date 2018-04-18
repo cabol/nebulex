@@ -4,6 +4,8 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
   import Mix.Nebulex
   import Mix.Generator
 
+  alias Mix.Project
+
   @shortdoc "Generates a new cache"
 
   @moduledoc """
@@ -45,7 +47,7 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
     cache   = Module.concat([cache])
     adapter = Module.concat([parsed[:adapter] || Nebulex.Adapters.Local])
 
-    config      = Mix.Project.config
+    config      = Project.config
     underscored = Macro.underscore(inspect(cache))
 
     base = Path.basename(underscored)
