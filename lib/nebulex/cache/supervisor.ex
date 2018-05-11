@@ -62,7 +62,6 @@ defmodule Nebulex.Cache.Supervisor do
           worker(Nebulex.Cache.Stats, [cache])
           | adapter.children_specs(cache, opts)
         ]
-
         supervise(children, strategy: :one_for_one)
       :ignore ->
         :ignore

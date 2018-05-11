@@ -80,7 +80,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     {{_, gen_index}, ref} =
       if gc_interval = opts[:gc_interval],
         do: {new_gen(cache, 0), start_timer(gc_interval)},
-        else: {{nil, 0}, nil}
+        else: {new_gen(cache, 0), nil}
 
     {:ok, %{cache: cache, gc_interval: gc_interval, time_ref: ref, gen_index: gen_index}}
   end
@@ -88,6 +88,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   @doc false
   def handle_call({:new_generation, opts}, _from, %{cache: cache, gen_index: gen_index} = state) do
     {generations, gen_index} = new_gen(cache, gen_index)
+
     state =
       opts
       |> Keyword.get(:reset_timeout, true)
@@ -120,9 +121,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   defp init_indexes(metadata, cache) do
-    Enum.each(0..(metadata.n_generations), fn(index) ->
-      _ = String.to_atom("#{cache}.#{index}")
-    end)
+    :ok = Enum.each(0..(metadata.n_generations), &String.to_atom("#{cache}.#{&1}"))
     metadata
   end
 
@@ -133,7 +132,6 @@ defmodule Nebulex.Adapters.Local.Generation do
       |> Local.new(cache.__tab_opts__)
       |> Metadata.new_generation(cache)
       |> maybe_delete_gen()
-
     {gens, incr_gen_index(cache, gen_index)}
   end
 

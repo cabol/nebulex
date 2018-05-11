@@ -27,8 +27,6 @@ defmodule Nebulex.Adapters.LocalTest do
   end
 
   test "get_and_update" do
-    TestCache.new_generation()
-
     assert {nil, 1} == TestCache.get_and_update(1, fn v ->
       if v, do: {v, v * 2}, else: {v, 1}
     end)
@@ -61,8 +59,6 @@ defmodule Nebulex.Adapters.LocalTest do
   end
 
   test "incr with update" do
-    TestCache.new_generation()
-
     assert 1 == TestCache.update_counter(:counter)
     assert 2 == TestCache.update_counter(:counter)
 
@@ -79,9 +75,6 @@ defmodule Nebulex.Adapters.LocalTest do
   end
 
   test "push generations" do
-    # create 1st generation
-    TestCache.new_generation()
-
     # should be empty
     refute TestCache.get(1)
 

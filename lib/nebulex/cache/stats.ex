@@ -71,7 +71,6 @@ defmodule Nebulex.Cache.Stats do
         read_concurrency: true,
         write_concurrency: true
       ])
-
     {:ok, %{name: name, cache: cache}}
   end
 

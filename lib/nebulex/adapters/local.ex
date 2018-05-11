@@ -209,7 +209,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp set_object(obj, gen, cache) do
-    _ = Local.insert(gen, {obj.key, obj.value, obj.version, obj.ttl}, cache.__state__)
+    true = Local.insert(gen, {obj.key, obj.value, obj.version, obj.ttl}, cache.__state__)
     obj
   end
 
@@ -236,7 +236,7 @@ defmodule Nebulex.Adapters.Local do
   defp do_delete({:nothing, cached_obj}, _, _),
     do: cached_obj
   defp do_delete(%Object{} = object, generations, state) do
-    _ = Enum.each(generations, &Local.remove(&1, object.key, state))
+    :ok = Enum.each(generations, &Local.remove(&1, object.key, state))
     object
   end
 
@@ -435,7 +435,7 @@ defmodule Nebulex.Adapters.Local do
     if ttl > seconds_since_epoch(0) do
       object
     else
-      _ = Local.remove(gen, object.key, cache.__state__)
+      true = Local.delete(gen, object.key, cache.__state__)
       nil
     end
   end

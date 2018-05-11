@@ -440,7 +440,6 @@ defmodule Nebulex.Adapters.Multilevel do
 
   defp eval(ml_cache, fun, args, opts \\ []) do
     [l1 | next] = eval_levels(opts[:level], ml_cache)
-
     Enum.reduce(next, apply(l1, fun, args), fn(cache, acc) ->
       ^acc = apply(cache, fun, args)
     end)
@@ -466,7 +465,6 @@ defmodule Nebulex.Adapters.Multilevel do
       if fallback = opts[:fallback] || cache. __fallback__,
         do: %Object{key: key, value: eval_fallback(fallback, key)},
         else: nil
-
     {object, levels}
   end
   defp maybe_fallback(return, _, _, _), do: return
