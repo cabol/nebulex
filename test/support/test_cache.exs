@@ -31,27 +31,15 @@ defmodule Nebulex.TestCache do
     end
   end
 
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Local, [
-    n_shards: 2,
-    version_generator: Nebulex.Version.Timestamp
-  ])
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Local, version_generator: Nebulex.Version.Timestamp)
 
   defmodule Local do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
   end
 
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C1, [
-    n_shards: 2,
-    post_hooks_mode: :async
-  ])
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C2, [
-    n_shards: 2,
-    post_hooks_mode: :pipe
-  ])
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C3, [
-    n_shards: 2,
-    post_hooks_mode: :sync
-  ])
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C1, post_hooks_mode: :async)
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C2, post_hooks_mode: :pipe)
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C3, post_hooks_mode: :sync)
 
   defmodule Hooked do
     defmodule C1 do
@@ -70,29 +58,21 @@ defmodule Nebulex.TestCache do
     end
   end
 
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.CacheStats, [
-    n_shards: 2,
-    stats: true,
-    post_hooks_mode: :pipe
-  ])
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.CacheStats, stats: true, post_hooks_mode: :pipe)
 
   defmodule CacheStats do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
   end
 
   for mod <- [Nebulex.TestCache.LocalWithGC, Nebulex.TestCache.DistLocal] do
-    :ok = Application.put_env(:nebulex, mod, [
-      n_shards: 2,
-      gc_interval: 3600,
-      version_generator: Nebulex.Version.Timestamp
-    ])
+    :ok = Application.put_env(:nebulex, mod, gc_interval: 3600, version_generator: Nebulex.Version.Timestamp)
 
     defmodule mod do
       use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
     end
   end
 
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Dist, [local: Nebulex.TestCache.DistLocal])
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Dist, local: Nebulex.TestCache.DistLocal)
 
   defmodule Dist do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Dist
@@ -116,7 +96,7 @@ defmodule Nebulex.TestCache do
     levels =
       for l <- 1..3 do
         level = String.to_atom("#{mod}.L#{l}")
-        :ok = Application.put_env(:nebulex, level, [n_shards: 2, gc_interval: 3600])
+        :ok = Application.put_env(:nebulex, level, n_shards: 2, gc_interval: 3600)
         level
       end
 

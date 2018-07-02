@@ -1,6 +1,51 @@
 defmodule Nebulex.Adapter.Transaction  do
   @moduledoc """
   Specifies the adapter transactions API.
+
+  ## Default implementation
+
+  This module also provides a default implementation which uses the Erlang
+  library `:global`.
+
+  Theis implementation accepts the following options:
+
+    * `:keys` - The list of the keys that will be locked. Since the lock id is
+      generated based on the key, if this option is not set, a fixed/constant
+      lock id is used to perform the transaction, then all further transactions
+      (without this option set) are serialized and the performance is affected
+      significantly. For that reason it is recommended to pass the list of keys
+      involved in the transaction.
+
+    * `:nodes` - The list of the nodes where the lock will be set, or on
+      all nodes if none are specified.
+
+    * `:retries` - If the key has been locked by other process already, and
+      `:retries` is not equal to 0, the process sleeps for a while and tries
+      to execute the action later. When `:retries` attempts have been made,
+      an exception is raised. If `:retries` is `:infinity` (the default),
+      the function will eventually be executed (unless the lock is never
+      released).
+
+  Let's see an example:
+
+      MyCache.transaction fn ->
+        counter = MyCache.get(:counter)
+        MyCache.set(:counter, counter + 1)
+      end
+
+  Locking only the involved key (recommended):
+
+      MyCache.transaction fn ->
+        counter = MyCache.get(:counter)
+        MyCache.set(:counter, counter + 1)
+      end, keys: [:counter]
+
+      MyCache.transaction fn ->
+        alice = MyCache.get(:alice)
+        bob = MyCache.get(:bob)
+        MyCache.set(:alice, %{alice | balance: alice.balance + 100})
+        MyCache.set(:bob, %{bob | balance: bob.balance + 100})
+      end, keys: [:alice, :bob]
   """
 
   @type cache :: Nebulex.Cache.t
@@ -13,7 +58,7 @@ defmodule Nebulex.Adapter.Transaction  do
 
       @doc false
       def transaction(cache, opts, fun) do
-        keys  = opts[:keys] || []
+        keys = opts[:keys]
         nodes = opts[:nodes] || [node() | Node.list()]
         retries = opts[:retries] || :infinity
         do_transaction(cache, keys, nodes, retries, fun)
@@ -71,7 +116,7 @@ defmodule Nebulex.Adapter.Transaction  do
         end)
       end
 
-      defp lock_ids(cache, []),
+      defp lock_ids(cache, nil),
         do: [{cache, self()}]
       defp lock_ids(cache, keys),
         do: for key <- keys, do: {{cache, key}, self()}

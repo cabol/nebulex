@@ -12,7 +12,7 @@
         {Credo.Check.Design.AliasUsage, priority: :low},
 
         ## Readability Checks
-        {Credo.Check.Readability.MaxLineLength, priority: :low, max_length: 100},
+        {Credo.Check.Readability.MaxLineLength, priority: :low, max_length: 110},
 
         ## Refactoring Opportunities
         {Credo.Check.Refactor.LongQuoteBlocks, false}

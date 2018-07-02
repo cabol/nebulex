@@ -59,7 +59,7 @@ defmodule Nebulex.Cache do
 
   Almost all of the Cache operations below accept the following options:
 
-    * `:return` - selects return type. When `:value` (the default), returns
+    * `:return` - Selects return type. When `:value` (the default), returns
       the object `value`. When `:object`, returns the `Nebulex.Object.t`.
 
     * `:version` - The version of the object on which the operation will
@@ -545,7 +545,7 @@ defmodule Nebulex.Cache do
   Besides the "Shared options" section at the module documentation,
   it accepts:
 
-    * `:on_conflict` - same as callback `get/2`.
+    * `:on_conflict` - Same as callback `get/2`.
 
   ## Examples
 
@@ -577,7 +577,7 @@ defmodule Nebulex.Cache do
   Besides the "Shared options" section at the module documentation,
   it accepts:
 
-    * `:on_conflict` - same as callback `get/2`.
+    * `:on_conflict` - Same as callback `get/2`.
 
   ## Examples
 
@@ -624,7 +624,7 @@ defmodule Nebulex.Cache do
   Besides the "Shared options" section at the module documentation,
   it accepts:
 
-    * `:on_conflict` - same as callback `get/2`.
+    * `:on_conflict` - Same as callback `get/2`.
 
   ## Examples
 
@@ -674,9 +674,10 @@ defmodule Nebulex.Cache do
   ## Examples
 
       MyCache.transaction fn ->
-        1 = MyCache.set(:a, 1)
-        true = MyCache.has_key?(:a)
-        MyCache.get(:a)
+        alice = MyCache.get(:alice)
+        bob = MyCache.get(:bob)
+        MyCache.set(:alice, %{alice | balance: alice.balance + 100})
+        MyCache.set(:bob, %{bob | balance: bob.balance + 100})
       end
   """
   @callback transaction(function :: fun, opts) :: any

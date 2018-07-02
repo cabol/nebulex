@@ -77,9 +77,9 @@ defmodule Nebulex.Adapters.Local do
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
 
-  alias Nebulex.Object
   alias ExShards.Local
   alias Nebulex.Adapters.Local.Generation
+  alias Nebulex.Object
 
   ## Adapter Impl
 
@@ -95,8 +95,8 @@ defmodule Nebulex.Adapters.Local do
 
     quote do
       alias ExShards.State
-      alias Nebulex.Adapters.Local.Metadata
       alias Nebulex.Adapters.Local.Generation
+      alias Nebulex.Adapters.Local.Metadata
 
       def __metadata__, do: Metadata.get(__MODULE__)
 

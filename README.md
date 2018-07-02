@@ -1,5 +1,5 @@
 # Nebulex
-> ### A fast, flexible and powerful caching library for Elixir.
+> ### A fast, flexible and extensible distributed and local caching library for Elixir.
 > – Not only local but also distributed!
 
 [![Build Status](https://travis-ci.org/cabol/nebulex.svg?branch=master)](https://travis-ci.org/cabol/nebulex)
