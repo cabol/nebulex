@@ -49,9 +49,10 @@ defmodule Nebulex.Cache.Hook do
     quote do
       @behaviour Nebulex.Cache.Hook
 
-      @doc false
-      def eval_hooks([], _eval, {_cache, _action, _args}, result),
-        do: result
+      def eval_hooks([], _eval, {_cache, _action, _args}, result) do
+        result
+      end
+
       def eval_hooks(hooks, eval, {_cache, _action, _args} = cache_op, result) do
         Enum.reduce(hooks, result, fn
           (hook, acc) when is_function(hook, 2) and eval == :pipe ->
@@ -69,10 +70,8 @@ defmodule Nebulex.Cache.Hook do
         end)
       end
 
-      @doc false
       def pre_hooks, do: []
 
-      @doc false
       def post_hooks, do: []
 
       defoverridable [pre_hooks: 0, post_hooks: 0]
@@ -116,10 +115,13 @@ defmodule Nebulex.Cache.Hook do
           [&post_hook/2]
         end
 
-        def post_hook(result, {_, :set, _} = call),
-          do: send(:hooked_cache, call)
-        def post_hook(_, _),
-          do: :noop
+        def post_hook(result, {_, :set, _} = call) do
+          send(:hooked_cache, call)
+        end
+
+        def post_hook(_, _) do
+          :noop
+        end
       end
   """
   @callback post_hooks() :: [hook_fun]

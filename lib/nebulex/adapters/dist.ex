@@ -113,7 +113,7 @@ defmodule Nebulex.Adapters.Dist do
 
   ## Adapter Impl
 
-  @doc false
+  @impl true
   defmacro __before_compile__(env) do
     otp_app = Module.get_attribute(env.module, :otp_app)
     config = Module.get_attribute(env.module, :config)
@@ -163,32 +163,34 @@ defmodule Nebulex.Adapters.Dist do
 
   ## Adapter Impl
 
-  @doc false
-  def children_specs(_cache, _opts), do: []
+  @impl true
+  def init(_cache, _opts), do: {:ok, []}
 
-  @doc false
+  @impl true
   def get(cache, key, opts) do
     call(cache, :get, [key, opts])
   end
 
-  @doc false
-  def set(_cache, _key, nil, _opts),
-    do: nil
+  @impl true
+  def set(_cache, _key, nil, _opts) do
+    nil
+  end
+
   def set(cache, key, value, opts) do
     call(cache, :set, [key, value, opts])
   end
 
-  @doc false
+  @impl true
   def delete(cache, key, opts) do
     call(cache, :delete, [key, opts])
   end
 
-  @doc false
+  @impl true
   def has_key?(cache, key) do
     call(cache, :has_key?, [key])
   end
 
-  @doc false
+  @impl true
   def size(cache) do
     Enum.reduce(cache.nodes, 0, fn(node, acc) ->
       node
@@ -197,28 +199,28 @@ defmodule Nebulex.Adapters.Dist do
     end)
   end
 
-  @doc false
+  @impl true
   def flush(cache) do
     Enum.each(cache.nodes, fn(node) ->
       rpc_call(node, cache.__local__, :flush, [])
     end)
   end
 
-  @doc false
+  @impl true
   def keys(cache) do
     cache.nodes
     |> Enum.reduce([], fn(node, acc) -> rpc_call(node, cache.__local__, :keys, []) ++ acc end)
     |> :lists.usort()
   end
 
-  @doc false
+  @impl true
   def reduce(cache, acc_in, fun, opts) do
     Enum.reduce(cache.nodes, acc_in, fn(node, acc) ->
       rpc_call(node, cache.__local__, :reduce, [acc, fun, opts])
     end)
   end
 
-  @doc false
+  @impl true
   def to_map(cache, opts) do
     Enum.reduce(cache.nodes, %{}, fn(node, acc) ->
       node
@@ -227,22 +229,22 @@ defmodule Nebulex.Adapters.Dist do
     end)
   end
 
-  @doc false
+  @impl true
   def pop(cache, key, opts) do
     call(cache, :pop, [key, opts])
   end
 
-  @doc false
+  @impl true
   def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
     call(cache, :get_and_update, [key, fun, opts])
   end
 
-  @doc false
+  @impl true
   def update(cache, key, initial, fun, opts) do
     call(cache, :update, [key, initial, fun, opts])
   end
 
-  @doc false
+  @impl true
   def update_counter(cache, key, incr, opts) do
     call(cache, :update_counter, [key, incr, opts])
   end
@@ -263,8 +265,10 @@ defmodule Nebulex.Adapters.Dist do
     case :rpc.call(node, mod, fun, args) do
       {:badrpc, {:EXIT, {remote_ex, _}}} ->
         raise remote_ex
+
       {:badrpc, _} = err ->
         {:error, err}
+
       response ->
         response
     end

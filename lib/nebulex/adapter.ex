@@ -19,9 +19,9 @@ defmodule Nebulex.Adapter do
   @macrocallback __before_compile__(env :: Macro.Env.t) :: Macro.t
 
   @doc """
-  Returns the children specs that starts the adapter process.
+  Initializes the adapter supervision tree by returning the children
   """
-  @callback children_specs(cache, opts) :: [Supervisor.Spec.spec]
+  @callback init(cache, opts) :: {:ok, [:supervisor.child_spec()]}
 
   @doc """
   Retrieves a single object from Cache.
@@ -104,7 +104,7 @@ defmodule Nebulex.Adapter do
   See `Nebulex.Cache.get_and_update/3`.
   """
   @callback get_and_update(cache, key, (value -> {get, update} | :pop), opts) ::
-            no_return | {get, update} when get: value, update: return
+              no_return | {get, update} when get: value, update: return
 
   @doc """
   Updates the cached `key` with the given function.

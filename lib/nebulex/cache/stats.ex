@@ -11,6 +11,14 @@ defmodule Nebulex.Cache.Stats do
     GenServer.start_link(__MODULE__, {name, cache}, name: name)
   end
 
+  @spec child_spec(Nebulex.Cache.t) :: :supervisor.child_spec()
+  def child_spec(cache) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [cache]}
+    }
+  end
+
   @spec get_counter(Nebulex.Cache.t, atom) :: integer
   def get_counter(cache, action) when is_atom(action) do
     cache
@@ -62,7 +70,7 @@ defmodule Nebulex.Cache.Stats do
 
   ## GenServer Callbacks
 
-  @doc false
+  @impl true
   def init({name, cache}) do
     ^name =
       :ets.new(name, [
@@ -71,6 +79,7 @@ defmodule Nebulex.Cache.Stats do
         read_concurrency: true,
         write_concurrency: true
       ])
+
     {:ok, %{name: name, cache: cache}}
   end
 

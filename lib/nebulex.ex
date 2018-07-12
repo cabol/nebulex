@@ -46,18 +46,13 @@ defmodule Nebulex do
   edit the `start/2` function to start the repo as a supervisor on your
   application's supervisor:
 
-      defmodule MyApp do
-        use Application
+      def start(_type, _args) do
+        children = [
+          {MyApp.Cache, []}
+        ]
 
-        def start(_type, _args) do
-          import Supervisor.Spec
-
-          children = [
-            supervisor(MyApp.MyCache, [])
-          ]
-
-          ...
-        end
+        opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+        Supervisor.start_link(children, opts)
       end
 
   ## Object

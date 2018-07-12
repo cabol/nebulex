@@ -16,8 +16,11 @@ defmodule Mix.Tasks.Nebulex do
     {_opts, args, _} = OptionParser.parse(args)
 
     case args do
-      [] -> general()
-      _  -> Mix.raise "Invalid arguments, expected: mix nebulex"
+      [] ->
+        general()
+
+      _  ->
+        Mix.raise "Invalid arguments, expected: mix nebulex"
     end
   end
 

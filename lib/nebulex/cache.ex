@@ -96,13 +96,25 @@ defmodule Nebulex.Cache do
       @config config
       @before_compile adapter
 
-      def __adapter__ do
-        @adapter
-      end
+      ## Config and metadata
 
       def config do
         {:ok, config} = Nebulex.Cache.Supervisor.runtime_config(__MODULE__, @otp_app, [])
         config
+      end
+
+      def __adapter__ do
+        @adapter
+      end
+
+      ## Process lifecycle
+
+      def child_spec(opts) do
+        %{
+          id: __MODULE__,
+          start: {__MODULE__, :start_link, [opts]},
+          type: :supervisor
+        }
       end
 
       def start_link(opts \\ []) do
@@ -113,14 +125,17 @@ defmodule Nebulex.Cache do
         Supervisor.stop(pid, :normal, timeout)
       end
 
+      ## Cache
+
       def get(key, opts \\ []) do
         execute(:get, [key, opts])
       end
 
       def get!(key, opts \\ []) do
-        case get(key, opts) do
-          nil -> raise KeyError, key: key, term: __MODULE__
-          val -> val
+        if result = get(key, opts) do
+          result
+        else
+          raise KeyError, key: key, term: __MODULE__
         end
       end
 
@@ -169,10 +184,16 @@ defmodule Nebulex.Cache do
       end
 
       def update_counter(key, incr \\ 1, opts \\ [])
-      def update_counter(key, incr, opts) when is_integer(incr),
-        do: execute(:update_counter, [key, incr, opts])
-      def update_counter(_key, incr, _opts),
-        do: raise ArgumentError, "the incr must be a valid integer, got: #{inspect incr}"
+
+      def update_counter(key, incr, opts) when is_integer(incr) do
+        execute(:update_counter, [key, incr, opts])
+      end
+
+      def update_counter(_key, incr, _opts) do
+        raise ArgumentError, "the incr must be a valid integer, got: #{inspect incr}"
+      end
+
+      ## Transactions
 
       if function_exported?(@adapter, :transaction, 3) do
         def transaction(fun, opts \\ []) do
@@ -205,8 +226,7 @@ defmodule Nebulex.Cache do
         @stats_hook &Nebulex.Cache.Stats.post_hook/2
 
         defp eval_post_hooks(result, action, args) do
-          [@stats_hook | post_hooks()]
-          |> eval_hooks(@post_hooks_mode, {__MODULE__, action, args}, result)
+          eval_hooks([@stats_hook | post_hooks()], @post_hooks_mode, {__MODULE__, action, args}, result)
         end
       else
         defp eval_post_hooks(result, action, args) do
@@ -242,8 +262,7 @@ defmodule Nebulex.Cache do
   See the configuration in the moduledoc for options shared between adapters,
   for adapter-specific configuration see the adapter's documentation.
   """
-  @callback start_link(opts) ::
-            {:ok, pid} | {:error, {:already_started, pid}} | {:error, term}
+  @callback start_link(opts) :: {:ok, pid} | {:error, {:already_started, pid}} | {:error, term}
 
   @doc """
   A callback executed when the cache starts or when configuration is read.
@@ -608,7 +627,7 @@ defmodule Nebulex.Cache do
         end, return: :object)
   """
   @callback get_and_update(key, (value -> {get, update} | :pop), opts) ::
-            no_return | {get, update} when get: value, update: return
+              no_return | {get, update} when get: value, update: return
 
   @doc """
   Updates the cached `key` with the given function.

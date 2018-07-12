@@ -73,7 +73,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   ## GenServer Callbacks
 
-  @doc false
+  @impl true
   def init({cache, opts}) do
     _ = init_metadata(cache, opts)
 
@@ -85,7 +85,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     {:ok, %{cache: cache, gc_interval: gc_interval, time_ref: ref, gen_index: gen_index}}
   end
 
-  @doc false
+  @impl true
   def handle_call({:new_generation, opts}, _from, %{cache: cache, gen_index: gen_index} = state) do
     {generations, gen_index} = new_gen(cache, gen_index)
 
@@ -97,12 +97,11 @@ defmodule Nebulex.Adapters.Local.Generation do
     {:reply, generations, %{state | gen_index: gen_index}}
   end
 
-  @doc false
   def handle_call(:flush, _from, %{cache: cache} = state) do
     {:reply, do_flush(cache), %{state | gen_index: 0}}
   end
 
-  @doc false
+  @impl true
   def handle_info(:timeout, %{cache: cache, gc_interval: time, gen_index: gen_index} = state) do
     {_, gen_index} = new_gen(cache, gen_index)
     {:noreply, %{state | gen_index: gen_index, time_ref: start_timer(time)}}
@@ -132,20 +131,21 @@ defmodule Nebulex.Adapters.Local.Generation do
       |> Local.new(cache.__tab_opts__)
       |> Metadata.new_generation(cache)
       |> maybe_delete_gen()
+
     {gens, incr_gen_index(cache, gen_index)}
   end
 
-  defp maybe_delete_gen({generations, nil}),
-    do: generations
+  defp maybe_delete_gen({generations, nil}) do
+    generations
+  end
+
   defp maybe_delete_gen({generations, dropped_gen}) do
     _ = Local.delete(dropped_gen)
     generations
   end
 
   defp incr_gen_index(cache, gen_index) do
-    if gen_index < cache.__metadata__.n_generations,
-      do: gen_index + 1,
-      else: 0
+    if gen_index < cache.__metadata__.n_generations, do: gen_index + 1, else: 0
   end
 
   defp start_timer(time) do
@@ -153,10 +153,14 @@ defmodule Nebulex.Adapters.Local.Generation do
     ref
   end
 
-  defp maybe_reset_timeout(_, %{gc_interval: nil} = state),
-    do: state
-  defp maybe_reset_timeout(false, state),
-    do: state
+  defp maybe_reset_timeout(_, %{gc_interval: nil} = state) do
+    state
+  end
+
+  defp maybe_reset_timeout(false, state) do
+    state
+  end
+
   defp maybe_reset_timeout(true, %{gc_interval: time, time_ref: ref} = state) do
     {:ok, :cancel} = :timer.cancel(ref)
     %{state | time_ref: start_timer(time)}

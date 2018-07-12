@@ -56,7 +56,6 @@ defmodule Nebulex.Adapter.Transaction  do
     quote do
       @behaviour Nebulex.Adapter.Transaction
 
-      @doc false
       def transaction(cache, opts, fun) do
         keys = opts[:keys]
         nodes = opts[:nodes] || [node() | Node.list()]
@@ -64,7 +63,6 @@ defmodule Nebulex.Adapter.Transaction  do
         do_transaction(cache, keys, nodes, retries, fun)
       end
 
-      @doc false
       def in_transaction?(cache) do
         if Process.get(cache), do: true, else: false
       end
@@ -85,6 +83,7 @@ defmodule Nebulex.Adapter.Transaction  do
               _ = Process.delete(cache)
               del_locks(ids, nodes)
             end
+
           false ->
       	    raise "transaction aborted"
         end
@@ -94,8 +93,11 @@ defmodule Nebulex.Adapter.Transaction  do
         maybe_set_lock =
           fn(id, {:ok, acc}) ->
             case :global.set_lock(id, nodes, retries) do
-              true  -> {:cont, {:ok, [id | acc]}}
-              false -> {:halt, {:error, acc}}
+              true ->
+                {:cont, {:ok, [id | acc]}}
+
+              false ->
+                {:halt, {:error, acc}}
             end
           end
 
@@ -104,6 +106,7 @@ defmodule Nebulex.Adapter.Transaction  do
         |> case do
           {:ok, _} ->
             true
+
           {:error, locked_ids} ->
             :ok = del_locks(locked_ids, nodes)
             false
@@ -116,10 +119,13 @@ defmodule Nebulex.Adapter.Transaction  do
         end)
       end
 
-      defp lock_ids(cache, nil),
-        do: [{cache, self()}]
-      defp lock_ids(cache, keys),
-        do: for key <- keys, do: {{cache, key}, self()}
+      defp lock_ids(cache, nil) do
+        [{cache, self()}]
+      end
+
+      defp lock_ids(cache, keys) do
+        for key <- keys, do: {{cache, key}, self()}
+      end
     end
   end
 

@@ -3,7 +3,6 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
 
   import Nebulex.FileHelpers
   import Mix.Tasks.Nebulex.Gen.Cache, only: [run: 1]
-  import Mock
 
   test "generates a new cache" do
     in_tmp fn _ ->
@@ -60,22 +59,6 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
     assert_raise Mix.Error, ~r"nebulex.gen.cache expects the cache to be given as -c", fn ->
       in_tmp fn _ ->
         run []
-      end
-    end
-  end
-
-  test "generates a new cache for Elixir <= 1.4.0" do
-    with_mock Version, [compare: fn(_, _) -> :lt end] do
-      in_tmp fn _ ->
-        run ["-c", "Cache"]
-        assert_file "lib/cache.ex", "defmodule Cache do"
-      end
-    end
-
-    with_mock Version, [compare: fn(_, _) -> :eq end] do
-      in_tmp fn _ ->
-        run ["-c", "Cache"]
-        assert_file "lib/cache.ex", "defmodule Cache do"
       end
     end
   end

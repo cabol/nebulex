@@ -18,10 +18,14 @@ defmodule Nebulex.Object do
       Object.ttl(obj)
   """
   @spec ttl(Nebulex.Object.t) :: timeout
-  def ttl(%Nebulex.Object{ttl: nil}),
-    do: :infinity
-  def ttl(%Nebulex.Object{ttl: :infinity}),
-    do: :infinity
+  def ttl(%Nebulex.Object{ttl: nil}) do
+    :infinity
+  end
+
+  def ttl(%Nebulex.Object{ttl: :infinity}) do
+    :infinity
+  end
+
   def ttl(%Nebulex.Object{ttl: ttl}) when is_integer(ttl) do
     remaining = ttl - DateTime.to_unix(DateTime.utc_now())
     if remaining >= 0, do: remaining, else: 0

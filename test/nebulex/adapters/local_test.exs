@@ -132,6 +132,7 @@ defmodule Nebulex.Adapters.LocalTest do
     case ExShards.Local.lookup(gen, key, TestCache.__state__) do
       [] ->
         nil
+
       [{^key, val, vsn, ttl}] ->
         %Object{key: key, value: val, version: vsn, ttl: ttl}
     end

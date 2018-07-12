@@ -27,7 +27,9 @@ defmodule Nebulex.Adapters.Multilevel do
       defaults to `:inclusive`. In an inclusive cache, the same data can be
       present in all caches/levels. In an exclusive cache, data can be present
       in only one cache/level and a key cannot be found in the rest of caches
-      at the same time. This option affects get operation only.
+      at the same time. This option affects `get` operation only; if
+      `:cache_model` is `:inclusive`, when the key is found in a level N,
+      that entry is duplicated backwards (to all previous levels: 1..N-1).
 
     * `:levels` - The list of caches where each cache corresponds to a level.
       The order of the caches in the list defines the the order of the levels
@@ -105,6 +107,26 @@ defmodule Nebulex.Adapters.Multilevel do
         n_shards: 2,
         gc_interval: 3600
 
+  Using the multilevel cache cache:
+
+      # Retrieving data from cache
+      MyCache.get("foo", fallback: fn(_key) ->
+        # Maybe fetch the key from database
+        "initial value"
+      end)
+
+      # Entry is set in all cache levels
+      MyCache.set("foo", "bar")
+
+      # Entry is set at second cache level
+      MyCache.set("foo", "bar", level: 2)
+
+      # Entry is deleted from all cache levels
+      MyCache.delete("foo")
+
+      # Entry is deleted from second cache level
+      MyCache.delete("foo", level: 2)
+
   ## Extended API
 
   This adapter provides some additional functions to the `Nebulex.Cache` API.
@@ -142,7 +164,7 @@ defmodule Nebulex.Adapters.Multilevel do
 
   ## Adapter Impl
 
-  @doc false
+  @impl true
   defmacro __before_compile__(env) do
     otp_app = Module.get_attribute(env.module, :otp_app)
     config = Module.get_attribute(env.module, :config)
@@ -171,36 +193,10 @@ defmodule Nebulex.Adapters.Multilevel do
     end
   end
 
-  ## Adapter Impl
+  @impl true
+  def init(_cache, _opts), do: {:ok, []}
 
-  @doc false
-  def children_specs(_cache, _opts), do: []
-
-  @doc """
-  Retrieves the requested key (if it exists) checking the fastest,
-  level 1 (L1) cache first; if it hits, the adapter proceeds at
-  high speed. If that first cache misses, the next fastest cache
-  (level 2, L2) is checked, and so on, before accessing external
-  memory (that can be handled by the `:fallback` function).
-
-  If `:cache_model` is `:inclusive`, when the key is found in a level N,
-  that entry is duplicated backwards (to all previous levels: 1..N-1).
-
-  ## Options
-
-    * `:fallback` - Defines a fallback function when a key is not present
-      in any cache level. Function is defined as: `(key -> value)`.
-
-  See the "Shared options" section at the module documentation and alse
-  `Nebulex.Cache`.
-
-  ## Example
-
-      MyCache.get("foo", fallback: fn(_key) ->
-        # Maybe fetch the key from database
-        "initial value"
-      end)
-  """
+  @impl true
   def get(cache, key, opts) do
     fun =
       fn(current, {_, prev}) ->
@@ -218,122 +214,54 @@ defmodule Nebulex.Adapters.Multilevel do
     |> validate_return(opts)
   end
 
-  @doc """
-  Sets the given `value` under `key` in the Cache.
+  @impl true
+  def set(_cache, _key, nil, _opts) do
+    nil
+  end
 
-  ## Options
-
-    * `:level` - Check shared options in module documentation.
-
-  ## Example
-
-      # Entry is set in all cache levels
-      MyCache.set("foo", "bar")
-
-      # Entry is set at second cache level
-      MyCache.set("foo", "bar", level: 2)
-  """
-  def set(_cache, _key, nil, _opts),
-    do: nil
   def set(cache, key, value, opts) do
     eval(cache, :set, [key, value, opts], opts)
   end
 
-  @doc """
-  Deletes the cached entry in for a specific `key`.
-
-  ## Options
-
-    * `:level` - Check shared options in module documentation.
-
-  ## Example
-
-      # Entry is deleted from all cache levels
-      MyCache.delete("foo")
-
-      # Entry is deleted from second cache level
-      MyCache.delete("foo", level: 2)
-  """
+  @impl true
   def delete(cache, key, opts) do
     eval(cache, :delete, [key, opts], opts)
   end
 
-  @doc """
-  Evaluates this operation on each cache level until get a non-empty result
-  (different from nil or false), otherwise it returns the latest obtained
-  result (last cache level).
-
-  ## Examples
-
-      MyCache.has_key?(:a)
-  """
+  @impl true
   def has_key?(cache, key) do
     eval_while(cache, :has_key?, [key], false)
   end
 
-  @doc """
-  Returns the total number of entries in all cache levels.
-
-  ## Examples
-
-      MyCache.size
-  """
+  @impl true
   def size(cache) do
     Enum.reduce(cache.__levels__, 0, fn(level_cache, acc) ->
       level_cache.size() + acc
     end)
   end
 
-  @doc """
-  Flushes all cache levels.
-
-  ## Examples
-
-      MyCache.flush
-  """
+  @impl true
   def flush(cache) do
     Enum.each(cache.__levels__, fn(level_cache) ->
       level_cache.flush()
     end)
   end
 
-  @doc """
-  Returns all cached keys in all cache levels.
-
-  ## Examples
-
-      MyCache.keys
-  """
+  @impl true
   def keys(cache) do
     cache.__levels__
     |> Enum.reduce([], fn(level_cache, acc) -> level_cache.keys() ++ acc end)
     |> :lists.usort()
   end
 
-  @doc """
-  Execute the reduce function in all cache levels.
-
-  ## Examples
-
-      MyCache.reduce({%{}, 0}, fn({key, value}, {acc1, acc2}) ->
-        if Map.has_key?(acc1, key),
-          do: {acc1, acc2},
-          else: {Map.put(acc1, key, value), value + acc2}
-      end)
-  """
+  @impl true
   def reduce(cache, acc_in, fun, opts) do
     Enum.reduce(cache.__levels__, acc_in, fn(level_cache, acc) ->
       level_cache.reduce(acc, fun, opts)
     end)
   end
 
-  @doc """
-  Returns a map with all cached entries in all cache levels.
-
-  ## Examples
-
-      MyCache.to_map
-  """
+  @impl true
   def to_map(cache, opts) do
     Enum.reduce(cache.__levels__, %{}, fn(level_cache, acc) ->
       opts
@@ -342,97 +270,38 @@ defmodule Nebulex.Adapters.Multilevel do
     end)
   end
 
-  @doc """
-  Evaluates this operation on each cache level until get a non-empty result
-  (different from nil or false), otherwise it returns the latest obtained
-  result (last cache level).
-
-  ## Examples
-
-      MyCache.pop(:a)
-  """
+  @impl true
   def pop(cache, key, opts) do
     eval_while(cache, :pop, [key, opts])
   end
 
-  @doc """
-  Gets the value from `key` and updates it, all in one pass.
-
-  ## Options
-
-    * `:level` - Check shared options in module documentation.
-
-  ## Example
-
-      {nil, "value!"} = MyCache.get_and_update(:a, fn current_value ->
-        {current_value, "value!"}
-      end)
-  """
+  @impl true
   def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
     eval(cache, :get_and_update, [key, fun, opts], opts)
   end
 
-  @doc """
-  Updates the cached `key` with the given function.
-
-  ## Options
-
-    * `:level` - Check shared options in module documentation.
-
-  ## Example
-
-      MyCache.update(:a, 1, &(&1 * 2))
-  """
+  @impl true
   def update(cache, key, initial, fun, opts) do
     eval(cache, :update, [key, initial, fun, opts], opts)
   end
 
-  @doc """
-  Updates (increment or decrement) the counter mapped to the given `key`.
-
-  ## Options
-
-    * `:level` - Check shared options in module documentation.
-
-  ## Example
-
-      # Counter is incremented in all cache levels
-      MyCache.update_counter("foo", "bar")
-  """
+  @impl true
   def update_counter(cache, key, incr, opts) do
     eval(cache, :update_counter, [key, incr, opts], opts)
   end
 
-  @doc """
-  Runs the given function inside a transaction.
-
-  A successful transaction returns the value returned by the function.
-
-  ## Options
-
-    * `:level` - Check shared options in module documentation.
-
-  ## Example
-
-      MyCache.transaction(fn ->
-        1 = MyCache.set(:a, 1)
-        true = MyCache.has_key?(:a)
-        MyCache.get(:a)
-      end)
-  """
+  @impl true
   def transaction(cache, opts, fun) do
     eval(cache, :transaction, [fun, opts])
   end
 
-  @doc """
-  Returns `true` if the given process is inside a transaction in any of the
-  cache levels.
-  """
+  @impl true
   def in_transaction?(cache) do
     results =
       Enum.reduce(cache.__levels__, [], fn(level, acc) ->
         [level.in_transaction?() | acc]
       end)
+
     true in results
   end
 
@@ -440,15 +309,19 @@ defmodule Nebulex.Adapters.Multilevel do
 
   defp eval(ml_cache, fun, args, opts \\ []) do
     [l1 | next] = eval_levels(opts[:level], ml_cache)
+
     Enum.reduce(next, apply(l1, fun, args), fn(cache, acc) ->
       ^acc = apply(cache, fun, args)
     end)
   end
 
-  defp eval_levels(nil, cache),
-    do: cache.__levels__
-  defp eval_levels(level, cache) when is_integer(level),
-    do: [:lists.nth(level, cache.__levels__)]
+  defp eval_levels(nil, cache) do
+    cache.__levels__
+  end
+
+  defp eval_levels(level, cache) when is_integer(level) do
+    [:lists.nth(level, cache.__levels__)]
+  end
 
   defp eval_while(ml_cache, fun, args, init \\ nil) do
     Enum.reduce_while(ml_cache.__levels__, init, fn(cache, acc) ->
@@ -465,19 +338,30 @@ defmodule Nebulex.Adapters.Multilevel do
       if fallback = opts[:fallback] || cache. __fallback__,
         do: %Object{key: key, value: eval_fallback(fallback, key)},
         else: nil
+
     {object, levels}
   end
-  defp maybe_fallback(return, _, _, _), do: return
 
-  defp eval_fallback(fallback, key) when is_function(fallback, 1),
-    do: fallback.(key)
-  defp eval_fallback({m, f}, key) when is_atom(m) and is_atom(f),
-    do: apply(m, f, [key])
+  defp maybe_fallback(return, _, _, _) do
+    return
+  end
 
-  defp maybe_replicate_data({nil, _}, _, _),
-    do: nil
-  defp maybe_replicate_data({%Object{value: nil}, _}, _, _),
-    do: nil
+  defp eval_fallback(fallback, key) when is_function(fallback, 1) do
+    fallback.(key)
+  end
+
+  defp eval_fallback({m, f}, key) when is_atom(m) and is_atom(f) do
+    apply(m, f, [key])
+  end
+
+  defp maybe_replicate_data({nil, _}, _, _) do
+    nil
+  end
+
+  defp maybe_replicate_data({%Object{value: nil}, _}, _, _) do
+    nil
+  end
+
   defp maybe_replicate_data({object, levels}, cache, opts) do
     opts = Keyword.put(opts, :return, :object)
 
@@ -490,8 +374,10 @@ defmodule Nebulex.Adapters.Multilevel do
     Enum.reduce(replicas, object, &(&1.set(&2.key, &2.value, opts)))
   end
 
-  defp validate_return(nil, _),
-    do: nil
+  defp validate_return(nil, _) do
+    nil
+  end
+
   defp validate_return(object, opts) do
     case Keyword.get(opts, :return, :value) do
       :object -> object

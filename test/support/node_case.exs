@@ -56,6 +56,7 @@ defmodule Nebulex.NodeCase do
         result = func.()
         send parent, {ref, result}
         ref = Process.monitor(parent)
+
         receive do
           {:DOWN, ^ref, :process, _, _} -> :ok
         end

@@ -168,6 +168,7 @@ defmodule Nebulex.CacheTest do
           case @cache.__adapter__ do
             Nebulex.Adapters.Dist ->
               &(@cache.reducer_fun/2)
+
             _ ->
               local_fun
           end

@@ -32,7 +32,6 @@ defmodule Nebulex.Adapters.Dist.NodePicker do
     quote do
       @behaviour Nebulex.Adapters.Dist.NodePicker
 
-      @doc false
       def pick_node(nodes, key) do
         key
         |> :erlang.phash2(length(nodes))

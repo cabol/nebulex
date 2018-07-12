@@ -55,7 +55,7 @@ defmodule MyApp do
     import Supervisor.Spec
 
     children = [
-      supervisor(MyApp.Cache, [])
+      {MyApp.Cache, []}
     ]
 
     opts = [strategy: :one_for_one, name: MyApp.Supervisor]

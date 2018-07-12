@@ -89,4 +89,11 @@ defmodule LocalBench do
     Cache.update_counter(bench_context, 1)
     :ok
   end
+
+  bench "transaction" do
+    Cache.transaction(fn ->
+      Cache.update_counter(bench_context, 1)
+      :ok
+    end, keys: [1])
+  end
 end

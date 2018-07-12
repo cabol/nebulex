@@ -11,7 +11,7 @@ Additionally, Nebulex provides three adapter implementations built-in:
 Nebulex Adapter               | Description
 :---------------------------- | :-----------------------
 `Nebulex.Adapters.Local`      | Local Generational Cache
-`Nebulex.Adapters.Dist`       | Distributed Cache
+`Nebulex.Adapters.Dist`       | Distributed/Partitioned Cache
 `Nebulex.Adapters.Multilevel` | Multi-level Cache
 
 In this guide, we're going to learn some basics about Nebulex, such as set,
@@ -35,7 +35,9 @@ changing the `deps` definition in that file to this:
 
 ```elixir
 defp deps do
-  [{:nebulex, "~> 1.0.0-rc.3"}]
+  [
+    {:nebulex, "~> 1.0.0"}
+  ]
 end
 ```
 
@@ -83,12 +85,25 @@ supervisor within the application's supervision tree, which we can do in
 `lib/blog/application.ex` (or `lib/blog.ex` for elixir versions `< 1.4.0`),
 inside the `start/2` function:
 
+`Elixir < 1.5.0`:
+
 ```elixir
 def start(_type, _args) do
   import Supervisor.Spec, warn: false
 
   children = [
     supervisor(Blog.Cache, []),
+  ]
+
+  ...
+```
+
+`Elixir >= 1.5.0`:
+
+```elixir
+def start(_type, _args) do
+  children = [
+    Blog.Cache
   ]
 
   ...
@@ -267,7 +282,7 @@ request to return either the key, value or object.
 ## Distributed Cache
 
 Nebulex provides the adapter `Nebulex.Adapters.Dist`, which allows to setup a
-distributed cache.
+partitioned cache topology.
 
 Let's setup our distributed cache by running this command:
 
@@ -276,7 +291,7 @@ mix nebulex.gen.cache -c Blog.DistCache -a Nebulex.Adapters.Dist
 ```
 
 This command will generate the configuration required to use our distributed
-cache. Within the `config/config.exs`:
+cache; it is defined in `config/config.exs`:
 
 ```elixir
 config :blog, Blog.DistCache,
@@ -285,23 +300,9 @@ config :blog, Blog.DistCache,
   node_picker: Nebulex.Adapters.Dist
 ```
 
-Replace the `local` config value `:YOUR_LOCAL_CACHE` by an existing local cache,
-for example, we can set the local cache we created previously or create a new
-one. Let's create a new one:
-
-```
-mix nebulex.gen.cache -c Blog.LocalCache
-```
-
-Now let's replace the `local` config value `:YOUR_LOCAL_CACHE` by our new local
-cache:
-
-```elixir
-config :blog, Blog.DistCache,
-  adapter: Nebulex.Adapters.Dist,
-  local: Blog.LocalCache,
-  node_picker: Nebulex.Adapters.Dist
-```
+Replace the `local` config value `:YOUR_LOCAL_CACHE` by an existing local cache
+(e.g.: we can set the local cache we created previously), or create a new
+one (we will create a new one within `Blog.DistCache`).
 
 The `Blog.DistCache` module is defined in `lib/blog/dist_cache.ex` by our
 `mix nebulex.gen.cache` command:
@@ -312,26 +313,64 @@ defmodule Blog.DistCache do
 end
 ```
 
-And the `Blog.LocalCache` module is defined in `lib/blog/local_cache.ex`:
+As mentioned previously, let's add the local backend (local cache):
 
 ```elixir
-defmodule Blog.LocalCache do
+defmodule Blog.DistCache do
   use Nebulex.Cache, otp_app: :blog
+
+  defmodule Primary do
+    use Nebulex.Cache, otp_app: :blog
+  end
 end
 ```
 
-And remember to setup the `Blog.DistCache` and its local cache `Blog.LocalCache`
-as supervisors within the application's supervision tree (such as we did it
-previously):
+Now we have to add the new local cache to the config, and also replace the
+`local` config value `:YOUR_LOCAL_CACHE` by our new local cache in the
+distributed cache config.
+
+```elixir
+# Local backend for the distributed cache
+config :blog, Blog.DistCache.Primary,
+  adapter: Nebulex.Adapters.Local,
+  gc_interval: 86_400 # 24 hrs
+
+# Distributed Cache
+config :blog, Blog.DistCache,
+  adapter: Nebulex.Adapters.Dist,
+  local: Blog.DistCache.Primary,
+  node_picker: Nebulex.Adapters.Dist
+```
+
+And remember to setup the `Blog.DistCache` and its local backend
+`Blog.DistCache.Primary` as supervisors within the application's
+supervision tree (such as we did it previously):
+
+`Elixir < 1.5.0`:
 
 ```elixir
 def start(_type, _args) do
   import Supervisor.Spec, warn: false
 
   children = [
-    supervisor(Blog.Cache, []),      # Previous created local cache
-    supervisor(Blog.DistCache, []),  # Distributed cache
-    supervisor(Blog.LocalCache, [])  # Local cache that will be used by the distributed cache
+    supervisor(Blog.Cache, []),            # Previous created local cache
+    supervisor(Blog.DistCache, []),        # Distributed cache
+    supervisor(Blog.DistCache.Primary, []) # Local cache that will be used by the distributed cache
+  ]
+
+  ...
+```
+
+`Elixir >= 1.5.0`:
+
+```elixir
+def start(_type, _args) do
+  import Supervisor.Spec, warn: false
+
+  children = [
+    Blog.Cache,            # Previous created local cache
+    Blog.DistCache,        # Distributed cache
+    Blog.DistCache.Primary # Local cache that will be used by the distributed cache
   ]
 
   ...
@@ -351,14 +390,14 @@ setup a multi-level caching hierarchy.
 First, let's create a multi-level cache module:
 
 ```
-mix nebulex.gen.cache -c Blog.MultilevelCache -a Nebulex.Adapters.Multilevel
+mix nebulex.gen.cache -c Blog.Multilevel -a Nebulex.Adapters.Multilevel
 ```
 
 This command will generate the configuration required to use our multilevel
-cache. Within the `config/config.exs`:
+cache; it is defined in `config/config.exs`:
 
 ```elixir
-config :blog, Blog.MultilevelCache,
+config :blog, Blog.Multilevel,
   adapter: Nebulex.Adapters.Multilevel,
   cache_model: :inclusive,
   levels: []
@@ -370,27 +409,45 @@ cache, where L1 (first level) is our local cache and L2 (second level) the
 distributed cache. Therefore, the configuration would be like so:
 
 ```elixir
-config :blog, Blog.MultilevelCache,
+config :blog, Blog.Multilevel,
   adapter: Nebulex.Adapters.Multilevel,
   cache_model: :inclusive,
   levels: [Blog.Cache, Blog.DistCache]
 ```
 
-Note that the `Blog.LocalCache` cannot be part of the levels, since it is the
-cache used by `Blog.DistCache` behind scenes.
+Note that the `Blog.DistCache.Primary` cannot be part of the levels, since it
+is the backend used by `Blog.DistCache` behind scenes.
 
-And remember to setup the `Blog.MultilevelCache` as a supervisor within the
+And remember to setup the `Blog.Multilevel` as a supervisor within the
 application's supervision tree (such as we did it previously):
+
+`Elixir < 1.5.0`:
 
 ```elixir
 def start(_type, _args) do
   import Supervisor.Spec, warn: false
 
   children = [
-    supervisor(Blog.Cache, []),          # Previous created local cache
-    supervisor(Blog.DistCache, []),      # Distributed cache
-    supervisor(Blog.LocalCache, []),     # Local cache that will be used by the distributed cache
-    supervisor(Blog.MultilevelCache, []) # Multilevel cache
+    supervisor(Blog.Cache, []),             # Previous created local cache
+    supervisor(Blog.DistCache, []),         # Distributed cache
+    supervisor(Blog.DistCache.Primary, []), # Local cache that will be used by the distributed cache
+    supervisor(Blog.MultilevelCache, [])    # Multilevel cache
+  ]
+
+  ...
+```
+
+`Elixir >= 1.5.0`:
+
+```elixir
+def start(_type, _args) do
+  import Supervisor.Spec, warn: false
+
+  children = [
+    Blog.Cache,             # Previous created local cache
+    Blog.DistCache,         # Distributed cache
+    Blog.DistCache.Primary, # Local cache that will be used by the distributed cache
+    Blog.Multilevel         # Multilevel cache
   ]
 
   ...
@@ -414,7 +471,7 @@ iex> Blog.DistCache.get("foo")
 Now let's retrieve the data but using the multi-level cache:
 
 ```elixir
-iex> Blog.MultilevelCache.get("foo")
+iex> Blog.Multilevel.get("foo")
 "bar"
 
 iex> Blog.Cache.get("foo")

@@ -12,9 +12,8 @@ defmodule Nebulex.Cluster do
     :erl_boot_server.start([])
     allow_boot to_charlist("127.0.0.1")
 
-    nodes = Application.get_env(:nebulex, :nodes, [])
-
-    nodes
+    :nebulex
+    |> Application.get_env(:nodes, [])
     |> Enum.map(&Task.async(fn -> spawn_node(&1) end))
     |> Enum.map(&Task.await(&1, 30_000))
   end
@@ -55,6 +54,7 @@ defmodule Nebulex.Cluster do
   defp ensure_applications_started(node) do
     rpc(node, Application, :ensure_all_started, [:mix])
     rpc(node, Mix, :env, [Mix.env()])
+
     for {app_name, _, _} <- Application.loaded_applications do
       rpc(node, Application, :ensure_all_started, [app_name])
     end

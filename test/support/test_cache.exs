@@ -9,6 +9,7 @@ defmodule Nebulex.TestCache do
             fn
               (result, {_, :get, _} = call) ->
                 send(:hooked_cache, call)
+
               (_, _) ->
                 :noop
             end
@@ -25,8 +26,14 @@ defmodule Nebulex.TestCache do
           _ = send(:hooked_cache, call)
           result
         end
-        def post_hook(nil, {_, :get, _}), do: "hello"
-        def post_hook(result, _), do: result
+
+        def post_hook(nil, {_, :get, _}) do
+          "hello"
+        end
+
+        def post_hook(result, _) do
+          result
+        end
       end
     end
   end
@@ -104,6 +111,7 @@ defmodule Nebulex.TestCache do
       case mod do
         Nebulex.TestCache.Multilevel ->
           [levels: levels, fallback: &mod.fallback/1]
+
         _ ->
           [cache_model: :exclusive, levels: levels, fallback: &mod.fallback/1]
       end

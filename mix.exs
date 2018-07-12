@@ -3,13 +3,13 @@ Enum.each Path.wildcard("bench/tasks/*.exs"), &Code.require_file/1
 defmodule Nebulex.Mixfile do
   use Mix.Project
 
-  @version "1.0.0-rc.4"
+  @version "1.0.0"
 
   def project do
     [
       app: :nebulex,
       version: @version,
-      elixir: "~> 1.3",
+      elixir: "~> 1.5",
       deps: deps(),
 
       # Docs
@@ -18,7 +18,12 @@ defmodule Nebulex.Mixfile do
 
       # Testing
       test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: ["coveralls": :test, "coveralls.detail": :test, "coveralls.post": :test, "coveralls.html": :test],
+      preferred_cli_env: [
+        "coveralls": :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test
+      ],
 
       # Dialyzer
       dialyzer: dialyzer(),

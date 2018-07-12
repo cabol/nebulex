@@ -90,4 +90,11 @@ defmodule DistBench do
     Dist.update_counter(bench_context, 1)
     :ok
   end
+
+  bench "transaction" do
+    Dist.transaction(fn ->
+      Dist.update_counter(bench_context, 1)
+      :ok
+    end, keys: [1])
+  end
 end

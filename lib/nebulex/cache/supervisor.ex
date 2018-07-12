@@ -6,8 +6,8 @@ defmodule Nebulex.Cache.Supervisor do
   Starts the cache manager supervisor.
   """
   def start_link(cache, otp_app, adapter, opts) do
-    name = Keyword.get(opts, :name, cache)
-    Supervisor.start_link(__MODULE__, {cache, otp_app, adapter, opts}, [name: name])
+    sup_opts = if name = Keyword.get(opts, :name, cache), do: [name: name], else: []
+    Supervisor.start_link(__MODULE__, {cache, otp_app, adapter, opts}, sup_opts)
   end
 
   @doc """
@@ -15,7 +15,7 @@ defmodule Nebulex.Cache.Supervisor do
   """
   def runtime_config(cache, otp_app, custom) do
     if config = Application.get_env(otp_app, cache) do
-      config = [otp_app: otp_app, cache: cache] ++ Keyword.merge(config, custom)
+      config = [otp_app: otp_app] ++ Keyword.merge(config, custom)
       cache_init(cache, config)
     else
       raise ArgumentError,
@@ -58,11 +58,10 @@ defmodule Nebulex.Cache.Supervisor do
   def init({cache, otp_app, adapter, opts}) do
     case runtime_config(cache, otp_app, opts) do
       {:ok, opts} ->
-        children = [
-          worker(Nebulex.Cache.Stats, [cache])
-          | adapter.children_specs(cache, opts)
-        ]
-        supervise(children, strategy: :one_for_one)
+        {:ok, children} = adapter.init(cache, opts)
+        children = [{Nebulex.Cache.Stats, cache} | children]
+        Supervisor.init(children, strategy: :one_for_one)
+
       :ignore ->
         :ignore
     end
