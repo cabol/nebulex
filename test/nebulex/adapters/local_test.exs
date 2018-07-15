@@ -11,7 +11,7 @@ defmodule Nebulex.Adapters.LocalTest do
 
     on_exit fn ->
       _ = :timer.sleep(10)
-      if Process.alive?(pid), do: TestCache.stop(pid, 1)
+      if Process.alive?(pid), do: TestCache.stop(pid)
     end
   end
 
@@ -19,7 +19,7 @@ defmodule Nebulex.Adapters.LocalTest do
     :ok =
       TestCache
       |> Process.whereis
-      |> TestCache.stop(1)
+      |> TestCache.stop()
 
     assert_raise ArgumentError, fn -> TestCache.set 1, 13, return: :object end
     assert_raise ArgumentError, fn -> TestCache.get 1 end
@@ -47,7 +47,7 @@ defmodule Nebulex.Adapters.LocalTest do
       if v, do: {v, :ok}, else: {v, :error}
     end, version: -1, on_conflict: :nothing)
 
-    assert_raise Nebulex.VersionConflictError, fn ->
+    assert_raise Nebulex.ConflictError, fn ->
       1
       |> TestCache.set(1, return: :key)
       |> TestCache.get_and_update(&({&1, -1}), version: -1)

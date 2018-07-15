@@ -1,94 +1,82 @@
 # Nebulex
-> ### A fast, flexible and extensible distributed and local caching library for Elixir.
-> – Not only local but also distributed!
+> ### In-Process and Distributed Caching Solution.
+> A fast, flexible and powerful distributed caching library for Elixir.
 
 [![Build Status](https://travis-ci.org/cabol/nebulex.svg?branch=master)](https://travis-ci.org/cabol/nebulex)
 [![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
 [![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
 
-## Features
+Nebulex is an in-process and distributed caching solution with a set of useful
+features such as:
 
-* Simple and fluent API inspired by [Ecto](https://github.com/elixir-ecto/ecto)
-* Flexible and pluggable architecture like Ecto – based on [adapter pattern](https://en.wikipedia.org/wiki/Adapter_pattern)
-* Built-in adapters
-  - [Local generational cache](http://hexdocs.pm/nebulex/Nebulex.Adapters.Local.html)
-  - [Distributed/Partitioned cache](http://hexdocs.pm/nebulex/Nebulex.Adapters.Dist.html)
-  - [Multi-level cache](http://hexdocs.pm/nebulex/Nebulex.Adapters.Multilevel.html)
-* Support for different cache topologies setup (Partitioned, Near, ...)
-* Time-based expiration
-* [Pre/post execution hooks](http://hexdocs.pm/nebulex/hooks.html)
-* Transactions (key-locking)
-* Key versioning – support for [optimistic offline locks](https://martinfowler.com/eaaCatalog/optimisticOfflineLock.html)
-* Optional statistics gathering
+  * Highly inspired by [Ecto][ecto]; simple and fluent API, flexible and
+    pluggable architecture (based on adapters).
+
+  * Built-in adapters (supporting local and distributed caching)
+
+  * Support for different distributed caching topologies, such as: Partitioned,
+    Near, Replicated, etc.
+
+  * Time-based expiration through a `:ttl` (Time-To_Live) property on the
+    cached objects.
+
+  * [Optimistic offline locks](https://martinfowler.com/eaaCatalog/optimisticOfflineLock.html)
+    through a `:version` property on cached objects.
+
+  * [Pre/post execution hooks](http://hexdocs.pm/nebulex/hooks.html)
+
+  * Transactions and key-locking
+
+  * Optional statistics gathering
+
+[ecto]: https://github.com/elixir-ecto/ecto
 
 See the [getting started](http://hexdocs.pm/nebulex/getting-started.html) guide
 and the [online documentation](http://hexdocs.pm/nebulex/Nebulex.html).
 
-## Installation
+## Usage
 
-Add `nebulex` to your list dependencies in `mix.exs`:
+You need to add `nebulex` as a dependency to your `mix.exs` file. However,
+in the case you want to use an external (non built-in) cache adapter, you
+also have to add the proper dependency to your `mix.exs` file.
+
+The supported caches and their adapters are:
+
+Cache                  | Nebulex Adapter                | Dependency
+:--------------------- | :----------------------------- | :-------------------------
+Local (Built-In)       | Nebulex.Adapters.Local         | NA
+Distributed (Built-In) | Nebulex.Adapters.Dist          | NA
+Multi-level (Built-In) | Nebulex.Adapters.Multilevel    | NA
+Replicated             | NebulexExt.Adapters.Replicated | [nebulex_ext][nebulex_ext]
+
+[nebulex_ext]: https://github.com/amilkr/nebulex_ext
+
+For example, if you want to use a built-in cache, you just need to add
+`nebulex` to your `mix.exs` file:
 
 ```elixir
 def deps do
-  [{:nebulex, "~> 1.0.0-rc.3"}]
+  [
+    {:nebulex, "~> 1.0.0-rc.3"}
+  ]
 end
 ```
 
-## Example
+Then run `mix deps.get` in your shell to fetch the dependencies.
+
+Finally, in the cache definition, you will need to specify the `adapter`
+respective to the chosen dependency. For the local built-in cache it is:
 
 ```elixir
-# In your config/config.exs file
-config :my_app, MyApp.Cache,
-  adapter: Nebulex.Adapters.Local,
-  n_shards: 2,
-  gc_interval: 3600
-
-# In your application code
 defmodule MyApp.Cache do
-  use Nebulex.Cache, otp_app: :my_app
-end
-
-defmodule MyApp do
-  use Application
-
-  def start(_type, _args) do
-    import Supervisor.Spec
-
-    children = [
-      {MyApp.Cache, []}
-    ]
-
-    opts = [strategy: :one_for_one, name: MyApp.Supervisor]
-    Supervisor.start_link(children, opts)
-  end
-end
-
-# Now it is ready to be used from any other module. Here is an example:
-defmodule MyApp.Test do
-  alias MyApp.Cache
-  alias Nebulex.Object
-
-  def test do
-    Cache.set "foo", "bar", ttl: 2
-
-    "bar" = Cache.get "foo"
-
-    true = Cache.has_key? "foo"
-
-    %Object{key: "foo", value: "bar"} = Cache.get "foo", return: :object
-
-    :timer.sleep(2000)
-
-    nil = Cache.get "foo"
-
-    nil =
-      "foo"
-      |> Cache.set("bar", return: :key)
-      |> Cache.delete(return: :key)
-      |> Cache.get
-  end
-end
+  use Nebulex.Cache,
+    otp_app: :my_app
+    adapter: Nebulex.Adapters.Local
+  ...
 ```
+
+> Checkout the [getting started](http://hexdocs.pm/nebulex/getting-started.html)
+  guide to learn more about it.
 
 ## Important links
 

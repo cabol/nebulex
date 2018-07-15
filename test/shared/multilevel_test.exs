@@ -91,12 +91,12 @@ defmodule Nebulex.MultilevelTest do
         for x <- 21..30, do: @l3.set(x, x)
         assert @cache.size() == 30
 
-        for x <- [1, 11, 21], do: @cache.delete(x, level: 1)
+        for x <- [1, 11, 21], do: @cache.delete(x, level: 1, return: :key)
         assert 29 == @cache.size()
 
-        assert 1 == @l1.delete(1)
-        assert 11 == @l2.delete(11)
-        assert 21 == @l3.delete(21)
+        assert 1 == @l1.delete(1, return: :key)
+        assert 11 == @l2.delete(11, return: :key)
+        assert 21 == @l3.delete(21, return: :key)
         assert 27 == @cache.size()
       end
 
@@ -119,7 +119,7 @@ defmodule Nebulex.MultilevelTest do
 
         assert expected == @cache.keys()
 
-        del = for x <- 20..60, do: @cache.delete(x)
+        del = for x <- 20..60, do: @cache.delete(x, return: :key)
 
         assert @cache.keys() == :lists.usort(expected -- del)
       end
@@ -168,7 +168,7 @@ defmodule Nebulex.MultilevelTest do
           |> @cache.set("hello", return: :key)
           |> @cache.pop(return: :object)
 
-        assert_raise Nebulex.VersionConflictError, fn ->
+        assert_raise Nebulex.ConflictError, fn ->
           :b
           |> @cache.set("hello", return: :key)
           |> @cache.pop(version: -1)
@@ -253,6 +253,7 @@ defmodule Nebulex.MultilevelTest do
               |> @cache.get!(return: :key)
               |> @cache.delete(return: :key)
               |> @cache.get
+
             :ok = res
           end
         end

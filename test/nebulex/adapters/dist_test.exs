@@ -48,7 +48,7 @@ defmodule Nebulex.Adapters.DistTest do
       Dist.get_and_update(1, &Dist.wrong_get_and_update_fun/1)
     end
 
-    assert_raise Nebulex.VersionConflictError, fn ->
+    assert_raise Nebulex.ConflictError, fn ->
       1
       |> Dist.set(1, return: :key)
       |> Dist.get_and_update(&Dist.get_and_update_fun/1, version: -1)

@@ -93,11 +93,8 @@ defmodule Nebulex.Adapter.Transaction  do
         maybe_set_lock =
           fn(id, {:ok, acc}) ->
             case :global.set_lock(id, nodes, retries) do
-              true ->
-                {:cont, {:ok, [id | acc]}}
-
-              false ->
-                {:halt, {:error, acc}}
+              true  -> {:cont, {:ok, [id | acc]}}
+              false -> {:halt, {:error, acc}}
             end
           end
 

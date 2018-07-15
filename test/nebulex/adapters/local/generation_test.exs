@@ -17,12 +17,12 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
     assert 1 == length(TestCache.__metadata__.generations)
 
     for i <- 2..3 do
-      _ = :timer.sleep(1010)
+      _ = :timer.sleep(1020)
       assert i == length(TestCache.__metadata__.generations)
     end
 
     for _ <- 1..12 do
-      _ = :timer.sleep(1010)
+      _ = :timer.sleep(1020)
       assert 3 == length(TestCache.__metadata__.generations)
     end
   end
@@ -36,7 +36,7 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
     _ = :timer.sleep(500)
     assert 2 == length(TestCache.__metadata__.generations)
 
-    _ = :timer.sleep(510)
+    _ = :timer.sleep(520)
     assert 3 == length(TestCache.__metadata__.generations)
   end
 

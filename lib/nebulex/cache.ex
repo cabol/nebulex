@@ -39,7 +39,7 @@ defmodule Nebulex.Cache do
       mode how post-hooks will be executed – see pre/post hooks below.
 
     * `:version_generator` - this option specifies the module that
-      implements the `Nebulex.Version` interface. This interface
+      implements the `Nebulex.Object.Version` interface. This interface
       defines only one callback `generate/1` that is invoked by
       the adapters to generate new object versions. If this option
       is not set, then the version is set to `nil` by default.
@@ -76,12 +76,25 @@ defmodule Nebulex.Cache do
   it is important to review the adapters documentation.
   """
 
-  @type t       :: module
-  @type key     :: any
-  @type value   :: any
-  @type object  :: Nebulex.Object.t
-  @type opts    :: Keyword.t
-  @type return  :: key | value | object
+  @typedoc "Cache"
+  @type t :: module
+
+  @typedoc "Cache object key"
+  @type key :: any
+
+  @typedoc "Cache object value"
+  @type value :: any
+
+  @typedoc "Cache object"
+  @type object :: Nebulex.Object.t
+
+  @typedoc "Cache command options"
+  @type opts :: Keyword.t
+
+  @typedoc "Return alternatives (value is the default)"
+  @type return :: key | value | object
+
+  @typedoc "Reduce callabck function"
   @type reducer :: ({key, return}, acc_in :: any -> acc_out :: any)
 
   @doc false
@@ -303,7 +316,7 @@ defmodule Nebulex.Cache do
 
     * `:raise` - raises if there is a conflicting key
     * `:nothing` - ignores the error in case of conflicts
-    * `nil` - forces to return `nil`
+    * `:override` - same effect as `:nothing`
 
   ## Examples
 
@@ -317,10 +330,6 @@ defmodule Nebulex.Cache do
       # cached object.
       %Nebulex.Object{key: :a, value: 1} =
         MyCache.get :a, return: :object, version: :invalid, on_conflict: :nothing
-      1 = MyCache.get :a
-
-      # Gets with the same invalid version but force to return `nil`
-      nil = MyCache.get :a, version: :invalid, on_conflict: nil
       1 = MyCache.get :a
   """
   @callback get(key, opts) :: nil | return | no_return
@@ -354,7 +363,7 @@ defmodule Nebulex.Cache do
   it accepts:
 
     * `:on_conflict` - It may be one of `:raise` (the default), `:nothing`,
-      `:replace`. See the "OnConflict" section for more information.
+      `:override`. See the "OnConflict" section for more information.
 
   ## Example
 
@@ -372,8 +381,8 @@ defmodule Nebulex.Cache do
 
     * `:raise` - raises if there is a conflicting key
     * `:nothing` - ignores the error in case of conflicts
-    * `:replace` - replace the value on the existing key with
-      the given `value`
+    * `:override` - the command is executed ignoring the conflict, then
+      the value on the existing key is replaced with the given `value`
 
   ## Examples
 
@@ -392,7 +401,7 @@ defmodule Nebulex.Cache do
 
       # Set with the same key and wrong version but replace the current
       # value on conflicts.
-      3 = MyCache.set :a, 3, version: v1, on_conflict: :replace
+      3 = MyCache.set :a, 3, version: v1, on_conflict: :override
       3 = MyCache.get :a
   """
   @callback set(key, value, opts) :: return | no_return
@@ -409,7 +418,7 @@ defmodule Nebulex.Cache do
   it accepts:
 
     * `:on_conflict` - It may be one of `:raise` (the default), `:nothing`,
-      `:delete`. See the "OnConflict" section for more information.
+      `:override`. See the "OnConflict" section for more information.
 
   Note that for this function `:return` option hasn't any effect
   since it always returns the `key` either success or not.
@@ -430,7 +439,8 @@ defmodule Nebulex.Cache do
 
     * `:raise` - raises if there is a conflicting key
     * `:nothing` - ignores the error in case of conflicts
-    * `:delete` - deletes the value on the existing key
+    * `:override` - the command is executed ignoring the conflict, then
+      the value on the existing key is deleted
 
   ## Examples
 
@@ -446,7 +456,7 @@ defmodule Nebulex.Cache do
 
       # Delete with the same invalid version but force to delete the current
       # value on conflicts (if it exist).
-      :a = MyCache.delete :a, version: :invalid, on_conflict: :delete
+      :a = MyCache.delete :a, version: :invalid, on_conflict: :override
       nil = MyCache.get :a
   """
   @callback delete(key, opts) :: key | no_return
@@ -643,7 +653,7 @@ defmodule Nebulex.Cache do
   Besides the "Shared options" section at the module documentation,
   it accepts:
 
-    * `:on_conflict` - Same as callback `get/2`.
+    * `:on_conflict` - Same as callback `set/3`.
 
   ## Examples
 

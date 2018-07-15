@@ -1,29 +1,28 @@
 
-defmodule Nebulex.VersionConflictError do
+defmodule Nebulex.ConflictError do
   @moduledoc """
   Raised at runtime when there is a version mismatch between the
   cached object and the requested version.
   """
-  defexception [:message, :cached_vsn, :requested_vsn]
+  defexception [:message, :cached, :version]
 
   @doc false
   def exception(opts) do
-    action = Keyword.fetch!(opts, :action)
     version = Keyword.fetch!(opts, :version)
     cached = Keyword.fetch!(opts, :cached)
 
     msg = """
-    could not perform #{inspect action} because versions mismatch.
+    Version conflict error.
 
-    Cached version
+    Cached object
 
-    #{inspect cached.version}
+    #{inspect cached}
 
     Requested version
 
     #{inspect version}
     """
 
-    %__MODULE__{message: msg, cached_vsn: cached.version, requested_vsn: version}
+    %__MODULE__{message: msg, cached: cached.version, version: version}
   end
 end

@@ -26,7 +26,7 @@ defmodule Nebulex.Cache.StatsTest do
     assert 4 == Stats.get_counter(CacheStats, :get_miss_count)
     assert 5 == Stats.get_counter(CacheStats, :get)
 
-    assert 1 == CacheStats.delete(1)
+    assert 1 == CacheStats.delete(1, return: :key)
     assert 1 == Stats.get_counter(CacheStats, :delete)
 
     counters = Stats.get_counters(CacheStats)

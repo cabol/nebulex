@@ -1,3 +1,12 @@
+defmodule Nebulex.Version.Timestamp do
+  @behaviour Nebulex.Object.Version
+
+  @impl true
+  def generate(_) do
+    DateTime.utc_now |> DateTime.to_unix(:nanoseconds)
+  end
+end
+
 defmodule Nebulex.TestCache do
   :ok = Application.put_env(:nebulex, :nodes, [:"node1@127.0.0.1", :"node2@127.0.0.1"])
 

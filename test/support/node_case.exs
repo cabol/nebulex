@@ -4,7 +4,7 @@ defmodule Nebulex.NodeCase do
   Copyright (c) 2014 Chris McCord
   """
 
-  @timeout 500
+  @timeout 5000
 
   defmacro __using__(_opts) do
     quote do

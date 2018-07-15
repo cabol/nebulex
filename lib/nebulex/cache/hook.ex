@@ -57,14 +57,18 @@ defmodule Nebulex.Cache.Hook do
         Enum.reduce(hooks, result, fn
           (hook, acc) when is_function(hook, 2) and eval == :pipe ->
             hook.(acc, cache_op)
+
           (hook, ^result) when is_function(hook, 2) and eval == :sync ->
             _ = hook.(result, cache_op)
             result
+
           (hook, ^result) when is_function(hook, 2) ->
             _ = Task.start_link(:erlang, :apply, [hook, [result, cache_op]])
             result
+
           (_, acc) when eval == :pipe ->
             acc
+
           (_, _) ->
             result
         end)

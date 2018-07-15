@@ -1,12 +1,12 @@
 # Getting Started
 
 This guide is an introduction to [Nebulex](https://github.com/cabol/nebulex),
-a local and distributed caching tool for Elixir. Nebulex API is pretty much
+a local and distributed caching library for Elixir. Nebulex API is pretty much
 inspired by [Ecto](https://github.com/elixir-ecto/ecto), taking advantage of
 its simple interface, flexible and pluggable architecture. In the same way
 as Ecto, developers can provide their own Cache implementations.
 
-Additionally, Nebulex provides three adapter implementations built-in:
+Additionally, Nebulex comes with three adapter implementations built-in:
 
 Nebulex Adapter               | Description
 :---------------------------- | :-----------------------

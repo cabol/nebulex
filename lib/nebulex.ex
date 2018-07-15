@@ -33,18 +33,17 @@ defmodule Nebulex do
       config :my_app, MyApp.MyCache,
         adapter: Nebulex.Adapters.Local,
         n_shards: 2,
-        gc_interval: 3600,
-        write_concurrency: true
+        gc_interval: 3600
 
   Each cache in Nebulex defines a `start_link/1` function that needs to be
   invoked before using the cache. In general, this function is not called
   directly, but used as part of your application supervision tree.
 
-  If your application was generated with a supervisor (by passing `--sup` to
-  `mix new`) you will have a `lib/my_app.ex` file containing the application
-  start callback that defines and starts your supervisor. You just need to
-  edit the `start/2` function to start the repo as a supervisor on your
-  application's supervisor:
+  If your application was generated with a supervisor (by passing `--sup`
+  to `mix new`) you will have a `lib/my_app/application.ex` file containing
+  the application start callback that defines and starts your supervisor.
+  You just need to edit the `start/2` function to start the repo as a
+  supervisor on your application's supervisor:
 
       def start(_type, _args) do
         children = [
@@ -53,6 +52,42 @@ defmodule Nebulex do
 
         opts = [strategy: :one_for_one, name: MyApp.Supervisor]
         Supervisor.start_link(children, opts)
+      end
+
+  You can use the cache from your application whatever you want.
+  For example, let's suppose we want to handle user sessions in cache:
+
+      defmodule MyApp.UserSession do
+        alias MyApp.Cache
+        alias MyApp.User
+
+        def new(username, password) do
+          case Repo.get(User, username) do
+            %User{password: ^password} = user ->
+              sesion_token =
+                username
+                |> generate_token(password)
+                |> Cache.set(user, ttl: 3600)
+
+              {:ok, sesion_token}
+
+            _ ->
+              {:error, :unauthorized}
+          end
+        end
+
+        def get(token) do
+          case Cache.get(token) do
+            nil  -> {:error, :not_found}
+            user -> {:ok, user}
+          end
+        end
+
+        ## Helpers
+
+        defp generate_token(username, password) do
+          # your code ...
+        end
       end
 
   ## Object
@@ -64,11 +99,28 @@ defmodule Nebulex do
   for return the whole object:
 
       iex> MyCache.set "foo", "bar", return: :object
-      %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: 1493481403098321000}
+      %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: nil}
 
       iex> MyCache.get "foo", return: :object
-      %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: 1493481403098321000}
+      %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: nil}
 
   See `Nebulex.Object` to learn more about it.
+
+  ### Object Versioning (Optimistic Offline Locks)
+
+  It is also possible to set a version (or ETag) on the object to be cached;
+  in the case you want to implement something like *"Optimistic Locking"*
+  through a version property on cached objects.
+
+  Supposing we have a "serial" version generator:
+
+      iex> MyCache.set "foo", "bar", return: :object
+      %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: 1}
+
+      iex> MyCache.set "foo", "bar", version: 1, return: :object
+      %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: 2}
+
+      iex> MyCache.set "foo", "bar", version: 2, return: :object
+      %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: 3}
   """
 end
