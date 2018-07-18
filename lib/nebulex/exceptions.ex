@@ -1,28 +1,43 @@
 
 defmodule Nebulex.ConflictError do
-  @moduledoc """
-  Raised at runtime when there is a version mismatch between the
-  cached object and the requested version.
-  """
-  defexception [:message, :cached, :version]
+  defexception [:cached, :version]
 
-  @doc false
-  def exception(opts) do
-    version = Keyword.fetch!(opts, :version)
-    cached = Keyword.fetch!(opts, :cached)
-
-    msg = """
-    Version conflict error.
-
-    Cached object
-
-    #{inspect cached}
+  @impl true
+  def message(%{cached: cached, version: version}) do
+    """
+    could not perform cache action because versions mismatch.
 
     Requested version
 
-    #{inspect version}
-    """
+    #{pretty version}
 
-    %__MODULE__{message: msg, cached: cached.version, version: version}
+    Cached version
+
+    #{pretty cached.version}
+
+    Cached object
+
+    #{pretty cached}
+    """
+  end
+
+  defp pretty(term) do
+    term
+    |> inspect(pretty: true)
+    |> String.split("\n")
+    |> Enum.map_join("\n", &"    " <> &1)
+  end
+end
+
+defmodule Nebulex.RPCError do
+  defexception [:reason]
+
+  @impl true
+  def message(%{reason: reason}) do
+    """
+    the remote procedure call failed with reason:
+
+    #{inspect reason, pretty: true}
+    """
   end
 end

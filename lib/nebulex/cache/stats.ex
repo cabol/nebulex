@@ -5,13 +5,13 @@ defmodule Nebulex.Cache.Stats do
 
   ## API
 
-  @spec start_link(Nebulex.Cache.t) :: GenServer.on_start
+  @spec start_link(Nebulex.Cache.t()) :: GenServer.on_start
   def start_link(cache) do
     name = server_name(cache)
     GenServer.start_link(__MODULE__, {name, cache}, name: name)
   end
 
-  @spec child_spec(Nebulex.Cache.t) :: :supervisor.child_spec()
+  @spec child_spec(Nebulex.Cache.t()) :: :supervisor.child_spec()
   def child_spec(cache) do
     %{
       id: __MODULE__,
@@ -19,35 +19,35 @@ defmodule Nebulex.Cache.Stats do
     }
   end
 
-  @spec get_counter(Nebulex.Cache.t, atom) :: integer
+  @spec get_counter(Nebulex.Cache.t(), atom) :: integer
   def get_counter(cache, action) when is_atom(action) do
     cache
     |> server_name
     |> :ets.lookup_element(action, 2)
   end
 
-  @spec get_counters(Nebulex.Cache.t) :: Keyword.t
+  @spec get_counters(Nebulex.Cache.t()) :: Keyword.t()
   def get_counters(cache) do
     cache
     |> server_name
     |> :ets.select([{{:"$1", :"$2"}, [], [{{:"$1", :"$2"}}]}])
   end
 
-  @spec incr_counter(Nebulex.Cache.t, atom) :: integer
+  @spec incr_counter(Nebulex.Cache.t(), atom) :: integer
   def incr_counter(cache, action) when is_atom(action) do
     cache
     |> server_name
     |> :ets.update_counter(action, 1, {action, 0})
   end
 
-  @spec reset_counter(Nebulex.Cache.t, atom) :: boolean
+  @spec reset_counter(Nebulex.Cache.t(), atom) :: boolean
   def reset_counter(cache, action) when is_atom(action) do
     cache
     |> server_name
     |> :ets.update_element(action, {2, 0})
   end
 
-  @spec reset_counters(Nebulex.Cache.t) :: :ok
+  @spec reset_counters(Nebulex.Cache.t()) :: :ok
   def reset_counters(cache) do
     :ets.foldl(fn({counter, _}, acc) ->
       true = reset_counter(cache, counter)

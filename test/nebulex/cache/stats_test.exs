@@ -10,7 +10,7 @@ defmodule Nebulex.Cache.StatsTest do
 
     on_exit fn ->
       _ = :timer.sleep(10)
-      if Process.alive?(pid), do: CacheStats.stop(pid, 1)
+      if Process.alive?(pid), do: CacheStats.stop(pid)
     end
   end
 

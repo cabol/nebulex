@@ -9,7 +9,7 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
 
     on_exit fn ->
       _ = :timer.sleep(10)
-      if Process.alive?(pid), do: TestCache.stop(pid, 1)
+      if Process.alive?(pid), do: TestCache.stop(pid)
     end
   end
 

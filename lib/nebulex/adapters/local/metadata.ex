@@ -7,25 +7,25 @@ defmodule Nebulex.Adapters.Local.Metadata do
 
   alias Nebulex.Adapters.Local.Metadata
 
-  @spec create(cache :: Nebulex.Cache.t, initial :: Metadata.t) :: Metadata.t
+  @spec create(cache :: Nebulex.Cache.t(), initial :: Metadata.t) :: Metadata.t
   def create(cache, %Metadata{} = initial \\ %Metadata{}) do
     ^cache = :ets.new(cache, [:named_table, read_concurrency: true])
     true = :ets.insert(cache, metadata: initial)
     initial
   end
 
-  @spec get(cache :: Nebulex.Cache.t) :: Metadata.t
+  @spec get(cache :: Nebulex.Cache.t()) :: Metadata.t
   def get(cache) do
     :ets.lookup_element(cache, :metadata, 2)
   end
 
-  @spec update(metadata :: Metadata.t, cache :: Nebulex.Cache.t) :: Metadata.t
+  @spec update(metadata :: Metadata.t, cache :: Nebulex.Cache.t()) :: Metadata.t
   def update(%Metadata{} = metadata, cache) do
     true = :ets.update_element(cache, :metadata, {2, metadata})
     metadata
   end
 
-  @spec new_generation(gen :: atom, cache :: Nebulex.Cache.t) ::
+  @spec new_generation(gen :: atom, cache :: Nebulex.Cache.t()) ::
         {generations :: [atom], dropped_generation :: atom | nil}
   def new_generation(gen, cache) do
     metadata = get(cache)

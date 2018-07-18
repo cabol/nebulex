@@ -21,21 +21,15 @@ defmodule Nebulex.Object.Version do
   """
 
   @doc """
-  Generates a new `Nebulex.Object.t` version.
-
-  This callback is invoked by the adapter when an object is going to be set.
-  The argument passed to the function will be the cached object, and a new
-  version must be returned.
-
-  For more information, see the adapters documentation.
+  Returns a cache object with the new generated version.
   """
-  @callback generate(cached_object :: Nebulex.Object.t) :: any
+  @callback generate(object :: Nebulex.Object.t()) :: Nebulex.Object.t()
 
   @typedoc "On-Conflict options"
   @type on_conflict :: :raise | :override | :nothing
 
   @typedoc "Validation result"
-  @type result :: {on_conflict, Nebulex.Object.t} | no_return
+  @type result :: {on_conflict, Nebulex.Object.t()} | no_return
 
   alias Nebulex.Object
 
@@ -63,7 +57,7 @@ defmodule Nebulex.Object.Version do
 
   For more information, you can check the different adapter implementations.
   """
-  @spec validate(Nebulex.Object.t, Nebulex.Cache.opts) :: result
+  @spec validate(Nebulex.Object.t(), Nebulex.Cache.opts) :: result
   def validate(nil, _opts) do
     {:override, nil}
   end

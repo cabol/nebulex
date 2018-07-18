@@ -1,4 +1,4 @@
-defmodule Nebulex.Cache.Hook do
+defmodule Nebulex.Hook do
   @moduledoc """
   This module specifies the behaviour for pre/post hooks callbacks.
   These functions are defined in order to intercept any cache operation
@@ -41,46 +41,14 @@ defmodule Nebulex.Cache.Hook do
       end
   """
 
-  @type cache_op :: {Nebulex.Cache.t, action :: atom, args :: [any]}
-  @type hook_fun :: (result :: any, cache_op -> any)
+  @typedoc "Defines a cache command"
+  @type command :: {Nebulex.Cache.t(), action :: atom, args :: [any]}
 
-  @doc false
-  defmacro __using__(_opts) do
-    quote do
-      @behaviour Nebulex.Cache.Hook
+  @typedoc "Defines the hook callback function"
+  @type hook_fun :: (result :: any, command -> any)
 
-      def eval_hooks([], _eval, {_cache, _action, _args}, result) do
-        result
-      end
-
-      def eval_hooks(hooks, eval, {_cache, _action, _args} = cache_op, result) do
-        Enum.reduce(hooks, result, fn
-          (hook, acc) when is_function(hook, 2) and eval == :pipe ->
-            hook.(acc, cache_op)
-
-          (hook, ^result) when is_function(hook, 2) and eval == :sync ->
-            _ = hook.(result, cache_op)
-            result
-
-          (hook, ^result) when is_function(hook, 2) ->
-            _ = Task.start_link(:erlang, :apply, [hook, [result, cache_op]])
-            result
-
-          (_, acc) when eval == :pipe ->
-            acc
-
-          (_, _) ->
-            result
-        end)
-      end
-
-      def pre_hooks, do: []
-
-      def post_hooks, do: []
-
-      defoverridable [pre_hooks: 0, post_hooks: 0]
-    end
-  end
+  @typedoc "Hook execution mode"
+  @type mode :: :async | :sync | :pipe
 
   @doc """
   Returns a list of hook functions that will be executed before invoke the
@@ -129,4 +97,31 @@ defmodule Nebulex.Cache.Hook do
       end
   """
   @callback post_hooks() :: [hook_fun]
+
+  @doc """
+  Evaluates the `hooks` according to the given execution `mode`.
+  """
+  @spec eval(hooks :: [hook_fun], mode, command, result :: any) :: any
+  def eval([], _mode, _command, result), do: result
+
+  def eval(hooks, mode, {_cache, _action, _args} = command, result) do
+    Enum.reduce(hooks, result, fn
+      (hook, acc) when is_function(hook, 2) and mode == :pipe ->
+        hook.(acc, command)
+
+      (hook, ^result) when is_function(hook, 2) and mode == :sync ->
+        _ = hook.(result, command)
+        result
+
+      (hook, ^result) when is_function(hook, 2) ->
+        _ = Task.start_link(:erlang, :apply, [hook, [result, command]])
+        result
+
+      (_, acc) when mode == :pipe ->
+        acc
+
+      (_, _) ->
+        result
+    end)
+  end
 end

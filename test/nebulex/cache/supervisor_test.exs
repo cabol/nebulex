@@ -12,7 +12,7 @@ defmodule Nebulex.Cache.SupervisorTest do
 
     on_exit fn ->
       _ = :timer.sleep(10)
-      if Process.alive?(pid), do: MyCache.stop(pid, 1)
+      if Process.alive?(pid), do: MyCache.stop(pid)
     end
   end
 

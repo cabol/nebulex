@@ -21,7 +21,7 @@ defmodule Nebulex.MultilevelTest do
 
         on_exit fn ->
           stop_levels(levels_and_pids)
-          if Process.alive?(ml_cache), do: @cache.stop(ml_cache, 1)
+          if Process.alive?(ml_cache), do: @cache.stop(ml_cache)
         end
       end
 
@@ -131,10 +131,10 @@ defmodule Nebulex.MultilevelTest do
         expected = :maps.from_list(for x <- 1..10, do: {x, x})
 
         assert {expected, 55} ==
-          @cache.reduce({%{}, 0}, fn({key, value}, {acc1, acc2}) ->
-            if Map.has_key?(acc1, key),
+          @cache.reduce({%{}, 0}, fn(object, {acc1, acc2}) ->
+            if Map.has_key?(acc1, object.key),
               do: {acc1, acc2},
-              else: {Map.put(acc1, key, value), value + acc2}
+              else: {Map.put(acc1, object.key, object.value), object.value + acc2}
           end)
       end
 
@@ -157,9 +157,10 @@ defmodule Nebulex.MultilevelTest do
         assert 1 == @cache.pop(1)
         assert 2 == @cache.pop(2)
         assert 3 == @cache.pop(3)
+
         refute @l1.get(1)
-        assert @l2.get(1)
-        assert @l3.get(1)
+        refute @l2.get(1)
+        refute @l3.get(1)
         refute @l2.get(2)
         refute @l3.get(3)
 
@@ -302,7 +303,7 @@ defmodule Nebulex.MultilevelTest do
       defp stop_levels(levels_and_pids) do
         for {level, pid} <- levels_and_pids do
           _ = :timer.sleep(10)
-          if Process.alive?(pid), do: level.stop(pid, 1)
+          if Process.alive?(pid), do: level.stop(pid)
         end
       end
 

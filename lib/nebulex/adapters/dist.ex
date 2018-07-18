@@ -26,7 +26,7 @@ defmodule Nebulex.Adapters.Dist do
   ## Features
 
     * Support for Distributed Cache
-    * Support for Sharding; handled by `Nebulex.Adapters.Dist.NodePicker`
+    * Support for Sharding; handled by `Nebulex.Adapter.NodePicker`
     * Support for transactions via Erlang global name registration facility
 
   ## Options
@@ -41,8 +41,8 @@ defmodule Nebulex.Adapters.Dist do
       cache adapter.
 
     * `:node_picker` - The module that implements the node picker interface
-      `Nebulex.Adapters.Dist.NodePicker`. If this option is not set, the
-      default implementation provided by the interface is used.
+      `Nebulex.Adapter.NodePicker`. If this option is not set, the default
+      implementation provided by the interface is used.
 
   ## Example
 
@@ -75,8 +75,7 @@ defmodule Nebulex.Adapters.Dist do
 
   ### `pick_node/1`
 
-  This function invokes `Nebulex.Adapters.Dist.NodePicker.pick_node/2`
-  internally.
+  This function invokes `Nebulex.Adapter.NodePicker.pick_node/2` internally.
 
       MyCache.pick_node("mykey")
 
@@ -103,7 +102,7 @@ defmodule Nebulex.Adapters.Dist do
   """
 
   # Inherit default node picker function
-  use Nebulex.Adapters.Dist.NodePicker
+  use Nebulex.Adapter.NodePicker
 
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
@@ -126,20 +125,15 @@ defmodule Nebulex.Adapters.Dist do
     end
 
     quote do
+      alias Nebulex.Adapters.Dist.PG2
       alias Nebulex.Adapters.Local.Generation
 
       def __local__, do: unquote(local)
 
-      def pick_node(key) do
-        nodes()
-        |> unquote(node_picker).pick_node(key)
-      end
+      def nodes, do: PG2.get_nodes(__MODULE__)
 
-      def nodes do
-        pg2_namespace()
-        |> :pg2.get_members()
-        |> Enum.map(&node(&1))
-        |> :lists.usort
+      def pick_node(key) do
+        unquote(node_picker).pick_node(nodes(), key)
       end
 
       def new_generation(opts \\ []) do
@@ -148,16 +142,9 @@ defmodule Nebulex.Adapters.Dist do
       end
 
       def init(config) do
-        :ok = :pg2.create(pg2_namespace())
-
-        unless self() in :pg2.get_members(pg2_namespace()) do
-          :ok = :pg2.join(pg2_namespace(), self())
-        end
-
+        :ok = PG2.join(__MODULE__)
         {:ok, config}
       end
-
-      defp pg2_namespace, do: {:nebulex, __MODULE__}
     end
   end
 
@@ -172,12 +159,8 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   @impl true
-  def set(_cache, _key, nil, _opts) do
-    nil
-  end
-
-  def set(cache, key, value, opts) do
-    call(cache, :set, [key, value, opts])
+  def set(cache, object, opts) do
+    call(cache, object.key, :set, [object, opts])
   end
 
   @impl true
@@ -191,10 +174,15 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   @impl true
+  def update_counter(cache, key, incr, opts) do
+    call(cache, :update_counter, [key, incr, opts])
+  end
+
+  @impl true
   def size(cache) do
     Enum.reduce(cache.nodes, 0, fn(node, acc) ->
       node
-      |> rpc_call(cache.__local__, :size, [])
+      |> rpc_call(cache.__local__.__adapter__, :size, [cache.__local__])
       |> Kernel.+(acc)
     end)
   end
@@ -202,21 +190,23 @@ defmodule Nebulex.Adapters.Dist do
   @impl true
   def flush(cache) do
     Enum.each(cache.nodes, fn(node) ->
-      rpc_call(node, cache.__local__, :flush, [])
+      rpc_call(node, cache.__local__.__adapter__, :flush, [cache.__local__])
     end)
   end
 
   @impl true
   def keys(cache) do
     cache.nodes
-    |> Enum.reduce([], fn(node, acc) -> rpc_call(node, cache.__local__, :keys, []) ++ acc end)
+    |> Enum.reduce([], fn(node, acc) ->
+      rpc_call(node, cache.__local__.__adapter__, :keys, [cache.__local__]) ++ acc
+    end)
     |> :lists.usort()
   end
 
   @impl true
   def reduce(cache, acc_in, fun, opts) do
     Enum.reduce(cache.nodes, acc_in, fn(node, acc) ->
-      rpc_call(node, cache.__local__, :reduce, [acc, fun, opts])
+      rpc_call(node, cache.__local__.__adapter__, :reduce, [cache.__local__, acc, fun, opts])
     end)
   end
 
@@ -224,50 +214,25 @@ defmodule Nebulex.Adapters.Dist do
   def to_map(cache, opts) do
     Enum.reduce(cache.nodes, %{}, fn(node, acc) ->
       node
-      |> rpc_call(cache.__local__, :to_map, [opts])
+      |> rpc_call(cache.__local__.__adapter__, :to_map, [cache.__local__, opts])
       |> Map.merge(acc)
     end)
   end
 
-  @impl true
-  def pop(cache, key, opts) do
-    call(cache, :pop, [key, opts])
-  end
-
-  @impl true
-  def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
-    call(cache, :get_and_update, [key, fun, opts])
-  end
-
-  @impl true
-  def update(cache, key, initial, fun, opts) do
-    call(cache, :update, [key, initial, fun, opts])
-  end
-
-  @impl true
-  def update_counter(cache, key, incr, opts) do
-    call(cache, :update_counter, [key, incr, opts])
-  end
-
   ## Private Functions
 
-  defp call(cache, fun, [key | _] = args) do
-    call(cache, key, fun, args)
-  end
+  defp call(cache, fun, [key | _] = args), do: call(cache, key, fun, args)
 
   defp call(cache, key, fun, args) do
     key
     |> cache.pick_node()
-    |> rpc_call(cache.__local__, fun, args)
+    |> rpc_call(cache.__local__.__adapter__, fun, [cache.__local__ | args])
   end
 
   defp rpc_call(node, mod, fun, args) do
     case :rpc.call(node, mod, fun, args) do
-      {:badrpc, {:EXIT, {remote_ex, _}}} ->
-        raise remote_ex
-
-      {:badrpc, _} = err ->
-        {:error, err}
+      {:badrpc, reason} ->
+        raise Nebulex.RPCError, reason: reason
 
       response ->
         response

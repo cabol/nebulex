@@ -1,4 +1,4 @@
-defmodule Nebulex.Adapters.Dist.NodePicker do
+defmodule Nebulex.Adapter.NodePicker do
   @moduledoc """
   Node Picker Interface.
 
@@ -13,7 +13,7 @@ defmodule Nebulex.Adapters.Dist.NodePicker do
   ## Example
 
       defmodule MyApp.MyNodePicker do
-        @behaviour Nebulex.Adapters.Dist.NodePicker
+        @behaviour Nebulex.Adapter.NodePicker
 
         def pick_node(nodes, key) do
           key
@@ -30,7 +30,7 @@ defmodule Nebulex.Adapters.Dist.NodePicker do
   @doc false
   defmacro __using__(_opts) do
     quote do
-      @behaviour Nebulex.Adapters.Dist.NodePicker
+      @behaviour Nebulex.Adapter.NodePicker
 
       def pick_node(nodes, key) do
         key

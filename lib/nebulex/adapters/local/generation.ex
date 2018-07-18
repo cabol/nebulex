@@ -26,7 +26,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   ## API
 
   @doc false
-  @spec start_link(Nebulex.Cache.t, Nebulex.Cache.opts) :: GenServer.on_start
+  @spec start_link(Nebulex.Cache.t(), Nebulex.Cache.opts) :: GenServer.on_start
   def start_link(cache, opts \\ []) do
     GenServer.start_link(__MODULE__, {cache, opts}, name: server_name(cache))
   end
@@ -48,7 +48,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
       new_generation(MyCache, reset_timeout: :false)
   """
-  @spec new(Nebulex.Cache.t, Nebulex.Cache.opts) :: [atom]
+  @spec new(Nebulex.Cache.t(), Nebulex.Cache.opts) :: [atom]
   def new(cache, opts \\ []) do
     cache
     |> server_name()
@@ -64,7 +64,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
       flush(MyCache)
   """
-  @spec flush(Nebulex.Cache.t) :: :ok
+  @spec flush(Nebulex.Cache.t()) :: :ok
   def flush(cache) do
     cache
     |> server_name()
@@ -135,9 +135,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     {gens, incr_gen_index(cache, gen_index)}
   end
 
-  defp maybe_delete_gen({generations, nil}) do
-    generations
-  end
+  defp maybe_delete_gen({generations, nil}), do: generations
 
   defp maybe_delete_gen({generations, dropped_gen}) do
     _ = Local.delete(dropped_gen)
@@ -153,13 +151,8 @@ defmodule Nebulex.Adapters.Local.Generation do
     ref
   end
 
-  defp maybe_reset_timeout(_, %{gc_interval: nil} = state) do
-    state
-  end
-
-  defp maybe_reset_timeout(false, state) do
-    state
-  end
+  defp maybe_reset_timeout(_, %{gc_interval: nil} = state), do: state
+  defp maybe_reset_timeout(false, state), do: state
 
   defp maybe_reset_timeout(true, %{gc_interval: time, time_ref: ref} = state) do
     {:ok, :cancel} = :timer.cancel(ref)

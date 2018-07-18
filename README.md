@@ -17,8 +17,9 @@ features such as:
   * Support for different distributed caching topologies, such as: Partitioned,
     Near, Replicated, etc.
 
-  * Time-based expiration through a `:ttl` (Time-To_Live) property on the
-    cached objects.
+  * Different eviction mechanisms, such as: time-based eviction through
+    a `:ttl` (Time-To_Live) property on the cached objects, [Multi-queue][multi_queue]
+    or [generational caching][generational_caching] (built-in local cache), etc.
 
   * [Optimistic offline locks](https://martinfowler.com/eaaCatalog/optimisticOfflineLock.html)
     through a `:version` property on cached objects.
@@ -30,6 +31,8 @@ features such as:
   * Optional statistics gathering
 
 [ecto]: https://github.com/elixir-ecto/ecto
+[multi_queue]: https://en.wikipedia.org/wiki/Cache_replacement_policies#Multi_queue_(MQ)
+[generational_caching]: http://fairwaytech.com/2012/09/write-through-and-generational-caching
 
 See the [getting started](http://hexdocs.pm/nebulex/getting-started.html) guide
 and the [online documentation](http://hexdocs.pm/nebulex/Nebulex.html).
@@ -112,10 +115,10 @@ To run the benchmarks:
 $ mix nebulex.bench
 ```
 
-However, if you are interested to run more sophisticated load tests, perhaps you
-should take a look at the [Nebulex Bench Project](https://github.com/cabol/nebulex_examples/tree/master/nebulex_bench).
-This project allows you to run your own performance/load tests against
-`Nebulex` – additionally it also includes some load tests results.
+If you are interested to run more sophisticated load tests, perhaps you should
+checkout the [Nebulex Load Tests](https://github.com/cabol/nebulex_examples/tree/master/nebulex_bench)
+example, it allows you to run your own performance/load tests against Nebulex,
+and it also comes with load tests results.
 
 ## Copyright and License
 

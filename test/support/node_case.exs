@@ -37,7 +37,7 @@ defmodule Nebulex.NodeCase do
 
   def stop_cache(node_name, cache, pid) do
     call_node(node_name, fn ->
-      if Process.alive?(pid), do: cache.stop(pid)
+      if Process.alive?(pid), do: cache.stop(pid, @timeout)
     end)
   end
 

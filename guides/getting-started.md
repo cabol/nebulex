@@ -3,16 +3,8 @@
 This guide is an introduction to [Nebulex](https://github.com/cabol/nebulex),
 a local and distributed caching library for Elixir. Nebulex API is pretty much
 inspired by [Ecto](https://github.com/elixir-ecto/ecto), taking advantage of
-its simple interface, flexible and pluggable architecture. In the same way
-as Ecto, developers can provide their own Cache implementations.
-
-Additionally, Nebulex comes with three adapter implementations built-in:
-
-Nebulex Adapter               | Description
-:---------------------------- | :-----------------------
-`Nebulex.Adapters.Local`      | Local Generational Cache
-`Nebulex.Adapters.Dist`       | Distributed/Partitioned Cache
-`Nebulex.Adapters.Multilevel` | Multi-level Cache
+its simplicity, flexibility and pluggable architecture. In the same way
+as Ecto, developers can provide their own cache (adapter) implementations.
 
 In this guide, we're going to learn some basics about Nebulex, such as set,
 retrieve and destroy cache entries (key/value pairs).
@@ -121,9 +113,9 @@ against our cache.
 We can insert a new entries into our blog cache with this code:
 
 ```elixir
-data = %{id: 1, text: "hello"}
+user = %{id: 1, username: "cabol", email: "cabol@email.com"}
 
-Blog.Cache.set(data[:id], data)
+Blog.Cache.set(user[:id], user)
 ```
 
 To insert the data into our cache, we call `set` on `Blog.Cache`. This function
@@ -133,7 +125,7 @@ corresponding `Blog.Cache`.
 A successful set will return (by default) the inserted value, like so:
 
 ```elixir
-%{id: 1, text: "hello"}
+%{id: 1, username: "cabol", email: "cabol@email.com"}
 ```
 
 But, using the option `:return` we can ask for return either the value, key or
@@ -152,16 +144,16 @@ Blog.Cache.set("foo", "bar", return: :value) # Default
 First, let's create some data as we learned before.
 
 ```elixir
-people = [
+users = [
   %{id: 1, first_name: "Galileo", last_name: "Galilei"},
   %{id: 2, first_name: "Charles", last_name: "Darwin"},
   %{id: 3, first_name: "Albert", last_name: "Einstein"}
 ]
 
-Enum.each(people, fn(person) -> Blog.Cache.set(person[:id], person) end)
+Enum.each(users, fn(user) -> Blog.Cache.set(user[:id], user) end)
 ```
 
-This code will create three new people in our cache.
+This code will create three new users in our cache.
 
 ### Fetching a single entry
 

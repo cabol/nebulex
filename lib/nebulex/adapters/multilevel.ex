@@ -200,7 +200,7 @@ defmodule Nebulex.Adapters.Multilevel do
   def get(cache, key, opts) do
     fun =
       fn(current, {_, prev}) ->
-        if object = current.get(key, Keyword.put(opts, :return, :object)) do
+        if object = current.__adapter__.get(current, key, opts) do
           {:halt, {object, [current | prev]}}
         else
           {:cont, {nil, [current | prev]}}
@@ -211,16 +211,11 @@ defmodule Nebulex.Adapters.Multilevel do
     |> Enum.reduce_while({nil, []}, fun)
     |> maybe_fallback(cache, key, opts)
     |> maybe_replicate_data(cache, opts)
-    |> validate_return(opts)
   end
 
   @impl true
-  def set(_cache, _key, nil, _opts) do
-    nil
-  end
-
-  def set(cache, key, value, opts) do
-    eval(cache, :set, [key, value, opts], opts)
+  def set(cache, object, opts) do
+    eval(cache, :set, [object, opts], opts)
   end
 
   @impl true
@@ -234,64 +229,51 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
+  def update_counter(cache, key, incr, opts) do
+    eval(cache, :update_counter, [key, incr, opts], opts)
+  end
+
+  @impl true
   def size(cache) do
     Enum.reduce(cache.__levels__, 0, fn(level_cache, acc) ->
-      level_cache.size() + acc
+      level_cache.__adapter__.size(level_cache) + acc
     end)
   end
 
   @impl true
   def flush(cache) do
     Enum.each(cache.__levels__, fn(level_cache) ->
-      level_cache.flush()
+      level_cache.__adapter__.flush(level_cache)
     end)
   end
 
   @impl true
   def keys(cache) do
     cache.__levels__
-    |> Enum.reduce([], fn(level_cache, acc) -> level_cache.keys() ++ acc end)
+    |> Enum.reduce([], fn(level_cache, acc) ->
+      level_cache.__adapter__.keys(level_cache) ++ acc
+    end)
     |> :lists.usort()
   end
 
   @impl true
   def reduce(cache, acc_in, fun, opts) do
     Enum.reduce(cache.__levels__, acc_in, fn(level_cache, acc) ->
-      level_cache.reduce(acc, fun, opts)
+      level_cache.__adapter__.reduce(level_cache, acc, fun, opts)
     end)
   end
 
   @impl true
   def to_map(cache, opts) do
     Enum.reduce(cache.__levels__, %{}, fn(level_cache, acc) ->
-      opts
-      |> level_cache.to_map()
+      level_cache
+      |> level_cache.__adapter__.to_map(opts)
       |> Map.merge(acc)
     end)
   end
 
   @impl true
-  def pop(cache, key, opts) do
-    eval_while(cache, :pop, [key, opts])
-  end
-
-  @impl true
-  def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
-    eval(cache, :get_and_update, [key, fun, opts], opts)
-  end
-
-  @impl true
-  def update(cache, key, initial, fun, opts) do
-    eval(cache, :update, [key, initial, fun, opts], opts)
-  end
-
-  @impl true
-  def update_counter(cache, key, incr, opts) do
-    eval(cache, :update_counter, [key, incr, opts], opts)
-  end
-
-  @impl true
-  def transaction(cache, opts, fun) do
+  def transaction(cache, fun, opts) do
     eval(cache, :transaction, [fun, opts])
   end
 
@@ -308,28 +290,27 @@ defmodule Nebulex.Adapters.Multilevel do
   ## Helpers
 
   defp eval(ml_cache, fun, args, opts \\ []) do
-    [l1 | next] = eval_levels(opts[:level], ml_cache)
+    [l1 | next] =
+      opts
+      |> Keyword.get(:level)
+      |> eval_levels(ml_cache)
 
-    Enum.reduce(next, apply(l1, fun, args), fn(cache, acc) ->
-      ^acc = apply(cache, fun, args)
+    Enum.reduce(next, apply(l1.__adapter__, fun, [l1 | args]), fn(cache, acc) ->
+      ^acc = apply(cache.__adapter__, fun, [cache | args])
     end)
   end
 
-  defp eval_levels(nil, cache) do
-    cache.__levels__
-  end
+  defp eval_levels(nil, cache), do: cache.__levels__
 
   defp eval_levels(level, cache) when is_integer(level) do
     [:lists.nth(level, cache.__levels__)]
   end
 
-  defp eval_while(ml_cache, fun, args, init \\ nil) do
+  defp eval_while(ml_cache, fun, args, init) do
     Enum.reduce_while(ml_cache.__levels__, init, fn(cache, acc) ->
-      if return = apply(cache, fun, args) do
-        {:halt, return}
-      else
-        {:cont, acc}
-      end
+      if return = apply(cache.__adapter__, fun, [cache | args]),
+        do: {:halt, return},
+        else: {:cont, acc}
     end)
   end
 
@@ -342,47 +323,20 @@ defmodule Nebulex.Adapters.Multilevel do
     {object, levels}
   end
 
-  defp maybe_fallback(return, _, _, _) do
-    return
-  end
+  defp maybe_fallback(return, _, _, _), do: return
 
-  defp eval_fallback(fallback, key) when is_function(fallback, 1) do
-    fallback.(key)
-  end
+  defp eval_fallback(fallback, key) when is_function(fallback, 1), do: fallback.(key)
+  defp eval_fallback({m, f}, key) when is_atom(m) and is_atom(f), do: apply(m, f, [key])
 
-  defp eval_fallback({m, f}, key) when is_atom(m) and is_atom(f) do
-    apply(m, f, [key])
-  end
-
-  defp maybe_replicate_data({nil, _}, _, _) do
-    nil
-  end
-
-  defp maybe_replicate_data({%Object{value: nil}, _}, _, _) do
-    nil
-  end
+  defp maybe_replicate_data({nil, _}, _, _), do: nil
+  defp maybe_replicate_data({%Object{value: nil}, _}, _, _), do: nil
 
   defp maybe_replicate_data({object, levels}, cache, opts) do
-    opts = Keyword.put(opts, :return, :object)
-
-    replicas =
-      case cache.__model__ do
-        :exclusive -> []
-        :inclusive -> levels
-      end
-
-    Enum.reduce(replicas, object, &(&1.set(&2.key, &2.value, opts)))
-  end
-
-  defp validate_return(nil, _) do
-    nil
-  end
-
-  defp validate_return(object, opts) do
-    case Keyword.get(opts, :return, :value) do
-      :object -> object
-      :value  -> object.value
-      :key    -> object.key
+    cache.__model__
+    |> case do
+      :exclusive -> []
+      :inclusive -> levels
     end
+    |> Enum.reduce(object, &(&1.set(&2.key, &2.value, Keyword.put(opts, :return, :object))))
   end
 end

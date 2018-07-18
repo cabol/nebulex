@@ -41,9 +41,9 @@ defmodule Nebulex.Adapters.LocalTest do
 
     assert {nil, :error} == TestCache.get_and_update(:a, fn v ->
       if v, do: {v, :ok}, else: {v, :error}
-    end, version: -1, on_conflict: nil)
+    end, version: -1, on_conflict: :override)
 
-    assert {:error, :ok} == TestCache.get_and_update(:a, fn v ->
+    assert {:error, :error} == TestCache.get_and_update(:a, fn v ->
       if v, do: {v, :ok}, else: {v, :error}
     end, version: -1, on_conflict: :nothing)
 

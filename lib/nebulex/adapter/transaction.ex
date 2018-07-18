@@ -48,15 +48,12 @@ defmodule Nebulex.Adapter.Transaction  do
       end, keys: [:alice, :bob]
   """
 
-  @type cache :: Nebulex.Cache.t
-  @type opts  :: Nebulex.Cache.opts
-
   @doc false
   defmacro __using__(_opts) do
     quote do
       @behaviour Nebulex.Adapter.Transaction
 
-      def transaction(cache, opts, fun) do
+      def transaction(cache, fun, opts) do
         keys = opts[:keys]
         nodes = opts[:nodes] || [node() | Node.list()]
         retries = opts[:retries] || :infinity
@@ -131,12 +128,16 @@ defmodule Nebulex.Adapter.Transaction  do
 
   A successful transaction returns the value returned by the function.
 
-  See `Nebulex.Cache.transaction/2`.
+  See `Nebulex.Cache.t()ransaction/2`.
   """
-  @callback transaction(cache, opts, function :: fun) :: any
+  @callback transaction(
+              cache :: Nebulex.Cache.t(),
+              function :: fun,
+              opts :: Nebulex.Cache.opts()
+            ) :: any
 
   @doc """
   Returns `true` if the given process is inside a transaction.
   """
-  @callback in_transaction?(cache) :: boolean
+  @callback in_transaction?(cache :: Nebulex.Cache.t()) :: boolean
 end

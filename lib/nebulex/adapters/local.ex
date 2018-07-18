@@ -81,7 +81,6 @@ defmodule Nebulex.Adapters.Local do
   alias ExShards.Local
   alias Nebulex.Adapters.Local.Generation
   alias Nebulex.Object
-  alias Nebulex.Object.Version
 
   ## Adapter Impl
 
@@ -147,38 +146,35 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def get(cache, key, opts),
-    do: get(cache.__metadata__.generations, cache, key, opts, &elem(&1, 1))
-
-  defp get(generations, cache, key, opts, post_hook \\ &(&1)) do
-    generations
-    |> do_get(cache, key, opts)
-    |> post_hook.()
+  def get(cache, key, opts) do
+    do_get(cache.__metadata__.generations, cache, key, opts)
   end
 
   defp do_get([newest | _] = generations, cache, key, opts) do
-    case fetch(cache, newest, key, opts) do
-      nil -> retrieve(generations, cache, key, opts)
-      ret -> {newest, ret}
+    case fetch(cache, newest, key) do
+      nil ->
+        generations
+        |> retrieve(cache, key, opts)
+        |> elem(1)
+
+      ret ->
+        ret
     end
   end
 
-  defp fetch(cache, gen, key, opts, fun \\ &local_get/4) do
+  defp fetch(cache, gen, key, fun \\ &local_get/4) do
     fun
     |> apply([gen, key, nil, cache.__state__])
-    |> Version.validate(opts)
-    |> elem(1)
     |> validate_ttl(gen, cache)
-    |> validate_return(opts)
   end
 
   defp retrieve([newest | olders], cache, key, opts) do
     Enum.reduce_while(olders, {newest, nil}, fn(gen, {newer, _}) ->
-      if object = fetch(cache, gen, key, ret_obj(opts), &local_pop/4) do
+      if object = fetch(cache, gen, key, &local_pop/4) do
         # make sure we take the old timestamp since it will get set to
         # the default :infinity otherwise.
         opts = Keyword.put_new(opts, :ttl, diff_epoch(object.ttl))
-        {:halt, {gen, do_set(object, newer, cache, opts)}}
+        {:halt, {gen, do_set(newer, object, cache, opts)}}
       else
         {:cont, {gen, nil}}
       end
@@ -186,97 +182,52 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def set(_cache, _key, nil, _opts), do: nil
-
-  def set(cache, key, value, opts) do
-    generations = cache.__metadata__.generations
-
-    opts
-    |> Keyword.get(:version)
-    |> case do
-      nil ->
-        %Object{key: key, value: value}
-
-      vsn ->
-        generations
-        |> get(cache, key, [return: :object], &elem(&1, 1))
-        |> Version.validate(opts)
-        |> case do
-          {:override, nil} -> %Object{key: key, value: value, version: vsn}
-          {:override, obj} -> %{obj | value: value}
-          other            -> other
-        end
-    end
-    |> do_set(hd(generations), cache, opts)
+  def set(cache, object, opts) do
+    cache.__metadata__.generations
+    |> hd()
+    |> do_set(object, cache, opts)
   end
 
-  defp do_set(%Object{value: nil}, _gen, _cache, _opts),
-    do: nil
+  defp do_set(generation, object, cache, opts) do
+    object =
+      object
+      |> cache.set_object_vsn()
+      |> set_ttl(opts)
 
-  defp do_set({:nothing, cached}, _gen, _cache, opts),
-    do: validate_return(cached, opts)
-
-  defp do_set(object, gen, cache, opts) do
-    version = cache.generate_vsn(object)
-
-    ttl =
-      opts
-      |> Keyword.get(:ttl)
-      |> case do
-        nil -> object.ttl
-        opt -> seconds_since_epoch(opt)
-      end
-
-    %{object | version: version, ttl: ttl}
-    |> set_obj(gen, cache)
-    |> validate_return(opts)
-  end
-
-  defp set_obj(obj, gen, cache) do
-    true = Local.insert(gen, {obj.key, obj.value, obj.version, obj.ttl}, cache.__state__)
-    obj
+    true = Local.insert(generation, object_to_tuple(object), cache.__state__)
+    object
   end
 
   @impl true
-  def delete(cache, key, opts) do
-    generations = cache.__metadata__.generations
-
-    opts
-    |> Keyword.get(:version)
-    |> case do
-      nil ->
-        %Object{key: key}
-
-      _vsn ->
-        generations
-        |> get(cache, key, [return: :object], &elem(&1, 1))
-        |> Version.validate(opts)
-        |> case do
-          {:override, nil} -> {:nothing, %Object{key: key}}
-          {:override, obj} -> obj
-          other            -> other
-        end
-    end
-    |> do_delete(generations, cache.__state__)
-    |> validate_return(opts)
-  end
-
-  defp do_delete({:nothing, cached}, _, _), do: cached
-
-  defp do_delete(%Object{} = object, generations, state) do
-    :ok = Enum.each(generations, &Local.remove(&1, object.key, state))
-    object
+  def delete(cache, key, _opts) do
+    :ok = Enum.each(cache.__metadata__.generations, &Local.remove(&1, key, cache.__state__))
+    %Object{key: key}
   end
 
   @impl true
   def has_key?(cache, key) do
     Enum.reduce_while(cache.__metadata__.generations, false, fn(gen, acc) ->
-      if Local.has_key?(gen, key, cache.__state__) do
-        {:halt, true}
-      else
-        {:cont, acc}
-      end
+      if Local.has_key?(gen, key, cache.__state__),
+        do: {:halt, true},
+        else: {:cont, acc}
     end)
+  end
+
+  @impl true
+  def update_counter(cache, key, incr, opts) do
+    ttl =
+      opts
+      |> Keyword.get(:ttl)
+      |> seconds_since_epoch
+
+    try do
+      cache.__metadata__.generations
+      |> hd()
+      |> Local.update_counter(key, {2, incr}, {key, 0, nil, ttl}, cache.__state__)
+    rescue
+      _exception ->
+        reraise ArgumentError, System.stacktrace()
+    end
   end
 
   @impl true
@@ -307,12 +258,11 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def reduce(cache, acc_in, fun, opts) do
+  def reduce(cache, acc_in, fun, _opts) do
     Enum.reduce(cache.__metadata__.generations, acc_in, fn(gen, acc) ->
       Local.foldl(fn({key, val, vsn, ttl}, fold_acc) ->
-        obj = %Object{key: key, value: val, version: vsn, ttl: ttl}
-        return = validate_return(obj, opts)
-        fun.({key, return}, fold_acc)
+        object = %Object{key: key, value: val, version: vsn, ttl: ttl}
+        fun.(object, fold_acc)
       end, acc, gen, cache.__state__)
     end)
   end
@@ -338,79 +288,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def pop(cache, key, opts) do
-    generations = cache.__metadata__.generations
-
-    generations
-    |> get(cache, key, opts)
-    |> case do
-      {_, nil} ->
-        nil
-
-      {_, ret} ->
-        _ = do_delete(%Object{key: key}, generations, cache.__state__)
-        ret
-    end
-  end
-
-  @impl true
-  def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
-    generations = cache.__metadata__.generations
-    {gen, current} = get(generations, cache, key, Keyword.put(opts, :return, :object))
-    current = current || %Object{}
-
-    case fun.(current.value) do
-      {get, update} ->
-        {get, do_set(%{current | key: key, value: update}, gen, cache, opts)}
-
-      :pop ->
-        _ = do_delete(%Object{key: key}, generations, cache.__state__)
-        {current.value, nil}
-
-      other ->
-        raise ArgumentError,
-          "the given function must return a two-element tuple or :pop, " <>
-          "got: #{inspect(other)}"
-    end
-  end
-
-  @impl true
-  def update(cache, key, initial, fun, opts) do
-    generations = cache.__metadata__.generations
-    vsn = Keyword.get(opts, :version)
-
-    generations
-    |> get(cache, key, return: :object)
-    |> elem(1)
-    |> case do
-      nil -> {%Object{key: key, value: initial}, vsn}
-      obj -> {%{obj | key: key, value: fun.(obj.value)}, vsn}
-    end
-    |> case do
-      {obj, nil} -> do_set(obj, hd(generations), cache, opts)
-      {obj, _}   -> set(cache, key, obj.value, opts)
-    end
-  end
-
-  @impl true
-  def update_counter(cache, key, incr, opts) do
-    ttl =
-      opts
-      |> Keyword.get(:ttl)
-      |> seconds_since_epoch
-
-    try do
-      cache.__metadata__.generations
-      |> hd()
-      |> Local.update_counter(key, {2, incr}, {key, 0, nil, ttl}, cache.__state__)
-    rescue
-      _exception ->
-        reraise ArgumentError, System.stacktrace()
-    end
-  end
-
-  @impl true
-  def transaction(cache, opts, fun) do
+  def transaction(cache, fun, opts) do
     keys  = opts[:keys] || []
     nodes = opts[:nodes] || [node()]
     retries = opts[:retries] || :infinity
@@ -436,6 +314,9 @@ defmodule Nebulex.Adapters.Local do
   defp tuple_to_object({key, val, vsn, ttl}),
     do: %Object{key: key, value: val, version: vsn, ttl: ttl}
 
+  defp object_to_tuple(%Object{key: key, value: val, version: vsn, ttl: ttl}),
+    do: {key, val, vsn, ttl}
+
   defp validate_ttl(nil, _, _), do: nil
   defp validate_ttl(%Object{ttl: :infinity} = object, _, _), do: object
 
@@ -448,13 +329,12 @@ defmodule Nebulex.Adapters.Local do
     end
   end
 
-  defp validate_return(nil, _), do: nil
-
-  defp validate_return(%Object{} = object, opts) do
-    case Keyword.get(opts, :return, :value) do
-      :object -> object
-      :value  -> object.value
-      :key    -> object.key
+  defp set_ttl(object, opts) do
+    opts
+    |> Keyword.get(:ttl)
+    |> case do
+      nil -> object
+      opt -> %{object | ttl: seconds_since_epoch(opt)}
     end
   end
 
@@ -465,6 +345,4 @@ defmodule Nebulex.Adapters.Local do
   defp diff_epoch(_), do: :infinity
 
   defp unix_time, do: DateTime.to_unix(DateTime.utc_now())
-
-  defp ret_obj(opts), do: Keyword.put(opts, :return, :object)
 end

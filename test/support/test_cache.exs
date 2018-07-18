@@ -2,8 +2,8 @@ defmodule Nebulex.Version.Timestamp do
   @behaviour Nebulex.Object.Version
 
   @impl true
-  def generate(_) do
-    DateTime.utc_now |> DateTime.to_unix(:nanoseconds)
+  def generate(object) do
+    %{object | version: DateTime.to_unix(DateTime.utc_now, :nanoseconds)}
   end
 end
 
@@ -53,11 +53,11 @@ defmodule Nebulex.TestCache do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
   end
 
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C1, post_hooks_mode: :async)
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C2, post_hooks_mode: :pipe)
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Hooked.C3, post_hooks_mode: :sync)
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.HookableCache.C1, post_hooks_mode: :async)
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.HookableCache.C2, post_hooks_mode: :pipe)
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.HookableCache.C3, post_hooks_mode: :sync)
 
-  defmodule Hooked do
+  defmodule HookableCache do
     defmodule C1 do
       use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
       use Hooks
@@ -93,16 +93,16 @@ defmodule Nebulex.TestCache do
   defmodule Dist do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Dist
 
-    def reducer_fun({key, value}, {acc1, acc2}) do
-      if Map.has_key?(acc1, key),
+    def reducer_fun(object, {acc1, acc2}) do
+      if Map.has_key?(acc1, object.key),
         do: {acc1, acc2},
-        else: {Map.put(acc1, key, value), value + acc2}
+        else: {Map.put(acc1, object.key, object.value), object.value + acc2}
     end
 
     def get_and_update_fun(nil), do: {nil, 1}
     def get_and_update_fun(current) when is_integer(current), do: {current, current * 2}
 
-    def wrong_get_and_update_fun(_), do: :other
+    def get_and_update_bad_fun(_), do: :other
 
     def update_fun(nil), do: 1
     def update_fun(current) when is_integer(current), do: current * 2

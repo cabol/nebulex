@@ -161,10 +161,10 @@ defmodule Nebulex.CacheTest do
 
       test "reduce" do
         local_fun =
-          fn({key, value}, {acc1, acc2}) ->
-            if Map.has_key?(acc1, key),
+          fn(object, {acc1, acc2}) ->
+            if Map.has_key?(acc1, object.key),
               do: {acc1, acc2},
-              else: {Map.put(acc1, key, value), value + acc2}
+              else: {Map.put(acc1, object.key, object.value), object.value + acc2}
           end
 
         reducer_fun =
@@ -387,7 +387,7 @@ defmodule Nebulex.CacheTest do
       test "fail on Nebulex.ConflictError" do
         assert 1 == @cache.set(1, 1)
 
-        message = ~r"Version conflict error."
+        message = ~r"could not perform cache action because versions mismatch."
         assert_raise Nebulex.ConflictError, message, fn ->
           @cache.set(1, 2, version: -1)
         end
