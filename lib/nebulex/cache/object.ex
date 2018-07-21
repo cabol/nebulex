@@ -16,6 +16,25 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
+  Implementation for `Nebulex.Cache.mget/2`.
+  """
+  def mget(_cache, [], _opts), do: %{}
+
+  def mget(cache, keys, opts) do
+    objects_map = cache.__adapter__.mget(cache, keys, opts)
+
+    case opts[:return] do
+      :object ->
+        objects_map
+
+      _ ->
+        Enum.reduce(objects_map, %{}, fn({key, obj}, acc) ->
+          Map.put(acc, key, validate_return(obj, opts))
+        end)
+    end
+  end
+
+  @doc """
   Implementation for `Nebulex.Cache.set/3`.
   """
   def set(cache, key, value, opts) do
@@ -29,6 +48,17 @@ defmodule Nebulex.Cache.Object do
     |> validate_vsn(cached, &on_conflict_set/2, cache, opts)
     |> maybe_set_obj(cache, opts)
     |> validate_return(opts)
+  end
+
+  @doc """
+  Implementation for `Nebulex.Cache.mset/2`.
+  """
+  def mset(_cache, [], _opts), do: :ok
+  def mset(_cache, entries, _opts) when map_size(entries) == 0, do: :ok
+
+  def mset(cache, entries, opts) do
+    objects = for {key, value} <- entries, do: %Object{key: key, value: value}
+    cache.__adapter__.mset(cache, objects, opts)
   end
 
   @doc """

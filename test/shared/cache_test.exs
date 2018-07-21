@@ -113,6 +113,46 @@ defmodule Nebulex.CacheTest do
         refute @cache.get("foo")
       end
 
+      test "mget" do
+        for parallel <- [false, true] do
+          assert :ok == @cache.mset([a: 1, c: 3])
+
+          map = @cache.mget([:a, :b, :c], version: -1, parallel: parallel)
+          assert %{a: 1, c: 3} == map
+          refute map[:b]
+
+          map = @cache.mget([:a, :b, :c], return: :object, parallel: parallel)
+          %{a: %Object{value: 1}, c: %Object{value: 3}} = map
+          refute map[:b]
+
+          assert 0 == map_size(@cache.mget([]))
+          assert :ok == @cache.flush()
+        end
+      end
+
+      test "mset" do
+        for parallel <- [false, true] do
+          assert :ok == @cache.mset(for x <- 1..3 do
+            {x, x}
+          end, ttl: 1, parallel: parallel)
+
+          for x <- 1..3, do: assert x ==  @cache.get(x)
+          _ = :timer.sleep(1200)
+          for x <- 1..3, do: refute @cache.get(x)
+
+          assert :ok == @cache.mset(%{"apples" => 1, "bananas" => 3}, parallel: parallel)
+          assert :ok == @cache.mset([blueberries: 2, strawberries: 5], parallel: parallel)
+          assert 1 ==  @cache.get("apples")
+          assert 3 ==  @cache.get("bananas")
+          assert 2 ==  @cache.get(:blueberries)
+          assert 5 ==  @cache.get(:strawberries)
+
+          assert :ok == @cache.mset([])
+          assert :ok == @cache.mset(%{})
+          assert :ok == @cache.flush()
+        end
+      end
+
       test "has_key?" do
         for x <- 1..2, do: @cache.set(x, x)
 
@@ -276,18 +316,25 @@ defmodule Nebulex.CacheTest do
         _ = :timer.sleep(1510)
         refute @cache.get(1)
 
-        assert "bar" == @cache.set("foo", "bar", ttl: 2)
-        _ = :timer.sleep(900)
-        assert "bar" == @cache.get("foo")
-        _ = :timer.sleep(1200)
-        refute @cache.get("foo")
+        ops = [
+          set: ["foo", "bar", [ttl: 2]],
+          mset: [[{"foo", "bar"}], [ttl: 2]]
+        ]
 
-        assert "bar" == @cache.set("foo", "bar", ttl: 2)
-        @cache.new_generation()
-        _ = :timer.sleep(900)
-        assert "bar" == @cache.get("foo")
-        _ = :timer.sleep(1200)
-        refute @cache.get("foo")
+        for {action, args} <- ops do
+          assert apply(@cache, action, args)
+          _ = :timer.sleep(900)
+          assert "bar" == @cache.get("foo")
+          _ = :timer.sleep(1200)
+          refute @cache.get("foo")
+
+          assert apply(@cache, action, args)
+          @cache.new_generation()
+          _ = :timer.sleep(900)
+          assert "bar" == @cache.get("foo")
+          _ = :timer.sleep(1200)
+          refute @cache.get("foo")
+        end
       end
 
       test "object ttl" do

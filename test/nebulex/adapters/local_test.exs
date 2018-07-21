@@ -18,7 +18,7 @@ defmodule Nebulex.Adapters.LocalTest do
   test "fail with ArgumentError because cache was stopped" do
     :ok =
       TestCache
-      |> Process.whereis
+      |> Process.whereis()
       |> TestCache.stop()
 
     assert_raise ArgumentError, fn -> TestCache.set 1, 13, return: :object end
@@ -72,6 +72,15 @@ defmodule Nebulex.Adapters.LocalTest do
     assert_raise ArgumentError, fn ->
       TestCache.update_counter("foo")
     end
+  end
+
+  test "mset failure" do
+    :ok =
+      TestCache
+      |> Process.whereis()
+      |> TestCache.stop()
+
+    assert {:error, ["apples"]} == @cache.mset(%{"apples" => 1})
   end
 
   test "push generations" do

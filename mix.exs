@@ -46,8 +46,8 @@ defmodule Nebulex.Mixfile do
 
       # Test
       {:excoveralls, "~> 0.6", only: :test},
-      {:mock, "~> 0.2", only: :test},
       {:benchfella, "~> 0.3", optional: true, only: [:dev, :test]},
+      {:mock, "~> 0.2", only: :test},
 
       # Code Analysis
       {:dialyxir, "~> 0.5", only: :dev, runtime: false},

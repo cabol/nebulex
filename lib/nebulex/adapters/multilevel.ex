@@ -214,8 +214,31 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
+  def mget(cache, keys, opts) do
+    Enum.reduce(keys, %{}, fn(key, acc) ->
+      if obj = get(cache, key, opts),
+        do: Map.put(acc, key, obj),
+        else: acc
+    end)
+  end
+
+  @impl true
   def set(cache, object, opts) do
     eval(cache, :set, [object, opts], opts)
+  end
+
+  @impl true
+  def mset(cache, objects, opts) do
+    opts
+    |> Keyword.get(:level)
+    |> eval_levels(cache)
+    |> Enum.reduce({objects, []}, fn(level, {objs, acc}) ->
+      do_mset(level, objs, opts, acc)
+    end)
+    |> case do
+      {_, []}  -> :ok
+      {_, err} -> {:error, err}
+    end
   end
 
   @impl true
@@ -337,6 +360,17 @@ defmodule Nebulex.Adapters.Multilevel do
       :exclusive -> []
       :inclusive -> levels
     end
-    |> Enum.reduce(object, &(&1.set(&2.key, &2.value, Keyword.put(opts, :return, :object))))
+    |> Enum.reduce(object, &(&1.__adapter__.set(&1, &2, opts)))
+  end
+
+  defp do_mset(cache, objs, opts, acc) do
+    case cache.__adapter__.mset(cache, objs, opts) do
+      :ok ->
+        {objs, acc}
+
+      {:error, err_keys} ->
+        objs = for %Object{key: key} = obj <- objs, not key in err_keys, do: obj
+        {objs, err_keys ++ acc}
+    end
   end
 end

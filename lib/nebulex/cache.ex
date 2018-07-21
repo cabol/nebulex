@@ -29,8 +29,11 @@ defmodule Nebulex.Cache do
       As a compile-time option, it may also be given as an option to
       `use Nebulex.Cache`.
 
-    * `:stats` - a compile-time option that specifies if cache statistics
-      is enabled or not (defaults to `false`).
+    * `:version_generator` - this option specifies the module that
+      implements the `Nebulex.Object.Version` interface. This interface
+      defines only one callback `generate/1` that is invoked by
+      the adapters to generate new object versions. If this option
+      is not set, then the version is set to `nil` by default.
 
     * `:pre_hooks_mode` - a compile-time option that determinates the
       mode how pre-hooks will be executed – see pre/post hooks below.
@@ -38,11 +41,8 @@ defmodule Nebulex.Cache do
     * `:post_hooks_mode` - a compile-time option that determinates the
       mode how post-hooks will be executed – see pre/post hooks below.
 
-    * `:version_generator` - this option specifies the module that
-      implements the `Nebulex.Object.Version` interface. This interface
-      defines only one callback `generate/1` that is invoked by
-      the adapters to generate new object versions. If this option
-      is not set, then the version is set to `nil` by default.
+    * `:stats` - a compile-time option that specifies if cache statistics
+      is enabled or not (defaults to `false`).
 
   ## Pre/Post hooks
 
@@ -78,14 +78,17 @@ defmodule Nebulex.Cache do
 
   @type t :: module
 
-  @typedoc "Cache entry key"
+  @typedoc "Cache object"
+  @type object :: Nebulex.Object.t()
+
+  @typedoc "Object key"
   @type key :: any
 
-  @typedoc "Cache object value"
+  @typedoc "Object value"
   @type value :: any
 
-  @typedoc "Cache entry"
-  @type object :: Nebulex.Object.t()
+  @typedoc "Cache entries"
+  @type entries :: map | [{key, value}]
 
   @typedoc "Cache action options"
   @type opts :: Keyword.t()
@@ -102,14 +105,16 @@ defmodule Nebulex.Cache do
       @behaviour Nebulex.Cache
       @behaviour Nebulex.Hook
 
+      alias Nebulex.Cache.{Bucket, Stats, Transaction}
       alias Nebulex.Hook
-
-      #alias Nebulex.Cache.Object
 
       {otp_app, adapter, config} = Nebulex.Cache.Supervisor.compile_config(__MODULE__, opts)
       @otp_app otp_app
       @adapter adapter
       @config config
+      @version_generator Keyword.get(config, :version_generator)
+      @pre_hooks_mode Keyword.get(config, :pre_hooks_mode, :async)
+      @post_hooks_mode Keyword.get(config, :post_hooks_mode, :async)
       @before_compile adapter
 
       ## Config and metadata
@@ -120,6 +125,8 @@ defmodule Nebulex.Cache do
       end
 
       def __adapter__, do: @adapter
+
+      def __version_generator__, do: @version_generator
 
       ## Process lifecycle
 
@@ -142,7 +149,7 @@ defmodule Nebulex.Cache do
       ## Objects
 
       def get(key, opts \\ []) do
-        execute(Nebulex.Cache.Object, :get, [key, opts])
+        with_hooks(Nebulex.Cache.Object, :get, [key, opts])
       end
 
       def get!(key, opts \\ []) do
@@ -153,76 +160,74 @@ defmodule Nebulex.Cache do
         end
       end
 
+      def mget(keys, opts \\ []) do
+        with_hooks(Nebulex.Cache.Object, :mget, [keys, opts])
+      end
+
       def set(key, value, opts \\ []) do
-        execute(Nebulex.Cache.Object, :set, [key, value, opts])
+        with_hooks(Nebulex.Cache.Object, :set, [key, value, opts])
+      end
+
+      def mset(objects, opts \\ []) do
+        with_hooks(Nebulex.Cache.Object, :mset, [objects, opts])
       end
 
       def delete(key, opts \\ []) do
-        execute(Nebulex.Cache.Object, :delete, [key, opts])
+        with_hooks(Nebulex.Cache.Object, :delete, [key, opts])
       end
 
       def pop(key, opts \\ []) do
-        execute(Nebulex.Cache.Object, :pop, [key, opts])
+        with_hooks(Nebulex.Cache.Object, :pop, [key, opts])
       end
 
       def has_key?(key) do
-        execute(Nebulex.Cache.Object, :has_key?, [key])
+        with_hooks(Nebulex.Cache.Object, :has_key?, [key])
       end
 
       def get_and_update(key, fun, opts \\ []) do
-        execute(Nebulex.Cache.Object, :get_and_update, [key, fun, opts])
+        with_hooks(Nebulex.Cache.Object, :get_and_update, [key, fun, opts])
       end
 
       def update(key, initial, fun, opts \\ []) do
-        execute(Nebulex.Cache.Object, :update, [key, initial, fun, opts])
+        with_hooks(Nebulex.Cache.Object, :update, [key, initial, fun, opts])
       end
 
       def update_counter(key, incr \\ 1, opts \\ []) do
-        execute(Nebulex.Cache.Object, :update_counter, [key, incr, opts])
+        with_hooks(Nebulex.Cache.Object, :update_counter, [key, incr, opts])
       end
 
       ## Cache Bucket
 
       def size do
-        execute(Nebulex.Cache.Bucket, :size, [])
+        Bucket.size(__MODULE__)
       end
 
       def flush do
-        execute(Nebulex.Cache.Bucket, :flush, [])
+        Bucket.flush(__MODULE__)
       end
 
       def keys do
-        execute(Nebulex.Cache.Bucket, :keys, [])
+        Bucket.keys(__MODULE__)
       end
 
       def reduce(acc, fun, opts \\ []) do
-        execute(Nebulex.Cache.Bucket, :reduce, [acc, fun, opts])
+        Bucket.reduce(__MODULE__, acc, fun, opts)
       end
 
       def to_map(opts \\ []) do
-        execute(Nebulex.Cache.Bucket, :to_map, [opts])
+        Bucket.to_map(__MODULE__, opts)
       end
 
       ## Transactions
 
       if function_exported?(@adapter, :transaction, 3) do
         def transaction(fun, opts \\ []) do
-          execute(Nebulex.Cache.Transaction, :transaction, [fun, opts])
+          Transaction.transaction(__MODULE__, fun, opts)
         end
 
         def in_transaction? do
-          execute(Nebulex.Cache.Transaction, :in_transaction?, [])
+          Transaction.in_transaction?(__MODULE__)
         end
-      end
-
-      ## Object Versions
-
-      @version_generator Keyword.get(@config, :version_generator)
-
-      if @version_generator do
-        def set_object_vsn(object), do: @version_generator.generate(object)
-      else
-        def set_object_vsn(object), do: object
       end
 
       ## Hooks
@@ -235,15 +240,12 @@ defmodule Nebulex.Cache do
 
       ## Helpers
 
-      defp execute(wrapper, action, args) do
+      defp with_hooks(wrapper, action, args) do
         wrapper
         |> eval_pre_hooks(action, args)
         |> apply(action, [__MODULE__ | args])
         |> eval_post_hooks(action, args)
       end
-
-      @pre_hooks_mode Keyword.get(@config, :pre_hooks_mode, :async)
-      @post_hooks_mode Keyword.get(@config, :post_hooks_mode, :async)
 
       defp eval_pre_hooks(wrapper, action, args) do
         _ = Hook.eval(pre_hooks(), @pre_hooks_mode, {__MODULE__, action, args}, nil)
@@ -251,10 +253,13 @@ defmodule Nebulex.Cache do
       end
 
       if @config[:stats] == true do
-        @stats_hook &Nebulex.Cache.Stats.post_hook/2
-
         defp eval_post_hooks(result, action, args) do
-          Hook.eval([@stats_hook | post_hooks()], @post_hooks_mode, {__MODULE__, action, args}, result)
+          Hook.eval(
+            [unquote(&Stats.post_hook/2) | post_hooks()],
+            @post_hooks_mode,
+            {__MODULE__, action, args},
+            result
+          )
         end
       else
         defp eval_post_hooks(result, action, args) do
@@ -367,6 +372,24 @@ defmodule Nebulex.Cache do
   @callback get!(key, opts) :: return | no_return
 
   @doc """
+  Returns a map with the values or objects (check `:return` option) for all
+  specified keys. For every key that does not hold a value or does not exist,
+  the special value `nil` is returned. Because of this, the operation never
+  fails.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
+
+  ## Example
+
+      :ok = MyCache.mset([a: 1, c: 3])
+
+      %{a: 1, b: nil, c: 3} = MyCache.mget([:a, :b, :c])
+  """
+  @callback mget([key], opts) :: map
+
+  @doc """
   Sets the given `value` under `key` in the Cache.
 
   It returns `value` or `Nebulex.Object.t()` (depends on `:return` option)
@@ -423,6 +446,30 @@ defmodule Nebulex.Cache do
       3 = MyCache.get :a
   """
   @callback set(key, value, opts) :: return | no_return
+
+  @doc """
+  Sets the given `entries`, replacing existing ones, just as regular `set`.
+
+  Returns `:ok` if the all the objects were successfully set, otherwise
+  `{:error, failed_keys}`, where `failed_keys` contains the keys that
+  could not be set.
+
+  Ideally, this operation should be atomic, so all given keys are set at once.
+  But it depends purely on the adapter's implementation and the backed used
+  internally by this adapter. Hence, it is recommended to checkout the
+  adapter's documentation.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
+
+  ## Example
+
+      :ok = MyCache.mset(%{"apples" => 1, "bananas" => 3})
+
+      {:error, [:a, :b]} = MyCache.mset([a: 1, b: 2, c: 3], ttl: 1000)
+  """
+  @callback mset(entries, opts) :: :ok | {:error, failed_keys :: [key]}
 
   @doc """
   Deletes the cached entry in for a specific `key`.

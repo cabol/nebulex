@@ -110,6 +110,8 @@ defmodule Nebulex.Adapters.Dist do
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
 
+  alias Nebulex.Object
+
   ## Adapter Impl
 
   @impl true
@@ -159,8 +161,43 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   @impl true
+  def mget(cache, keys, opts) do
+    reduce_fun =
+      fn
+        (res, _, acc) when is_map(res) ->
+          Map.merge(acc, res)
+
+        (_, _, acc) ->
+          acc
+      end
+
+    map_reduce(keys, cache, :mget, opts, %{}, reduce_fun)
+  end
+
+  @impl true
   def set(cache, object, opts) do
     call(cache, object.key, :set, [object, opts])
+  end
+
+  @impl true
+  def mset(cache, objects, opts) do
+    reduce_fun =
+      fn
+        (:ok, _, acc) ->
+          acc
+
+        ({:error, err_keys}, _, acc) ->
+          err_keys ++ acc
+
+        (_, group, acc) ->
+          (for o <- group, do: o.key) ++ acc
+      end
+
+
+    case map_reduce(objects, cache, :mset, opts, [], reduce_fun) do
+      []  -> :ok
+      acc -> {:error, acc}
+    end
   end
 
   @impl true
@@ -237,5 +274,70 @@ defmodule Nebulex.Adapters.Dist do
       response ->
         response
     end
+  end
+
+  defp group_keys_by_node(objs_or_keys, cache) do
+    Enum.reduce(objs_or_keys, %{}, fn
+      (%Object{} = obj, acc) ->
+        node = cache.pick_node(obj.key)
+        Map.put(acc, node, [obj | Map.get(acc, node, [])])
+
+      (key, acc) ->
+        node = cache.pick_node(key)
+        Map.put(acc, node, [key | Map.get(acc, node, [])])
+    end)
+  end
+
+  defp map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun) do
+    opts
+    |> Keyword.get(:parallel)
+    |> case do
+      true ->
+        parallel_map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun)
+
+      _ ->
+        seq_map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun)
+    end
+  end
+
+  defp seq_map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun) do
+    enum
+    |> group_keys_by_node(cache)
+    |> Enum.reduce(reduce_acc, fn({node, group}, acc) ->
+      node
+      |> rpc_call(cache.__local__.__adapter__, action, [cache.__local__, group, opts])
+      |> reduce_fun.(group, acc)
+    end)
+  end
+
+  defp parallel_map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun) do
+    groups = group_keys_by_node(enum, cache)
+
+    tasks =
+      for {node, group} <- groups do
+        Task.async(fn ->
+          rpc_call(
+            node,
+            cache.__local__.__adapter__,
+            action,
+            [cache.__local__, group, opts]
+          )
+        end)
+      end
+
+    tasks
+    |> Task.yield_many(Keyword.get(opts, :timeout, 5000))
+    |> :lists.zip(Map.values(groups))
+    |> Enum.reduce(reduce_acc, fn
+      ({{_task, {:ok, res}}, group}, acc) ->
+        reduce_fun.(res, group, acc)
+
+      ({{_task, {:exit, _reason}}, group}, acc) ->
+        reduce_fun.(:exit, group, acc)
+
+      ({{task, nil}, group}, acc) ->
+        _ = Task.shutdown(task, :brutal_kill)
+        reduce_fun.(nil, group, acc)
+    end)
   end
 end

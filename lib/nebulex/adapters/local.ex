@@ -182,6 +182,15 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
+  def mget(cache, keys, opts) do
+    Enum.reduce(keys, %{}, fn(key, acc) ->
+      if obj = get(cache, key, opts),
+        do: Map.put(acc, key, obj),
+        else: acc
+    end)
+  end
+
+  @impl true
   def set(cache, object, opts) do
     cache.__metadata__.generations
     |> hd()
@@ -189,13 +198,19 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp do_set(generation, object, cache, opts) do
-    object =
-      object
-      |> cache.set_object_vsn()
-      |> set_ttl(opts)
-
-    true = Local.insert(generation, object_to_tuple(object), cache.__state__)
+    [object] = local_set(generation, [object], cache, opts)
     object
+  end
+
+  @impl true
+  def mset(cache, objects, opts) do
+    cache.__metadata__.generations
+    |> hd()
+    |> local_set(objects, cache, opts)
+
+    :ok
+  rescue
+    _ -> {:error, (for o <- objects, do: o.key)}
   end
 
   @impl true
@@ -299,23 +314,52 @@ defmodule Nebulex.Adapters.Local do
 
   defp local_get(tab, key, default, state) do
     case Local.lookup(tab, key, state) do
-      []    -> default
-      [raw] -> tuple_to_object(raw)
+      []      -> default
+      [tuple] -> from_tuple(tuple)
     end
   end
 
   defp local_pop(tab, key, default, state) do
     case Local.take(tab, key, state) do
-      []    -> default
-      [raw] -> tuple_to_object(raw)
+      []      -> default
+      [tuple] -> from_tuple(tuple)
     end
   end
 
-  defp tuple_to_object({key, val, vsn, ttl}),
-    do: %Object{key: key, value: val, version: vsn, ttl: ttl}
+  defp local_set(generation, objects, cache, opts) do
+    objects =
+      objects
+      |> set_vsn(cache.__version_generator__)
+      |> set_ttl(opts)
 
-  defp object_to_tuple(%Object{key: key, value: val, version: vsn, ttl: ttl}),
-    do: {key, val, vsn, ttl}
+    true = Local.insert(generation, to_tuples(objects), cache.__state__)
+    objects
+  end
+
+  defp from_tuple({key, val, vsn, ttl}) do
+    %Object{key: key, value: val, version: vsn, ttl: ttl}
+  end
+
+  defp to_tuples(objs) do
+    for %Object{key: key, value: val, version: vsn, ttl: ttl} <- objs do
+      {key, val, vsn, ttl}
+    end
+  end
+
+  defp set_vsn(objs, nil), do: objs
+
+  defp set_vsn(objs, versioner) do
+    for obj <- objs, do: versioner.generate(obj)
+  end
+
+  defp set_ttl(objs, opts) do
+    opts
+    |> Keyword.get(:ttl)
+    |> case do
+      nil -> objs
+      opt -> for obj <- objs, do: %{obj | ttl: seconds_since_epoch(opt)}
+    end
+  end
 
   defp validate_ttl(nil, _, _), do: nil
   defp validate_ttl(%Object{ttl: :infinity} = object, _, _), do: object
@@ -326,15 +370,6 @@ defmodule Nebulex.Adapters.Local do
     else
       true = Local.delete(gen, object.key, cache.__state__)
       nil
-    end
-  end
-
-  defp set_ttl(object, opts) do
-    opts
-    |> Keyword.get(:ttl)
-    |> case do
-      nil -> object
-      opt -> %{object | ttl: seconds_since_epoch(opt)}
     end
   end
 

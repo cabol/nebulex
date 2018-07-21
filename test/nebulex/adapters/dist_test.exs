@@ -2,7 +2,7 @@ defmodule Nebulex.Adapters.DistTest do
   use Nebulex.NodeCase
   use Nebulex.CacheTest, cache: Nebulex.TestCache.Dist
 
-  alias Nebulex.TestCache.Dist
+  alias Nebulex.TestCache.{Dist, DistMock, LocalMock}
   alias Nebulex.TestCache.DistLocal, as: Local
   alias Nebulex.Adapters.Dist.PG2
 
@@ -59,14 +59,49 @@ defmodule Nebulex.Adapters.DistTest do
     end
   end
 
+  test "mset rollback" do
+    assert 4 == Dist.set(4, 4)
+    assert 4 == Dist.get(4)
+
+    :ok = teardown_cache(1)
+
+    assert {:error, [1]} == Dist.mset([{4, 44}, {2, 2}, {1, 1}])
+
+    assert 44 == Dist.get(4)
+    assert 2 == Dist.get(2)
+
+    assert_raise Nebulex.RPCError, fn ->
+      Dist.get(1)
+    end
+  end
+
+  test "mset and mget parallel errors" do
+    {:ok, pid1} = DistMock.start_link()
+    {:ok, pid2} = LocalMock.start_link()
+
+    assert 0 == map_size(DistMock.mget([1, 2, 3], parallel: true, timeout: 10))
+
+    {:error, err_keys} = DistMock.mset([a: 1, b: 2], parallel: true)
+    assert [:a, :b] == :lists.usort(err_keys)
+
+    :ok = DistMock.stop(pid1)
+    :ok = DistMock.stop(pid2)
+  end
+
   test "remote procedure call exception" do
-    node = Dist.pick_node(1)
-    remote_pid = :rpc.call(node, Process, :whereis, [Dist.__local__])
-    :ok = :rpc.call(node, Dist.__local__, :stop, [remote_pid])
+    :ok = teardown_cache(1)
 
     message = ~r"the remote procedure call failed with reason:"
     assert_raise Nebulex.RPCError, message, fn ->
       Dist.set(1, 1)
     end
+  end
+
+  ## Private Functions
+
+  defp teardown_cache(key) do
+    node = Dist.pick_node(key)
+    remote_pid = :rpc.call(node, Process, :whereis, [Dist.__local__])
+    :ok = :rpc.call(node, Dist.__local__, :stop, [remote_pid])
   end
 end

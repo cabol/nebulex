@@ -29,11 +29,27 @@ defmodule Nebulex.Adapter do
   @callback get(cache, key, opts) :: nil | object | no_return
 
   @doc """
+  Returns a map with the objects for all specified keys. For every key that
+  does not hold a value or does not exist, the special value `nil` is
+  returned.
+
+  See `Nebulex.Cache.mget/2`.
+  """
+  @callback mget(cache, [key], opts) :: map
+
+  @doc """
   Stores a single object in the Cache.
 
   See `Nebulex.Cache.set/3`.
   """
   @callback set(cache, object, opts) :: object | no_return
+
+  @doc """
+  Stores multiple objects in the Cache.
+
+  See `Nebulex.Cache.mset/2`.
+  """
+  @callback mset(cache, [object], opts) :: :ok | {:error, failed_keys :: [key]}
 
   @doc """
   Deletes a single object from Cache.
