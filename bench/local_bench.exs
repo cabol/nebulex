@@ -1,7 +1,7 @@
 defmodule LocalBench do
   use Benchfella
 
-  Application.put_env(:nebulex, LocalBench.Cache, [gc_interval: 3600, n_shards: 2])
+  Application.put_env(:nebulex, LocalBench.Cache, gc_interval: 3600, n_shards: 2)
 
   defmodule Cache do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
@@ -59,7 +59,7 @@ defmodule LocalBench do
   end
 
   bench "reduce" do
-    Cache.reduce([], fn(r, acc) -> [r | acc] end)
+    Cache.reduce([], fn r, acc -> [r | acc] end)
     :ok
   end
 
@@ -77,11 +77,12 @@ defmodule LocalBench do
     Cache.get_and_update(bench_context, fn v ->
       if v, do: {v, v}, else: {v, 1}
     end)
+
     :ok
   end
 
   bench "update" do
-    Cache.update(bench_context, 1, &(&1))
+    Cache.update(bench_context, 1, & &1)
     :ok
   end
 
@@ -91,9 +92,12 @@ defmodule LocalBench do
   end
 
   bench "transaction" do
-    Cache.transaction(fn ->
-      Cache.update_counter(bench_context, 1)
-      :ok
-    end, keys: [1])
+    Cache.transaction(
+      fn ->
+        Cache.update_counter(bench_context, 1)
+        :ok
+      end,
+      keys: [1]
+    )
   end
 end

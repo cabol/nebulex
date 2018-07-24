@@ -169,7 +169,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp retrieve([newest | olders], cache, key, opts) do
-    Enum.reduce_while(olders, {newest, nil}, fn(gen, {newer, _}) ->
+    Enum.reduce_while(olders, {newest, nil}, fn gen, {newer, _} ->
       if object = fetch(cache, gen, key, &local_pop/4) do
         # make sure we take the old timestamp since it will get set to
         # the default :infinity otherwise.
@@ -183,7 +183,7 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def mget(cache, keys, opts) do
-    Enum.reduce(keys, %{}, fn(key, acc) ->
+    Enum.reduce(keys, %{}, fn key, acc ->
       if obj = get(cache, key, opts),
         do: Map.put(acc, key, obj),
         else: acc
@@ -210,7 +210,7 @@ defmodule Nebulex.Adapters.Local do
 
     :ok
   rescue
-    _ -> {:error, (for o <- objects, do: o.key)}
+    _ -> {:error, for(o <- objects, do: o.key)}
   end
 
   @impl true
@@ -221,7 +221,7 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def has_key?(cache, key) do
-    Enum.reduce_while(cache.__metadata__.generations, false, fn(gen, acc) ->
+    Enum.reduce_while(cache.__metadata__.generations, false, fn gen, acc ->
       if Local.has_key?(gen, key, cache.__state__),
         do: {:halt, true},
         else: {:cont, acc}
@@ -247,7 +247,7 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def size(cache) do
-    Enum.reduce(cache.__metadata__.generations, 0, fn(gen, acc) ->
+    Enum.reduce(cache.__metadata__.generations, 0, fn gen, acc ->
       gen
       |> Local.info(:size, cache.__state__)
       |> Kernel.+(acc)
@@ -266,7 +266,7 @@ defmodule Nebulex.Adapters.Local do
     ms = [{{:"$1", :_, :_, :_}, [], [:"$1"]}]
 
     cache.__metadata__.generations
-    |> Enum.reduce([], fn(gen, acc) ->
+    |> Enum.reduce([], fn gen, acc ->
       Local.select(gen, ms, cache.__state__) ++ acc
     end)
     |> :lists.usort()
@@ -274,11 +274,16 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def reduce(cache, acc_in, fun, _opts) do
-    Enum.reduce(cache.__metadata__.generations, acc_in, fn(gen, acc) ->
-      Local.foldl(fn({key, val, vsn, ttl}, fold_acc) ->
-        object = %Object{key: key, value: val, version: vsn, ttl: ttl}
-        fun.(object, fold_acc)
-      end, acc, gen, cache.__state__)
+    Enum.reduce(cache.__metadata__.generations, acc_in, fn gen, acc ->
+      Local.foldl(
+        fn {key, val, vsn, ttl}, fold_acc ->
+          object = %Object{key: key, value: val, version: vsn, ttl: ttl}
+          fun.(object, fold_acc)
+        end,
+        acc,
+        gen,
+        cache.__state__
+      )
     end)
   end
 
@@ -294,7 +299,7 @@ defmodule Nebulex.Adapters.Local do
           [{{:"$1", :"$2", :_, :_}, [], [{{:"$1", :"$2"}}]}]
       end
 
-    Enum.reduce(cache.__metadata__.generations, %{}, fn(gen, acc) ->
+    Enum.reduce(cache.__metadata__.generations, %{}, fn gen, acc ->
       gen
       |> Local.select(match_spec, cache.__state__)
       |> :maps.from_list()
@@ -304,7 +309,7 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def transaction(cache, fun, opts) do
-    keys  = opts[:keys] || []
+    keys = opts[:keys] || []
     nodes = opts[:nodes] || [node()]
     retries = opts[:retries] || :infinity
     do_transaction(cache, keys, nodes, retries, fun)
@@ -314,14 +319,14 @@ defmodule Nebulex.Adapters.Local do
 
   defp local_get(tab, key, default, state) do
     case Local.lookup(tab, key, state) do
-      []      -> default
+      [] -> default
       [tuple] -> from_tuple(tuple)
     end
   end
 
   defp local_pop(tab, key, default, state) do
     case Local.take(tab, key, state) do
-      []      -> default
+      [] -> default
       [tuple] -> from_tuple(tuple)
     end
   end

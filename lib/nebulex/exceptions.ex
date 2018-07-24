@@ -1,4 +1,3 @@
-
 defmodule Nebulex.ConflictError do
   defexception [:cached, :version]
 
@@ -9,15 +8,15 @@ defmodule Nebulex.ConflictError do
 
     Requested version
 
-    #{pretty version}
+    #{pretty(version)}
 
     Cached version
 
-    #{pretty cached.version}
+    #{pretty(cached.version)}
 
     Cached object
 
-    #{pretty cached}
+    #{pretty(cached)}
     """
   end
 
@@ -25,7 +24,7 @@ defmodule Nebulex.ConflictError do
     term
     |> inspect(pretty: true)
     |> String.split("\n")
-    |> Enum.map_join("\n", &"    " <> &1)
+    |> Enum.map_join("\n", &("    " <> &1))
   end
 end
 
@@ -37,7 +36,7 @@ defmodule Nebulex.RPCError do
     """
     the remote procedure call failed with reason:
 
-    #{inspect reason, pretty: true}
+    #{inspect(reason, pretty: true)}
     """
   end
 end

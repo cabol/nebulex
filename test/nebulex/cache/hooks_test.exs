@@ -9,9 +9,9 @@ defmodule Nebulex.Cache.HooksTest do
     caches_and_pids = start_caches([Hooked1, Hooked2, Hooked3])
     :ok
 
-    on_exit fn ->
+    on_exit(fn ->
       stop_caches(caches_and_pids)
-    end
+    end)
   end
 
   test "pre_hooks async" do

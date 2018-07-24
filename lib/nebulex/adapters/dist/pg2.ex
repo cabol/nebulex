@@ -39,7 +39,7 @@ defmodule Nebulex.Adapters.Dist.PG2 do
     |> ensure_namespace()
     |> :pg2.get_members()
     |> Enum.map(&node(&1))
-    |> :lists.usort
+    |> :lists.usort()
   end
 
   ## Private Functions

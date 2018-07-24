@@ -6,20 +6,22 @@ defmodule Nebulex.Cache.SupervisorTest do
   end
 
   setup do
-    _ = Application.put_env(:nebulex, MyCache, [n_shards: 2])
+    _ = Application.put_env(:nebulex, MyCache, n_shards: 2)
     {:ok, pid} = MyCache.start_link()
     :ok
 
-    on_exit fn ->
+    on_exit(fn ->
       _ = :timer.sleep(10)
       if Process.alive?(pid), do: MyCache.stop(pid)
-    end
+    end)
   end
 
   test "fail on runtime_config because configuration for cache not specified" do
     _ = Application.delete_env(:nebulex, MyCache)
 
-    msg = "configuration for Nebulex.Cache.SupervisorTest.MyCache not specified in :nebulex environment"
+    msg =
+      "configuration for Nebulex.Cache.SupervisorTest.MyCache not specified in :nebulex environment"
+
     assert_raise ArgumentError, msg, fn ->
       Nebulex.Cache.Supervisor.runtime_config(MyCache, :nebulex, nil)
     end
@@ -29,7 +31,9 @@ defmodule Nebulex.Cache.SupervisorTest do
     opts = [otp_app: :nebulex, n_shards: 2]
     _ = Application.put_env(:nebulex, MyCache, opts)
 
-    msg = "missing :adapter configuration in config :nebulex, Nebulex.Cache.SupervisorTest.MyCache"
+    msg =
+      "missing :adapter configuration in config :nebulex, Nebulex.Cache.SupervisorTest.MyCache"
+
     assert_raise ArgumentError, msg, fn ->
       Nebulex.Cache.Supervisor.compile_config(MyCache, opts)
     end
@@ -40,6 +44,7 @@ defmodule Nebulex.Cache.SupervisorTest do
     _ = Application.put_env(:nebulex, MyCache, opts)
 
     msg = ~r"adapter TestAdapter was not compiled, ensure"
+
     assert_raise ArgumentError, msg, fn ->
       Nebulex.Cache.Supervisor.compile_config(MyCache, opts)
     end

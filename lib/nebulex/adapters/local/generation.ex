@@ -26,7 +26,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   ## API
 
   @doc false
-  @spec start_link(Nebulex.Cache.t(), Nebulex.Cache.opts) :: GenServer.on_start
+  @spec start_link(Nebulex.Cache.t(), Nebulex.Cache.opts()) :: GenServer.on_start()
   def start_link(cache, opts \\ []) do
     GenServer.start_link(__MODULE__, {cache, opts}, name: server_name(cache))
   end
@@ -48,7 +48,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
       new_generation(MyCache, reset_timeout: :false)
   """
-  @spec new(Nebulex.Cache.t(), Nebulex.Cache.opts) :: [atom]
+  @spec new(Nebulex.Cache.t(), Nebulex.Cache.opts()) :: [atom]
   def new(cache, opts \\ []) do
     cache
     |> server_name()
@@ -120,7 +120,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   defp init_indexes(metadata, cache) do
-    :ok = Enum.each(0..(metadata.n_generations), &String.to_atom("#{cache}.#{&1}"))
+    :ok = Enum.each(0..metadata.n_generations, &String.to_atom("#{cache}.#{&1}"))
     metadata
   end
 

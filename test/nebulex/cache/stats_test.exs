@@ -8,21 +8,21 @@ defmodule Nebulex.Cache.StatsTest do
     {:ok, pid} = CacheStats.start_link(n_generations: 2)
     :ok
 
-    on_exit fn ->
+    on_exit(fn ->
       _ = :timer.sleep(10)
       if Process.alive?(pid), do: CacheStats.stop(pid)
-    end
+    end)
   end
 
   test "test counters" do
     CacheStats.new_generation()
 
-    for x <- 1..5, do: CacheStats.set x, x
+    for x <- 1..5, do: CacheStats.set(x, x)
     assert 5 == Stats.get_counter(CacheStats, :set)
 
-    for x <- 1..5, do: assert CacheStats.get(x) == x
+    for x <- 1..5, do: assert(CacheStats.get(x) == x)
     assert 5 == Stats.get_counter(CacheStats, :get)
-    for x <- 6..9, do: refute CacheStats.get(x)
+    for x <- 6..9, do: refute(CacheStats.get(x))
     assert 4 == Stats.get_counter(CacheStats, :get_miss_count)
     assert 5 == Stats.get_counter(CacheStats, :get)
 

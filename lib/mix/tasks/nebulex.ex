@@ -19,16 +19,16 @@ defmodule Mix.Tasks.Nebulex do
       [] ->
         general()
 
-      _  ->
-        Mix.raise "Invalid arguments, expected: mix nebulex"
+      _ ->
+        Mix.raise("Invalid arguments, expected: mix nebulex")
     end
   end
 
   defp general do
     {:ok, _} = Application.ensure_all_started(:nebulex)
-    Mix.shell.info "Nebulex v#{Application.spec(:nebulex, :vsn)}"
-    Mix.shell.info "A fast, flexible and powerful caching library for Elixir."
-    Mix.shell.info "\nAvailable tasks:\n"
+    Mix.shell().info("Nebulex v#{Application.spec(:nebulex, :vsn)}")
+    Mix.shell().info("A fast, flexible and powerful caching library for Elixir.")
+    Mix.shell().info("\nAvailable tasks:\n")
     Help.run(["--search", "nebulex."])
   end
 end

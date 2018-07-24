@@ -39,7 +39,7 @@ defmodule Nebulex.Adapter.NodePicker do
         |> :lists.nth(nodes)
       end
 
-      defoverridable [pick_node: 2]
+      defoverridable pick_node: 2
     end
   end
 

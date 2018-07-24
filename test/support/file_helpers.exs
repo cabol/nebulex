@@ -44,6 +44,6 @@ defmodule Nebulex.FileHelpers do
   end
 
   def assert_file(file, match) do
-    assert_file file, &(assert &1 =~  match)
+    assert_file(file, &assert(&1 =~ match))
   end
 end

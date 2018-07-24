@@ -3,7 +3,7 @@ defmodule Nebulex.Version.Timestamp do
 
   @impl true
   def generate(object) do
-    %{object | version: DateTime.to_unix(DateTime.utc_now, :nanoseconds)}
+    %{object | version: DateTime.to_unix(DateTime.utc_now(), :nanoseconds)}
   end
 end
 
@@ -14,20 +14,19 @@ defmodule Nebulex.TestCache do
     defmacro __using__(_opts) do
       quote do
         def pre_hooks do
-          pre_hook =
-            fn
-              (result, {_, :get, _} = call) ->
-                send(:hooked_cache, call)
+          pre_hook = fn
+            result, {_, :get, _} = call ->
+              send(:hooked_cache, call)
 
-              (_, _) ->
-                :noop
-            end
+            _, _ ->
+              :noop
+          end
 
           [pre_hook]
         end
 
         def post_hooks do
-          wrong_hook = fn(var) -> var end
+          wrong_hook = fn var -> var end
           [wrong_hook, &post_hook/2]
         end
 
@@ -47,12 +46,12 @@ defmodule Nebulex.TestCache do
     end
   end
 
-  :ok = Application.put_env(
-    :nebulex,
-    Nebulex.TestCache.Local,
-    version_generator:
-    Nebulex.Version.Timestamp
-  )
+  :ok =
+    Application.put_env(
+      :nebulex,
+      Nebulex.TestCache.Local,
+      version_generator: Nebulex.Version.Timestamp
+    )
 
   defmodule Local do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
@@ -64,7 +63,7 @@ defmodule Nebulex.TestCache do
     {Nebulex.TestCache.HookableCache.C3, :sync}
   ]
 
-  Enum.each(hookable_caches, fn({cache, mode}) ->
+  Enum.each(hookable_caches, fn {cache, mode} ->
     :ok = Application.put_env(:nebulex, cache, post_hooks_mode: mode)
   end)
 
@@ -85,35 +84,38 @@ defmodule Nebulex.TestCache do
     end
   end
 
-  :ok = Application.put_env(
-    :nebulex,
-    Nebulex.TestCache.CacheStats,
-    stats: true,
-    post_hooks_mode: :pipe
-  )
+  :ok =
+    Application.put_env(
+      :nebulex,
+      Nebulex.TestCache.CacheStats,
+      stats: true,
+      post_hooks_mode: :pipe
+    )
 
   defmodule CacheStats do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
   end
 
   for mod <- [Nebulex.TestCache.LocalWithGC, Nebulex.TestCache.DistLocal] do
-    :ok = Application.put_env(
-      :nebulex,
-      mod,
-      gc_interval: 3600,
-      version_generator: Nebulex.Version.Timestamp
-    )
+    :ok =
+      Application.put_env(
+        :nebulex,
+        mod,
+        gc_interval: 3600,
+        version_generator: Nebulex.Version.Timestamp
+      )
 
     defmodule mod do
       use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
     end
   end
 
-  :ok = Application.put_env(
-    :nebulex,
-    Nebulex.TestCache.Dist,
-    local: Nebulex.TestCache.DistLocal
-  )
+  :ok =
+    Application.put_env(
+      :nebulex,
+      Nebulex.TestCache.Dist,
+      local: Nebulex.TestCache.DistLocal
+    )
 
   defmodule Dist do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Dist
@@ -176,11 +178,12 @@ defmodule Nebulex.TestCache do
 
   ## Mocks
 
-  :ok = Application.put_env(
-    :nebulex,
-    Nebulex.TestCache.DistMock,
-    local: Nebulex.TestCache.LocalMock
-  )
+  :ok =
+    Application.put_env(
+      :nebulex,
+      Nebulex.TestCache.DistMock,
+      local: Nebulex.TestCache.LocalMock
+    )
 
   :ok = Application.put_env(:nebulex, Nebulex.TestCache.LocalMock, [])
 

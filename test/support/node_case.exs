@@ -17,7 +17,7 @@ defmodule Nebulex.NodeCase do
   end
 
   def start_caches(nodes, caches) do
-    apply_for_all(nodes, caches, fn(node, cache) ->
+    apply_for_all(nodes, caches, fn node, cache ->
       {_, {:ok, pid}} = start_cache(node, cache)
       pid
     end)
@@ -30,7 +30,7 @@ defmodule Nebulex.NodeCase do
   end
 
   def stop_caches(node_pid_list) do
-    Enum.each(node_pid_list, fn({node, cache, pid}) ->
+    Enum.each(node_pid_list, fn {node, cache, pid} ->
       stop_cache(node, cache, pid)
     end)
   end
@@ -42,8 +42,8 @@ defmodule Nebulex.NodeCase do
   end
 
   defp apply_for_all(nodes, caches, fun) do
-    Enum.reduce(nodes, [], fn(node, acc) ->
-      (for cache <- caches, do: {node, cache, fun.(node, cache)}) ++ acc
+    Enum.reduce(nodes, [], fn node, acc ->
+      for(cache <- caches, do: {node, cache, fun.(node, cache)}) ++ acc
     end)
   end
 
@@ -54,7 +54,7 @@ defmodule Nebulex.NodeCase do
     pid =
       Node.spawn_link(node, fn ->
         result = func.()
-        send parent, {ref, result}
+        send(parent, {ref, result})
         ref = Process.monitor(parent)
 
         receive do

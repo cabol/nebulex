@@ -19,10 +19,10 @@ defmodule Nebulex.MultilevelTest do
         levels_and_pids = start_levels()
         :ok
 
-        on_exit fn ->
+        on_exit(fn ->
           stop_levels(levels_and_pids)
           if Process.alive?(ml_cache), do: @cache.stop(ml_cache)
-        end
+        end)
       end
 
       test "fail on __before_compile__ because missing levels config" do
@@ -34,9 +34,15 @@ defmodule Nebulex.MultilevelTest do
       end
 
       test "fail on __before_compile__ because empty level list" do
-        :ok = Application.put_env(:nebulex, String.to_atom("#{__MODULE__}.EmptyLevelList"), [levels: []])
+        :ok =
+          Application.put_env(
+            :nebulex,
+            String.to_atom("#{__MODULE__}.EmptyLevelList"),
+            levels: []
+          )
 
         msg = ~r":levels configuration in config must have at least one level"
+
         assert_raise ArgumentError, msg, fn ->
           defmodule EmptyLevelList do
             use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Multilevel
@@ -60,7 +66,7 @@ defmodule Nebulex.MultilevelTest do
       end
 
       test "mget" do
-        assert :ok == @cache.mset([a: 1, c: 3])
+        assert :ok == @cache.mset(a: 1, c: 3)
 
         map = @cache.mget([:a, :b, :c], version: -1)
         assert %{a: 1, c: 3} == map
@@ -72,20 +78,24 @@ defmodule Nebulex.MultilevelTest do
       end
 
       test "mset" do
-        assert :ok == @cache.mset(for x <- 1..3 do
-          {x, x}
-        end, ttl: 1)
+        assert :ok ==
+                 @cache.mset(
+                   for x <- 1..3 do
+                     {x, x}
+                   end,
+                   ttl: 1
+                 )
 
-        for x <- 1..3, do: assert x ==  @cache.get(x)
+        for x <- 1..3, do: assert(x == @cache.get(x))
         _ = :timer.sleep(1200)
-        for x <- 1..3, do: refute @cache.get(x)
+        for x <- 1..3, do: refute(@cache.get(x))
 
         assert :ok == @cache.mset(%{"apples" => 1, "bananas" => 3})
-        assert :ok == @cache.mset([blueberries: 2, strawberries: 5])
-        assert 1 ==  @cache.get("apples")
-        assert 3 ==  @cache.get("bananas")
-        assert 2 ==  @cache.get(:blueberries)
-        assert 5 ==  @cache.get(:strawberries)
+        assert :ok == @cache.mset(blueberries: 2, strawberries: 5)
+        assert 1 == @cache.get("apples")
+        assert 3 == @cache.get("bananas")
+        assert 2 == @cache.get(:blueberries)
+        assert 5 == @cache.get(:strawberries)
 
         assert :ok == @cache.mset([])
         assert :ok == @cache.mset(%{})
@@ -147,7 +157,7 @@ defmodule Nebulex.MultilevelTest do
         assert :ok == @cache.flush()
         _ = :timer.sleep(500)
 
-        for x <- 1..30, do: refute @cache.get(x)
+        for x <- 1..30, do: refute(@cache.get(x))
       end
 
       test "keys" do
@@ -170,11 +180,11 @@ defmodule Nebulex.MultilevelTest do
         expected = :maps.from_list(for x <- 1..10, do: {x, x})
 
         assert {expected, 55} ==
-          @cache.reduce({%{}, 0}, fn(object, {acc1, acc2}) ->
-            if Map.has_key?(acc1, object.key),
-              do: {acc1, acc2},
-              else: {Map.put(acc1, object.key, object.value), object.value + acc2}
-          end)
+                 @cache.reduce({%{}, 0}, fn object, {acc1, acc2} ->
+                   if Map.has_key?(acc1, object.key),
+                     do: {acc1, acc2},
+                     else: {Map.put(acc1, object.key, object.value), object.value + acc2}
+                 end)
       end
 
       test "to_map" do
@@ -219,12 +229,12 @@ defmodule Nebulex.MultilevelTest do
         assert 1 == @cache.set(1, 1, level: 1)
         assert 2 == @cache.set(2, 2)
 
-        assert {1, 2} == @cache.get_and_update(1, &({&1, &1 * 2}), level: 1)
+        assert {1, 2} == @cache.get_and_update(1, &{&1, &1 * 2}, level: 1)
         assert 2 == @l1.get(1)
         refute @l2.get(1)
         refute @l3.get(1)
 
-        assert {2, 4} == @cache.get_and_update(2, &({&1, &1 * 2}))
+        assert {2, 4} == @cache.get_and_update(2, &{&1, &1 * 2})
         assert 4 == @l1.get(2)
         assert 4 == @l2.get(2)
         assert 4 == @l3.get(2)
@@ -277,16 +287,16 @@ defmodule Nebulex.MultilevelTest do
       end
 
       test "transaction" do
-        refute @cache.transaction fn ->
-          1
-          |> @cache.set(11, return: :key)
-          |> @cache.get!(return: :key)
-          |> @cache.delete(return: :key)
-          |> @cache.get
-        end
+        refute @cache.transaction(fn ->
+                 1
+                 |> @cache.set(11, return: :key)
+                 |> @cache.get!(return: :key)
+                 |> @cache.delete(return: :key)
+                 |> @cache.get
+               end)
 
         assert_raise MatchError, fn ->
-          @cache.transaction fn ->
+          @cache.transaction(fn ->
             res =
               1
               |> @cache.set(11, return: :key)
@@ -295,37 +305,46 @@ defmodule Nebulex.MultilevelTest do
               |> @cache.get
 
             :ok = res
-          end
+          end)
         end
       end
 
       test "transaction aborted" do
-        spawn_link fn ->
-          @cache.transaction(fn ->
-            :timer.sleep(1100)
-          end, keys: [1], retries: 1)
-        end
+        spawn_link(fn ->
+          @cache.transaction(
+            fn ->
+              :timer.sleep(1100)
+            end,
+            keys: [1],
+            retries: 1
+          )
+        end)
+
         :timer.sleep(200)
 
         assert_raise RuntimeError, "transaction aborted", fn ->
-          @cache.transaction(fn ->
-            @cache.get(1)
-          end, keys: [1], retries: 1)
+          @cache.transaction(
+            fn ->
+              @cache.get(1)
+            end,
+            keys: [1],
+            retries: 1
+          )
         end
       end
 
       test "in_transaction?" do
         refute @cache.in_transaction?
 
-        @cache.transaction fn ->
+        @cache.transaction(fn ->
           _ = @cache.set(1, 11, return: :key)
           true = @cache.in_transaction?
-        end
+        end)
       end
 
       test "get with fallback" do
         assert_for_all_levels(nil, 1)
-        assert 2 == @cache.get(1, fallback: fn(key) -> key * 2 end)
+        assert 2 == @cache.get(1, fallback: fn key -> key * 2 end)
         assert_for_all_levels(2, 1)
         refute @cache.get("foo", fallback: {@cache, :fallback})
       end
@@ -347,7 +366,7 @@ defmodule Nebulex.MultilevelTest do
       end
 
       defp assert_for_all_levels(expected, key) do
-        Enum.each(@levels, fn(cache) ->
+        Enum.each(@levels, fn cache ->
           case @cache.__model__ do
             :inclusive -> ^expected = cache.get(key)
             :exclusive -> nil = cache.get(key)

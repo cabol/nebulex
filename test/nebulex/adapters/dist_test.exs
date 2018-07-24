@@ -10,17 +10,17 @@ defmodule Nebulex.Adapters.DistTest do
   @cluster :lists.usort([@primary | Application.get_env(:nebulex, :nodes, [])])
 
   setup do
-    {:ok, local} = Local.start_link
-    {:ok, dist} = Dist.start_link
+    {:ok, local} = Local.start_link()
+    {:ok, dist} = Dist.start_link()
     node_pid_list = start_caches(Node.list(), [Local, Dist])
     :ok
 
-    on_exit fn ->
+    on_exit(fn ->
       _ = :timer.sleep(100)
       if Process.alive?(local), do: Local.stop(local)
       if Process.alive?(dist), do: Dist.stop(dist)
       stop_caches(node_pid_list)
-    end
+    end)
   end
 
   test "fail on __before_compile__ because missing local cache" do
@@ -92,6 +92,7 @@ defmodule Nebulex.Adapters.DistTest do
     :ok = teardown_cache(1)
 
     message = ~r"the remote procedure call failed with reason:"
+
     assert_raise Nebulex.RPCError, message, fn ->
       Dist.set(1, 1)
     end
@@ -101,7 +102,7 @@ defmodule Nebulex.Adapters.DistTest do
 
   defp teardown_cache(key) do
     node = Dist.pick_node(key)
-    remote_pid = :rpc.call(node, Process, :whereis, [Dist.__local__])
-    :ok = :rpc.call(node, Dist.__local__, :stop, [remote_pid])
+    remote_pid = :rpc.call(node, Process, :whereis, [Dist.__local__()])
+    :ok = :rpc.call(node, Dist.__local__(), :stop, [remote_pid])
   end
 end

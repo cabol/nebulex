@@ -4,11 +4,11 @@ defmodule Nebulex.Adapter do
   implement.
   """
 
-  @type t       :: module
-  @type cache   :: Nebulex.Cache.t()
-  @type key     :: Nebulex.Cache.key
-  @type object  :: Nebulex.Object.t()
-  @type opts    :: Nebulex.Cache.opts()
+  @type t :: module
+  @type cache :: Nebulex.Cache.t()
+  @type key :: Nebulex.Cache.key()
+  @type object :: Nebulex.Object.t()
+  @type opts :: Nebulex.Cache.opts()
   @type reducer :: Nebulex.Cache.reducer()
 
   @doc """

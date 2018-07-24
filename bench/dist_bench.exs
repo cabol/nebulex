@@ -6,8 +6,8 @@ defmodule DistBench do
   alias Nebulex.TestCache.DistLocal, as: Local
 
   setup_all do
-    {:ok, local} = Local.start_link
-    {:ok, dist} = Dist.start_link
+    {:ok, local} = Local.start_link()
+    {:ok, dist} = Dist.start_link()
     node_pid_list = NodeCase.start_caches(Node.list(), [Local, Dist])
 
     :ok = Enum.each(1..1000, fn x -> Dist.set(x, x) end)
@@ -92,9 +92,12 @@ defmodule DistBench do
   end
 
   bench "transaction" do
-    Dist.transaction(fn ->
-      Dist.update_counter(bench_context, 1)
-      :ok
-    end, keys: [1])
+    Dist.transaction(
+      fn ->
+        Dist.update_counter(bench_context, 1)
+        :ok
+      end,
+      keys: [1]
+    )
   end
 end

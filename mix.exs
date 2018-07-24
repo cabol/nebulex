@@ -1,4 +1,4 @@
-Enum.each Path.wildcard("bench/tasks/*.exs"), &Code.require_file/1
+Enum.each(Path.wildcard("bench/tasks/*.exs"), &Code.require_file/1)
 
 defmodule Nebulex.Mixfile do
   use Mix.Project
@@ -19,7 +19,7 @@ defmodule Nebulex.Mixfile do
       # Testing
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [
-        "coveralls": :test,
+        coveralls: :test,
         "coveralls.detail": :test,
         "coveralls.post": :test,
         "coveralls.html": :test

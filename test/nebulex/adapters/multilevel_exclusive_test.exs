@@ -5,9 +5,9 @@ defmodule Nebulex.Adapters.MultilevelExclusiveTest do
   alias Nebulex.TestCache.MultilevelExclusive, as: Multilevel
 
   test "get on an exclusive cache" do
-    1 = @l1.set 1, 1
-    2 = @l2.set 2, 2
-    3 = @l3.set 3, 3
+    1 = @l1.set(1, 1)
+    2 = @l2.set(2, 2)
+    3 = @l3.set(3, 3)
 
     assert 1 == Multilevel.get(1)
     assert 2 == Multilevel.get(2, return: :key)

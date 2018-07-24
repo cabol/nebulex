@@ -122,8 +122,8 @@ defmodule Nebulex.Adapters.Dist do
 
     unless local = Keyword.get(config, :local) do
       raise ArgumentError,
-        "missing :local configuration in " <>
-        "config #{inspect otp_app}, #{inspect env.module}"
+            "missing :local configuration in " <>
+              "config #{inspect(otp_app)}, #{inspect(env.module)}"
     end
 
     quote do
@@ -162,16 +162,13 @@ defmodule Nebulex.Adapters.Dist do
 
   @impl true
   def mget(cache, keys, opts) do
-    reduce_fun =
-      fn
-        (res, _, acc) when is_map(res) ->
-          Map.merge(acc, res)
+    map_reduce(keys, cache, :mget, opts, %{}, fn
+      res, _, acc when is_map(res) ->
+        Map.merge(acc, res)
 
-        (_, _, acc) ->
-          acc
-      end
-
-    map_reduce(keys, cache, :mget, opts, %{}, reduce_fun)
+      _, _, acc ->
+        acc
+    end)
   end
 
   @impl true
@@ -181,21 +178,19 @@ defmodule Nebulex.Adapters.Dist do
 
   @impl true
   def mset(cache, objects, opts) do
-    reduce_fun =
-      fn
-        (:ok, _, acc) ->
-          acc
+    objects
+    |> map_reduce(cache, :mset, opts, [], fn
+      :ok, _, acc ->
+        acc
 
-        ({:error, err_keys}, _, acc) ->
-          err_keys ++ acc
+      {:error, err_keys}, _, acc ->
+        err_keys ++ acc
 
-        (_, group, acc) ->
-          (for o <- group, do: o.key) ++ acc
-      end
-
-
-    case map_reduce(objects, cache, :mset, opts, [], reduce_fun) do
-      []  -> :ok
+      _, group, acc ->
+        for(o <- group, do: o.key) ++ acc
+    end)
+    |> case do
+      [] -> :ok
       acc -> {:error, acc}
     end
   end
@@ -217,7 +212,7 @@ defmodule Nebulex.Adapters.Dist do
 
   @impl true
   def size(cache) do
-    Enum.reduce(cache.nodes, 0, fn(node, acc) ->
+    Enum.reduce(cache.nodes, 0, fn node, acc ->
       node
       |> rpc_call(cache.__local__.__adapter__, :size, [cache.__local__])
       |> Kernel.+(acc)
@@ -226,7 +221,7 @@ defmodule Nebulex.Adapters.Dist do
 
   @impl true
   def flush(cache) do
-    Enum.each(cache.nodes, fn(node) ->
+    Enum.each(cache.nodes, fn node ->
       rpc_call(node, cache.__local__.__adapter__, :flush, [cache.__local__])
     end)
   end
@@ -234,7 +229,7 @@ defmodule Nebulex.Adapters.Dist do
   @impl true
   def keys(cache) do
     cache.nodes
-    |> Enum.reduce([], fn(node, acc) ->
+    |> Enum.reduce([], fn node, acc ->
       rpc_call(node, cache.__local__.__adapter__, :keys, [cache.__local__]) ++ acc
     end)
     |> :lists.usort()
@@ -242,14 +237,14 @@ defmodule Nebulex.Adapters.Dist do
 
   @impl true
   def reduce(cache, acc_in, fun, opts) do
-    Enum.reduce(cache.nodes, acc_in, fn(node, acc) ->
+    Enum.reduce(cache.nodes, acc_in, fn node, acc ->
       rpc_call(node, cache.__local__.__adapter__, :reduce, [cache.__local__, acc, fun, opts])
     end)
   end
 
   @impl true
   def to_map(cache, opts) do
-    Enum.reduce(cache.nodes, %{}, fn(node, acc) ->
+    Enum.reduce(cache.nodes, %{}, fn node, acc ->
       node
       |> rpc_call(cache.__local__.__adapter__, :to_map, [cache.__local__, opts])
       |> Map.merge(acc)
@@ -278,11 +273,11 @@ defmodule Nebulex.Adapters.Dist do
 
   defp group_keys_by_node(objs_or_keys, cache) do
     Enum.reduce(objs_or_keys, %{}, fn
-      (%Object{} = obj, acc) ->
+      %Object{} = obj, acc ->
         node = cache.pick_node(obj.key)
         Map.put(acc, node, [obj | Map.get(acc, node, [])])
 
-      (key, acc) ->
+      key, acc ->
         node = cache.pick_node(key)
         Map.put(acc, node, [key | Map.get(acc, node, [])])
     end)
@@ -303,7 +298,7 @@ defmodule Nebulex.Adapters.Dist do
   defp seq_map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun) do
     enum
     |> group_keys_by_node(cache)
-    |> Enum.reduce(reduce_acc, fn({node, group}, acc) ->
+    |> Enum.reduce(reduce_acc, fn {node, group}, acc ->
       node
       |> rpc_call(cache.__local__.__adapter__, action, [cache.__local__, group, opts])
       |> reduce_fun.(group, acc)
@@ -329,13 +324,13 @@ defmodule Nebulex.Adapters.Dist do
     |> Task.yield_many(Keyword.get(opts, :timeout, 5000))
     |> :lists.zip(Map.values(groups))
     |> Enum.reduce(reduce_acc, fn
-      ({{_task, {:ok, res}}, group}, acc) ->
+      {{_task, {:ok, res}}, group}, acc ->
         reduce_fun.(res, group, acc)
 
-      ({{_task, {:exit, _reason}}, group}, acc) ->
+      {{_task, {:exit, _reason}}, group}, acc ->
         reduce_fun.(:exit, group, acc)
 
-      ({{task, nil}, group}, acc) ->
+      {{task, nil}, group}, acc ->
         _ = Task.shutdown(task, :brutal_kill)
         reduce_fun.(nil, group, acc)
     end)

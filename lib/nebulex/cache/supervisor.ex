@@ -19,7 +19,7 @@ defmodule Nebulex.Cache.Supervisor do
       cache_init(cache, config)
     else
       raise ArgumentError,
-        "configuration for #{inspect cache} not specified in #{inspect otp_app} environment"
+            "configuration for #{inspect(cache)} not specified in #{inspect(otp_app)} environment"
     end
   end
 
@@ -36,17 +36,19 @@ defmodule Nebulex.Cache.Supervisor do
   """
   def compile_config(cache, opts) do
     otp_app = Keyword.fetch!(opts, :otp_app)
-    config  = Application.get_env(otp_app, cache, [])
+    config = Application.get_env(otp_app, cache, [])
     adapter = opts[:adapter] || config[:adapter]
 
     unless adapter do
-      raise ArgumentError, "missing :adapter configuration in " <>
-                           "config #{inspect otp_app}, #{inspect cache}"
+      raise ArgumentError,
+            "missing :adapter configuration in " <>
+              "config #{inspect(otp_app)}, #{inspect(cache)}"
     end
 
     unless Code.ensure_loaded?(adapter) do
-      raise ArgumentError, "adapter #{inspect adapter} was not compiled, " <>
-                           "ensure it is correct and it is included as a project dependency"
+      raise ArgumentError,
+            "adapter #{inspect(adapter)} was not compiled, " <>
+              "ensure it is correct and it is included as a project dependency"
     end
 
     {otp_app, adapter, config}

@@ -174,14 +174,14 @@ defmodule Nebulex.Adapters.Multilevel do
 
     unless levels do
       raise ArgumentError,
-        "missing :levels configuration in config " <>
-        "#{inspect otp_app}, #{inspect env.module}"
+            "missing :levels configuration in config " <>
+              "#{inspect(otp_app)}, #{inspect(env.module)}"
     end
 
     unless is_list(levels) && length(levels) > 0 do
       raise ArgumentError,
-        ":levels configuration in config must have at least one level, " <>
-        "got: #{inspect levels}"
+            ":levels configuration in config must have at least one level, " <>
+              "got: #{inspect(levels)}"
     end
 
     quote do
@@ -198,14 +198,13 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   def get(cache, key, opts) do
-    fun =
-      fn(current, {_, prev}) ->
-        if object = current.__adapter__.get(current, key, opts) do
-          {:halt, {object, [current | prev]}}
-        else
-          {:cont, {nil, [current | prev]}}
-        end
+    fun = fn current, {_, prev} ->
+      if object = current.__adapter__.get(current, key, opts) do
+        {:halt, {object, [current | prev]}}
+      else
+        {:cont, {nil, [current | prev]}}
       end
+    end
 
     cache.__levels__
     |> Enum.reduce_while({nil, []}, fun)
@@ -215,7 +214,7 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   def mget(cache, keys, opts) do
-    Enum.reduce(keys, %{}, fn(key, acc) ->
+    Enum.reduce(keys, %{}, fn key, acc ->
       if obj = get(cache, key, opts),
         do: Map.put(acc, key, obj),
         else: acc
@@ -232,11 +231,11 @@ defmodule Nebulex.Adapters.Multilevel do
     opts
     |> Keyword.get(:level)
     |> eval_levels(cache)
-    |> Enum.reduce({objects, []}, fn(level, {objs, acc}) ->
+    |> Enum.reduce({objects, []}, fn level, {objs, acc} ->
       do_mset(level, objs, opts, acc)
     end)
     |> case do
-      {_, []}  -> :ok
+      {_, []} -> :ok
       {_, err} -> {:error, err}
     end
   end
@@ -258,14 +257,14 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   def size(cache) do
-    Enum.reduce(cache.__levels__, 0, fn(level_cache, acc) ->
+    Enum.reduce(cache.__levels__, 0, fn level_cache, acc ->
       level_cache.__adapter__.size(level_cache) + acc
     end)
   end
 
   @impl true
   def flush(cache) do
-    Enum.each(cache.__levels__, fn(level_cache) ->
+    Enum.each(cache.__levels__, fn level_cache ->
       level_cache.__adapter__.flush(level_cache)
     end)
   end
@@ -273,7 +272,7 @@ defmodule Nebulex.Adapters.Multilevel do
   @impl true
   def keys(cache) do
     cache.__levels__
-    |> Enum.reduce([], fn(level_cache, acc) ->
+    |> Enum.reduce([], fn level_cache, acc ->
       level_cache.__adapter__.keys(level_cache) ++ acc
     end)
     |> :lists.usort()
@@ -281,14 +280,14 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   def reduce(cache, acc_in, fun, opts) do
-    Enum.reduce(cache.__levels__, acc_in, fn(level_cache, acc) ->
+    Enum.reduce(cache.__levels__, acc_in, fn level_cache, acc ->
       level_cache.__adapter__.reduce(level_cache, acc, fun, opts)
     end)
   end
 
   @impl true
   def to_map(cache, opts) do
-    Enum.reduce(cache.__levels__, %{}, fn(level_cache, acc) ->
+    Enum.reduce(cache.__levels__, %{}, fn level_cache, acc ->
       level_cache
       |> level_cache.__adapter__.to_map(opts)
       |> Map.merge(acc)
@@ -303,7 +302,7 @@ defmodule Nebulex.Adapters.Multilevel do
   @impl true
   def in_transaction?(cache) do
     results =
-      Enum.reduce(cache.__levels__, [], fn(level, acc) ->
+      Enum.reduce(cache.__levels__, [], fn level, acc ->
         [level.in_transaction?() | acc]
       end)
 
@@ -318,7 +317,7 @@ defmodule Nebulex.Adapters.Multilevel do
       |> Keyword.get(:level)
       |> eval_levels(ml_cache)
 
-    Enum.reduce(next, apply(l1.__adapter__, fun, [l1 | args]), fn(cache, acc) ->
+    Enum.reduce(next, apply(l1.__adapter__, fun, [l1 | args]), fn cache, acc ->
       ^acc = apply(cache.__adapter__, fun, [cache | args])
     end)
   end
@@ -330,7 +329,7 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   defp eval_while(ml_cache, fun, args, init) do
-    Enum.reduce_while(ml_cache.__levels__, init, fn(cache, acc) ->
+    Enum.reduce_while(ml_cache.__levels__, init, fn cache, acc ->
       if return = apply(cache.__adapter__, fun, [cache | args]),
         do: {:halt, return},
         else: {:cont, acc}
@@ -339,7 +338,7 @@ defmodule Nebulex.Adapters.Multilevel do
 
   defp maybe_fallback({nil, levels}, cache, key, opts) do
     object =
-      if fallback = opts[:fallback] || cache. __fallback__,
+      if fallback = opts[:fallback] || cache.__fallback__,
         do: %Object{key: key, value: eval_fallback(fallback, key)},
         else: nil
 
@@ -360,7 +359,7 @@ defmodule Nebulex.Adapters.Multilevel do
       :exclusive -> []
       :inclusive -> levels
     end
-    |> Enum.reduce(object, &(&1.__adapter__.set(&1, &2, opts)))
+    |> Enum.reduce(object, & &1.__adapter__.set(&1, &2, opts))
   end
 
   defp do_mset(cache, objs, opts, acc) do
@@ -369,7 +368,7 @@ defmodule Nebulex.Adapters.Multilevel do
         {objs, acc}
 
       {:error, err_keys} ->
-        objs = for %Object{key: key} = obj <- objs, not key in err_keys, do: obj
+        objs = for %Object{key: key} = obj <- objs, not (key in err_keys), do: obj
         {objs, err_keys ++ acc}
     end
   end

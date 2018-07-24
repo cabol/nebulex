@@ -236,7 +236,7 @@ defmodule Nebulex.Cache do
 
       def post_hooks, do: []
 
-      defoverridable [pre_hooks: 0, post_hooks: 0]
+      defoverridable pre_hooks: 0, post_hooks: 0
 
       ## Helpers
 
@@ -381,6 +381,8 @@ defmodule Nebulex.Cache do
 
   See the "Shared options" section at the module documentation.
 
+  For bulk operations like `mget` or `mset`, the option `:version` is ignored.
+
   ## Example
 
       :ok = MyCache.mset([a: 1, c: 3])
@@ -462,6 +464,8 @@ defmodule Nebulex.Cache do
   ## Options
 
   See the "Shared options" section at the module documentation.
+
+  For bulk operations like `mget` or `mset`, the option `:version` is ignored.
 
   ## Example
 

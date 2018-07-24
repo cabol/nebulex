@@ -5,7 +5,7 @@ defmodule Nebulex.Cache.Stats do
 
   ## API
 
-  @spec start_link(Nebulex.Cache.t()) :: GenServer.on_start
+  @spec start_link(Nebulex.Cache.t()) :: GenServer.on_start()
   def start_link(cache) do
     name = server_name(cache)
     GenServer.start_link(__MODULE__, {name, cache}, name: name)
@@ -49,10 +49,14 @@ defmodule Nebulex.Cache.Stats do
 
   @spec reset_counters(Nebulex.Cache.t()) :: :ok
   def reset_counters(cache) do
-    :ets.foldl(fn({counter, _}, acc) ->
-      true = reset_counter(cache, counter)
-      acc
-    end, :ok, server_name(cache))
+    :ets.foldl(
+      fn {counter, _}, acc ->
+        true = reset_counter(cache, counter)
+        acc
+      end,
+      :ok,
+      server_name(cache)
+    )
   end
 
   ## Post Hook

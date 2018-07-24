@@ -10,7 +10,7 @@ defmodule Nebulex.Cluster do
 
     # Allow spawned nodes to fetch all code from this node
     :erl_boot_server.start([])
-    allow_boot to_charlist("127.0.0.1")
+    allow_boot(to_charlist("127.0.0.1"))
 
     :nebulex
     |> Application.get_env(:nodes, [])
@@ -44,7 +44,7 @@ defmodule Nebulex.Cluster do
   end
 
   defp transfer_configuration(node) do
-    for {app_name, _, _} <- Application.loaded_applications do
+    for {app_name, _, _} <- Application.loaded_applications() do
       for {key, val} <- Application.get_all_env(app_name) do
         rpc(node, Application, :put_env, [app_name, key, val])
       end
@@ -55,7 +55,7 @@ defmodule Nebulex.Cluster do
     rpc(node, Application, :ensure_all_started, [:mix])
     rpc(node, Mix, :env, [Mix.env()])
 
-    for {app_name, _, _} <- Application.loaded_applications do
+    for {app_name, _, _} <- Application.loaded_applications() do
       rpc(node, Application, :ensure_all_started, [app_name])
     end
   end
@@ -65,6 +65,6 @@ defmodule Nebulex.Cluster do
     |> to_string
     |> String.split("@")
     |> Enum.at(0)
-    |> String.to_atom
+    |> String.to_atom()
   end
 end

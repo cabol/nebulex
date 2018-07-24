@@ -57,7 +57,7 @@ defmodule Nebulex.Object.Version do
 
   For more information, you can check the different adapter implementations.
   """
-  @spec validate(Nebulex.Object.t(), Nebulex.Cache.opts) :: result
+  @spec validate(Nebulex.Object.t(), Nebulex.Cache.opts()) :: result
   def validate(nil, _opts) do
     {:override, nil}
   end
@@ -80,8 +80,8 @@ defmodule Nebulex.Object.Version do
     do: {on_conflict, cached}
 
   defp on_conflict(cached, version, :raise),
-    do: raise Nebulex.ConflictError, cached: cached, version: version
+    do: raise(Nebulex.ConflictError, cached: cached, version: version)
 
   defp on_conflict(_, _, other),
-    do: raise ArgumentError, "unknown value for :on_conflict, got: #{inspect other}"
+    do: raise(ArgumentError, "unknown value for :on_conflict, got: #{inspect(other)}")
 end

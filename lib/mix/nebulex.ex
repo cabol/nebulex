@@ -9,8 +9,8 @@ defmodule Mix.Nebulex do
   Raises on umbrella application.
   """
   def no_umbrella!(task) do
-    if Project.umbrella? do
-      Mix.raise "Cannot run task #{inspect task} from umbrella application"
+    if Project.umbrella?() do
+      Mix.raise("Cannot run task #{inspect(task)} from umbrella application")
     end
   end
 end

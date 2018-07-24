@@ -106,21 +106,21 @@ defmodule Nebulex.Hook do
 
   def eval(hooks, mode, {_cache, _action, _args} = command, result) do
     Enum.reduce(hooks, result, fn
-      (hook, acc) when is_function(hook, 2) and mode == :pipe ->
+      hook, acc when is_function(hook, 2) and mode == :pipe ->
         hook.(acc, command)
 
-      (hook, ^result) when is_function(hook, 2) and mode == :sync ->
+      hook, ^result when is_function(hook, 2) and mode == :sync ->
         _ = hook.(result, command)
         result
 
-      (hook, ^result) when is_function(hook, 2) ->
+      hook, ^result when is_function(hook, 2) ->
         _ = Task.start_link(:erlang, :apply, [hook, [result, command]])
         result
 
-      (_, acc) when mode == :pipe ->
+      _, acc when mode == :pipe ->
         acc
 
-      (_, _) ->
+      _, _ ->
         result
     end)
   end

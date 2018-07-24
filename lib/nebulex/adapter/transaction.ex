@@ -1,4 +1,4 @@
-defmodule Nebulex.Adapter.Transaction  do
+defmodule Nebulex.Adapter.Transaction do
   @moduledoc """
   Specifies the adapter transactions API.
 
@@ -64,7 +64,7 @@ defmodule Nebulex.Adapter.Transaction  do
         if Process.get(cache), do: true, else: false
       end
 
-      defoverridable [transaction: 3, in_transaction?: 1]
+      defoverridable transaction: 3, in_transaction?: 1
 
       ## Helpers
 
@@ -82,18 +82,17 @@ defmodule Nebulex.Adapter.Transaction  do
             end
 
           false ->
-      	    raise "transaction aborted"
+            raise "transaction aborted"
         end
       end
 
       defp set_locks(ids, nodes, retries) do
-        maybe_set_lock =
-          fn(id, {:ok, acc}) ->
-            case :global.set_lock(id, nodes, retries) do
-              true  -> {:cont, {:ok, [id | acc]}}
-              false -> {:halt, {:error, acc}}
-            end
+        maybe_set_lock = fn id, {:ok, acc} ->
+          case :global.set_lock(id, nodes, retries) do
+            true -> {:cont, {:ok, [id | acc]}}
+            false -> {:halt, {:error, acc}}
           end
+        end
 
         ids
         |> Enum.reduce_while({:ok, []}, maybe_set_lock)

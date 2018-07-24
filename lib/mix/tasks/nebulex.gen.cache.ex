@@ -32,7 +32,7 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
     {parsed, _, _} = OptionParser.parse(args, switches: switches, aliases: aliases)
 
     unless cache = parsed[:cache] do
-      Mix.raise """
+      Mix.raise("""
       nebulex.gen.cache expects the cache to be given as -c MyApp.Cache,
       for example:
 
@@ -41,46 +41,49 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
       To specify other adapter different than default, use -a option:
 
           mix nebulex.gen.cache -c MyApp.Cache -a Nebulex.Adapters.Dist
-      """
+      """)
     end
 
-    cache   = Module.concat([cache])
+    cache = Module.concat([cache])
     adapter = Module.concat([parsed[:adapter] || Nebulex.Adapters.Local])
 
-    config      = Project.config
+    config = Project.config()
     underscored = Macro.underscore(inspect(cache))
 
     base = Path.basename(underscored)
     file = Path.join("lib", underscored) <> ".ex"
-    app  = config[:app] || :YOUR_APP_NAME
+    app = config[:app] || :YOUR_APP_NAME
     opts = %{mod: cache, adapter: adapter, app: app, base: base}
 
-    create_directory Path.dirname(file)
-    create_file file, cache_template(opts)
+    create_directory(Path.dirname(file))
+    create_file(file, cache_template(opts))
 
-    case File.read "config/config.exs" do
+    case File.read("config/config.exs") do
       {:ok, contents} ->
-        Mix.shell.info [:green, "* updating ", :reset, "config/config.exs"]
-        File.write! "config/config.exs",
-                    String.replace(contents, "use Mix.Config", config_template(opts))
+        Mix.shell().info([:green, "* updating ", :reset, "config/config.exs"])
+
+        File.write!(
+          "config/config.exs",
+          String.replace(contents, "use Mix.Config", config_template(opts))
+        )
 
       {:error, _} ->
-        create_file "config/config.exs", config_template(opts)
+        create_file("config/config.exs", config_template(opts))
     end
 
-    Mix.shell.info """
+    Mix.shell().info("""
     Don't forget to add your new cache to your supervision tree
     (typically in lib/#{app}/application.ex):
 
         # For Elixir v1.5 and later
-        {#{inspect cache}, []}
+        {#{inspect(cache)}, []}
 
         # For Elixir v1.4 and earlier
-        supervisor(#{inspect cache}, [])
+        supervisor(#{inspect(cache)}, [])
 
     And for more information about cache config options, check the adapter
     documentation and Nebulex.Cache shared options.
-    """
+    """)
   end
 
   defp config_template(opts) do
@@ -99,42 +102,42 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
     end
   end
 
-  embed_template :cache, """
+  embed_template(:cache, """
   defmodule <%= inspect @mod %> do
     use Nebulex.Cache, otp_app: <%= inspect @app %>
   end
-  """
+  """)
 
-  embed_template :default_config, """
+  embed_template(:default_config, """
   use Mix.Config
 
   config <%= inspect @app %>, <%= inspect @mod %>,
     adapter: <%= inspect @adapter %>
-  """
+  """)
 
-  embed_template :local_config, """
+  embed_template(:local_config, """
   use Mix.Config
 
   config <%= inspect @app %>, <%= inspect @mod %>,
     adapter: <%= inspect @adapter %>,
     gc_interval: 86_400 # 24 hrs
-  """
+  """)
 
-  embed_template :dist_config, """
+  embed_template(:dist_config, """
   use Mix.Config
 
   config <%= inspect @app %>, <%= inspect @mod %>,
     adapter: <%= inspect @adapter %>,
     local: :YOUR_LOCAL_CACHE,
     node_picker: <%= inspect @adapter %>
-  """
+  """)
 
-  embed_template :multilevel_config, """
+  embed_template(:multilevel_config, """
   use Mix.Config
 
   config <%= inspect @app %>, <%= inspect @mod %>,
     adapter: <%= inspect @adapter %>,
     cache_model: :inclusive,
     levels: []
-  """
+  """)
 end

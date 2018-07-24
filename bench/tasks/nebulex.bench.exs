@@ -14,7 +14,7 @@ defmodule Mix.Tasks.Nebulex.Bench do
     System.cmd("epmd", ["-daemon"])
     Mix.Task.run("app.start", [])
     :ok = start_nodes()
-    Mix.Tasks.Bench.run []
+    Mix.Tasks.Bench.run([])
   end
 
   defp start_nodes() do
@@ -24,10 +24,13 @@ defmodule Mix.Tasks.Nebulex.Bench do
       end
 
     nodes = Keyword.values(Nebulex.Cluster.spawn())
-    Enum.each(required_files, fn({file, loaded}) ->
-      Enum.each(loaded, fn({mod, bin}) ->
+
+    Enum.each(required_files, fn {file, loaded} ->
+      Enum.each(loaded, fn {mod, bin} ->
         expected = List.duplicate({:module, mod}, length(nodes))
-        {^expected, []} = :rpc.multicall(nodes, :code, :load_binary, [mod, to_charlist(file), bin])
+
+        {^expected, []} =
+          :rpc.multicall(nodes, :code, :load_binary, [mod, to_charlist(file), bin])
       end)
     end)
   end

@@ -28,7 +28,7 @@ defmodule Nebulex.Cache.Object do
         objects_map
 
       _ ->
-        Enum.reduce(objects_map, %{}, fn({key, obj}, acc) ->
+        Enum.reduce(objects_map, %{}, fn {key, obj}, acc ->
           Map.put(acc, key, validate_return(obj, opts))
         end)
     end
@@ -110,8 +110,8 @@ defmodule Nebulex.Cache.Object do
 
       other ->
         raise ArgumentError,
-          "the given function must return a two-element tuple or :pop, " <>
-          "got: #{inspect(other)}"
+              "the given function must return a two-element tuple or :pop, " <>
+                "got: #{inspect(other)}"
     end
   end
 
@@ -138,7 +138,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   def update_counter(_cache, _key, incr, _opts) do
-    raise ArgumentError, "the incr must be a valid integer, got: #{inspect incr}"
+    raise ArgumentError, "the incr must be a valid integer, got: #{inspect(incr)}"
   end
 
   ## Private Functions
@@ -183,8 +183,8 @@ defmodule Nebulex.Cache.Object do
   defp validate_return(%Object{} = object, opts) do
     case Keyword.get(opts, :return, :value) do
       :object -> object
-      :value  -> object.value
-      :key    -> object.key
+      :value -> object.value
+      :key -> object.key
     end
   end
 
