@@ -158,11 +158,12 @@ defmodule Nebulex.Adapters.Multilevel do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.List
   @behaviour Nebulex.Adapter.Transaction
 
   alias Nebulex.Object
 
-  ## Adapter Impl
+  ## Adapter
 
   @impl true
   defmacro __before_compile__(env) do
@@ -213,9 +214,9 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
-  def mget(cache, keys, opts) do
+  def mget(cache, keys, _opts) do
     Enum.reduce(keys, %{}, fn key, acc ->
-      if obj = get(cache, key, opts),
+      if obj = get(cache, key, []),
         do: Map.put(acc, key, obj),
         else: acc
     end)
@@ -229,8 +230,7 @@ defmodule Nebulex.Adapters.Multilevel do
   @impl true
   def mset(cache, objects, opts) do
     opts
-    |> Keyword.get(:level)
-    |> eval_levels(cache)
+    |> levels(cache)
     |> Enum.reduce({objects, []}, fn level, {objs, acc} ->
       do_mset(level, objs, opts, acc)
     end)
@@ -246,8 +246,37 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
+  def take(cache, key, opts) do
+    opts
+    |> levels(cache)
+    |> do_take(nil, key, opts)
+  end
+
+  defp do_take([], result, _key, _opts), do: result
+
+  defp do_take([level | rest], nil, key, opts) do
+    result = level.__adapter__.take(level, key, opts)
+    do_take(rest, result, key, opts)
+  end
+
+  defp do_take(levels, result, key, _opts) do
+    _ = eval(levels, :delete, [key, []])
+    result
+  end
+
+  @impl true
   def has_key?(cache, key) do
     eval_while(cache, :has_key?, [key], false)
+  end
+
+  @impl true
+  def get_and_update(cache, key, fun, opts) do
+    eval(cache, :get_and_update, [key, fun, opts], opts)
+  end
+
+  @impl true
+  def update(cache, key, initial, fun, opts) do
+    eval(cache, :update, [key, initial, fun, opts], opts)
   end
 
   @impl true
@@ -278,25 +307,38 @@ defmodule Nebulex.Adapters.Multilevel do
     |> :lists.usort()
   end
 
+  ## Lists
+
   @impl true
-  def reduce(cache, acc_in, fun, opts) do
-    Enum.reduce(cache.__levels__, acc_in, fn level_cache, acc ->
-      level_cache.__adapter__.reduce(level_cache, acc, fun, opts)
-    end)
+  def lpush(cache, key, value, opts) do
+    eval(cache, :lpush, [key, value, opts], opts)
   end
 
   @impl true
-  def to_map(cache, opts) do
-    Enum.reduce(cache.__levels__, %{}, fn level_cache, acc ->
-      level_cache
-      |> level_cache.__adapter__.to_map(opts)
-      |> Map.merge(acc)
-    end)
+  def rpush(cache, key, value, opts) do
+    eval(cache, :rpush, [key, value, opts], opts)
   end
+
+  @impl true
+  def lpop(cache, key, opts) do
+    eval(cache, :lpop, [key, opts], opts)
+  end
+
+  @impl true
+  def rpop(cache, key, opts) do
+    eval(cache, :rpop, [key, opts], opts)
+  end
+
+  @impl true
+  def lrange(cache, key, offset, limit, opts) do
+    eval(cache, :lrange, [key, offset, limit, opts], opts)
+  end
+
+  ## Transaction
 
   @impl true
   def transaction(cache, fun, opts) do
-    eval(cache, :transaction, [fun, opts])
+    eval(cache, :transaction, [fun, opts], [])
   end
 
   @impl true
@@ -311,21 +353,23 @@ defmodule Nebulex.Adapters.Multilevel do
 
   ## Helpers
 
-  defp eval(ml_cache, fun, args, opts \\ []) do
-    [l1 | next] =
-      opts
-      |> Keyword.get(:level)
-      |> eval_levels(ml_cache)
+  defp eval(ml_cache, fun, args, opts) do
+    eval(levels(opts, ml_cache), fun, args)
+  end
 
+  defp eval([l1 | next], fun, args) do
     Enum.reduce(next, apply(l1.__adapter__, fun, [l1 | args]), fn cache, acc ->
       ^acc = apply(cache.__adapter__, fun, [cache | args])
     end)
   end
 
-  defp eval_levels(nil, cache), do: cache.__levels__
-
-  defp eval_levels(level, cache) when is_integer(level) do
-    [:lists.nth(level, cache.__levels__)]
+  defp levels(opts, cache) do
+    opts
+    |> Keyword.get(:level)
+    |> case do
+      nil -> cache.__levels__
+      level -> [:lists.nth(level, cache.__levels__)]
+    end
   end
 
   defp eval_while(ml_cache, fun, args, init) do

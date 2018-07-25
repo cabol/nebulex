@@ -4,6 +4,7 @@ defmodule Nebulex.Adapters.LocalTest do
 
   alias Nebulex.Object
   alias Nebulex.TestCache.Local, as: TestCache
+  alias Nebulex.TestCache.Versionless
 
   setup do
     {:ok, pid} = TestCache.start_link(n_generations: 2)
@@ -26,6 +27,15 @@ defmodule Nebulex.Adapters.LocalTest do
     assert_raise ArgumentError, fn -> TestCache.delete(1) end
   end
 
+  test "set without version generator" do
+    {:ok, pid} = Versionless.start_link()
+
+    %Object{key: 1, value: 1, version: nil} = Versionless.set(1, 1, return: :object)
+    %Object{key: 1, value: 2, version: nil} = Versionless.set(1, 2, return: :object)
+
+    :ok = Versionless.stop(pid)
+  end
+
   test "get_and_update" do
     assert {nil, 1} ==
              TestCache.get_and_update(1, fn v ->
@@ -42,12 +52,14 @@ defmodule Nebulex.Adapters.LocalTest do
     assert {6, nil} == TestCache.get_and_update(1, fn _ -> :pop end)
     assert {nil, 3} == TestCache.get_and_update(3, &{&1, 3})
 
+    fun = fn v ->
+      if v, do: {v, :ok}, else: {v, :error}
+    end
+
     assert {nil, :error} ==
              TestCache.get_and_update(
                :a,
-               fn v ->
-                 if v, do: {v, :ok}, else: {v, :error}
-               end,
+               fun,
                version: -1,
                on_conflict: :override
              )
@@ -55,9 +67,7 @@ defmodule Nebulex.Adapters.LocalTest do
     assert {:error, :error} ==
              TestCache.get_and_update(
                :a,
-               fn v ->
-                 if v, do: {v, :ok}, else: {v, :error}
-               end,
+               fun,
                version: -1,
                on_conflict: :nothing
              )
@@ -154,7 +164,7 @@ defmodule Nebulex.Adapters.LocalTest do
   end
 
   defp get_from(gen, key) do
-    case ExShards.Local.lookup(gen, key, TestCache.__state__()) do
+    case :shards_local.lookup(gen, key, TestCache.__state__()) do
       [] ->
         nil
 

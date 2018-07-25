@@ -7,6 +7,7 @@ defmodule Nebulex.CacheTest do
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       alias Nebulex.Object
+      alias Nebulex.TestCache.Dist
 
       @cache Keyword.fetch!(opts, :cache)
 
@@ -88,6 +89,13 @@ defmodule Nebulex.CacheTest do
         assert 1 == @cache.get(1)
         assert 2 == @cache.get(2)
 
+        for x <- 3..4, do: @cache.set(x, x * x)
+        assert 9 == @cache.get(3)
+        assert 16 == @cache.get(4)
+
+        refute @cache.set("foo", nil)
+        refute @cache.get("foo")
+
         %Object{value: 11, key: 1, version: v1} = @cache.set(1, 11, return: :object)
         %Object{value: 12, key: 1, version: v2} = @cache.set(1, 12, return: :object, version: v1)
         assert v1 != v2
@@ -99,18 +107,13 @@ defmodule Nebulex.CacheTest do
           @cache.set(1, 13, return: :object, version: -1)
         end
 
-        for x <- 3..4, do: @cache.set(x, x * x)
-        assert 9 == @cache.get(3)
-        assert 16 == @cache.get(4)
-
-        assert 1 == @cache.set(:a, 1, version: -1)
+        assert_raise Nebulex.ConflictError, fn ->
+          @cache.set(:a, 1, version: -1)
+        end
 
         assert_raise ArgumentError, fn ->
           @cache.set(:a, 1, version: -1, on_conflict: :invalid) == 1
         end
-
-        refute @cache.set("foo", nil)
-        refute @cache.get("foo")
       end
 
       test "mget" do
@@ -155,6 +158,37 @@ defmodule Nebulex.CacheTest do
           assert :ok == @cache.mset([])
           assert :ok == @cache.mset(%{})
           assert :ok == @cache.flush()
+        end
+      end
+
+      test "take" do
+        for x <- 1..2, do: @cache.set(x, x)
+
+        assert 1 == @cache.take(1)
+        assert 2 == @cache.take(2)
+        refute @cache.take(3)
+        refute @cache.take(nil)
+
+        for x <- 1..3, do: refute(@cache.get(x))
+
+        %Object{value: "bar", key: "foo"} =
+          "foo"
+          |> @cache.set("bar", return: :key)
+          |> @cache.take(return: :object)
+
+        assert "world" ==
+                 "hello"
+                 |> @cache.set("world", return: :key)
+                 |> @cache.take(version: -1, on_conflict: :nothing, return: :key)
+                 |> @cache.get()
+
+        assert "world" == @cache.take("hello", version: -1, on_conflict: :override)
+        refute @cache.get("hello")
+
+        assert_raise Nebulex.ConflictError, fn ->
+          :b
+          |> @cache.set("hello", return: :key)
+          |> @cache.take(version: -1)
         end
       end
 
@@ -204,61 +238,6 @@ defmodule Nebulex.CacheTest do
         assert @cache.keys() == :lists.usort(expected -- set3)
       end
 
-      test "reduce" do
-        local_fun = fn object, {acc1, acc2} ->
-          if Map.has_key?(acc1, object.key),
-            do: {acc1, acc2},
-            else: {Map.put(acc1, object.key, object.value), object.value + acc2}
-        end
-
-        reducer_fun =
-          case @cache.__adapter__ do
-            Nebulex.Adapters.Dist -> &@cache.reducer_fun/2
-            _adapter -> local_fun
-          end
-
-        set1 = for x <- 1..3, do: @cache.set(x, x)
-        @cache.new_generation()
-        set2 = for x <- 2..5, do: @cache.set(x, x)
-        expected = :maps.from_list(for x <- 1..5, do: {x, x})
-
-        assert {expected, 15} == @cache.reduce({%{}, 0}, reducer_fun)
-      end
-
-      test "to_map" do
-        set1 = for x <- 1..50, do: @cache.set(x, x)
-
-        @cache.new_generation()
-        set2 = for x <- 51..100, do: @cache.set(x, x)
-        for x <- 1..30, do: assert(@cache.get(x) == x)
-        expected = :maps.from_list(for x <- 1..100, do: {x, x})
-
-        assert expected == @cache.to_map()
-        assert expected == @cache.to_map(return: :value)
-        %Object{key: 1} = Map.get(@cache.to_map(return: :object), 1)
-      end
-
-      test "pop" do
-        for x <- 1..2, do: @cache.set(x, x)
-
-        assert 1 == @cache.pop(1)
-        assert 2 == @cache.pop(2)
-        refute @cache.pop(3)
-
-        for x <- 1..3, do: refute(@cache.get(x))
-
-        %Object{value: "hello", key: :a} =
-          :a
-          |> @cache.set("hello", return: :key)
-          |> @cache.pop(return: :object)
-
-        assert_raise Nebulex.ConflictError, fn ->
-          :b
-          |> @cache.set("hello", return: :key)
-          |> @cache.pop(version: -1)
-        end
-      end
-
       test "update" do
         for x <- 1..2, do: @cache.set(x, x)
 
@@ -297,8 +276,7 @@ defmodule Nebulex.CacheTest do
         assert 3 == @cache.update_counter(:counter, -2)
         assert 0 == @cache.update_counter(:counter, -3)
 
-        expected_counter_obj = %Object{key: :counter, value: 0, ttl: :infinity}
-        assert @cache.get(:counter, return: :object) == expected_counter_obj
+        %Object{key: :counter, value: 0, ttl: :infinity} = @cache.get(:counter, return: :object)
 
         assert 1 == @cache.update_counter(:counter_with_ttl, 1, ttl: 1)
         assert 2 == @cache.update_counter(:counter_with_ttl)
@@ -308,6 +286,120 @@ defmodule Nebulex.CacheTest do
 
         assert_raise ArgumentError, fn ->
           @cache.update_counter(:counter, "foo")
+        end
+      end
+
+      test "lpush" do
+        assert 0 == @cache.lpush(:lst, [])
+        refute @cache.get(:lst)
+
+        assert 3 == @cache.lpush(:lst, [1, 2, 3])
+        assert 4 == @cache.lpush(:lst, ["654"])
+
+        assert ["654", 3, 2, 1] == @cache.get(:lst)
+
+        %Object{key: :lst, value: ["654", 3, 2, 1], ttl: :infinity} =
+          @cache.get(:lst, return: :object)
+
+        assert 1 == @cache.lpush(:lst_with_ttl, ["foo"], ttl: 1)
+        assert 2 == @cache.lpush(:lst_with_ttl, ["bar"])
+        assert ["bar", "foo"] == @cache.get(:lst_with_ttl)
+        _ = :timer.sleep(1010)
+        refute @cache.get(:lst_with_ttl)
+
+        assert 4 == @cache.lpush(:lst, [7], version: -1, on_conflict: :nothing)
+        assert ["654", 3, 2, 1] == @cache.get(:lst)
+
+        assert 5 == @cache.lpush(:lst, [7], version: -1, on_conflict: :override)
+        assert [7, "654", 3, 2, 1] == @cache.get(:lst)
+
+        assert_raise Nebulex.ConflictError, fn ->
+          @cache.lpush(:lst, [7], version: -1)
+        end
+      end
+
+      test "rpush" do
+        assert 0 == @cache.rpush(:lst, [])
+        refute @cache.get(:lst)
+
+        assert 3 == @cache.rpush(:lst, [1, 2, 3])
+        assert 4 == @cache.rpush(:lst, ["456"])
+
+        assert [1, 2, 3, "456"] == @cache.get(:lst)
+
+        %Object{key: :lst, value: [1, 2, 3, "456"], ttl: :infinity} =
+          @cache.get(:lst, return: :object)
+
+        assert 1 == @cache.rpush(:lst_with_ttl, ["foo"], ttl: 1)
+        assert 2 == @cache.rpush(:lst_with_ttl, ["bar"])
+        assert ["foo", "bar"] == @cache.get(:lst_with_ttl)
+        _ = :timer.sleep(1010)
+        refute @cache.get(:lst_with_ttl)
+      end
+
+      test "lpop" do
+        refute @cache.lpop(:lst)
+        assert 3 == @cache.lpush(:lst, [1, 2, 3])
+        assert 3 == @cache.lpop(:lst)
+
+        assert [2, 1] == @cache.get(:lst)
+
+        %Object{key: :lst, value: [2, 1], ttl: :infinity} = @cache.get(:lst, return: :object)
+
+        assert 2 == @cache.lpop(:lst, version: -1, on_conflict: :nothing)
+        assert [2, 1] == @cache.get(:lst)
+
+        assert 2 == @cache.lpop(:lst, version: -1, on_conflict: :override)
+        assert [1] == @cache.get(:lst)
+
+        assert_raise Nebulex.ConflictError, fn ->
+          @cache.lpop(:lst, version: -1)
+        end
+      end
+
+      test "rpop" do
+        refute @cache.rpop(:lst)
+        assert 3 == @cache.rpush(:lst, [1, 2, 3])
+        assert 3 == @cache.rpop(:lst)
+
+        assert [1, 2] == @cache.get(:lst)
+
+        %Object{key: :lst, value: [1, 2], ttl: :infinity} = @cache.get(:lst, return: :object)
+
+        assert 2 == @cache.rpop(:lst, version: -1, on_conflict: :nothing)
+        assert [1, 2] == @cache.get(:lst)
+
+        assert 2 == @cache.rpop(:lst, version: -1, on_conflict: :override)
+        assert [1] == @cache.get(:lst)
+
+        assert_raise Nebulex.ConflictError, fn ->
+          @cache.rpop(:lst, version: -1)
+        end
+      end
+
+      test "lrange" do
+        assert 5 == @cache.lpush(:lst, [1, 2, 3, 4, 5])
+        assert [5, 4, 3, 2, 1] == @cache.get(:lst)
+
+        assert [4, 3, 2] == @cache.lrange(:lst, 2, 3)
+        assert [3, 2, 1] == @cache.lrange(:lst, 3, 10)
+        assert [] == @cache.lrange(:lst, 6, 10)
+
+        assert [5, 4] == @cache.lrange(:lst, 1, 2, version: -1, on_conflict: :nothing)
+        assert [5, 4] == @cache.lrange(:lst, 1, 2, version: -1, on_conflict: :override)
+
+        assert_raise Nebulex.ConflictError, fn ->
+          @cache.lrange(:lst, 1, 2, version: -1)
+        end
+
+        message = ~r"the offset must be >= 1 and limit >= 0"
+
+        assert_raise ArgumentError, message, fn ->
+          @cache.lrange(:lst, -1, 2)
+        end
+
+        assert_raise ArgumentError, fn ->
+          @cache.lrange(:lst, 1, -2)
         end
       end
 
@@ -354,14 +446,14 @@ defmodule Nebulex.CacheTest do
           :timer.sleep(1000)
         end
 
-        assert :infinity ==
+        assert 3 ==
                  1
-                 |> @cache.set(11, return: :object)
+                 |> @cache.set(11, ttl: 3, return: :object)
                  |> Object.ttl()
 
         assert 3 ==
                  1
-                 |> @cache.update(nil, &:erlang.phash2/1, ttl: 3, return: :object)
+                 |> @cache.update(nil, &:erlang.phash2/1, ttl: 5, return: :object)
                  |> Object.ttl()
 
         assert :infinity == Object.ttl(%Object{})
@@ -372,7 +464,7 @@ defmodule Nebulex.CacheTest do
         assert 1 == @cache.get(1)
 
         _ = :timer.sleep(500)
-        assert {1, 2} == @cache.get_and_update(1, &Nebulex.TestCache.Dist.get_and_update_fun/1)
+        assert {1, 2} == @cache.get_and_update(1, &Dist.get_and_update_fun/1)
         assert ttl == @cache.get(1, return: :object).ttl
 
         _ = :timer.sleep(2000)

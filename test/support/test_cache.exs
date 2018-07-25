@@ -57,6 +57,12 @@ defmodule Nebulex.TestCache do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
   end
 
+  ok = Application.put_env(:nebulex, Nebulex.TestCache.Versionless, [])
+
+  defmodule Versionless do
+    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+  end
+
   hookable_caches = [
     {Nebulex.TestCache.HookableCache.C1, :async},
     {Nebulex.TestCache.HookableCache.C2, :pipe},
@@ -188,10 +194,11 @@ defmodule Nebulex.TestCache do
   :ok = Application.put_env(:nebulex, Nebulex.TestCache.LocalMock, [])
 
   defmodule AdapterMock do
-    defmacro __before_compile__(_) do
-    end
+    defmacro __before_compile__(_), do: :ok
 
     def init(_, _), do: {:ok, []}
+
+    def get(_, _, _), do: :timer.sleep(1000)
 
     def mget(_, _, _), do: :timer.sleep(1000)
 

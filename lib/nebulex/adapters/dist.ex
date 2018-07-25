@@ -109,6 +109,7 @@ defmodule Nebulex.Adapters.Dist do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.List
 
   alias Nebulex.Object
 
@@ -150,14 +151,14 @@ defmodule Nebulex.Adapters.Dist do
     end
   end
 
-  ## Adapter Impl
+  ## Adapter
 
   @impl true
   def init(_cache, _opts), do: {:ok, []}
 
   @impl true
   def get(cache, key, opts) do
-    call(cache, :get, [key, opts])
+    call(cache, key, :get, [key, opts], opts)
   end
 
   @impl true
@@ -173,7 +174,7 @@ defmodule Nebulex.Adapters.Dist do
 
   @impl true
   def set(cache, object, opts) do
-    call(cache, object.key, :set, [object, opts])
+    call(cache, object.key, :set, [object, opts], opts)
   end
 
   @impl true
@@ -197,17 +198,32 @@ defmodule Nebulex.Adapters.Dist do
 
   @impl true
   def delete(cache, key, opts) do
-    call(cache, :delete, [key, opts])
+    call(cache, key, :delete, [key, opts], opts)
+  end
+
+  @impl true
+  def take(cache, key, opts) do
+    call(cache, key, :take, [key, opts], opts)
   end
 
   @impl true
   def has_key?(cache, key) do
-    call(cache, :has_key?, [key])
+    call(cache, key, :has_key?, [key])
+  end
+
+  @impl true
+  def get_and_update(cache, key, fun, opts) do
+    call(cache, key, :get_and_update, [key, fun, opts], opts)
+  end
+
+  @impl true
+  def update(cache, key, initial, fun, opts) do
+    call(cache, key, :update, [key, initial, fun, opts], opts)
   end
 
   @impl true
   def update_counter(cache, key, incr, opts) do
-    call(cache, :update_counter, [key, incr, opts])
+    call(cache, key, :update_counter, [key, incr, opts], opts)
   end
 
   @impl true
@@ -235,34 +251,46 @@ defmodule Nebulex.Adapters.Dist do
     |> :lists.usort()
   end
 
+  ## Lists
+
   @impl true
-  def reduce(cache, acc_in, fun, opts) do
-    Enum.reduce(cache.nodes, acc_in, fn node, acc ->
-      rpc_call(node, cache.__local__.__adapter__, :reduce, [cache.__local__, acc, fun, opts])
-    end)
+  def lpush(cache, key, value, opts) do
+    call(cache, key, :lpush, [key, value, opts], opts)
   end
 
   @impl true
-  def to_map(cache, opts) do
-    Enum.reduce(cache.nodes, %{}, fn node, acc ->
-      node
-      |> rpc_call(cache.__local__.__adapter__, :to_map, [cache.__local__, opts])
-      |> Map.merge(acc)
-    end)
+  def rpush(cache, key, value, opts) do
+    call(cache, key, :rpush, [key, value, opts], opts)
+  end
+
+  @impl true
+  def lpop(cache, key, opts) do
+    call(cache, key, :lpop, [key, opts], opts)
+  end
+
+  @impl true
+  def rpop(cache, key, opts) do
+    call(cache, key, :rpop, [key, opts], opts)
+  end
+
+  @impl true
+  def lrange(cache, key, offset, limit, opts) do
+    call(cache, key, :lrange, [key, offset, limit, opts], opts)
   end
 
   ## Private Functions
 
-  defp call(cache, fun, [key | _] = args), do: call(cache, key, fun, args)
-
-  defp call(cache, key, fun, args) do
+  defp call(cache, key, fun, args, opts \\ []) do
     key
     |> cache.pick_node()
-    |> rpc_call(cache.__local__.__adapter__, fun, [cache.__local__ | args])
+    |> rpc_call(cache.__local__.__adapter__, fun, [cache.__local__ | args], opts)
   end
 
-  defp rpc_call(node, mod, fun, args) do
-    case :rpc.call(node, mod, fun, args) do
+  defp rpc_call(node, mod, fun, args, opts \\ []) do
+    case :rpc.call(node, mod, fun, args, opts[:timeout] || :infinity) do
+      {:badrpc, {:EXIT, {remote_ex, _}}} ->
+        raise remote_ex
+
       {:badrpc, reason} ->
         raise Nebulex.RPCError, reason: reason
 

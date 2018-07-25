@@ -123,6 +123,33 @@ defmodule Nebulex.MultilevelTest do
         refute @l3.get(2)
       end
 
+      test "take" do
+        assert 1 == @cache.set(1, 1)
+        assert 2 == @cache.set(2, 2, level: 2)
+        assert 3 == @cache.set(3, 3, level: 3)
+
+        assert 1 == @cache.take(1)
+        assert 2 == @cache.take(2)
+        assert 3 == @cache.take(3)
+
+        refute @l1.get(1)
+        refute @l2.get(1)
+        refute @l3.get(1)
+        refute @l2.get(2)
+        refute @l3.get(3)
+
+        %Object{value: "hello", key: :a} =
+          :a
+          |> @cache.set("hello", return: :key)
+          |> @cache.take(return: :object)
+
+        assert_raise Nebulex.ConflictError, fn ->
+          :b
+          |> @cache.set("hello", return: :key)
+          |> @cache.take(version: -1)
+        end
+      end
+
       test "has_key?" do
         assert 1 == @cache.set(1, 1)
         assert 2 == @cache.set(2, 2, level: 2)
@@ -171,58 +198,6 @@ defmodule Nebulex.MultilevelTest do
         del = for x <- 20..60, do: @cache.delete(x, return: :key)
 
         assert @cache.keys() == :lists.usort(expected -- del)
-      end
-
-      test "reduce" do
-        l1 = for x <- 1..5, do: @l1.set(x, x)
-        l2 = for x <- 3..7, do: @l2.set(x, x)
-        l3 = for x <- 6..10, do: @l3.set(x, x)
-        expected = :maps.from_list(for x <- 1..10, do: {x, x})
-
-        assert {expected, 55} ==
-                 @cache.reduce({%{}, 0}, fn object, {acc1, acc2} ->
-                   if Map.has_key?(acc1, object.key),
-                     do: {acc1, acc2},
-                     else: {Map.put(acc1, object.key, object.value), object.value + acc2}
-                 end)
-      end
-
-      test "to_map" do
-        l1 = for x <- 1..30, do: @l1.set(x, x)
-        l2 = for x <- 20..60, do: @l2.set(x, x)
-        l3 = for x <- 50..100, do: @l3.set(x, x)
-        expected = :maps.from_list(for x <- 1..100, do: {x, x})
-
-        assert expected == @cache.to_map()
-        assert expected == @cache.to_map(return: :value)
-        %Object{key: 1} = Map.get(@cache.to_map(return: :object), 1)
-      end
-
-      test "pop" do
-        assert 1 == @cache.set(1, 1)
-        assert 2 == @cache.set(2, 2, level: 2)
-        assert 3 == @cache.set(3, 3, level: 3)
-
-        assert 1 == @cache.pop(1)
-        assert 2 == @cache.pop(2)
-        assert 3 == @cache.pop(3)
-
-        refute @l1.get(1)
-        refute @l2.get(1)
-        refute @l3.get(1)
-        refute @l2.get(2)
-        refute @l3.get(3)
-
-        %Object{value: "hello", key: :a} =
-          :a
-          |> @cache.set("hello", return: :key)
-          |> @cache.pop(return: :object)
-
-        assert_raise Nebulex.ConflictError, fn ->
-          :b
-          |> @cache.set("hello", return: :key)
-          |> @cache.pop(version: -1)
-        end
       end
 
       test "get_and_update" do
@@ -284,6 +259,53 @@ defmodule Nebulex.MultilevelTest do
         assert 0 == @l1.get(4)
         assert 0 == @l2.get(4)
         assert 0 == @l3.get(4)
+      end
+
+      test "lpush and lrange" do
+        assert 1 == @cache.lpush(1, ["world"])
+        assert 2 == @cache.lpush(1, ["hello"])
+        assert ["hello", "world"] == @l1.get(1)
+        assert ["hello", "world"] == @l2.get(1)
+        assert ["hello", "world"] == @l3.get(1)
+
+        assert 1 == @cache.lpush(2, ["foo"], level: 2)
+        assert ["foo"] == @l2.get(2)
+        refute @l1.get(2)
+        refute @l3.get(2)
+
+        assert 5 == @cache.lpush(:lst, [1, 2, 3, 4, 5])
+        assert [5, 4, 3, 2, 1] == @cache.get(:lst)
+        assert [4, 3, 2] == @cache.lrange(:lst, 2, 3)
+      end
+
+      test "rpush" do
+        assert 1 == @cache.rpush(1, ["hello"])
+        assert 2 == @cache.rpush(1, ["world"])
+        assert ["hello", "world"] == @l1.get(1)
+        assert ["hello", "world"] == @l2.get(1)
+        assert ["hello", "world"] == @l3.get(1)
+
+        assert 1 == @cache.rpush(2, ["foo"], level: 2)
+        assert ["foo"] == @l2.get(2)
+        refute @l1.get(2)
+        refute @l3.get(2)
+      end
+
+      test "lpop and rpop" do
+        for {push, pop} <- [rpush: :rpop, lpush: :lpop] do
+          assert 5 == apply(@cache, push, [1, [1, 2, 3, 4, 5]])
+          assert 5 == apply(@cache, pop, [1])
+          assert 4 == length(@l1.get(1))
+          assert 4 == length(@l2.get(1))
+          assert 4 == length(@l3.get(1))
+
+          assert 2 == apply(@cache, push, [2, ["foo", "bar"], [level: 2]])
+          assert "bar" == apply(@cache, pop, [2, [level: 2]])
+          refute @l1.get(2)
+          refute @l3.get(2)
+
+          :ok = @cache.flush()
+        end
       end
 
       test "transaction" do

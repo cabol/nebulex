@@ -20,8 +20,8 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   use GenServer
 
-  alias ExShards.Local
   alias Nebulex.Adapters.Local.Metadata
+  alias :shards_local, as: Local
 
   ## API
 

@@ -42,7 +42,7 @@ defmodule Nebulex.Mixfile do
 
   defp deps do
     [
-      {:ex_shards, "~> 0.2"},
+      {:shards, "~> 0.5"},
 
       # Test
       {:excoveralls, "~> 0.6", only: :test},
@@ -83,7 +83,7 @@ defmodule Nebulex.Mixfile do
 
   defp dialyzer do
     [
-      plt_add_apps: [:ex_shards, :mix, :eex],
+      plt_add_apps: [:shards, :mix, :eex],
       flags: [
         :unmatched_returns,
         :error_handling,

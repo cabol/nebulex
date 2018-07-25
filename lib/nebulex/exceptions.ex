@@ -1,4 +1,7 @@
 defmodule Nebulex.ConflictError do
+  @moduledoc """
+  Raised at runtime when there is a object version conflict.
+  """
   defexception [:cached, :version]
 
   @impl true
@@ -9,10 +12,6 @@ defmodule Nebulex.ConflictError do
     Requested version
 
     #{pretty(version)}
-
-    Cached version
-
-    #{pretty(cached.version)}
 
     Cached object
 
@@ -29,6 +28,9 @@ defmodule Nebulex.ConflictError do
 end
 
 defmodule Nebulex.RPCError do
+  @moduledoc """
+  Raised at runtime when RPC call fails.
+  """
   defexception [:reason]
 
   @impl true
