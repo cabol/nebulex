@@ -43,6 +43,18 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
+  Implementation for `Nebulex.Cache.add/3`.
+  """
+  def add(_cache, _key, nil, _opts), do: {:ok, nil}
+
+  def add(cache, key, value, opts) do
+    case cache.__adapter__.add(cache, %Object{key: key, value: value}, opts) do
+      {:ok, object} -> {:ok, validate_return(object, opts)}
+      :error -> :error
+    end
+  end
+
+  @doc """
   Implementation for `Nebulex.Cache.mset/2`.
   """
   def mset(_cache, [], _opts), do: :ok
@@ -100,12 +112,8 @@ defmodule Nebulex.Cache.Object do
   @doc """
   Implementation for `Nebulex.Cache.update_counter/3`.
   """
-  def update_counter(cache, key, incr, opts) when is_integer(incr) do
+  def update_counter(cache, key, incr, opts) do
     cache.__adapter__.update_counter(cache, key, incr, opts)
-  end
-
-  def update_counter(_cache, _key, incr, _opts) do
-    raise ArgumentError, "the incr must be a valid integer, got: #{inspect(incr)}"
   end
 
   ## Private Functions

@@ -36,6 +36,14 @@ defmodule Nebulex.Adapter do
   @callback set(cache, object, opts) :: object | no_return
 
   @doc """
+  Stores the given `value` under `key` in the Cache, only if it does not
+  already exist.
+
+  See `Nebulex.Cache.add/3`.
+  """
+  @callback add(cache, object, opts) :: {:ok, object} | :error
+
+  @doc """
   Returns a map with the objects for all specified keys. For every key that
   does not hold a value or does not exist, the special value `nil` is
   returned.

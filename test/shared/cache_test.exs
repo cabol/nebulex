@@ -28,7 +28,7 @@ defmodule Nebulex.CacheTest do
         assert :a == :a |> @cache.set(1, return: :key) |> @cache.delete(return: :key)
         refute @cache.get(:a)
 
-        assert_raise Nebulex.ConflictError, fn ->
+        assert_raise Nebulex.VersionConflictError, fn ->
           @cache.delete(3, version: -1)
         end
 
@@ -61,7 +61,7 @@ defmodule Nebulex.CacheTest do
 
         assert 1 == @cache.get(1, version: v1)
 
-        assert_raise Nebulex.ConflictError, fn ->
+        assert_raise Nebulex.VersionConflictError, fn ->
           assert @cache.get(1, version: -1)
         end
 
@@ -103,11 +103,11 @@ defmodule Nebulex.CacheTest do
         assert 12 == @cache.set(1, 13, version: -1, on_conflict: :nothing)
         assert 13 == @cache.set(1, 13, version: -1, on_conflict: :override)
 
-        assert_raise Nebulex.ConflictError, fn ->
+        assert_raise Nebulex.VersionConflictError, fn ->
           @cache.set(1, 13, return: :object, version: -1)
         end
 
-        assert_raise Nebulex.ConflictError, fn ->
+        assert_raise Nebulex.VersionConflictError, fn ->
           @cache.set(:a, 1, version: -1)
         end
 
@@ -116,15 +116,31 @@ defmodule Nebulex.CacheTest do
         end
       end
 
+      test "add" do
+        assert {:ok, "bar"} == @cache.add("foo", "bar")
+        assert "bar" == @cache.get("foo")
+        assert :error == @cache.add("foo", "bar")
+        assert {:ok, nil} == @cache.add(:mykey, nil)
+        {:ok, %Object{value: 1}} = @cache.add(1, 1, return: :object)
+
+        assert "world" == @cache.add!("hello", "world")
+
+        message = ~r"key \"hello\" already exists in cache"
+
+        assert_raise Nebulex.KeyAlreadyExistsError, message, fn ->
+          @cache.add!("hello", "world")
+        end
+      end
+
       test "mget" do
-        for parallel <- [false, true] do
+        for in_parallel <- [false, true] do
           assert :ok == @cache.mset(a: 1, c: 3)
 
-          map = @cache.mget([:a, :b, :c], version: -1, parallel: parallel)
+          map = @cache.mget([:a, :b, :c], version: -1, in_parallel: in_parallel)
           assert %{a: 1, c: 3} == map
           refute map[:b]
 
-          map = @cache.mget([:a, :b, :c], return: :object, parallel: parallel)
+          map = @cache.mget([:a, :b, :c], return: :object, in_parallel: in_parallel)
           %{a: %Object{value: 1}, c: %Object{value: 3}} = map
           refute map[:b]
 
@@ -134,22 +150,22 @@ defmodule Nebulex.CacheTest do
       end
 
       test "mset" do
-        for parallel <- [false, true] do
+        for in_parallel <- [false, true] do
           assert :ok ==
                    @cache.mset(
                      for x <- 1..3 do
                        {x, x}
                      end,
                      ttl: 1,
-                     parallel: parallel
+                     in_parallel: in_parallel
                    )
 
           for x <- 1..3, do: assert(x == @cache.get(x))
           _ = :timer.sleep(1200)
           for x <- 1..3, do: refute(@cache.get(x))
 
-          assert :ok == @cache.mset(%{"apples" => 1, "bananas" => 3}, parallel: parallel)
-          assert :ok == @cache.mset([blueberries: 2, strawberries: 5], parallel: parallel)
+          assert :ok == @cache.mset(%{"apples" => 1, "bananas" => 3}, in_parallel: in_parallel)
+          assert :ok == @cache.mset([blueberries: 2, strawberries: 5], in_parallel: in_parallel)
           assert 1 == @cache.get("apples")
           assert 3 == @cache.get("bananas")
           assert 2 == @cache.get(:blueberries)
@@ -185,7 +201,7 @@ defmodule Nebulex.CacheTest do
         assert "world" == @cache.take("hello", version: -1, on_conflict: :override)
         refute @cache.get("hello")
 
-        assert_raise Nebulex.ConflictError, fn ->
+        assert_raise Nebulex.VersionConflictError, fn ->
           :b
           |> @cache.set("hello", return: :key)
           |> @cache.take(version: -1)
@@ -255,7 +271,7 @@ defmodule Nebulex.CacheTest do
         assert "1" ==
                  @cache.update(3, 3, &Integer.to_string/1, version: -1, on_conflict: :override)
 
-        assert_raise Nebulex.ConflictError, fn ->
+        assert_raise Nebulex.VersionConflictError, fn ->
           :a
           |> @cache.set(1, return: :key)
           |> @cache.update(0, &Integer.to_string/1, version: -1)
@@ -313,7 +329,7 @@ defmodule Nebulex.CacheTest do
         assert 5 == @cache.lpush(:lst, [7], version: -1, on_conflict: :override)
         assert [7, "654", 3, 2, 1] == @cache.get(:lst)
 
-        assert_raise Nebulex.ConflictError, fn ->
+        assert_raise Nebulex.VersionConflictError, fn ->
           @cache.lpush(:lst, [7], version: -1)
         end
       end
@@ -352,7 +368,7 @@ defmodule Nebulex.CacheTest do
         assert 2 == @cache.lpop(:lst, version: -1, on_conflict: :override)
         assert [1] == @cache.get(:lst)
 
-        assert_raise Nebulex.ConflictError, fn ->
+        assert_raise Nebulex.VersionConflictError, fn ->
           @cache.lpop(:lst, version: -1)
         end
       end
@@ -372,7 +388,7 @@ defmodule Nebulex.CacheTest do
         assert 2 == @cache.rpop(:lst, version: -1, on_conflict: :override)
         assert [1] == @cache.get(:lst)
 
-        assert_raise Nebulex.ConflictError, fn ->
+        assert_raise Nebulex.VersionConflictError, fn ->
           @cache.rpop(:lst, version: -1)
         end
       end
@@ -388,7 +404,7 @@ defmodule Nebulex.CacheTest do
         assert [5, 4] == @cache.lrange(:lst, 1, 2, version: -1, on_conflict: :nothing)
         assert [5, 4] == @cache.lrange(:lst, 1, 2, version: -1, on_conflict: :override)
 
-        assert_raise Nebulex.ConflictError, fn ->
+        assert_raise Nebulex.VersionConflictError, fn ->
           @cache.lrange(:lst, 1, 2, version: -1)
         end
 
@@ -537,12 +553,12 @@ defmodule Nebulex.CacheTest do
         end)
       end
 
-      test "fail on Nebulex.ConflictError" do
+      test "fail on Nebulex.VersionConflictError" do
         assert 1 == @cache.set(1, 1)
 
         message = ~r"could not perform cache action because versions mismatch."
 
-        assert_raise Nebulex.ConflictError, message, fn ->
+        assert_raise Nebulex.VersionConflictError, message, fn ->
           @cache.set(1, 2, version: -1)
         end
       end

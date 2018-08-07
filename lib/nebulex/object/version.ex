@@ -45,7 +45,7 @@ defmodule Nebulex.Object.Version do
         when object: Nebulex.Object.t()
   def validate!(nil, _cache, _opts), do: {:override, nil}
 
-  def validate!(%Object{key: key} = object, cache, opts) do
+  def validate!(%Object{} = object, cache, opts) do
     opts
     |> Keyword.get(:version)
     |> case do
@@ -56,7 +56,7 @@ defmodule Nebulex.Object.Version do
         # TODO: There is still a race condition between the `get` to retrieve
         # the cached object and the command executed later in the adapter
         cache
-        |> cache.__adapter__.get(key, [])
+        |> maybe_get(object)
         |> on_conflict(vsn, Keyword.get(opts, :on_conflict, :raise))
     end
   end
@@ -67,6 +67,12 @@ defmodule Nebulex.Object.Version do
 
   ## Helpers
 
+  defp maybe_get(cache, %Object{key: key, value: nil}),
+    do: cache.__adapter__.get(cache, key, [])
+
+  defp maybe_get(_cache, %Object{} = object),
+    do: object
+
   defp on_conflict(%Object{version: version} = cached, version, _on_conflict),
     do: {:override, cached}
 
@@ -74,7 +80,7 @@ defmodule Nebulex.Object.Version do
     do: {on_conflict, cached}
 
   defp on_conflict(cached, version, :raise),
-    do: raise(Nebulex.ConflictError, cached: cached, version: version)
+    do: raise(Nebulex.VersionConflictError, cached: cached, version: version)
 
   defp on_conflict(_, _, other),
     do: raise(ArgumentError, "unknown value for :on_conflict, got: #{inspect(other)}")

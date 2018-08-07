@@ -44,6 +44,9 @@ defmodule Nebulex.Adapters.Dist do
       `Nebulex.Adapter.NodePicker`. If this option is not set, the default
       implementation provided by the interface is used.
 
+  Additionally, this adapter supports the option `:in_parallel` for `mget`
+  and `mset` commands. Check `Nebulex.Cache.mset/2` and `Nebulex.Cache.mget/2`.
+
   ## Example
 
   `Nebulex.Cache` is the wrapper around the Cache. We can define the
@@ -197,6 +200,11 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   @impl true
+  def add(cache, object, opts) do
+    call(cache, object.key, :add, [object, opts], opts)
+  end
+
+  @impl true
   def delete(cache, key, opts) do
     call(cache, key, :delete, [key, opts], opts)
   end
@@ -313,7 +321,7 @@ defmodule Nebulex.Adapters.Dist do
 
   defp map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun) do
     opts
-    |> Keyword.get(:parallel)
+    |> Keyword.get(:in_parallel)
     |> case do
       true ->
         parallel_map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun)

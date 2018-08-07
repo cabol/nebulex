@@ -72,7 +72,7 @@ defmodule Nebulex.Adapters.LocalTest do
                on_conflict: :nothing
              )
 
-    assert_raise Nebulex.ConflictError, fn ->
+    assert_raise Nebulex.VersionConflictError, fn ->
       1
       |> TestCache.set(1, return: :key)
       |> TestCache.get_and_update(&{&1, -1}, version: -1)

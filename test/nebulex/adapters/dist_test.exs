@@ -51,20 +51,20 @@ defmodule Nebulex.Adapters.DistTest do
       Dist.get_and_update(1, &Dist.get_and_update_bad_fun/1)
     end
 
-    assert_raise Nebulex.ConflictError, fn ->
+    assert_raise Nebulex.VersionConflictError, fn ->
       1
       |> Dist.set(1, return: :key)
       |> Dist.get_and_update(&Dist.get_and_update_fun/1, version: -1)
     end
   end
 
-  test "mset and mget parallel errors" do
+  test "mset and mget in_parallel errors" do
     {:ok, pid1} = DistMock.start_link()
     {:ok, pid2} = LocalMock.start_link()
 
-    assert 0 == map_size(DistMock.mget([1, 2, 3], parallel: true, timeout: 10))
+    assert 0 == map_size(DistMock.mget([1, 2, 3], in_parallel: true, timeout: 10))
 
-    {:error, err_keys} = DistMock.mset([a: 1, b: 2], parallel: true)
+    {:error, err_keys} = DistMock.mset([a: 1, b: 2], in_parallel: true)
     assert [:a, :b] == :lists.usort(err_keys)
 
     :ok = Enum.each([pid1, pid2], &DistMock.stop/1)

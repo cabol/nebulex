@@ -7,6 +7,9 @@ defmodule LocalBench do
     use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
   end
 
+  @bulk_objs Enum.map(1..1000, &%Nebulex.Object{key: &1, value: &1})
+  @bulk_keys Enum.to_list(1..1000)
+
   setup_all do
     res = Cache.start_link()
     :ok = Enum.each(1..1000, fn x -> Cache.set(x, x) end)
@@ -33,13 +36,33 @@ defmodule LocalBench do
     :ok
   end
 
+  bench "mget" do
+    Cache.mget(@bulk_keys)
+    :ok
+  end
+
   bench "set" do
     Cache.set(bench_context, bench_context)
     :ok
   end
 
+  bench "mset" do
+    Cache.mset(@bulk_objs)
+    :ok
+  end
+
+  bench "add" do
+    Cache.add(bench_context, bench_context)
+    :ok
+  end
+
   bench "delete" do
     Cache.delete(bench_context)
+    :ok
+  end
+
+  bench "take" do
+    Cache.take(bench_context)
     :ok
   end
 
@@ -55,21 +78,6 @@ defmodule LocalBench do
 
   bench "keys" do
     Cache.keys()
-    :ok
-  end
-
-  bench "reduce" do
-    Cache.reduce([], fn r, acc -> [r | acc] end)
-    :ok
-  end
-
-  bench "to_map" do
-    Cache.to_map()
-    :ok
-  end
-
-  bench "pop" do
-    Cache.pop(bench_context)
     :ok
   end
 

@@ -179,7 +179,7 @@ defmodule Nebulex.Adapters.Local do
         # make sure we take the old timestamp since it will get set to
         # the default :infinity otherwise.
         opts = Keyword.put_new(opts, :ttl, diff_epoch(object.ttl))
-        {:halt, {gen, do_set(newer, object, cache, opts)}}
+        {:halt, {gen, local_set(newer, object, cache, opts)}}
       else
         {:cont, {gen, nil}}
       end
@@ -197,7 +197,7 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def set(cache, object, opts) do
-    object
+    object.key
     |> Version.validate!(cache, opts)
     |> maybe_exec(:set, {&do_set/3, [cache, object, opts]})
   end
@@ -207,12 +207,7 @@ defmodule Nebulex.Adapters.Local do
   defp do_set(cache, object, opts) do
     cache.__metadata__.generations
     |> hd()
-    |> do_set(object, cache, opts)
-  end
-
-  defp do_set(generation, object, cache, opts) do
-    [object] = local_set(generation, [object], cache, opts)
-    object
+    |> local_set(object, cache, opts)
   end
 
   @impl true
@@ -224,6 +219,13 @@ defmodule Nebulex.Adapters.Local do
     :ok
   rescue
     _ -> {:error, for(o <- objects, do: o.key)}
+  end
+
+  @impl true
+  def add(cache, object, opts) do
+    cache.__metadata__.generations
+    |> hd()
+    |> local_add(object, cache, opts)
   end
 
   @impl true
@@ -304,33 +306,33 @@ defmodule Nebulex.Adapters.Local do
         do_set(cache, %Object{key: key, value: initial}, opts)
 
       {:override, object} ->
-        value = fun.(object.value)
-        true = do_update(cache, key, value)
-        %{object | value: value}
+        do_update(cache, %{object | value: fun.(object.value)})
     end
   end
 
-  defp do_update(cache, key, value) do
-    cache.__metadata__.generations
-    |> hd()
-    |> Local.update_element(key, {2, value}, cache.__state__)
+  defp do_update(cache, object) do
+    true =
+      cache.__metadata__.generations
+      |> hd()
+      |> Local.update_element(object.key, {2, object.value}, cache.__state__)
+
+    object
   end
 
   @impl true
-  def update_counter(cache, key, incr, opts) do
+  def update_counter(cache, key, incr, opts) when is_integer(incr) do
     ttl =
       opts
       |> Keyword.get(:ttl)
       |> seconds_since_epoch()
 
-    try do
-      cache.__metadata__.generations
-      |> hd()
-      |> Local.update_counter(key, {2, incr}, {key, 0, nil, ttl}, cache.__state__)
-    rescue
-      _exception ->
-        reraise ArgumentError, System.stacktrace()
-    end
+    cache.__metadata__.generations
+    |> hd()
+    |> Local.update_counter(key, {2, incr}, {key, 0, nil, ttl}, cache.__state__)
+  end
+
+  def update_counter(_cache, _key, incr, _opts) do
+    raise ArgumentError, "the incr must be a valid integer, got: #{inspect(incr)}"
   end
 
   @impl true
@@ -507,19 +509,33 @@ defmodule Nebulex.Adapters.Local do
     end
   end
 
-  defp local_set(generation, objects, cache, opts) do
-    objects =
-      objects
+  defp local_set(generation, obj_or_objs, cache, opts) do
+    obj_or_objs =
+      obj_or_objs
       |> set_vsn(cache.__version_generator__)
       |> set_ttl(opts)
 
-    true = Local.insert(generation, to_tuples(objects), cache.__state__)
-    objects
+    true = Local.insert(generation, to_tuples(obj_or_objs), cache.__state__)
+    obj_or_objs
+  end
+
+  defp local_add(generation, object, cache, opts) do
+    object =
+      object
+      |> set_vsn(cache.__version_generator__)
+      |> set_ttl(opts)
+
+    if Local.insert_new(generation, to_tuples(object), cache.__state__),
+      do: {:ok, object},
+      else: :error
   end
 
   defp from_tuple({key, val, vsn, ttl}) do
     %Object{key: key, value: val, version: vsn, ttl: ttl}
   end
+
+  defp to_tuples(%Object{key: key, value: val, version: vsn, ttl: ttl}),
+    do: {key, val, vsn, ttl}
 
   defp to_tuples(objs) do
     for %Object{key: key, value: val, version: vsn, ttl: ttl} <- objs do
@@ -528,9 +544,15 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp set_vsn(objs, nil), do: objs
+  defp set_vsn(%Object{} = obj, versioner), do: versioner.generate(obj)
 
   defp set_vsn(objs, versioner) do
     for obj <- objs, do: versioner.generate(obj)
+  end
+
+  defp set_ttl(%Object{} = obj, opts) do
+    [obj] = set_ttl([obj], opts)
+    obj
   end
 
   defp set_ttl(objs, opts) do
@@ -538,7 +560,7 @@ defmodule Nebulex.Adapters.Local do
     |> Keyword.get(:ttl)
     |> case do
       nil -> objs
-      opt -> for obj <- objs, do: %{obj | ttl: seconds_since_epoch(opt)}
+      ttl -> for obj <- objs, do: %{obj | ttl: seconds_since_epoch(ttl)}
     end
   end
 

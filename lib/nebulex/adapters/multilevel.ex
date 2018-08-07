@@ -241,6 +241,11 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
+  def add(cache, object, opts) do
+    eval(cache, :add, [object, opts], opts)
+  end
+
+  @impl true
   def delete(cache, key, opts) do
     eval(cache, :delete, [key, opts], opts)
   end

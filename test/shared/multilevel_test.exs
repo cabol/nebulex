@@ -65,16 +65,20 @@ defmodule Nebulex.MultilevelTest do
         refute @cache.get("foo")
       end
 
-      test "mget" do
-        assert :ok == @cache.mset(a: 1, c: 3)
+      test "add" do
+        assert {:ok, 1} == @cache.add(1, 1)
+        assert :error == @cache.add(1, 2)
+        assert 1 == @l1.get(1)
+        assert 1 == @l2.get(1)
+        assert 1 == @l3.get(1)
 
-        map = @cache.mget([:a, :b, :c], version: -1)
-        assert %{a: 1, c: 3} == map
-        refute map[:b]
+        assert {:ok, 2} == @cache.add(2, 2, level: 2)
+        assert 2 == @l2.get(2)
+        refute @l1.get(2)
+        refute @l3.get(2)
 
-        map = @cache.mget([:a, :b, :c], return: :object)
-        %{a: %Object{value: 1}, c: %Object{value: 3}} = map
-        refute map[:b]
+        assert {:ok, nil} == @cache.add("foo", nil)
+        refute @cache.get("foo")
       end
 
       test "mset" do
@@ -106,6 +110,18 @@ defmodule Nebulex.MultilevelTest do
           |> @l1.stop()
 
         assert {:error, ["apples"]} == @cache.mset(%{"apples" => 1})
+      end
+
+      test "mget" do
+        assert :ok == @cache.mset(a: 1, c: 3)
+
+        map = @cache.mget([:a, :b, :c], version: -1)
+        assert %{a: 1, c: 3} == map
+        refute map[:b]
+
+        map = @cache.mget([:a, :b, :c], return: :object)
+        %{a: %Object{value: 1}, c: %Object{value: 3}} = map
+        refute map[:b]
       end
 
       test "delete" do
@@ -143,7 +159,7 @@ defmodule Nebulex.MultilevelTest do
           |> @cache.set("hello", return: :key)
           |> @cache.take(return: :object)
 
-        assert_raise Nebulex.ConflictError, fn ->
+        assert_raise Nebulex.VersionConflictError, fn ->
           :b
           |> @cache.set("hello", return: :key)
           |> @cache.take(version: -1)

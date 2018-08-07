@@ -184,6 +184,22 @@ defmodule Nebulex.Cache do
       end
 
       @doc false
+      def add(key, value, opts \\ []) do
+        with_hooks(Nebulex.Cache.Object, :add, [key, value, opts])
+      end
+
+      @doc false
+      def add!(key, value, opts \\ []) do
+        case add(key, value, opts) do
+          {:ok, result} ->
+            result
+
+          :error ->
+            raise Nebulex.KeyAlreadyExistsError, key: key, cache: __MODULE__
+        end
+      end
+
+      @doc false
       def delete(key, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :delete, [key, opts])
       end
@@ -230,17 +246,8 @@ defmodule Nebulex.Cache do
 
       ## Lists
 
-      [
-        lpush: 4,
-        rpush: 4,
-        lpop: 3,
-        rpop: 3,
-        lrange: 5
-      ]
-      |> Enum.reduce(
-        true,
-        &Kernel.and(function_exported?(@adapter, elem(&1, 0), elem(&1, 1)), &2)
-      )
+      Nebulex.Cache.List.__api__()
+      |> Enum.all?(&function_exported?(@adapter, elem(&1, 0), elem(&1, 1)))
       |> if do
         @doc false
         def lpush(key, value, opts \\ []) do
@@ -435,13 +442,37 @@ defmodule Nebulex.Cache do
   @callback get!(key, opts) :: return | no_return
 
   @doc """
+  Returns a map with the values or objects (check `:return` option) for all
+  specified keys. For every key that does not hold a value or does not exist,
+  the special value `nil` is returned. Because of this, the operation never
+  fails.
+
+  ## Options
+
+  Besides the "Shared options" section at the module documentation,
+  it accepts:
+
+    * `:in_parallel` - If the `mget` must be done in parallel. This
+      option is optional, it might be implemented by the adapter
+      or not (check adapter documentation). Default to `false`.
+
+  For bulk operations like `mget`, the option `:version` is ignored.
+
+  ## Example
+
+      :ok = MyCache.mset([a: 1, c: 3])
+
+      %{a: 1, b: nil, c: 3} = MyCache.mget([:a, :b, :c])
+  """
+  @callback mget([key], opts) :: map
+
+  @doc """
   Sets the given `value` under `key` in the Cache.
 
   It returns `value` or `Nebulex.Object.t()` (depends on `:return` option)
   if the value has been successfully inserted.
 
-  If the given `value` is `nil`, it is not stored in the cache and `nil` is
-  returned.
+  If `value` is `nil`, then it is not cached and `nil` is returned instead.
 
   ## Options
 
@@ -493,26 +524,6 @@ defmodule Nebulex.Cache do
   @callback set(key, value, opts) :: return | no_return
 
   @doc """
-  Returns a map with the values or objects (check `:return` option) for all
-  specified keys. For every key that does not hold a value or does not exist,
-  the special value `nil` is returned. Because of this, the operation never
-  fails.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation.
-
-  For bulk operations like `mget` or `mset`, the option `:version` is ignored.
-
-  ## Example
-
-      :ok = MyCache.mset([a: 1, c: 3])
-
-      %{a: 1, b: nil, c: 3} = MyCache.mget([:a, :b, :c])
-  """
-  @callback mget([key], opts) :: map
-
-  @doc """
   Sets the given `entries`, replacing existing ones, just as regular `set`.
 
   Returns `:ok` if the all the objects were successfully set, otherwise
@@ -526,9 +537,14 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-  See the "Shared options" section at the module documentation.
+  Besides the "Shared options" section at the module documentation,
+  it accepts:
 
-  For bulk operations like `mget` or `mset`, the option `:version` is ignored.
+    * `:in_parallel` - If the `mset` must be done in parallel. This
+      option is optional, it might be implemented by the adapter
+      or not (check adapter documentation). Default to `false`.
+
+  For bulk operations like `mset`, the option `:version` is ignored.
 
   ## Example
 
@@ -537,6 +553,46 @@ defmodule Nebulex.Cache do
       {:error, [:a, :b]} = MyCache.mset([a: 1, b: 2, c: 3], ttl: 1000)
   """
   @callback mset(entries, opts) :: :ok | {:error, failed_keys :: [key]}
+
+  @doc """
+  Stores the given `value` under `key` in the Cache, only if it does not
+  already exist.
+
+  It returns `value` or `Nebulex.Object.t()` (depends on `:return` option)
+  if the value has been successfully inserted.
+
+  If `value` is `nil`, then it is not cached and `nil` is returned instead.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
+
+  For `add` operation, the option `:version` is ignored.
+
+  ## Example
+
+      {ok, "bar"} = MyCache.add "foo", "bar"
+
+      :error = MyCache.add "foo", "bar"
+
+      # if the value is nil, it is not stored (operation is skipped)
+      {ok, nil} = MyCache.add "foo", nil
+  """
+  @callback add(key, value, opts) :: {:ok, return} | :error
+
+  @doc """
+  Similar to `add/3` but raises `Nebulex.KeyAlreadyExistsError` if the
+  key already exists.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
+
+  ## Example
+
+      MyCache.add! "foo", "bar"
+  """
+  @callback add!(key, value, opts) :: return | no_return
 
   @doc """
   Deletes the cached entry in for a specific `key`.
