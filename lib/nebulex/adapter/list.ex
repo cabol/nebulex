@@ -1,6 +1,6 @@
 defmodule Nebulex.Adapter.List do
   @moduledoc """
-  Specifies the adapter lists API.
+  Lists API.
 
   This API is based on Redis Lists API.
   """

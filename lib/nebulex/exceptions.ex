@@ -39,19 +39,3 @@ defmodule Nebulex.KeyAlreadyExistsError do
     "key #{inspect(key)} already exists in cache #{inspect(cache)}"
   end
 end
-
-defmodule Nebulex.RPCError do
-  @moduledoc """
-  Raised at runtime when RPC call fails.
-  """
-  defexception [:reason]
-
-  @impl true
-  def message(%{reason: reason}) do
-    """
-    the remote procedure call failed with reason:
-
-    #{inspect(reason, pretty: true)}
-    """
-  end
-end

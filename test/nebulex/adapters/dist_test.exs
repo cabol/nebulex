@@ -58,13 +58,13 @@ defmodule Nebulex.Adapters.DistTest do
     end
   end
 
-  test "mset and mget in_parallel errors" do
+  test "mset and mget errors" do
     {:ok, pid1} = DistMock.start_link()
     {:ok, pid2} = LocalMock.start_link()
 
-    assert 0 == map_size(DistMock.mget([1, 2, 3], in_parallel: true, timeout: 10))
+    assert 0 == map_size(DistMock.mget([1, 2, 3], timeout: 10))
 
-    {:error, err_keys} = DistMock.mset([a: 1, b: 2], in_parallel: true)
+    {:error, err_keys} = DistMock.mset(a: 1, b: 2)
     assert [:a, :b] == :lists.usort(err_keys)
 
     :ok = Enum.each([pid1, pid2], &DistMock.stop/1)
@@ -81,22 +81,14 @@ defmodule Nebulex.Adapters.DistTest do
     assert 44 == Dist.get(4)
     assert 2 == Dist.get(2)
 
-    assert_raise UndefinedFunctionError, fn ->
+    assert_raise ArgumentError, fn ->
       Dist.get(1)
     end
   end
 
-  test "remote procedure call exception" do
-    {:ok, pid1} = DistMock.start_link()
-    {:ok, pid2} = LocalMock.start_link()
-
-    message = ~r"the remote procedure call failed with reason:"
-
-    assert_raise Nebulex.RPCError, message, fn ->
-      DistMock.get(1, timeout: 10)
-    end
-
-    :ok = Enum.each([pid1, pid2], &DistMock.stop/1)
+  test "rpc timeout" do
+    {:timeout, _} =
+      catch_exit(Dist.get_and_update(1, &Dist.get_and_update_timeout_fun/1, timeout: 10))
   end
 
   ## Private Functions

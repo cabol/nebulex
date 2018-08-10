@@ -444,17 +444,11 @@ defmodule Nebulex.Cache do
   @doc """
   Returns a map with the values or objects (check `:return` option) for all
   specified keys. For every key that does not hold a value or does not exist,
-  the special value `nil` is returned. Because of this, the operation never
-  fails.
+  that key is simply ignored. Because of this, the operation never fails.
 
   ## Options
 
-  Besides the "Shared options" section at the module documentation,
-  it accepts:
-
-    * `:in_parallel` - If the `mget` must be done in parallel. This
-      option is optional, it might be implemented by the adapter
-      or not (check adapter documentation). Default to `false`.
+  See the "Shared options" section at the module documentation.
 
   For bulk operations like `mget`, the option `:version` is ignored.
 
@@ -462,7 +456,7 @@ defmodule Nebulex.Cache do
 
       :ok = MyCache.mset([a: 1, c: 3])
 
-      %{a: 1, b: nil, c: 3} = MyCache.mget([:a, :b, :c])
+      %{a: 1, c: 3} = MyCache.mget([:a, :b, :c])
   """
   @callback mget([key], opts) :: map
 
@@ -537,12 +531,7 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-  Besides the "Shared options" section at the module documentation,
-  it accepts:
-
-    * `:in_parallel` - If the `mset` must be done in parallel. This
-      option is optional, it might be implemented by the adapter
-      or not (check adapter documentation). Default to `false`.
+  See the "Shared options" section at the module documentation.
 
   For bulk operations like `mset`, the option `:version` is ignored.
 
@@ -958,6 +947,14 @@ defmodule Nebulex.Cache do
         MyCache.set(:alice, %{alice | balance: alice.balance + 100})
         MyCache.set(:bob, %{bob | balance: bob.balance + 100})
       end
+
+      # locking only the involved key (recommended):
+      MyCache.transaction fn ->
+        alice = MyCache.get(:alice)
+        bob = MyCache.get(:bob)
+        MyCache.set(:alice, %{alice | balance: alice.balance + 100})
+        MyCache.set(:bob, %{bob | balance: bob.balance + 100})
+      end, keys: [:alice, :bob]
   """
   @callback transaction(function :: fun, opts) :: any
 

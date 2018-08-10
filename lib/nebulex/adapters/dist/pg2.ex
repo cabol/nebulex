@@ -1,5 +1,5 @@
 defmodule Nebulex.Adapters.Dist.PG2 do
-  # The module invoked by cache modules for
+  # The module invoked by cache adapters for
   # distributed caching related functionality.
   @moduledoc false
 

@@ -19,7 +19,7 @@ defmodule Nebulex.Adapter do
   @doc """
   Initializes the adapter supervision tree by returning the children
   """
-  @callback init(cache, opts) :: {:ok, [:supervisor.child_spec()]}
+  @callback init(cache, opts) :: {:ok, [:supervisor.child_spec() | {module(), term()} | module()]}
 
   @doc """
   Retrieves a single object from cache.

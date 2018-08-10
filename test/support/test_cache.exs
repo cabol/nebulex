@@ -137,6 +137,8 @@ defmodule Nebulex.TestCache do
 
     def get_and_update_bad_fun(_), do: :other
 
+    def get_and_update_timeout_fun(_), do: :timer.sleep(5000)
+
     def update_fun(nil), do: 1
     def update_fun(current) when is_integer(current), do: current * 2
   end

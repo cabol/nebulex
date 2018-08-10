@@ -44,8 +44,17 @@ defmodule Nebulex.Adapters.Dist do
       `Nebulex.Adapter.NodePicker`. If this option is not set, the default
       implementation provided by the interface is used.
 
-  Additionally, this adapter supports the option `:in_parallel` for `mget`
-  and `mset` commands. Check `Nebulex.Cache.mset/2` and `Nebulex.Cache.mget/2`.
+  ## Runtime options
+
+  These options apply to all adapter's functions.
+
+    * `:timeout` - The time-out value in milliseconds for the command that
+      will be executed. If the timeout is exceeded, then the current process
+      will exit. This adapter uses `Task.await/2` internally, therefore,
+      check the function documentation to learn more about it. For bulk
+      commands like `mset` and `mget`, if the timeout is exceeded, the task
+      is shutted down but the current process doesn't exit, only the result
+      associated to that task is just skipped in the reduce phase.
 
   ## Example
 
@@ -114,6 +123,7 @@ defmodule Nebulex.Adapters.Dist do
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.List
 
+  alias Nebulex.Adapters.Dist.RPC
   alias Nebulex.Object
 
   ## Adapter Impl
@@ -123,6 +133,7 @@ defmodule Nebulex.Adapters.Dist do
     otp_app = Module.get_attribute(env.module, :otp_app)
     config = Module.get_attribute(env.module, :config)
     node_picker = Keyword.get(config, :node_picker, __MODULE__)
+    task_supervisor = Module.concat([env.module, TaskSupervisor])
 
     unless local = Keyword.get(config, :local) do
       raise ArgumentError,
@@ -136,11 +147,11 @@ defmodule Nebulex.Adapters.Dist do
 
       def __local__, do: unquote(local)
 
+      def __task_sup__, do: unquote(task_supervisor)
+
       def nodes, do: PG2.get_nodes(__MODULE__)
 
-      def pick_node(key) do
-        unquote(node_picker).pick_node(nodes(), key)
-      end
+      def pick_node(key), do: unquote(node_picker).pick_node(nodes(), key)
 
       def new_generation(opts \\ []) do
         {res, _} = :rpc.multicall(nodes(), Generation, :new, [unquote(local), opts])
@@ -157,7 +168,9 @@ defmodule Nebulex.Adapters.Dist do
   ## Adapter
 
   @impl true
-  def init(_cache, _opts), do: {:ok, []}
+  def init(cache, _opts) do
+    {:ok, [{Task.Supervisor, name: cache.__task_sup__}]}
+  end
 
   @impl true
   def get(cache, key, opts) do
@@ -238,7 +251,7 @@ defmodule Nebulex.Adapters.Dist do
   def size(cache) do
     Enum.reduce(cache.nodes, 0, fn node, acc ->
       node
-      |> rpc_call(cache.__local__.__adapter__, :size, [cache.__local__])
+      |> rpc_call(cache, :size, [])
       |> Kernel.+(acc)
     end)
   end
@@ -246,7 +259,7 @@ defmodule Nebulex.Adapters.Dist do
   @impl true
   def flush(cache) do
     Enum.each(cache.nodes, fn node ->
-      rpc_call(node, cache.__local__.__adapter__, :flush, [cache.__local__])
+      rpc_call(node, cache, :flush, [])
     end)
   end
 
@@ -254,7 +267,7 @@ defmodule Nebulex.Adapters.Dist do
   def keys(cache) do
     cache.nodes
     |> Enum.reduce([], fn node, acc ->
-      rpc_call(node, cache.__local__.__adapter__, :keys, [cache.__local__]) ++ acc
+      rpc_call(node, cache, :keys, []) ++ acc
     end)
     |> :lists.usort()
   end
@@ -291,19 +304,21 @@ defmodule Nebulex.Adapters.Dist do
   defp call(cache, key, fun, args, opts \\ []) do
     key
     |> cache.pick_node()
-    |> rpc_call(cache.__local__.__adapter__, fun, [cache.__local__ | args], opts)
+    |> rpc_call(cache, fun, args, opts)
   end
 
-  defp rpc_call(node, mod, fun, args, opts \\ []) do
-    case :rpc.call(node, mod, fun, args, opts[:timeout] || :infinity) do
-      {:badrpc, {:EXIT, {remote_ex, _}}} ->
-        raise remote_ex
-
-      {:badrpc, reason} ->
-        raise Nebulex.RPCError, reason: reason
-
-      response ->
-        response
+  defp rpc_call(node, cache, fun, args, opts \\ []) do
+    node
+    |> RPC.call(
+      cache.__local__.__adapter__,
+      fun,
+      [cache.__local__ | args],
+      cache.__task_sup__,
+      Keyword.get(opts, :timeout, 5000)
+    )
+    |> case do
+      {:badrpc, remote_ex} -> raise remote_ex
+      response -> response
     end
   end
 
@@ -320,40 +335,16 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   defp map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun) do
-    opts
-    |> Keyword.get(:in_parallel)
-    |> case do
-      true ->
-        parallel_map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun)
-
-      _ ->
-        seq_map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun)
-    end
-  end
-
-  defp seq_map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun) do
-    enum
-    |> group_keys_by_node(cache)
-    |> Enum.reduce(reduce_acc, fn {node, group}, acc ->
-      node
-      |> rpc_call(cache.__local__.__adapter__, action, [cache.__local__, group, opts])
-      |> reduce_fun.(group, acc)
-    end)
-  end
-
-  defp parallel_map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun) do
     groups = group_keys_by_node(enum, cache)
 
     tasks =
       for {node, group} <- groups do
-        Task.async(fn ->
-          rpc_call(
-            node,
-            cache.__local__.__adapter__,
-            action,
-            [cache.__local__, group, opts]
-          )
-        end)
+        Task.Supervisor.async(
+          {cache.__task_sup__, node},
+          cache.__local__.__adapter__,
+          action,
+          [cache.__local__, group, opts]
+        )
       end
 
     tasks

@@ -370,6 +370,19 @@ def start(_type, _args) do
 
 Now we are ready to start using our distributed cache!
 
+### Timeout option
+
+The `Nebulex.Adapters.Dist` supports `:timeout` option, it is a value in
+milliseconds for the command that will be executed.
+
+```elixir
+DistCache.get("foo", timeout: 10)
+
+# if the timeout is exceeded, then the current process will exit
+DistCache.set("foo", "bar", timeout: 10)
+# ** (EXIT) time out
+```
+
 To learn more about how distributed cache works, please check
 `Nebulex.Adapters.Dist` documentation, and also it is recommended see the
 [partitioned cache example](https://github.com/cabol/nebulex_examples/tree/master/partitioned_cache)

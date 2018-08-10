@@ -6,7 +6,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
 [![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
 
-Nebulex is an in-process and distributed caching solution with a set of useful
+Nebulex is an in-process and distributed caching library with a set of useful
 features such as:
 
   * Highly inspired by [Ecto][ecto]; simple and fluent API, flexible and
@@ -92,13 +92,13 @@ defmodule MyApp.Cache do
 Testing by default spawns nodes internally for distributed tests.
 To run tests that do not require clustering, exclude  the `clustered` tag:
 
-```shell
+```
 $ mix test --exclude clustered
 ```
 
 If you have issues running the clustered tests try running:
 
-```shell
+```
 $ epmd -daemon
 ```
 
