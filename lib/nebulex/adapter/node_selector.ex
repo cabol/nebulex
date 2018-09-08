@@ -1,21 +1,21 @@
-defmodule Nebulex.Adapter.NodePicker do
+defmodule Nebulex.Adapter.NodeSelector do
   @moduledoc """
-  Node Picker Interface.
+  Node Selector Interface.
 
   The purpose of this module is to allow users implement a custom
-  node picker/selector to distribute keys. This interface is used
-  to cherry-pick the node where is supposed the given key remains
-  and then be able to execute the requested operation.
+  node selector to distribute keys. This interface is used to
+  select the node where is supposed the given key remains and
+  then be able to execute the requested operation.
 
-  To implement `pick_node/2` function, it is highly recommended to use a
+  To implement `get_node/2` function, it is highly recommended to use a
   **Consistent Hashing** algorithm.
 
   ## Example
 
-      defmodule MyApp.MyNodePicker do
-        @behaviour Nebulex.Adapter.NodePicker
+      defmodule MyApp.MyNodeSelector do
+        @behaviour Nebulex.Adapter.NodeSelector
 
-        def pick_node(nodes, key) do
+        def get_node(nodes, key) do
           key
           |> :erlang.phash2()
           |> :jchash.compute(length(nodes))
@@ -30,17 +30,17 @@ defmodule Nebulex.Adapter.NodePicker do
   @doc false
   defmacro __using__(_opts) do
     quote do
-      @behaviour Nebulex.Adapter.NodePicker
+      @behaviour Nebulex.Adapter.NodeSelector
 
       @doc false
-      def pick_node(nodes, key) do
+      def get_node(nodes, key) do
         key
         |> :erlang.phash2(length(nodes))
         |> Kernel.+(1)
         |> :lists.nth(nodes)
       end
 
-      defoverridable pick_node: 2
+      defoverridable get_node: 2
     end
   end
 
@@ -52,7 +52,7 @@ defmodule Nebulex.Adapter.NodePicker do
 
   ## Example
 
-      pick_node([:node1, :node2, :node2], "mykey")
+      MyNodeSelector.get_node([:node1, :node2, :node2], "mykey")
   """
-  @callback pick_node(nodes :: [node], key :: any) :: node
+  @callback get_node(nodes :: [node], key :: any) :: node
 end

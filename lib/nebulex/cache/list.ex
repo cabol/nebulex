@@ -1,17 +1,6 @@
 defmodule Nebulex.Cache.List do
   @moduledoc false
 
-  @doc false
-  def __api__ do
-    [
-      lpush: 4,
-      rpush: 4,
-      lpop: 3,
-      rpop: 3,
-      lrange: 5
-    ]
-  end
-
   @doc """
   Implementation for `Nebulex.Cache.lpush/3`.
   """

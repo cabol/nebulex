@@ -78,7 +78,7 @@ defmodule Nebulex do
 
         def get(token) do
           case Cache.get(token) do
-            nil  -> {:error, :not_found}
+            nil -> {:error, :not_found}
             user -> {:ok, user}
           end
         end
@@ -94,8 +94,8 @@ defmodule Nebulex do
 
   `Nebulex.Object` is the struct used by the caches to store and retrieve data.
 
-  By default, when you execute some operation (set, get, delete, etc.) over a
-  cache entry, the cache returns only the value of that entry, but you can ask
+  By default, when we perform an action (set, get, delete, etc.) on a cache
+  entry, the cache returns only the value of that entry, but you can ask
   for return the whole object:
 
       iex> MyCache.set "foo", "bar", return: :object

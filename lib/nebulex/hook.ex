@@ -68,11 +68,11 @@ defmodule Nebulex.Hook do
                 result
             end
 
-          [pre_hook]
+          {:async, [pre_hook]}
         end
       end
   """
-  @callback pre_hooks() :: [hook_fun]
+  @callback pre_hooks() :: {mode, [hook_fun]}
 
   @doc """
   Returns a list of hook functions that will be executed after invoke the
@@ -84,7 +84,7 @@ defmodule Nebulex.Hook do
         use Nebulex.Cache, adapter: Nebulex.Adapters.Local
 
         def post_hooks do
-          [&post_hook/2]
+          {:pipe, [&post_hook/2]}
         end
 
         def post_hook(result, {_, :set, _} = call) do
@@ -96,15 +96,15 @@ defmodule Nebulex.Hook do
         end
       end
   """
-  @callback post_hooks() :: [hook_fun]
+  @callback post_hooks() :: {mode, [hook_fun]}
 
   @doc """
   Evaluates the `hooks` according to the given execution `mode`.
   """
-  @spec eval(hooks :: [hook_fun], mode, command, result :: any) :: any
-  def eval([], _mode, _command, result), do: result
+  @spec eval({mode, hooks :: [hook_fun]}, command, result :: any) :: any
+  def eval({_mode, []}, _command, result), do: result
 
-  def eval(hooks, mode, {_cache, _action, _args} = command, result) do
+  def eval({mode, hooks}, {_cache, _action, _args} = command, result) do
     Enum.reduce(hooks, result, fn
       hook, acc when is_function(hook, 2) and mode == :pipe ->
         hook.(acc, command)

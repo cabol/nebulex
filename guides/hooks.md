@@ -6,7 +6,7 @@ dangerous at the same time, so you have to be careful.
 
 When we define a cache, we are able to override `pre_hooks/0` and `post_hooks/0`
 functions by providing ours; these callbacks are defined by `Nebulex.Cache.Hook`
-behaviour. Let's check the example just below in order to understand better
+behaviour. Let's check out the example just below in order to understand better
 how it works.
 
 ## Logging Hooks Example
@@ -30,7 +30,7 @@ defmodule MyApp.Cache do
         Logger.debug "PRE: #{inspect call} ==> #{inspect result}"
       end
 
-    [log]
+    {:async, [log]}
   end
 
   def post_hooks do
@@ -39,7 +39,7 @@ defmodule MyApp.Cache do
         Logger.debug "POST: #{inspect call} ==> #{inspect result}"
       end
 
-    [log]
+    {:pipe, [log]}
   end
 end
 ```
@@ -72,8 +72,8 @@ See how our hooks are logging all cache calls!
 It is possible to configure the strategy how the hooks are evaluated,
 the available strategies are:
 
-  * `:async` - (the default) all hooks are evaluated asynchronously
-    (in parallel) and their results are ignored.
+  * `:async` - all hooks are evaluated asynchronously (in parallel) and their
+    results are ignored.
 
   * `:sync` - hooks are evaluated synchronously (sequentially) and their
     results are ignored.
@@ -89,9 +89,7 @@ For example:
 ```elixir
 config :my_app, MyApp.MyCache,
   adapter: Nebulex.Adapters.Local,
-  n_shards: 2,
-  pre_hooks_mode: :async,
-  post_hooks_mode: :pipe
+  n_shards: 2
 ```
 
 You have to be careful with `:pipe` option, because the result of the hook is

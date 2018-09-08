@@ -36,23 +36,18 @@ defmodule LocalBench do
     :ok
   end
 
-  bench "mget" do
-    Cache.mget(@bulk_keys)
-    :ok
-  end
-
   bench "set" do
     Cache.set(bench_context, bench_context)
     :ok
   end
 
-  bench "mset" do
-    Cache.mset(@bulk_objs)
+  bench "add" do
+    Cache.add(bench_context, bench_context)
     :ok
   end
 
-  bench "add" do
-    Cache.add(bench_context, bench_context)
+  bench "replace" do
+    Cache.replace(bench_context, bench_context)
     :ok
   end
 
@@ -96,6 +91,16 @@ defmodule LocalBench do
 
   bench "update_counter" do
     Cache.update_counter(bench_context, 1)
+    :ok
+  end
+
+  bench "mget" do
+    Cache.mget(@bulk_keys)
+    :ok
+  end
+
+  bench "mset" do
+    Cache.mset(@bulk_objs)
     :ok
   end
 

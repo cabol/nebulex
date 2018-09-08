@@ -26,7 +26,7 @@ defmodule Nebulex.Adapters.Dist do
   ## Features
 
     * Support for Distributed Cache
-    * Support for Sharding; handled by `Nebulex.Adapter.NodePicker`
+    * Support for Sharding; handled by `Nebulex.Adapter.NodeSelector`
     * Support for transactions via Erlang global name registration facility
 
   ## Options
@@ -40,8 +40,8 @@ defmodule Nebulex.Adapters.Dist do
       `Nebulex.Adapters.Local`, unless you want to provide a custom local
       cache adapter.
 
-    * `:node_picker` - The module that implements the node picker interface
-      `Nebulex.Adapter.NodePicker`. If this option is not set, the default
+    * `:node_selector` - The module that implements the node picker interface
+      `Nebulex.Adapter.NodeSelector`. If this option is not set, the default
       implementation provided by the interface is used.
 
   ## Runtime options
@@ -85,42 +85,41 @@ defmodule Nebulex.Adapters.Dist do
 
   This adapter provides some additional functions to the `Nebulex.Cache` API.
 
-  ### `pick_node/1`
+  ### `__local__`
 
-  This function invokes `Nebulex.Adapter.NodePicker.pick_node/2` internally.
+  Returns the local cache adapter (the local backend).
 
-      MyCache.pick_node("mykey")
+  ### `get_node/1`
 
-  ### `nodes/0`
+  This function invokes `Nebulex.Adapter.NodeSelector.get_node/2` internally.
+
+      MyCache.get_node("mykey")
+
+  ### `get_nodes/0`
 
   Returns the nodes that belongs to the caller Cache.
 
-      MyCache.nodes()
-
-  ### `new_generation/1`
-
-  Creates a new generation in all nodes that belongs to the caller Cache.
-
-      MyCache.new_generation()
+      MyCache.get_nodes()
 
   ## Limitations
 
-  This adapter has some limitation for two functions: `get_and_update/4` and
-  `update/5`. They both have a parameter that is an anonymous function, and
-  the anonymous function is compiled into the module where it was created,
+  This adapter has a limitation for two functions: `get_and_update/4` and
+  `update/5`. They both have a parameter that is the anonymous function,
+  and the anonymous function is compiled into the module where it is created,
   which means it necessarily doesn't exists on remote nodes. To ensure they
   work as expected, you must provide functions from modules existing in all
   nodes of the group.
   """
 
-  # Inherit default node picker function
-  use Nebulex.Adapter.NodePicker
+  # Inherit default node selector function
+  use Nebulex.Adapter.NodeSelector
 
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Multi
   @behaviour Nebulex.Adapter.List
 
   alias Nebulex.Adapters.Dist.RPC
@@ -132,7 +131,7 @@ defmodule Nebulex.Adapters.Dist do
   defmacro __before_compile__(env) do
     otp_app = Module.get_attribute(env.module, :otp_app)
     config = Module.get_attribute(env.module, :config)
-    node_picker = Keyword.get(config, :node_picker, __MODULE__)
+    node_selector = Keyword.get(config, :node_selector, __MODULE__)
     task_supervisor = Module.concat([env.module, TaskSupervisor])
 
     unless local = Keyword.get(config, :local) do
@@ -142,24 +141,23 @@ defmodule Nebulex.Adapters.Dist do
     end
 
     quote do
-      alias Nebulex.Adapters.Dist.PG2
+      alias Nebulex.Adapters.Dist.Cluster
       alias Nebulex.Adapters.Local.Generation
 
       def __local__, do: unquote(local)
 
       def __task_sup__, do: unquote(task_supervisor)
 
-      def nodes, do: PG2.get_nodes(__MODULE__)
+      def get_nodes do
+        Cluster.get_nodes(__MODULE__)
+      end
 
-      def pick_node(key), do: unquote(node_picker).pick_node(nodes(), key)
-
-      def new_generation(opts \\ []) do
-        {res, _} = :rpc.multicall(nodes(), Generation, :new, [unquote(local), opts])
-        res
+      def get_node(key) do
+        unquote(node_selector).get_node(get_nodes(), key)
       end
 
       def init(config) do
-        :ok = PG2.join(__MODULE__)
+        :ok = Cluster.join(__MODULE__)
         {:ok, config}
       end
     end
@@ -178,6 +176,58 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   @impl true
+  def set(cache, object, opts) do
+    call(cache, object.key, :set, [object, opts], opts)
+  end
+
+  @impl true
+  def delete(cache, key, opts) do
+    call(cache, key, :delete, [key, opts], opts)
+  end
+
+  @impl true
+  def take(cache, key, opts) do
+    call(cache, key, :take, [key, opts], opts)
+  end
+
+  @impl true
+  def has_key?(cache, key) do
+    call(cache, key, :has_key?, [key])
+  end
+
+  @impl true
+  def update_counter(cache, key, incr, opts) do
+    call(cache, key, :update_counter, [key, incr, opts], opts)
+  end
+
+  @impl true
+  def size(cache) do
+    Enum.reduce(cache.get_nodes(), 0, fn node, acc ->
+      node
+      |> rpc_call(cache, :size, [])
+      |> Kernel.+(acc)
+    end)
+  end
+
+  @impl true
+  def flush(cache) do
+    Enum.each(cache.get_nodes(), fn node ->
+      rpc_call(node, cache, :flush, [])
+    end)
+  end
+
+  @impl true
+  def keys(cache, opts) do
+    cache.get_nodes()
+    |> Enum.reduce([], fn node, acc ->
+      rpc_call(node, cache, :keys, [opts], opts) ++ acc
+    end)
+    |> :lists.usort()
+  end
+
+  ## Multi
+
+  @impl true
   def mget(cache, keys, opts) do
     map_reduce(keys, cache, :mget, opts, %{}, fn
       res, _, acc when is_map(res) ->
@@ -186,11 +236,6 @@ defmodule Nebulex.Adapters.Dist do
       _, _, acc ->
         acc
     end)
-  end
-
-  @impl true
-  def set(cache, object, opts) do
-    call(cache, object.key, :set, [object, opts], opts)
   end
 
   @impl true
@@ -210,66 +255,6 @@ defmodule Nebulex.Adapters.Dist do
       [] -> :ok
       acc -> {:error, acc}
     end
-  end
-
-  @impl true
-  def add(cache, object, opts) do
-    call(cache, object.key, :add, [object, opts], opts)
-  end
-
-  @impl true
-  def delete(cache, key, opts) do
-    call(cache, key, :delete, [key, opts], opts)
-  end
-
-  @impl true
-  def take(cache, key, opts) do
-    call(cache, key, :take, [key, opts], opts)
-  end
-
-  @impl true
-  def has_key?(cache, key) do
-    call(cache, key, :has_key?, [key])
-  end
-
-  @impl true
-  def get_and_update(cache, key, fun, opts) do
-    call(cache, key, :get_and_update, [key, fun, opts], opts)
-  end
-
-  @impl true
-  def update(cache, key, initial, fun, opts) do
-    call(cache, key, :update, [key, initial, fun, opts], opts)
-  end
-
-  @impl true
-  def update_counter(cache, key, incr, opts) do
-    call(cache, key, :update_counter, [key, incr, opts], opts)
-  end
-
-  @impl true
-  def size(cache) do
-    Enum.reduce(cache.nodes, 0, fn node, acc ->
-      node
-      |> rpc_call(cache, :size, [])
-      |> Kernel.+(acc)
-    end)
-  end
-
-  @impl true
-  def flush(cache) do
-    Enum.each(cache.nodes, fn node ->
-      rpc_call(node, cache, :flush, [])
-    end)
-  end
-
-  @impl true
-  def keys(cache) do
-    cache.nodes
-    |> Enum.reduce([], fn node, acc ->
-      rpc_call(node, cache, :keys, []) ++ acc
-    end)
-    |> :lists.usort()
   end
 
   ## Lists
@@ -303,7 +288,7 @@ defmodule Nebulex.Adapters.Dist do
 
   defp call(cache, key, fun, args, opts \\ []) do
     key
-    |> cache.pick_node()
+    |> cache.get_node()
     |> rpc_call(cache, fun, args, opts)
   end
 
@@ -325,11 +310,11 @@ defmodule Nebulex.Adapters.Dist do
   defp group_keys_by_node(objs_or_keys, cache) do
     Enum.reduce(objs_or_keys, %{}, fn
       %Object{} = obj, acc ->
-        node = cache.pick_node(obj.key)
+        node = cache.get_node(obj.key)
         Map.put(acc, node, [obj | Map.get(acc, node, [])])
 
       key, acc ->
-        node = cache.pick_node(key)
+        node = cache.get_node(key)
         Map.put(acc, node, [key | Map.get(acc, node, [])])
     end)
   end

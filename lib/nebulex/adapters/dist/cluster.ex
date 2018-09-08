@@ -1,4 +1,4 @@
-defmodule Nebulex.Adapters.Dist.PG2 do
+defmodule Nebulex.Adapters.Dist.Cluster do
   # The module invoked by cache adapters for
   # distributed caching related functionality.
   @moduledoc false

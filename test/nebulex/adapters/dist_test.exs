@@ -2,7 +2,7 @@ defmodule Nebulex.Adapters.DistTest do
   use Nebulex.NodeCase
   use Nebulex.CacheTest, cache: Nebulex.TestCache.Dist
 
-  alias Nebulex.Adapters.Dist.PG2
+  alias Nebulex.Adapters.Dist.Cluster
   alias Nebulex.TestCache.{Dist, DistLocal, DistMock, LocalMock}
 
   @primary :"primary@127.0.0.1"
@@ -33,10 +33,10 @@ defmodule Nebulex.Adapters.DistTest do
   test "check cluster nodes" do
     assert @primary == node()
     assert @cluster -- [node()] == :lists.usort(Node.list())
-    assert @cluster == Dist.nodes()
+    assert @cluster == Dist.get_nodes()
 
-    :ok = PG2.leave(Dist)
-    assert @cluster -- [node()] == Dist.nodes()
+    :ok = Cluster.leave(Dist)
+    assert @cluster -- [node()] == Dist.get_nodes()
   end
 
   test "get_and_update" do
@@ -87,14 +87,14 @@ defmodule Nebulex.Adapters.DistTest do
   end
 
   test "rpc timeout" do
-    {:timeout, _} =
-      catch_exit(Dist.get_and_update(1, &Dist.get_and_update_timeout_fun/1, timeout: 10))
+    assert :ok == Dist.mset(for x <- 1..100_000, do: {x, x})
+    {:timeout, _} = catch_exit(Dist.keys(timeout: 1))
   end
 
   ## Private Functions
 
   defp teardown_cache(key) do
-    node = Dist.pick_node(key)
+    node = Dist.get_node(key)
     remote_pid = :rpc.call(node, Process, :whereis, [Dist.__local__()])
     :ok = :rpc.call(node, Dist.__local__(), :stop, [remote_pid])
   end

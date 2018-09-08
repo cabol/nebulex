@@ -149,6 +149,23 @@ defmodule Nebulex.Adapters.LocalTest do
     refute get_from_old(2)
   end
 
+  test "push generations with ttl" do
+    assert 1 == TestCache.set(1, 1, ttl: 2)
+    assert 1 == TestCache.get(1)
+
+    TestCache.new_generation()
+
+    refute get_from_new(1)
+    assert 1 == get_from_old(1).value
+    assert 1 == TestCache.get(1)
+
+    :timer.sleep(2010)
+
+    refute TestCache.get(1)
+    refute get_from_new(1)
+    refute get_from_old(1)
+  end
+
   ## Helpers
 
   defp get_from_new(key) do

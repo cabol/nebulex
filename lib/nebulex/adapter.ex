@@ -7,7 +7,6 @@ defmodule Nebulex.Adapter do
   @type t :: module
   @type cache :: Nebulex.Cache.t()
   @type key :: Nebulex.Cache.key()
-  @type value :: Nebulex.Cache.value()
   @type object :: Nebulex.Object.t()
   @type opts :: Nebulex.Cache.opts()
 
@@ -31,33 +30,31 @@ defmodule Nebulex.Adapter do
   @doc """
   Stores a single object in the cache.
 
-  See `Nebulex.Cache.set/3`.
+  ## Options
+
+  Besides the "Shared options" section in `Nebulex.Cache` documentation,
+  it accepts:
+
+    * `:set` - It may be one of `:add`, `:replace`, `nil` (the default).
+      See the "Set" section for more information.
+
+  ## Set
+
+  The `:set` option supports the following values:
+
+    * `:add` - Only set the `key` if it does not already exist. If it does,
+      `nil` is returned.
+
+    * `:replace` - Only set the key if it already exist. If it does not exist,
+      `nil` is returned.
+
+    * `nil` - If key already holds a value, it is overwritten. Any previous
+      `:ttl` (time to live) associated with the key is discarded on successful
+      `set` operation.
+
+  See `Nebulex.Cache.set/3`, `Nebulex.Cache.add/3`, `Nebulex.Cache.replace/3`.
   """
   @callback set(cache, object, opts) :: object | no_return
-
-  @doc """
-  Stores the given `value` under `key` in the Cache, only if it does not
-  already exist.
-
-  See `Nebulex.Cache.add/3`.
-  """
-  @callback add(cache, object, opts) :: {:ok, object} | :error
-
-  @doc """
-  Returns a map with the objects for all specified keys. For every key that
-  does not hold a value or does not exist, the special value `nil` is
-  returned.
-
-  See `Nebulex.Cache.mget/2`.
-  """
-  @callback mget(cache, [key], opts) :: map
-
-  @doc """
-  Stores multiple objects in the cache.
-
-  See `Nebulex.Cache.mset/2`.
-  """
-  @callback mset(cache, [object], opts) :: :ok | {:error, failed_keys :: [key]}
 
   @doc """
   Deletes a single object from cache.
@@ -71,7 +68,7 @@ defmodule Nebulex.Adapter do
 
   See `Nebulex.Cache.take/2`.
   """
-  @callback take(cache, key, opts) :: nil | object | no_return
+  @callback take(cache, key, opts) :: object | no_return
 
   @doc """
   Returns whether the given `key` exists in cache.
@@ -79,22 +76,6 @@ defmodule Nebulex.Adapter do
   See `Nebulex.Cache.has_key/2`.
   """
   @callback has_key?(cache, key) :: boolean
-
-  @doc """
-  Gets the object/value from `key` and updates it, all in one pass.
-
-  See `Nebulex.Cache.get_and_update/3`.
-  """
-  @callback get_and_update(cache, key, (value -> {get, update} | :pop), opts) ::
-              {get, update} | no_return
-            when get: value, update: object
-
-  @doc """
-  Updates the cached `key` with the given function.
-
-  See `Nebulex.Cache.update/4`.
-  """
-  @callback update(cache, key, initial :: value, (value -> value), opts) :: object | no_return
 
   @doc """
   Updates (increment or decrement) the counter mapped to the given `key`.
@@ -122,5 +103,5 @@ defmodule Nebulex.Adapter do
 
   See `Nebulex.Cache.keys/0`.
   """
-  @callback keys(cache) :: [key]
+  @callback keys(cache, opts) :: [key] | no_return
 end

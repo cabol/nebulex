@@ -79,8 +79,7 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
 
       config :nebulex, Cache,
         adapter: Nebulex.Adapters.Dist,
-        local: :YOUR_LOCAL_CACHE,
-        node_picker: Nebulex.Adapters.Dist
+        local: :YOUR_LOCAL_CACHE
       """)
     end)
   end

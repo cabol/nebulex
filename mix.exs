@@ -42,7 +42,7 @@ defmodule Nebulex.Mixfile do
 
   defp deps do
     [
-      {:shards, "~> 0.5"},
+      {:shards, "~> 0.6"},
 
       # Test
       {:excoveralls, "~> 0.6", only: :test},

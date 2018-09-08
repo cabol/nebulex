@@ -13,14 +13,10 @@ defmodule Nebulex.Cache.Supervisor do
   @doc """
   Retrieves the runtime configuration.
   """
-  def runtime_config(cache, otp_app, custom) do
-    if config = Application.get_env(otp_app, cache) do
-      config = [otp_app: otp_app] ++ Keyword.merge(config, custom)
-      cache_init(cache, config)
-    else
-      raise ArgumentError,
-            "configuration for #{inspect(cache)} not specified in #{inspect(otp_app)} environment"
-    end
+  def runtime_config(cache, otp_app, opts) do
+    config = Application.get_env(otp_app, cache, [])
+    config = [otp_app: otp_app] ++ Keyword.merge(config, opts)
+    cache_init(cache, config)
   end
 
   defp cache_init(cache, config) do
@@ -51,7 +47,17 @@ defmodule Nebulex.Cache.Supervisor do
               "ensure it is correct and it is included as a project dependency"
     end
 
-    {otp_app, adapter, config}
+    behaviours =
+      for {:behaviour, behaviours} <- adapter.__info__(:attributes),
+          behaviour <- behaviours,
+          do: behaviour
+
+    unless Nebulex.Adapter in behaviours do
+      raise ArgumentError,
+            "expected :adapter option given to Nebulex.Cache to list Nebulex.Adapter as a behaviour"
+    end
+
+    {otp_app, adapter, behaviours, config}
   end
 
   ## Callbacks

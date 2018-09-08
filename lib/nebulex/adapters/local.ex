@@ -7,9 +7,13 @@ defmodule Nebulex.Adapters.Local do
 
   ## Features
 
-    * Support for generational cache – inspired by [epocxy](https://github.com/duomark/epocxy)
+    * Support for generational cache – inspired by
+      [epocxy](https://github.com/duomark/epocxy).
+
     * Support for Sharding – handled by `:shards`.
+
     * Support for garbage collection via `Nebulex.Adapters.Local.Generation`
+
     * Support for transactions via Erlang global name registration facility
 
   ## Options
@@ -76,6 +80,7 @@ defmodule Nebulex.Adapters.Local do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Multi
   @behaviour Nebulex.Adapter.List
 
   alias Nebulex.Adapters.Local.Generation
@@ -94,7 +99,6 @@ defmodule Nebulex.Adapters.Local do
     n_shards = Keyword.get(config, :n_shards, System.schedulers_online())
     r_concurrency = Keyword.get(config, :read_concurrency, true)
     w_concurrency = Keyword.get(config, :write_concurrency, true)
-    vsn_generator = Keyword.get(config, :version_generator)
     shards_sup_name = Module.concat([cache, ShardsSupervisor])
 
     quote do
@@ -116,25 +120,15 @@ defmodule Nebulex.Adapters.Local do
         ]
       end
 
-      def new_generation(opts \\ []), do: Generation.new(__MODULE__, opts)
-
-      if unquote(vsn_generator) do
-        def generate_vsn(obj) do
-          unquote(vsn_generator).generate(obj)
-        end
-      else
-        def generate_vsn(_), do: nil
+      def new_generation(opts \\ []) do
+        Generation.new(__MODULE__, opts)
       end
     end
   end
 
   @impl true
   def init(cache, opts) do
-    {:ok, children(cache, opts)}
-  end
-
-  defp children(cache, opts) do
-    [
+    children = [
       %{
         id: cache.__shards_sup_name__,
         start: {:shards_sup, :start_link, [cache.__shards_sup_name__]},
@@ -145,6 +139,8 @@ defmodule Nebulex.Adapters.Local do
         start: {Generation, :start_link, [cache, opts]}
       }
     ]
+
+    {:ok, children}
   end
 
   @impl true
@@ -187,19 +183,22 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def mget(cache, keys, _opts) do
-    Enum.reduce(keys, %{}, fn key, acc ->
-      if obj = get(cache, key, []),
-        do: Map.put(acc, key, obj),
-        else: acc
-    end)
-  end
-
-  @impl true
   def set(cache, object, opts) do
+    action =
+      case Keyword.get(opts, :set) do
+        :add ->
+          {&do_add/3, [cache, object, opts]}
+
+        :replace ->
+          {&do_replace/3, [cache, object, opts]}
+
+        nil ->
+          {&do_set/3, [cache, object, opts]}
+      end
+
     object.key
     |> Version.validate!(cache, opts)
-    |> maybe_exec(:set, {&do_set/3, [cache, object, opts]})
+    |> maybe_exec(:set, action)
   end
 
   defp do_set(_cache, %Object{value: nil}, _opts), do: nil
@@ -210,22 +209,30 @@ defmodule Nebulex.Adapters.Local do
     |> local_set(object, cache, opts)
   end
 
-  @impl true
-  def mset(cache, objects, opts) do
+  defp do_add(cache, object, opts) do
+    object =
+      object
+      |> Object.set_version(cache)
+      |> set_ttl(opts)
+
     cache.__metadata__.generations
     |> hd()
-    |> local_set(objects, cache, opts)
-
-    :ok
-  rescue
-    _ -> {:error, for(o <- objects, do: o.key)}
+    |> Local.insert_new(to_tuples(object), cache.__state__)
+    |> case do
+      true -> object
+      false -> nil
+    end
   end
 
-  @impl true
-  def add(cache, object, opts) do
-    cache.__metadata__.generations
-    |> hd()
-    |> local_add(object, cache, opts)
+  defp do_replace(cache, object, _opts) do
+    object = Object.set_version(object, cache)
+
+    cache
+    |> local_update(object)
+    |> case do
+      true -> object
+      false -> nil
+    end
   end
 
   @impl true
@@ -266,60 +273,6 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def get_and_update(cache, key, fun, opts) do
-    cache
-    |> get(key, [])
-    |> Version.validate!(cache, opts)
-    |> case do
-      {:nothing, current} ->
-        {current.value, current}
-
-      {:override, current} ->
-        current = current || %Object{key: key}
-
-        case fun.(current.value) do
-          {get, update} ->
-            {get, do_set(cache, %{current | value: update}, opts)}
-
-          :pop ->
-            _ = do_delete(cache, key)
-            {current.value, nil}
-
-          other ->
-            raise ArgumentError,
-                  "the given function must return a two-element tuple or :pop, " <>
-                    "got: #{inspect(other)}"
-        end
-    end
-  end
-
-  @impl true
-  def update(cache, key, initial, fun, opts) do
-    cache
-    |> get(key, [])
-    |> Version.validate!(cache, opts)
-    |> case do
-      {:nothing, cached} ->
-        cached
-
-      {:override, nil} ->
-        do_set(cache, %Object{key: key, value: initial}, opts)
-
-      {:override, object} ->
-        do_update(cache, %{object | value: fun.(object.value)})
-    end
-  end
-
-  defp do_update(cache, object) do
-    true =
-      cache.__metadata__.generations
-      |> hd()
-      |> Local.update_element(object.key, {2, object.value}, cache.__state__)
-
-    object
-  end
-
-  @impl true
   def update_counter(cache, key, incr, opts) when is_integer(incr) do
     ttl =
       opts
@@ -352,7 +305,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def keys(cache) do
+  def keys(cache, _opts) do
     ms = [{{:"$1", :_, :_, :_}, [], [:"$1"]}]
 
     cache.__metadata__.generations
@@ -360,6 +313,28 @@ defmodule Nebulex.Adapters.Local do
       Local.select(gen, ms, cache.__state__) ++ acc
     end)
     |> :lists.usort()
+  end
+
+  ## Multi
+
+  @impl true
+  def mget(cache, keys, _opts) do
+    Enum.reduce(keys, %{}, fn key, acc ->
+      if obj = get(cache, key, []),
+        do: Map.put(acc, key, obj),
+        else: acc
+    end)
+  end
+
+  @impl true
+  def mset(cache, objects, opts) do
+    cache.__metadata__.generations
+    |> hd()
+    |> local_set(objects, cache, opts)
+
+    :ok
+  rescue
+    _ -> {:error, for(o <- objects, do: o.key)}
   end
 
   ## Lists
@@ -512,22 +487,17 @@ defmodule Nebulex.Adapters.Local do
   defp local_set(generation, obj_or_objs, cache, opts) do
     obj_or_objs =
       obj_or_objs
-      |> set_vsn(cache.__version_generator__)
+      |> Object.set_version(cache)
       |> set_ttl(opts)
 
     true = Local.insert(generation, to_tuples(obj_or_objs), cache.__state__)
     obj_or_objs
   end
 
-  defp local_add(generation, object, cache, opts) do
-    object =
-      object
-      |> set_vsn(cache.__version_generator__)
-      |> set_ttl(opts)
-
-    if Local.insert_new(generation, to_tuples(object), cache.__state__),
-      do: {:ok, object},
-      else: :error
+  defp local_update(cache, object) do
+    cache.__metadata__.generations
+    |> hd()
+    |> Local.update_element(object.key, [{2, object.value}, {3, object.version}], cache.__state__)
   end
 
   defp from_tuple({key, val, vsn, ttl}) do
@@ -541,13 +511,6 @@ defmodule Nebulex.Adapters.Local do
     for %Object{key: key, value: val, version: vsn, ttl: ttl} <- objs do
       {key, val, vsn, ttl}
     end
-  end
-
-  defp set_vsn(objs, nil), do: objs
-  defp set_vsn(%Object{} = obj, versioner), do: versioner.generate(obj)
-
-  defp set_vsn(objs, versioner) do
-    for obj <- objs, do: versioner.generate(obj)
   end
 
   defp set_ttl(%Object{} = obj, opts) do

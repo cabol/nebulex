@@ -18,7 +18,7 @@ defmodule Nebulex.Cache.Bucket do
   @doc """
   Implementation for `Nebulex.Cache.keys/0`.
   """
-  def keys(cache) do
-    cache.__adapter__.keys(cache)
+  def keys(cache, opts) do
+    cache.__adapter__.keys(cache, opts)
   end
 end

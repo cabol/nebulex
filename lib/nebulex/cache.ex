@@ -35,12 +35,6 @@ defmodule Nebulex.Cache do
       the adapters to generate new object versions. If this option
       is not set, then the version is set to `nil` by default.
 
-    * `:pre_hooks_mode` - a compile-time option that determinates the
-      mode how pre-hooks will be executed – see pre/post hooks below.
-
-    * `:post_hooks_mode` - a compile-time option that determinates the
-      mode how post-hooks will be executed – see pre/post hooks below.
-
     * `:stats` - a compile-time option that specifies if cache statistics
       is enabled or not (defaults to `false`).
 
@@ -53,7 +47,7 @@ defmodule Nebulex.Cache do
   Additionally, it is possible to configure the mode how the hooks are
   evaluated (synchronous, asynchronous and pipeline).
 
-  For more information about the usage, check `Nebulex.Hook`.
+  For more information about the usage, check out `Nebulex.Hook`.
 
   ## Shared options
 
@@ -105,16 +99,16 @@ defmodule Nebulex.Cache do
       @behaviour Nebulex.Cache
       @behaviour Nebulex.Hook
 
-      alias Nebulex.Cache.{Bucket, Stats, Transaction}
+      alias Nebulex.Cache.{Bucket, Stats}
       alias Nebulex.Hook
 
-      {otp_app, adapter, config} = Nebulex.Cache.Supervisor.compile_config(__MODULE__, opts)
+      {otp_app, adapter, behaviours, config} =
+        Nebulex.Cache.Supervisor.compile_config(__MODULE__, opts)
+
       @otp_app otp_app
       @adapter adapter
       @config config
       @version_generator Keyword.get(config, :version_generator)
-      @pre_hooks_mode Keyword.get(config, :pre_hooks_mode, :async)
-      @post_hooks_mode Keyword.get(config, :post_hooks_mode, :async)
       @before_compile adapter
 
       ## Config and metadata
@@ -161,26 +155,12 @@ defmodule Nebulex.Cache do
 
       @doc false
       def get!(key, opts \\ []) do
-        if result = get(key, opts) do
-          result
-        else
-          raise KeyError, key: key, term: __MODULE__
-        end
-      end
-
-      @doc false
-      def mget(keys, opts \\ []) do
-        with_hooks(Nebulex.Cache.Object, :mget, [keys, opts])
+        with_hooks(Nebulex.Cache.Object, :get!, [key, opts])
       end
 
       @doc false
       def set(key, value, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :set, [key, value, opts])
-      end
-
-      @doc false
-      def mset(objects, opts \\ []) do
-        with_hooks(Nebulex.Cache.Object, :mset, [objects, opts])
       end
 
       @doc false
@@ -190,13 +170,17 @@ defmodule Nebulex.Cache do
 
       @doc false
       def add!(key, value, opts \\ []) do
-        case add(key, value, opts) do
-          {:ok, result} ->
-            result
+        with_hooks(Nebulex.Cache.Object, :add!, [key, value, opts])
+      end
 
-          :error ->
-            raise Nebulex.KeyAlreadyExistsError, key: key, cache: __MODULE__
-        end
+      @doc false
+      def replace(key, value, opts \\ []) do
+        with_hooks(Nebulex.Cache.Object, :replace, [key, value, opts])
+      end
+
+      @doc false
+      def replace!(key, value, opts \\ []) do
+        with_hooks(Nebulex.Cache.Object, :replace!, [key, value, opts])
       end
 
       @doc false
@@ -207,6 +191,11 @@ defmodule Nebulex.Cache do
       @doc false
       def take(key, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :take, [key, opts])
+      end
+
+      @doc false
+      def take!(key, opts \\ []) do
+        with_hooks(Nebulex.Cache.Object, :take!, [key, opts])
       end
 
       @doc false
@@ -240,15 +229,27 @@ defmodule Nebulex.Cache do
       end
 
       @doc false
-      def keys do
-        Bucket.keys(__MODULE__)
+      def keys(opts \\ []) do
+        Bucket.keys(__MODULE__, opts)
+      end
+
+      ## Multi
+
+      if Nebulex.Adapter.Multi in behaviours do
+        @doc false
+        def mget(keys, opts \\ []) do
+          with_hooks(Nebulex.Cache.Multi, :mget, [keys, opts])
+        end
+
+        @doc false
+        def mset(objects, opts \\ []) do
+          with_hooks(Nebulex.Cache.Multi, :mset, [objects, opts])
+        end
       end
 
       ## Lists
 
-      Nebulex.Cache.List.__api__()
-      |> Enum.all?(&function_exported?(@adapter, elem(&1, 0), elem(&1, 1)))
-      |> if do
+      if Nebulex.Adapter.List in behaviours do
         @doc false
         def lpush(key, value, opts \\ []) do
           with_hooks(Nebulex.Cache.List, :lpush, [key, value, opts])
@@ -277,25 +278,25 @@ defmodule Nebulex.Cache do
 
       ## Transactions
 
-      if function_exported?(@adapter, :transaction, 3) do
+      if Nebulex.Adapter.Transaction in behaviours do
         @doc false
         def transaction(fun, opts \\ []) do
-          Transaction.transaction(__MODULE__, fun, opts)
+          Nebulex.Cache.Transaction.transaction(__MODULE__, fun, opts)
         end
 
         @doc false
         def in_transaction? do
-          Transaction.in_transaction?(__MODULE__)
+          Nebulex.Cache.Transaction.in_transaction?(__MODULE__)
         end
       end
 
       ## Hooks
 
       @doc false
-      def pre_hooks, do: []
+      def pre_hooks, do: {:async, []}
 
       @doc false
-      def post_hooks, do: []
+      def post_hooks, do: {:async, []}
 
       defoverridable pre_hooks: 0, post_hooks: 0
 
@@ -309,22 +310,23 @@ defmodule Nebulex.Cache do
       end
 
       defp eval_pre_hooks(wrapper, action, args) do
-        _ = Hook.eval(pre_hooks(), @pre_hooks_mode, {__MODULE__, action, args}, nil)
+        _ = Hook.eval(pre_hooks(), {__MODULE__, action, args}, nil)
         wrapper
       end
 
       if @config[:stats] == true do
         defp eval_post_hooks(result, action, args) do
+          {mode, hooks} = post_hooks()
+
           Hook.eval(
-            [unquote(&Stats.post_hook/2) | post_hooks()],
-            @post_hooks_mode,
+            {mode, [unquote(&Stats.post_hook/2) | hooks]},
             {__MODULE__, action, args},
             result
           )
         end
       else
         defp eval_post_hooks(result, action, args) do
-          Hook.eval(post_hooks(), @post_hooks_mode, {__MODULE__, action, args}, result)
+          Hook.eval(post_hooks(), {__MODULE__, action, args}, result)
         end
       end
     end
@@ -332,6 +334,8 @@ defmodule Nebulex.Cache do
 
   @optional_callbacks [
     init: 1,
+    mget: 2,
+    mset: 2,
     lpush: 3,
     rpush: 3,
     lpop: 2,
@@ -381,7 +385,7 @@ defmodule Nebulex.Cache do
   @callback stop(pid, timeout) :: :ok
 
   @doc """
-  Fetches a value or object from Cache where the key matches the
+  Gets a value or object from Cache where the key matches the
   given `key`.
 
   Returns `nil` if no result was found.
@@ -391,7 +395,7 @@ defmodule Nebulex.Cache do
   Besides the "Shared options" section at the module documentation,
   it accepts:
 
-    * `:on_conflict` - It may be one of `:raise` (the default), `:nothing`,
+    * `:on_conflict` - It may be one of `:error` (the default), `:nothing`,
       `nil`. See the "OnConflict" section for more information.
 
   ## Example
@@ -399,9 +403,9 @@ defmodule Nebulex.Cache do
       "some value" =
         :a
         |> MyCache.set("some value", return: :key)
-        |> MyCache.get
+        |> MyCache.get()
 
-      nil = MyCache.get :non_existent_key
+      nil = MyCache.get(:non_existent_key)
 
   ## OnConflict
 
@@ -414,7 +418,7 @@ defmodule Nebulex.Cache do
   ## Examples
 
       # Set a value
-      1 = MyCache.set :a, 1
+      1 = MyCache.set(:a, 1)
 
       # Gets with an invalid version but do nothing on conflicts.
       # Keep in mind that, although this returns successfully, the returned
@@ -422,14 +426,13 @@ defmodule Nebulex.Cache do
       # of "on_conflict: :nothing", it returns the latest version of the
       # cached object.
       %Nebulex.Object{key: :a, value: 1} =
-        MyCache.get :a, return: :object, version: :invalid, on_conflict: :nothing
-      1 = MyCache.get :a
+        MyCache.get(:a, return: :object, version: :invalid, on_conflict: :nothing)
+      1 = MyCache.get(:a)
   """
   @callback get(key, opts) :: nil | return | no_return
 
   @doc """
-  Similar to `get/2` but raises `KeyError` if no value associated with the
-  given `key` was found.
+  Similar to `get/2` but raises `KeyError` if `key` is not found.
 
   ## Options
 
@@ -442,31 +445,13 @@ defmodule Nebulex.Cache do
   @callback get!(key, opts) :: return | no_return
 
   @doc """
-  Returns a map with the values or objects (check `:return` option) for all
-  specified keys. For every key that does not hold a value or does not exist,
-  that key is simply ignored. Because of this, the operation never fails.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation.
-
-  For bulk operations like `mget`, the option `:version` is ignored.
-
-  ## Example
-
-      :ok = MyCache.mset([a: 1, c: 3])
-
-      %{a: 1, c: 3} = MyCache.mget([:a, :b, :c])
-  """
-  @callback mget([key], opts) :: map
-
-  @doc """
   Sets the given `value` under `key` in the Cache.
 
-  It returns `value` or `Nebulex.Object.t()` (depends on `:return` option)
-  if the value has been successfully inserted.
+  Returns the inserted `value` if the action is completed successfully.
+  It is also possible to return the key or the object itself,
+  depending on `:return` option.
 
-  If `value` is `nil`, then it is not cached and `nil` is returned instead.
+  If `value` is `nil`, action is skipped and `nil` is returned instead.
 
   ## Options
 
@@ -478,13 +463,13 @@ defmodule Nebulex.Cache do
 
   ## Example
 
-      "bar" = MyCache.set "foo", "bar"
+      "bar" = MyCache.set("foo", "bar")
 
       %Nebulex.Object{key: "foo"} =
-        MyCache.set "foo", "bar", ttl: 100000, return: :object
+        MyCache.set("foo", "bar", ttl: 100000, return: :object)
 
       # if the value is nil, then it is not stored (operation is skipped)
-      nil = MyCache.set "foo", nil
+      nil = MyCache.set("foo", nil)
 
   ## OnConflict
 
@@ -498,57 +483,33 @@ defmodule Nebulex.Cache do
   ## Examples
 
       # Set twice
-      %Nebulex.Object{key: :a, version: v1} = MyCache.set :a, 1, return: :object
+      %Nebulex.Object{key: :a, version: v1} =
+        MyCache.set(:a, 1, return: :object)
+
       %Nebulex.Object{key: :a, version: v2}
-        MyCache.set :a, 2, return: :object, version: v1
+        MyCache.set(:a, 2, return: :object, version: v1)
 
       # Set with the same key and wrong version but do nothing on conflicts.
       # Keep in mind that, although this returns successfully, the returned
       # struct does not reflect the data in the Cache. For instance, in case
       # of "on_conflict: :nothing", the returned object isn't set.
       %Nebulex.Object{key: :a, value: 2} =
-        MyCache.set :a, 3, return: :object, version: v1, on_conflict: :nothing
-      2 = MyCache.get :a
+        MyCache.set(:a, 3, return: :object, version: v1, on_conflict: :nothing)
+      2 = MyCache.get(:a)
 
       # Set with the same key and wrong version but replace the current
       # value on conflicts.
-      3 = MyCache.set :a, 3, version: v1, on_conflict: :override
-      3 = MyCache.get :a
+      3 = MyCache.set(:a, 3, version: v1, on_conflict: :override)
+      3 = MyCache.get(:a)
   """
   @callback set(key, value, opts) :: return | no_return
-
-  @doc """
-  Sets the given `entries`, replacing existing ones, just as regular `set`.
-
-  Returns `:ok` if the all the objects were successfully set, otherwise
-  `{:error, failed_keys}`, where `failed_keys` contains the keys that
-  could not be set.
-
-  Ideally, this operation should be atomic, so all given keys are set at once.
-  But it depends purely on the adapter's implementation and the backed used
-  internally by this adapter. Hence, it is recommended to checkout the
-  adapter's documentation.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation.
-
-  For bulk operations like `mset`, the option `:version` is ignored.
-
-  ## Example
-
-      :ok = MyCache.mset(%{"apples" => 1, "bananas" => 3})
-
-      {:error, [:a, :b]} = MyCache.mset([a: 1, b: 2, c: 3], ttl: 1000)
-  """
-  @callback mset(entries, opts) :: :ok | {:error, failed_keys :: [key]}
 
   @doc """
   Stores the given `value` under `key` in the Cache, only if it does not
   already exist.
 
-  It returns `value` or `Nebulex.Object.t()` (depends on `:return` option)
-  if the value has been successfully inserted.
+  If cache doesn't contain the given `key`, then `{:ok, value}` is returned.
+  If cache contains `key`, `:error` is returned.
 
   If `value` is `nil`, then it is not cached and `nil` is returned instead.
 
@@ -560,12 +521,12 @@ defmodule Nebulex.Cache do
 
   ## Example
 
-      {ok, "bar"} = MyCache.add "foo", "bar"
+      {ok, "bar"} = MyCache.add("foo", "bar")
 
-      :error = MyCache.add "foo", "bar"
+      :error = MyCache.add("foo", "bar")
 
       # if the value is nil, it is not stored (operation is skipped)
-      {ok, nil} = MyCache.add "foo", nil
+      {ok, nil} = MyCache.add("foo", nil)
   """
   @callback add(key, value, opts) :: {:ok, return} | :error
 
@@ -579,15 +540,60 @@ defmodule Nebulex.Cache do
 
   ## Example
 
-      MyCache.add! "foo", "bar"
+      MyCache.add!("foo", "bar")
   """
   @callback add!(key, value, opts) :: return | no_return
 
   @doc """
-  Deletes the cached entry in for a specific `key`.
+  Alters the value stored under `key` to `value`, but only if the entry `key`
+  already exists in the cache.
 
-  It always returns the `key`, either it exists or not. It the `key` exists,
-  it's removed from cache, otherwise nothing happens.
+  If cache contains the given `key`, then `{:ok, value}` is returned.
+  If cache doesn't contain `key`, `:error` is returned.
+
+  This action only updates the `value` and version of the cached object,
+  `ttl` is not altered. Therefore, if we return the cached object, the
+  contained `ttl` might not be the remaining one (it might be `nil`),
+  but this depends on the adapter.
+
+  ## Options
+
+  Besides the "Shared options" section at the module documentation,
+  it accepts:
+
+    * `:on_conflict` - Same as callback `set/3`.
+
+  ## Example
+
+      :error = MyCache.replace("foo", "bar")
+
+      "bar" = MyCache.set("foo", "bar")
+
+      {:ok, "bar"} = MyCache.replace("foo", "bar")
+  """
+  @callback replace(key, value, opts) :: {:ok, return} | :error
+
+  @doc """
+  Similar to `replace/3` but raises `KeyError` if `key` is not found.
+
+  ## Options
+
+  Besides the "Shared options" section at the module documentation,
+  it accepts:
+
+    * `:on_conflict` - Same as callback `set/3`.
+
+  ## Example
+
+      MyCache.replace!("foo", "bar")
+  """
+  @callback replace!(key, value, opts) :: return | no_return
+
+  @doc """
+  Deletes the entry in cache for a specific `key`.
+
+  If the `key` does not exist, returns the result according to the `:return`
+  option (for `delete` defaults to `:key`) but the cache is not altered.
 
   ## Options
 
@@ -608,7 +614,7 @@ defmodule Nebulex.Cache do
         |> MyCache.delete()
         |> MyCache.get()
 
-      :non_existent_key = MyCache.delete :non_existent_key
+      :non_existent_key = MyCache.delete(:non_existent_key)
 
   ## OnConflict
 
@@ -622,21 +628,21 @@ defmodule Nebulex.Cache do
   ## Examples
 
       # Set a value
-      1 = MyCache.set :a, 1
+      1 = MyCache.set(:a, 1)
 
       # Delete with an invalid version but do nothing on conflicts.
       # Keep in mind that, although this returns successfully, the returned
       # `kwy` does not reflect the data in the Cache. For instance, in case
       # of "on_conflict: :nothing", the returned `key` isn't deleted.
-      :a = MyCache.delete :a, version: :invalid, on_conflict: :nothing
-      1 = MyCache.get :a
+      :a = MyCache.delete(:a, version: :invalid, on_conflict: :nothing)
+      1 = MyCache.get(:a)
 
       # Delete with the same invalid version but force to delete the current
-      # value on conflicts (if it exist).
-      :a = MyCache.delete :a, version: :invalid, on_conflict: :override
-      nil = MyCache.get :a
+      # value on conflicts (if exist).
+      :a = MyCache.delete(:a, version: :invalid, on_conflict: :override)
+      nil = MyCache.get(:a)
   """
-  @callback delete(key, opts) :: key | no_return
+  @callback delete(key, opts) :: return | no_return
 
   @doc """
   Returns and removes the object with key `key` in the cache.
@@ -665,7 +671,20 @@ defmodule Nebulex.Cache do
   @callback take(key, opts) :: nil | return | no_return
 
   @doc """
-  Returns whether the given `key` exists in Cache.
+  Similar to `take/2` but raises `KeyError` if `key` is not found.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
+
+  ## Example
+
+      MyCache.take!(:a)
+  """
+  @callback take!(key, opts) :: return | no_return
+
+  @doc """
+  Returns whether the given `key` exists in cache.
 
   ## Examples
 
@@ -711,7 +730,7 @@ defmodule Nebulex.Cache do
           {current_value, "new value!"}
         end)
 
-      # pop/remove value if it exists
+      # pop/remove value if exist
       {"new value!", nil} = MyCache.get_and_update(:a, fn _ -> :pop end)
 
       # pop/remove nonexistent key
@@ -720,7 +739,7 @@ defmodule Nebulex.Cache do
       # update existing key but returning the object
       {"hello", %Object{key: :a, value: "hello world", ttl: _, version: _}} =
         :a
-        |> MyCache.set("hello", return: :key)
+        |> MyCache.set!("hello", return: :key)
         |> MyCache.get_and_update(fn current_value ->
           {current_value, "hello world"}
         end, return: :object)
@@ -791,11 +810,11 @@ defmodule Nebulex.Cache do
 
       for x <- 1..10, do: MyCache.set(x, x)
 
-      10 = MyCache.size
+      10 = MyCache.size()
 
       for x <- 1..5, do: MyCache.delete(x)
 
-      5 = MyCache.size
+      5 = MyCache.size()
   """
   @callback size() :: integer
 
@@ -806,7 +825,7 @@ defmodule Nebulex.Cache do
 
       for x <- 1..5, do: MyCache.set(x, x)
 
-      :ok = MyCache.flush
+      :ok = MyCache.flush()
 
       for x <- 1..5, do: nil = MyCache.get(x)
   """
@@ -815,15 +834,65 @@ defmodule Nebulex.Cache do
   @doc """
   Returns all cached keys.
 
+  ## Options
+
+  See adapters documentation. For example, in `Nebulex.Adapters.Dist`
+  adapter, it is possible to pass `:timeout` option.
+
   ## Examples
 
       for x <- 1..3, do: MyCache.set(x, x*2, return: :key)
 
-      [1, 2, 3] = MyCache.keys
+      [1, 2, 3] = MyCache.keys()
 
   **WARNING:** This is an expensive operation, beware of using it in prod.
   """
-  @callback keys() :: [key]
+  @callback keys(opts) :: [key]
+
+  @doc """
+  Returns a map with the values or objects (check `:return` option) for all
+  specified keys. For every key that does not hold a value or does not exist,
+  that key is simply ignored. Because of this, the operation never fails.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
+
+  For bulk operations like `mget`, the option `:version` is ignored.
+
+  ## Example
+
+      :ok = MyCache.mset([a: 1, c: 3])
+
+      %{a: 1, c: 3} = MyCache.mget([:a, :b, :c])
+  """
+  @callback mget([key], opts) :: map
+
+  @doc """
+  Sets the given `entries`, replacing existing ones, just as regular `set`.
+
+  Returns `:ok` if the all the objects were successfully set, otherwise
+  `{:error, failed_keys}`, where `failed_keys` contains the keys that
+  could not be set.
+
+  Ideally, this operation should be atomic, so all given keys are set at once.
+  But it depends purely on the adapter's implementation and the backed used
+  internally by this adapter. Hence, it is recommended to checkout the
+  adapter's documentation.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
+
+  For bulk operations like `mset`, the option `:version` is ignored.
+
+  ## Example
+
+      :ok = MyCache.mset(%{"apples" => 1, "bananas" => 3})
+
+      {:error, [:a, :b]} = MyCache.mset([a: 1, b: 2, c: 3], ttl: 1000)
+  """
+  @callback mset(entries, opts) :: :ok | {:error, failed_keys :: [key]}
 
   @doc """
   Insert all the specified values at the head of the list stored at `key`.

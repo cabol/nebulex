@@ -128,8 +128,7 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
 
   config <%= inspect @app %>, <%= inspect @mod %>,
     adapter: <%= inspect @adapter %>,
-    local: :YOUR_LOCAL_CACHE,
-    node_picker: <%= inspect @adapter %>
+    local: :YOUR_LOCAL_CACHE
   """)
 
   embed_template(:multilevel_config, """

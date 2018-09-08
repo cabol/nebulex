@@ -158,6 +158,7 @@ defmodule Nebulex.Adapters.Multilevel do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Multi
   @behaviour Nebulex.Adapter.List
   @behaviour Nebulex.Adapter.Transaction
 
@@ -214,35 +215,8 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
-  def mget(cache, keys, _opts) do
-    Enum.reduce(keys, %{}, fn key, acc ->
-      if obj = get(cache, key, []),
-        do: Map.put(acc, key, obj),
-        else: acc
-    end)
-  end
-
-  @impl true
   def set(cache, object, opts) do
     eval(cache, :set, [object, opts], opts)
-  end
-
-  @impl true
-  def mset(cache, objects, opts) do
-    opts
-    |> levels(cache)
-    |> Enum.reduce({objects, []}, fn level, {objs, acc} ->
-      do_mset(level, objs, opts, acc)
-    end)
-    |> case do
-      {_, []} -> :ok
-      {_, err} -> {:error, err}
-    end
-  end
-
-  @impl true
-  def add(cache, object, opts) do
-    eval(cache, :add, [object, opts], opts)
   end
 
   @impl true
@@ -275,16 +249,6 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
-  def get_and_update(cache, key, fun, opts) do
-    eval(cache, :get_and_update, [key, fun, opts], opts)
-  end
-
-  @impl true
-  def update(cache, key, initial, fun, opts) do
-    eval(cache, :update, [key, initial, fun, opts], opts)
-  end
-
-  @impl true
   def update_counter(cache, key, incr, opts) do
     eval(cache, :update_counter, [key, incr, opts], opts)
   end
@@ -304,12 +268,36 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
-  def keys(cache) do
+  def keys(cache, opts) do
     cache.__levels__
     |> Enum.reduce([], fn level_cache, acc ->
-      level_cache.__adapter__.keys(level_cache) ++ acc
+      level_cache.__adapter__.keys(level_cache, opts) ++ acc
     end)
     |> :lists.usort()
+  end
+
+  ## Multi
+
+  @impl true
+  def mget(cache, keys, _opts) do
+    Enum.reduce(keys, %{}, fn key, acc ->
+      if obj = get(cache, key, []),
+        do: Map.put(acc, key, obj),
+        else: acc
+    end)
+  end
+
+  @impl true
+  def mset(cache, objects, opts) do
+    opts
+    |> levels(cache)
+    |> Enum.reduce({objects, []}, fn level, {objs, acc} ->
+      do_mset(level, objs, opts, acc)
+    end)
+    |> case do
+      {_, []} -> :ok
+      {_, err} -> {:error, err}
+    end
   end
 
   ## Lists

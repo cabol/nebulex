@@ -139,6 +139,42 @@ Blog.Cache.set("foo", "bar", return: :object)
 Blog.Cache.set("foo", "bar", return: :value) # Default
 ```
 
+### Add and Replace
+
+As we saw previously, `set` creates a new entry in cache if it doesn't exist,
+or overrides it if it does exist (including the `:ttl`). However, there might
+be circumstances where we want to set the entry only if it doesn't exit or the
+other way around, this is where `add`, `add!`, `replace` and `replace!`
+functions come in.
+
+Let's try `add` and `add!` functions:
+
+```elixir
+{:ok, "value"} = Blog.Cache.add("new", "value")
+
+"value" = Blog.Cache.add!("new2", "value")
+
+# returns `:error` because the `key` already exists
+:error = Blog.Cache.add("new", "value")
+
+# same as previous one but raises `Nebulex.KeyAlreadyExistsError`
+Blog.Cache.add!("new", "new value")
+```
+
+Now `replace` and `replace!` functions:
+
+```elixir
+{:ok, "new value"} = Blog.Cache.replace("new", "new value")
+
+"new value" = Blog.Cache.replace!("new2", "new value")
+
+# returns `:error` because the `key` doesn't exist
+:error = Blog.Cache.replace("another", "new value")
+
+# same as previous one but raises `KeyError`
+Blog.Cache.replace!("another", "new value")
+```
+
 ## Retrieving entries
 
 First, let's create some data as we learned before.
@@ -178,23 +214,17 @@ for key <- 1..3, do: Blog.Cache.get(key, return: :object)
 Additionally, there is a function `has_key?` to check if a key exist in cache:
 
 ```elixir
-Blog.Cache.has_key? 1
+Blog.Cache.has_key?(1)
 ```
 
 It returns `true` if the ket exist and `false` otherwise.
 
-### Fetching all entries
+### Fetching all keys
 
-To fetch all entries from cache, Nebulex provides `to_map` function:
-
-```elixir
-Blog.Cache.to_map
-```
-
-By default, it returns all values, but gain, you can request to return the objects.
+To fetch all keys from cache, Nebulex provides `keys` function:
 
 ```elixir
-Blog.Cache.to_map(return: :object)
+Blog.Cache.keys()
 ```
 
 ## Updating entries
@@ -254,22 +284,37 @@ using Nebulex.
 Blog.Cache.delete(1)
 ```
 
-It always returns the `key` either if success or not, therefore, the option
-`:return` has not any effect.
+By default, `delete` returns the `key` either if success or not, therefore.
+
+### Take
 
 There is another way to delete an entry and at the same time to retrieve it,
-the function to achieve this is `pop`, this is an example:
+the function to achieve this is `take` or `take!`, this is an example:
 
 ```elixir
-Blog.Cache.pop(1)
+Blog.Cache.take(1)
 
-Blog.Cache.pop(2, return: :key)
+Blog.Cache.take(2, return: :key)
 
-Blog.Cache.pop(3, return: :object)
+Blog.Cache.take!(3, return: :object)
+
+# returns `nil` if `key` doesn't exist
+nil = Blog.Cache.take("nonexistent")
+
+# same as previous one but raises `KeyError`
+Blog.Cache.take!("nonexistent")
 ```
 
-Similar to `set` and `get`, `pop` returns the value by default, but you can
+Similar to `set` and `get`, `take` returns the value by default, but you can
 request to return either the key, value or object.
+
+### Flush
+
+Nebulex also provides a function to flush all cache entries, like so:
+
+```elixir
+Blog.Cache.flush()
+```
 
 ## Distributed Cache
 
@@ -289,7 +334,7 @@ cache; it is defined in `config/config.exs`:
 config :blog, Blog.DistCache,
   adapter: Nebulex.Adapters.Dist,
   local: :YOUR_LOCAL_CACHE,
-  node_picker: Nebulex.Adapters.Dist
+  node_selector: Nebulex.Adapters.Dist
 ```
 
 Replace the `local` config value `:YOUR_LOCAL_CACHE` by an existing local cache
@@ -331,7 +376,7 @@ config :blog, Blog.DistCache.Primary,
 config :blog, Blog.DistCache,
   adapter: Nebulex.Adapters.Dist,
   local: Blog.DistCache.Primary,
-  node_picker: Nebulex.Adapters.Dist
+  node_selector: Nebulex.Adapters.Dist
 ```
 
 And remember to setup the `Blog.DistCache` and its local backend
@@ -376,10 +421,10 @@ The `Nebulex.Adapters.Dist` supports `:timeout` option, it is a value in
 milliseconds for the command that will be executed.
 
 ```elixir
-DistCache.get("foo", timeout: 10)
+Blog.DistCache.get("foo", timeout: 10)
 
 # if the timeout is exceeded, then the current process will exit
-DistCache.set("foo", "bar", timeout: 10)
+Blog.DistCache.set("foo", "bar", timeout: 10)
 # ** (EXIT) time out
 ```
 

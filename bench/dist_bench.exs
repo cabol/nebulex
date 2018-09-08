@@ -39,23 +39,18 @@ defmodule DistBench do
     :ok
   end
 
-  bench "mget" do
-    Dist.mget(@bulk_keys)
-    :ok
-  end
-
   bench "set" do
     Dist.set(bench_context, bench_context)
     :ok
   end
 
-  bench "mset" do
-    Dist.mset(@bulk_objs)
+  bench "add" do
+    Dist.add(bench_context, bench_context)
     :ok
   end
 
-  bench "add" do
-    Dist.add(bench_context, bench_context)
+  bench "replace" do
+    Dist.replace(bench_context, bench_context)
     :ok
   end
 
@@ -96,6 +91,16 @@ defmodule DistBench do
 
   bench "update_counter" do
     Dist.update_counter(bench_context, 1)
+    :ok
+  end
+
+  bench "mget" do
+    Dist.mget(@bulk_keys)
+    :ok
+  end
+
+  bench "mset" do
+    Dist.mset(@bulk_objs)
     :ok
   end
 
