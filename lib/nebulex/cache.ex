@@ -90,16 +90,13 @@ defmodule Nebulex.Cache do
   @typedoc "Return alternatives (value is the default)"
   @type return :: key | value | object
 
-  @typedoc "Reduce callabck function"
-  @type reducer :: (object, acc_in :: any -> acc_out :: any)
-
   @doc false
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       @behaviour Nebulex.Cache
       @behaviour Nebulex.Hook
 
-      alias Nebulex.Cache.{Bucket, Stats}
+      alias Nebulex.Cache.Stats
       alias Nebulex.Hook
 
       {otp_app, adapter, behaviours, config} =
@@ -108,7 +105,7 @@ defmodule Nebulex.Cache do
       @otp_app otp_app
       @adapter adapter
       @config config
-      @version_generator Keyword.get(config, :version_generator)
+      @version_generator Keyword.get(@config, :version_generator)
       @before_compile adapter
 
       ## Config and metadata
@@ -159,6 +156,11 @@ defmodule Nebulex.Cache do
       end
 
       @doc false
+      def get_many(keys, opts \\ []) do
+        with_hooks(Nebulex.Cache.Object, :get_many, [keys, opts])
+      end
+
+      @doc false
       def set(key, value, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :set, [key, value, opts])
       end
@@ -181,6 +183,16 @@ defmodule Nebulex.Cache do
       @doc false
       def replace!(key, value, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :replace!, [key, value, opts])
+      end
+
+      @doc false
+      def add_or_replace!(key, value, opts \\ []) do
+        with_hooks(Nebulex.Cache.Object, :add_or_replace!, [key, value, opts])
+      end
+
+      @doc false
+      def set_many(entries, opts \\ []) do
+        with_hooks(Nebulex.Cache.Object, :set_many, [entries, opts])
       end
 
       @doc false
@@ -220,60 +232,17 @@ defmodule Nebulex.Cache do
 
       @doc false
       def size do
-        Bucket.size(__MODULE__)
+        with_hooks(@adapter, :size)
       end
 
       @doc false
       def flush do
-        Bucket.flush(__MODULE__)
+        with_hooks(@adapter, :flush)
       end
 
       @doc false
       def keys(opts \\ []) do
-        Bucket.keys(__MODULE__, opts)
-      end
-
-      ## Multi
-
-      if Nebulex.Adapter.Multi in behaviours do
-        @doc false
-        def mget(keys, opts \\ []) do
-          with_hooks(Nebulex.Cache.Multi, :mget, [keys, opts])
-        end
-
-        @doc false
-        def mset(objects, opts \\ []) do
-          with_hooks(Nebulex.Cache.Multi, :mset, [objects, opts])
-        end
-      end
-
-      ## Lists
-
-      if Nebulex.Adapter.List in behaviours do
-        @doc false
-        def lpush(key, value, opts \\ []) do
-          with_hooks(Nebulex.Cache.List, :lpush, [key, value, opts])
-        end
-
-        @doc false
-        def rpush(key, value, opts \\ []) do
-          with_hooks(Nebulex.Cache.List, :rpush, [key, value, opts])
-        end
-
-        @doc false
-        def lpop(key, opts \\ []) do
-          with_hooks(Nebulex.Cache.List, :lpop, [key, opts])
-        end
-
-        @doc false
-        def rpop(key, opts \\ []) do
-          with_hooks(Nebulex.Cache.List, :rpop, [key, opts])
-        end
-
-        @doc false
-        def lrange(key, offset, limit, opts \\ []) do
-          with_hooks(Nebulex.Cache.List, :lrange, [key, offset, limit, opts])
-        end
+        with_hooks(@adapter, :keys, [opts])
       end
 
       ## Transactions
@@ -281,12 +250,12 @@ defmodule Nebulex.Cache do
       if Nebulex.Adapter.Transaction in behaviours do
         @doc false
         def transaction(fun, opts \\ []) do
-          Nebulex.Cache.Transaction.transaction(__MODULE__, fun, opts)
+          with_hooks(Nebulex.Cache.Transaction, :transaction, [fun, opts])
         end
 
         @doc false
         def in_transaction? do
-          Nebulex.Cache.Transaction.in_transaction?(__MODULE__)
+          with_hooks(Nebulex.Cache.Transaction, :in_transaction?)
         end
       end
 
@@ -302,7 +271,7 @@ defmodule Nebulex.Cache do
 
       ## Helpers
 
-      defp with_hooks(wrapper, action, args) do
+      defp with_hooks(wrapper, action, args \\ []) do
         wrapper
         |> eval_pre_hooks(action, args)
         |> apply(action, [__MODULE__ | args])
@@ -334,13 +303,6 @@ defmodule Nebulex.Cache do
 
   @optional_callbacks [
     init: 1,
-    mget: 2,
-    mset: 2,
-    lpush: 3,
-    rpush: 3,
-    lpop: 2,
-    rpop: 2,
-    lrange: 4,
     transaction: 2,
     in_transaction?: 0
   ]
@@ -443,6 +405,25 @@ defmodule Nebulex.Cache do
       MyCache.get!(:a)
   """
   @callback get!(key, opts) :: return | no_return
+
+  @doc """
+  Returns a map with the values or objects (check `:return` option) for all
+  specified keys. For every key that does not hold a value or does not exist,
+  that key is simply ignored. Because of this, the operation never fails.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
+
+  Note that for this function, option `:version` is ignored.
+
+  ## Example
+
+      :ok = MyCache.set_many([a: 1, c: 3])
+
+      %{a: 1, c: 3} = MyCache.get_many([:a, :b, :c])
+  """
+  @callback get_many([key], opts) :: map
 
   @doc """
   Sets the given `value` under `key` in the Cache.
@@ -588,6 +569,57 @@ defmodule Nebulex.Cache do
       MyCache.replace!("foo", "bar")
   """
   @callback replace!(key, value, opts) :: return | no_return
+
+  @doc """
+  When the `key` already exists, the cached value is replaced by `value`,
+  otherwise the entry is created at fisrt time.
+
+  Returns the replaced or created value when the function is completed
+  successfully. Because this function is a combination of `replace/3`
+  and `add!/3` functions, there might be a race condition between them,
+  in that case the last operation `add!/3` fails with
+  `Nebulex.KeyAlreadyExistsError`.
+
+  ## Options
+
+  Besides the "Shared options" section at the module documentation,
+  it accepts:
+
+    * `:on_conflict` - Same as callback `set/3`.
+
+  ## Example
+
+      MyCache.add_or_replace!("foo", "bar")
+  """
+  @callback add_or_replace!(key, value, opts) :: return | no_return
+
+  @doc """
+  Sets the given `entries`, replacing existing ones, just as regular `set`.
+
+  Returns `:ok` if the all the objects were successfully set, otherwise
+  `{:error, failed_keys}`, where `failed_keys` contains the keys that
+  could not be set.
+
+  Ideally, this operation should be atomic, so all given keys are set at once.
+  But it depends purely on the adapter's implementation and the backend used
+  internally by the adapter. Hence, it is recommended to checkout the
+  adapter's documentation.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation.
+
+  Note that for this function, option `:version` is ignored.
+
+  ## Example
+
+      # all entries were set successfully
+      :ok = MyCache.set_many(%{"apples" => 1, "bananas" => 3})
+
+      # for some reason `:c` key couldn't be set, so we got an error
+      {:error, [:c]} = MyCache.set_many([a: 1, b: 2, c: 3], ttl: 1000)
+  """
+  @callback set_many(entries, opts) :: :ok | {:error, failed_keys :: [key]}
 
   @doc """
   Deletes the entry in cache for a specific `key`.
@@ -788,7 +820,7 @@ defmodule Nebulex.Cache do
 
   See the "Shared options" section at the module documentation.
 
-  For this command, the option `:version` is ignored.
+  Note that for this function, option `:version` is ignored.
 
   ## Examples
 
@@ -848,156 +880,6 @@ defmodule Nebulex.Cache do
   **WARNING:** This is an expensive operation, beware of using it in prod.
   """
   @callback keys(opts) :: [key]
-
-  @doc """
-  Returns a map with the values or objects (check `:return` option) for all
-  specified keys. For every key that does not hold a value or does not exist,
-  that key is simply ignored. Because of this, the operation never fails.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation.
-
-  For bulk operations like `mget`, the option `:version` is ignored.
-
-  ## Example
-
-      :ok = MyCache.mset([a: 1, c: 3])
-
-      %{a: 1, c: 3} = MyCache.mget([:a, :b, :c])
-  """
-  @callback mget([key], opts) :: map
-
-  @doc """
-  Sets the given `entries`, replacing existing ones, just as regular `set`.
-
-  Returns `:ok` if the all the objects were successfully set, otherwise
-  `{:error, failed_keys}`, where `failed_keys` contains the keys that
-  could not be set.
-
-  Ideally, this operation should be atomic, so all given keys are set at once.
-  But it depends purely on the adapter's implementation and the backed used
-  internally by this adapter. Hence, it is recommended to checkout the
-  adapter's documentation.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation.
-
-  For bulk operations like `mset`, the option `:version` is ignored.
-
-  ## Example
-
-      :ok = MyCache.mset(%{"apples" => 1, "bananas" => 3})
-
-      {:error, [:a, :b]} = MyCache.mset([a: 1, b: 2, c: 3], ttl: 1000)
-  """
-  @callback mset(entries, opts) :: :ok | {:error, failed_keys :: [key]}
-
-  @doc """
-  Insert all the specified values at the head of the list stored at `key`.
-  If `key` does not exist, it is created as empty list before performing
-  the push operations. When key holds a value that is not a list, an error
-  is raised.
-
-  Elements are inserted one after the other to the head of the list, from
-  the leftmost element to the rightmost element. So for instance the command
-  `lpush(:mykey, [1, 2, 3])` will result into a list containing 3 as first
-  element, 2 as second element and 1 as third element.
-
-  Returns the length of the list after the push operations.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation.
-
-  ## Example
-
-      3 = MyCache.lpush(:mykey, [1, 2, 3])
-      4 = MyCache.lpush(:mykey, ["654"])
-
-      ["654", 3, 2, 1] = MyCache.get(:mykey)
-  """
-  @callback lpush(key, elements :: [value], opts) :: integer | no_return
-
-  @doc """
-  Insert all the specified values at the tail of the list stored at `key`.
-  If key does not exist, it is created as empty list before performing
-  the push operation. When key holds a value that is not a list, an error
-  is raised.
-
-  Elements are inserted one after the other to the tail of the list, from
-  the leftmost element to the rightmost element. So for instance the command
-  `rpush(:mykey, [1, 2, 3])` will result into a list containing 1 as first
-  element, 2 as second element and 3 as third element.
-
-  Returns the length of the list after the push operations.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation.
-
-  ## Example
-
-      3 = MyCache.rpush(:mykey, [1, 2, 3])
-      4 = MyCache.rpush(:mykey, ["456"])
-
-      [1, 2, 3, "456"] = MyCache.get(:mykey)
-  """
-  @callback rpush(key, elements :: [value], opts) :: integer | no_return
-
-  @doc """
-  Removes and returns the first element of the list stored at `key`, or `nil`
-  when key does not exist.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation.
-
-  ## Example
-
-      2 = MyCache.lpush(:mykey, ["foo", "bar"])
-
-      "bar" = MyCache.lpop(:mykey)
-  """
-  @callback lpop(key, opts) :: nil | value | no_return
-
-  @doc """
-  Removes and returns the last element of the list stored at `key`, or `nil`
-  when key does not exist.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation.
-
-  ## Example
-
-      2 = MyCache.rpush(:mykey, ["foo", "bar"])
-
-      "bar" = MyCache.rpop(:mykey)
-  """
-  @callback rpop(key, opts) :: nil | value | no_return
-
-  @doc """
-  Returns the specified elements of the list stored at `key`. The `offset`
-  is an integer >= 1 and the `limit` an integer >= 0.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation.
-
-  ## Example
-
-      5 = MyCache.rpush(:mykey, [5, 4, 3, 2, 1])
-
-      [2, 3, 4] = MyCache.lrange(:mykey, 2, 3)
-
-      [2, 3, 4, 5] = MyCache.lrange(:mykey, 2, 5)
-
-      [] = MyCache.lrange(:mykey, 6, 3)
-  """
-  @callback lrange(key, offset :: pos_integer, limit :: non_neg_integer, opts) ::
-              [value] | no_return
 
   @doc """
   Runs the given function inside a transaction.

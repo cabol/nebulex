@@ -24,6 +24,25 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
+  Implementation for `Nebulex.Cache.get_many/2`.
+  """
+  def get_many(_cache, [], _opts), do: %{}
+
+  def get_many(cache, keys, opts) do
+    objects_map = cache.__adapter__.get_many(cache, keys, opts)
+
+    case opts[:return] do
+      :object ->
+        objects_map
+
+      _ ->
+        Enum.reduce(objects_map, %{}, fn {key, obj}, acc ->
+          Map.put(acc, key, Nebulex.Cache.Object.return(obj, opts))
+        end)
+    end
+  end
+
+  @doc """
   Implementation for `Nebulex.Cache.set/3`.
   """
   def set(_cache, _key, nil, _opts), do: nil
@@ -90,6 +109,35 @@ defmodule Nebulex.Cache.Object do
       :error ->
         raise(KeyError, key: key, term: cache)
     end
+  end
+
+  @doc """
+  Implementation for `Nebulex.Cache.add_or_replace!/3`.
+  """
+  def add_or_replace!(_cache, _key, nil, _opts), do: nil
+
+  def add_or_replace!(cache, key, value, opts) do
+    cache
+    |> set(key, value, Keyword.put(opts, :set, :replace))
+    |> case do
+      nil -> add!(cache, key, value, opts)
+      res -> res
+    end
+  end
+
+  @doc """
+  Implementation for `Nebulex.Cache.set_many/2`.
+  """
+  def set_many(_cache, [], _opts), do: :ok
+  def set_many(_cache, entries, _opts) when map_size(entries) == 0, do: :ok
+
+  def set_many(cache, entries, opts) do
+    objects =
+      for {key, value} <- entries, value != nil do
+        %Object{key: key, value: value}
+      end
+
+    cache.__adapter__.set_many(cache, objects, opts)
   end
 
   @doc """

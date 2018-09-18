@@ -80,15 +80,11 @@ defmodule Nebulex.Adapters.Local do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
-  @behaviour Nebulex.Adapter.Multi
-  @behaviour Nebulex.Adapter.List
 
   alias Nebulex.Adapters.Local.Generation
   alias Nebulex.Object
   alias Nebulex.Object.Version
   alias :shards_local, as: Local
-
-  @list_api [:lpush, :rpush, :lpop, :rpop, :lrange]
 
   ## Adapter
 
@@ -183,6 +179,15 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
+  def get_many(cache, keys, _opts) do
+    Enum.reduce(keys, %{}, fn key, acc ->
+      if obj = get(cache, key, []),
+        do: Map.put(acc, key, obj),
+        else: acc
+    end)
+  end
+
+  @impl true
   def set(cache, object, opts) do
     action =
       case Keyword.get(opts, :set) do
@@ -233,6 +238,17 @@ defmodule Nebulex.Adapters.Local do
       true -> object
       false -> nil
     end
+  end
+
+  @impl true
+  def set_many(cache, objects, opts) do
+    cache.__metadata__.generations
+    |> hd()
+    |> local_set(objects, cache, opts)
+
+    :ok
+  rescue
+    _ -> {:error, for(o <- objects, do: o.key)}
   end
 
   @impl true
@@ -315,122 +331,6 @@ defmodule Nebulex.Adapters.Local do
     |> :lists.usort()
   end
 
-  ## Multi
-
-  @impl true
-  def mget(cache, keys, _opts) do
-    Enum.reduce(keys, %{}, fn key, acc ->
-      if obj = get(cache, key, []),
-        do: Map.put(acc, key, obj),
-        else: acc
-    end)
-  end
-
-  @impl true
-  def mset(cache, objects, opts) do
-    cache.__metadata__.generations
-    |> hd()
-    |> local_set(objects, cache, opts)
-
-    :ok
-  rescue
-    _ -> {:error, for(o <- objects, do: o.key)}
-  end
-
-  ## Lists
-
-  @impl true
-  def lpush(cache, key, values, opts) do
-    key
-    |> Version.validate!(cache, opts)
-    |> maybe_exec(:lpush, {&do_lpush/5, [cache, key, values, opts]})
-  end
-
-  defp do_lpush(cached, cache, key, values, opts) do
-    do_push(cached, cache, key, opts, fn object ->
-      Enum.reduce(values, object, &%{&2 | value: [&1 | &2.value]})
-    end)
-  end
-
-  @impl true
-  def rpush(cache, key, values, opts) do
-    key
-    |> Version.validate!(cache, opts)
-    |> maybe_exec(:rpush, {&do_rpush/5, [cache, key, values, opts]})
-  end
-
-  defp do_rpush(cached, cache, key, values, opts) do
-    do_push(cached, cache, key, opts, &%{&1 | value: &1.value ++ values})
-  end
-
-  defp do_push(cached, cache, key, opts, fun) do
-    object =
-      cached
-      |> maybe_get(cache, key)
-      |> case do
-        nil -> %Object{key: key, value: []}
-        obj -> obj
-      end
-
-    object = do_set(cache, fun.(object), opts)
-    length(object.value)
-  end
-
-  @impl true
-  def lpop(cache, key, opts) do
-    key
-    |> Version.validate!(cache, opts)
-    |> maybe_exec(:lpop, {&do_lpop/4, [cache, key, opts]})
-  end
-
-  defp do_lpop(cached, cache, key, opts) do
-    do_pop(cached, cache, key, opts, fn [value | rest] -> {value, rest} end)
-  end
-
-  @impl true
-  def rpop(cache, key, opts) do
-    key
-    |> Version.validate!(cache, opts)
-    |> maybe_exec(:rpop, {&do_rpop/4, [cache, key, opts]})
-  end
-
-  defp do_rpop(cached, cache, key, opts) do
-    do_pop(cached, cache, key, opts, fn elements ->
-      {rest, [tail]} = :lists.split(length(elements) - 1, elements)
-      {tail, rest}
-    end)
-  end
-
-  defp do_pop(cached, cache, key, opts, fun) do
-    cached
-    |> maybe_get(cache, key)
-    |> case do
-      nil ->
-        nil
-
-      %Object{value: []} ->
-        nil
-
-      %Object{value: elements} = obj ->
-        {value, rest} = fun.(elements)
-        _ = set(cache, %{obj | value: rest}, opts)
-        value
-    end
-  end
-
-  @impl true
-  def lrange(cache, key, offset, limit, opts) do
-    key
-    |> Version.validate!(cache, opts)
-    |> elem(1)
-    |> maybe_get(cache, key)
-    |> case do
-      nil -> []
-      %Object{value: []} -> []
-      %Object{value: elements} -> :lists.sublist(elements, offset, limit)
-    end
-  end
-
   ## Transaction
 
   @impl true
@@ -443,32 +343,8 @@ defmodule Nebulex.Adapters.Local do
 
   ## Helpers
 
-  defp maybe_exec({:nothing, cached}, action, _cb) when action in [:lpush, :rpush],
-    do: length(cached.value)
-
-  defp maybe_exec({:nothing, cached}, :lpop, _cb),
-    do: List.first(cached.value)
-
-  defp maybe_exec({:nothing, cached}, :rpop, _cb),
-    do: List.last(cached.value)
-
-  defp maybe_exec({:nothing, cached}, _action, _cb),
-    do: cached
-
-  defp maybe_exec({:override, cached}, action, {fun, args}) when action in @list_api,
-    do: apply(fun, [cached | args])
-
-  defp maybe_exec({:override, _}, _action, {fun, args}),
-    do: apply(fun, args)
-
-  defp maybe_get(nil, cache, key),
-    do: do_get(cache.__metadata__.generations, cache, key, [])
-
-  defp maybe_get(%Object{key: key, value: nil}, cache, key),
-    do: maybe_get(nil, cache, key)
-
-  defp maybe_get(cached, _cache, _key),
-    do: cached
+  defp maybe_exec({:nothing, cached}, _action, _cb), do: cached
+  defp maybe_exec({:override, _}, _action, {fun, args}), do: apply(fun, args)
 
   defp local_get(tab, key, default, state) do
     case Local.lookup(tab, key, state) do

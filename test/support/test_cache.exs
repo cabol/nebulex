@@ -143,7 +143,7 @@ defmodule Nebulex.TestCache do
     levels =
       for l <- 1..3 do
         level = String.to_atom("#{mod}.L#{l}")
-        :ok = Application.put_env(:nebulex, level, n_shards: 2, gc_interval: 3600)
+        :ok = Application.put_env(:nebulex, level, gc_interval: 3600)
         level
       end
 
@@ -193,7 +193,6 @@ defmodule Nebulex.TestCache do
 
   defmodule AdapterMock do
     @behaviour Nebulex.Adapter
-    @behaviour Nebulex.Adapter.Multi
 
     @impl true
     defmacro __before_compile__(_), do: :ok
@@ -229,10 +228,10 @@ defmodule Nebulex.TestCache do
     def keys(_, _), do: :timer.sleep(1000)
 
     @impl true
-    def mget(_, _, _), do: :timer.sleep(1000)
+    def get_many(_, _, _), do: :timer.sleep(1000)
 
     @impl true
-    def mset(_, _, _), do: Process.exit(self(), :normal)
+    def set_many(_, _, _), do: Process.exit(self(), :normal)
   end
 
   defmodule LocalMock do

@@ -100,13 +100,13 @@ defmodule Nebulex.Adapters.LocalTest do
     end
   end
 
-  test "mset failure" do
+  test "set_many failure" do
     :ok =
       TestCache
       |> Process.whereis()
       |> TestCache.stop()
 
-    assert {:error, ["apples"]} == @cache.mset(%{"apples" => 1})
+    assert {:error, ["apples"]} == @cache.set_many(%{"apples" => 1})
   end
 
   test "push generations" do

@@ -58,25 +58,25 @@ defmodule Nebulex.Adapters.DistTest do
     end
   end
 
-  test "mset and mget errors" do
+  test "set_many and get_many errors" do
     {:ok, pid1} = DistMock.start_link()
     {:ok, pid2} = LocalMock.start_link()
 
-    assert 0 == map_size(DistMock.mget([1, 2, 3], timeout: 10))
+    assert 0 == map_size(DistMock.get_many([1, 2, 3], timeout: 10))
 
-    {:error, err_keys} = DistMock.mset(a: 1, b: 2)
+    {:error, err_keys} = DistMock.set_many(a: 1, b: 2)
     assert [:a, :b] == :lists.usort(err_keys)
 
     :ok = Enum.each([pid1, pid2], &DistMock.stop/1)
   end
 
-  test "mset rollback" do
+  test "set_many rollback" do
     assert 4 == Dist.set(4, 4)
     assert 4 == Dist.get(4)
 
     :ok = teardown_cache(1)
 
-    assert {:error, [1]} == Dist.mset([{4, 44}, {2, 2}, {1, 1}])
+    assert {:error, [1]} == Dist.set_many([{4, 44}, {2, 2}, {1, 1}])
 
     assert 44 == Dist.get(4)
     assert 2 == Dist.get(2)
@@ -87,7 +87,7 @@ defmodule Nebulex.Adapters.DistTest do
   end
 
   test "rpc timeout" do
-    assert :ok == Dist.mset(for x <- 1..100_000, do: {x, x})
+    assert :ok == Dist.set_many(for x <- 1..100_000, do: {x, x})
     {:timeout, _} = catch_exit(Dist.keys(timeout: 1))
   end
 

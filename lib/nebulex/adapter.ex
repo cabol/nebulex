@@ -57,6 +57,26 @@ defmodule Nebulex.Adapter do
   @callback set(cache, object, opts) :: object | no_return
 
   @doc """
+  Returns a map with the objects for all specified keys. For every key that
+  does not hold a value or does not exist, that key is simply ignored.
+  Because of this, the operation never fails.
+
+  See `Nebulex.Cache.get_many/2`.
+  """
+  @callback get_many(cache, [key], opts) :: map
+
+  @doc """
+  Stores multiple objects in the cache.
+
+  Returns `:ok` if the all the objects were successfully set, otherwise
+  `{:error, failed_keys}`, where `failed_keys` contains the keys that
+  could not be set.
+
+  See `Nebulex.Cache.set_many/2`.
+  """
+  @callback set_many(cache, [object], opts) :: :ok | {:error, failed_keys :: [key]}
+
+  @doc """
   Deletes a single object from cache.
 
   See `Nebulex.Cache.delete/2`.

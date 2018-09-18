@@ -51,8 +51,8 @@ defmodule Nebulex.Adapters.Dist do
     * `:timeout` - The time-out value in milliseconds for the command that
       will be executed. If the timeout is exceeded, then the current process
       will exit. This adapter uses `Task.await/2` internally, therefore,
-      check the function documentation to learn more about it. For bulk
-      commands like `mset` and `mget`, if the timeout is exceeded, the task
+      check the function documentation to learn more about it. For commands
+      like `set_many` and `get_many`, if the timeout is exceeded, the task
       is shutted down but the current process doesn't exit, only the result
       associated to that task is just skipped in the reduce phase.
 
@@ -119,8 +119,6 @@ defmodule Nebulex.Adapters.Dist do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
-  @behaviour Nebulex.Adapter.Multi
-  @behaviour Nebulex.Adapter.List
 
   alias Nebulex.Adapters.Dist.RPC
   alias Nebulex.Object
@@ -176,8 +174,38 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   @impl true
+  def get_many(cache, keys, opts) do
+    map_reduce(keys, cache, :get_many, opts, %{}, fn
+      res, _, acc when is_map(res) ->
+        Map.merge(acc, res)
+
+      _, _, acc ->
+        acc
+    end)
+  end
+
+  @impl true
   def set(cache, object, opts) do
     call(cache, object.key, :set, [object, opts], opts)
+  end
+
+  @impl true
+  def set_many(cache, objects, opts) do
+    objects
+    |> map_reduce(cache, :set_many, opts, [], fn
+      :ok, _, acc ->
+        acc
+
+      {:error, err_keys}, _, acc ->
+        err_keys ++ acc
+
+      _, group, acc ->
+        for(o <- group, do: o.key) ++ acc
+    end)
+    |> case do
+      [] -> :ok
+      acc -> {:error, acc}
+    end
   end
 
   @impl true
@@ -223,65 +251,6 @@ defmodule Nebulex.Adapters.Dist do
       rpc_call(node, cache, :keys, [opts], opts) ++ acc
     end)
     |> :lists.usort()
-  end
-
-  ## Multi
-
-  @impl true
-  def mget(cache, keys, opts) do
-    map_reduce(keys, cache, :mget, opts, %{}, fn
-      res, _, acc when is_map(res) ->
-        Map.merge(acc, res)
-
-      _, _, acc ->
-        acc
-    end)
-  end
-
-  @impl true
-  def mset(cache, objects, opts) do
-    objects
-    |> map_reduce(cache, :mset, opts, [], fn
-      :ok, _, acc ->
-        acc
-
-      {:error, err_keys}, _, acc ->
-        err_keys ++ acc
-
-      _, group, acc ->
-        for(o <- group, do: o.key) ++ acc
-    end)
-    |> case do
-      [] -> :ok
-      acc -> {:error, acc}
-    end
-  end
-
-  ## Lists
-
-  @impl true
-  def lpush(cache, key, value, opts) do
-    call(cache, key, :lpush, [key, value, opts], opts)
-  end
-
-  @impl true
-  def rpush(cache, key, value, opts) do
-    call(cache, key, :rpush, [key, value, opts], opts)
-  end
-
-  @impl true
-  def lpop(cache, key, opts) do
-    call(cache, key, :lpop, [key, opts], opts)
-  end
-
-  @impl true
-  def rpop(cache, key, opts) do
-    call(cache, key, :rpop, [key, opts], opts)
-  end
-
-  @impl true
-  def lrange(cache, key, offset, limit, opts) do
-    call(cache, key, :lrange, [key, offset, limit, opts], opts)
   end
 
   ## Private Functions

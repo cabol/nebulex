@@ -94,13 +94,13 @@ defmodule DistBench do
     :ok
   end
 
-  bench "mget" do
-    Dist.mget(@bulk_keys)
+  bench "get_many" do
+    Dist.get_many(@bulk_keys)
     :ok
   end
 
-  bench "mset" do
-    Dist.mset(@bulk_objs)
+  bench "set_many" do
+    Dist.set_many(@bulk_objs)
     :ok
   end
 

@@ -158,8 +158,6 @@ defmodule Nebulex.Adapters.Multilevel do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
-  @behaviour Nebulex.Adapter.Multi
-  @behaviour Nebulex.Adapter.List
   @behaviour Nebulex.Adapter.Transaction
 
   alias Nebulex.Object
@@ -215,8 +213,30 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
+  def get_many(cache, keys, _opts) do
+    Enum.reduce(keys, %{}, fn key, acc ->
+      if obj = get(cache, key, []),
+        do: Map.put(acc, key, obj),
+        else: acc
+    end)
+  end
+
+  @impl true
   def set(cache, object, opts) do
     eval(cache, :set, [object, opts], opts)
+  end
+
+  @impl true
+  def set_many(cache, objects, opts) do
+    opts
+    |> levels(cache)
+    |> Enum.reduce({objects, []}, fn level, {objs, acc} ->
+      do_set_many(level, objs, opts, acc)
+    end)
+    |> case do
+      {_, []} -> :ok
+      {_, err} -> {:error, err}
+    end
   end
 
   @impl true
@@ -274,57 +294,6 @@ defmodule Nebulex.Adapters.Multilevel do
       level_cache.__adapter__.keys(level_cache, opts) ++ acc
     end)
     |> :lists.usort()
-  end
-
-  ## Multi
-
-  @impl true
-  def mget(cache, keys, _opts) do
-    Enum.reduce(keys, %{}, fn key, acc ->
-      if obj = get(cache, key, []),
-        do: Map.put(acc, key, obj),
-        else: acc
-    end)
-  end
-
-  @impl true
-  def mset(cache, objects, opts) do
-    opts
-    |> levels(cache)
-    |> Enum.reduce({objects, []}, fn level, {objs, acc} ->
-      do_mset(level, objs, opts, acc)
-    end)
-    |> case do
-      {_, []} -> :ok
-      {_, err} -> {:error, err}
-    end
-  end
-
-  ## Lists
-
-  @impl true
-  def lpush(cache, key, value, opts) do
-    eval(cache, :lpush, [key, value, opts], opts)
-  end
-
-  @impl true
-  def rpush(cache, key, value, opts) do
-    eval(cache, :rpush, [key, value, opts], opts)
-  end
-
-  @impl true
-  def lpop(cache, key, opts) do
-    eval(cache, :lpop, [key, opts], opts)
-  end
-
-  @impl true
-  def rpop(cache, key, opts) do
-    eval(cache, :rpop, [key, opts], opts)
-  end
-
-  @impl true
-  def lrange(cache, key, offset, limit, opts) do
-    eval(cache, :lrange, [key, offset, limit, opts], opts)
   end
 
   ## Transaction
@@ -399,8 +368,8 @@ defmodule Nebulex.Adapters.Multilevel do
     |> Enum.reduce(object, & &1.__adapter__.set(&1, &2, opts))
   end
 
-  defp do_mset(cache, objs, opts, acc) do
-    case cache.__adapter__.mset(cache, objs, opts) do
+  defp do_set_many(cache, objs, opts, acc) do
+    case cache.__adapter__.set_many(cache, objs, opts) do
       :ok ->
         {objs, acc}
 

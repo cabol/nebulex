@@ -94,13 +94,13 @@ defmodule LocalBench do
     :ok
   end
 
-  bench "mget" do
-    Cache.mget(@bulk_keys)
+  bench "get_many" do
+    Cache.get_many(@bulk_keys)
     :ok
   end
 
-  bench "mset" do
-    Cache.mset(@bulk_objs)
+  bench "set_many" do
+    Cache.set_many(@bulk_objs)
     :ok
   end
 
