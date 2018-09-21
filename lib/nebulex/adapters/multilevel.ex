@@ -158,6 +158,7 @@ defmodule Nebulex.Adapters.Multilevel do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Queryable
   @behaviour Nebulex.Adapter.Transaction
 
   alias Nebulex.Object
@@ -194,7 +195,7 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
-  def init(_cache, _opts), do: {:ok, []}
+  def init(_opts), do: {:ok, []}
 
   @impl true
   def get(cache, key, opts) do
@@ -287,13 +288,35 @@ defmodule Nebulex.Adapters.Multilevel do
     end)
   end
 
+  ## Queryable
+
   @impl true
-  def keys(cache, opts) do
-    cache.__levels__
-    |> Enum.reduce([], fn level_cache, acc ->
-      level_cache.__adapter__.keys(level_cache, opts) ++ acc
-    end)
-    |> :lists.usort()
+  def all(cache, query, opts) do
+    for level_cache <- cache.__levels__,
+        elems <- level_cache.__adapter__.all(level_cache, query, opts),
+        do: elems
+  end
+
+  @impl true
+  def stream(cache, query, opts) do
+    Stream.resource(
+      fn ->
+        cache.__levels__
+      end,
+      fn
+        [] ->
+          {:halt, []}
+
+        [level | levels] ->
+          elements =
+            level
+            |> level.__adapter__.stream(query, opts)
+            |> Enum.to_list()
+
+          {elements, levels}
+      end,
+      & &1
+    )
   end
 
   ## Transaction

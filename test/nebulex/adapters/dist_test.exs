@@ -88,7 +88,7 @@ defmodule Nebulex.Adapters.DistTest do
 
   test "rpc timeout" do
     assert :ok == Dist.set_many(for x <- 1..100_000, do: {x, x})
-    {:timeout, _} = catch_exit(Dist.keys(timeout: 1))
+    {:timeout, _} = catch_exit(Dist.all(:all, timeout: 1))
   end
 
   ## Private Functions

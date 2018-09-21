@@ -2,6 +2,8 @@ defmodule Nebulex.Adapters.LocalTest do
   use ExUnit.Case, async: true
   use Nebulex.CacheTest, cache: Nebulex.TestCache.Local
 
+  import Ex2ms
+
   alias Nebulex.Object
   alias Nebulex.TestCache.Local, as: TestCache
   alias Nebulex.TestCache.Versionless
@@ -106,7 +108,55 @@ defmodule Nebulex.Adapters.LocalTest do
       |> Process.whereis()
       |> TestCache.stop()
 
-    assert {:error, ["apples"]} == @cache.set_many(%{"apples" => 1})
+    assert {:error, ["apples"]} == TestCache.set_many(%{"apples" => 1})
+  end
+
+  test "all and stream using match_spec queries" do
+    values = for x <- 1..5, do: TestCache.set(x, x * 2)
+    TestCache.new_generation()
+    values = values ++ for x <- 6..10, do: TestCache.set(x, x * 2)
+
+    assert values ==
+             :all
+             |> TestCache.stream(page_size: 3, return: :value)
+             |> Enum.to_list()
+             |> :lists.usort()
+
+    {_, expected} = Enum.split(values, 5)
+
+    test_ms =
+      fun do
+        {_, value, _, _} when value > 10 -> value
+      end
+
+    for action <- [:all, :stream] do
+      assert expected == all_or_stream(action, test_ms, page_size: 3, return: :value)
+
+      msg = ~r"invalid match spec"
+
+      assert_raise Nebulex.QueryError, msg, fn ->
+        all_or_stream(action, :invalid_query)
+      end
+    end
+  end
+
+  test "all and stream using expired and unexpired queries" do
+    for action <- [:all, :stream] do
+      expired = for x <- 1..5, do: TestCache.set(x, x * 2, ttl: 3)
+      unexpired = for x <- 6..10, do: TestCache.set(x, x * 2)
+      all = expired ++ unexpired
+
+      opts = [page_size: 3, return: :value]
+
+      assert all == all_or_stream(action, :all, opts)
+      assert all == all_or_stream(action, :all_unexpired, opts)
+      assert [] == all_or_stream(action, :all_expired, opts)
+
+      :timer.sleep(3500)
+
+      assert unexpired == all_or_stream(action, :all_unexpired, opts)
+      assert expired == all_or_stream(action, :all_expired, opts)
+    end
   end
 
   test "push generations" do
@@ -187,6 +237,20 @@ defmodule Nebulex.Adapters.LocalTest do
 
       [{^key, val, vsn, ttl}] ->
         %Object{key: key, value: val, version: vsn, ttl: ttl}
+    end
+  end
+
+  defp all_or_stream(action, ms, opts \\ []) do
+    TestCache
+    |> apply(action, [ms, opts])
+    |> case do
+      list when is_list(list) ->
+        :lists.usort(list)
+
+      stream ->
+        stream
+        |> Enum.to_list()
+        |> :lists.usort()
     end
   end
 end

@@ -67,7 +67,7 @@ defmodule Nebulex.Cache do
   ## Extended API
 
   Some adapters might extend the API with additional functions, therefore,
-  it is important to review the adapters documentation.
+  it is important to check out adapters documentation.
   """
 
   @type t :: module
@@ -240,9 +240,18 @@ defmodule Nebulex.Cache do
         with_hooks(@adapter, :flush)
       end
 
-      @doc false
-      def keys(opts \\ []) do
-        with_hooks(@adapter, :keys, [opts])
+      ## Queryable
+
+      if Nebulex.Adapter.Queryable in behaviours do
+        @doc false
+        def all(query \\ :all, opts \\ []) do
+          with_hooks(Nebulex.Cache.Queryable, :all, [query, opts])
+        end
+
+        @doc false
+        def stream(query \\ :all, opts \\ []) do
+          with_hooks(Nebulex.Cache.Queryable, :stream, [query, opts])
+        end
       end
 
       ## Transactions
@@ -301,11 +310,9 @@ defmodule Nebulex.Cache do
     end
   end
 
-  @optional_callbacks [
-    init: 1,
-    transaction: 2,
-    in_transaction?: 0
-  ]
+  ## Nebulex.Adapter
+
+  @optional_callbacks init: 1
 
   @doc """
   Returns the adapter tied to the cache.
@@ -391,7 +398,7 @@ defmodule Nebulex.Cache do
         MyCache.get(:a, return: :object, version: :invalid, on_conflict: :nothing)
       1 = MyCache.get(:a)
   """
-  @callback get(key, opts) :: nil | return | no_return
+  @callback get(key, opts) :: nil | return
 
   @doc """
   Similar to `get/2` but raises `KeyError` if `key` is not found.
@@ -404,7 +411,7 @@ defmodule Nebulex.Cache do
 
       MyCache.get!(:a)
   """
-  @callback get!(key, opts) :: return | no_return
+  @callback get!(key, opts) :: return
 
   @doc """
   Returns a map with the values or objects (check `:return` option) for all
@@ -483,7 +490,7 @@ defmodule Nebulex.Cache do
       3 = MyCache.set(:a, 3, version: v1, on_conflict: :override)
       3 = MyCache.get(:a)
   """
-  @callback set(key, value, opts) :: return | no_return
+  @callback set(key, value, opts) :: return
 
   @doc """
   Stores the given `value` under `key` in the Cache, only if it does not
@@ -523,7 +530,7 @@ defmodule Nebulex.Cache do
 
       MyCache.add!("foo", "bar")
   """
-  @callback add!(key, value, opts) :: return | no_return
+  @callback add!(key, value, opts) :: return
 
   @doc """
   Alters the value stored under `key` to `value`, but only if the entry `key`
@@ -568,7 +575,7 @@ defmodule Nebulex.Cache do
 
       MyCache.replace!("foo", "bar")
   """
-  @callback replace!(key, value, opts) :: return | no_return
+  @callback replace!(key, value, opts) :: return
 
   @doc """
   When the `key` already exists, the cached value is replaced by `value`,
@@ -591,7 +598,7 @@ defmodule Nebulex.Cache do
 
       MyCache.add_or_replace!("foo", "bar")
   """
-  @callback add_or_replace!(key, value, opts) :: return | no_return
+  @callback add_or_replace!(key, value, opts) :: return
 
   @doc """
   Sets the given `entries`, replacing existing ones, just as regular `set`.
@@ -674,7 +681,7 @@ defmodule Nebulex.Cache do
       :a = MyCache.delete(:a, version: :invalid, on_conflict: :override)
       nil = MyCache.get(:a)
   """
-  @callback delete(key, opts) :: return | no_return
+  @callback delete(key, opts) :: return
 
   @doc """
   Returns and removes the object with key `key` in the cache.
@@ -700,7 +707,7 @@ defmodule Nebulex.Cache do
         |> MyCache.set(1, return: :key)
         |> MyCache.take(return: :object)
   """
-  @callback take(key, opts) :: nil | return | no_return
+  @callback take(key, opts) :: nil | return
 
   @doc """
   Similar to `take/2` but raises `KeyError` if `key` is not found.
@@ -713,7 +720,7 @@ defmodule Nebulex.Cache do
 
       MyCache.take!(:a)
   """
-  @callback take!(key, opts) :: return | no_return
+  @callback take!(key, opts) :: return
 
   @doc """
   Returns whether the given `key` exists in cache.
@@ -776,8 +783,7 @@ defmodule Nebulex.Cache do
           {current_value, "hello world"}
         end, return: :object)
   """
-  @callback get_and_update(key, (value -> {get, update} | :pop), opts) ::
-              {get, update} | no_return
+  @callback get_and_update(key, (value -> {get, update} | :pop), opts) :: {get, update}
             when get: value, update: return
 
   @doc """
@@ -805,7 +811,7 @@ defmodule Nebulex.Cache do
       %Nebulex.Object{value: 4} =
         MyCache.update(:a, 1, &(&1 * 2), return: :object)
   """
-  @callback update(key, initial :: value, (value -> value), opts) :: return | no_return
+  @callback update(key, initial :: value, (value -> value), opts) :: return
 
   @doc """
   Updates (increment or decrement) the counter mapped to the given `key`.
@@ -833,7 +839,7 @@ defmodule Nebulex.Cache do
       %Nebulex.Object{key: :a, value: 2} =
         MyCache.update_counter(:a, 0, return: :object)
   """
-  @callback update_counter(key, incr :: integer, opts) :: integer | no_return
+  @callback update_counter(key, incr :: integer, opts) :: integer
 
   @doc """
   Returns the total number of cached entries.
@@ -861,25 +867,130 @@ defmodule Nebulex.Cache do
 
       for x <- 1..5, do: nil = MyCache.get(x)
   """
-  @callback flush() :: :ok | no_return
+  @callback flush() :: :ok
+
+  ## Nebulex.Adapter.Queryable
+
+  @optional_callbacks all: 2, stream: 2
 
   @doc """
-  Returns all cached keys.
+  Fetches all entries from cache matching the given `query`.
+
+  If the `query` is `:all`, it streams all entries from cache; this is common
+  for all adapters. However, the `query` may have any other value, which
+  depends entirely on the adapter's implementation; check out the "Query"
+  section below.
+
+  May raise `Nebulex.QueryError` if query validation fails.
 
   ## Options
 
-  See adapters documentation. For example, in `Nebulex.Adapters.Dist`
-  adapter, it is possible to pass `:timeout` option.
+  See the "Shared options" section at the module documentation.
+
+  Note that for this function, option `:version` is ignored.
+
+  ## Example
+
+      # fetch all (with default params)
+      MyCache.all()
+
+      # fetch all entries and return values
+      MyCache.all(:all, return: :value)
+
+      # fetch all entries and return objects
+      MyCache.all(:all, return: :object)
+
+      # fetch all entries that match with the given query
+      MyCache.all(myquery)
+
+  ## Query
+
+  Query spec is defined by the adapter, hence, it is recommended to check out
+  adapters documentation. For instance, the built-in `Nebulex.Adapters.Local`
+  adapter supports `:all | :all_unexpired | :all_expired | :ets.match_spec()`
+  as query value.
 
   ## Examples
 
-      for x <- 1..3, do: MyCache.set(x, x*2, return: :key)
+      # additional built-in queries for Nebulex.Adapters.Local adapter
+      MyCache.all(:all_unexpired)
+      MyCache.all(:all_expired)
 
-      [1, 2, 3] = MyCache.keys()
+      # if we are using Nebulex.Adapters.Local adapter, the stored entry
+      # is a tuple {key, value, version, ttl}, then the match spec
+      # could be something like:
+      spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
+      MyCache.all(spec)
 
-  **WARNING:** This is an expensive operation, beware of using it in prod.
+      # using Ex2ms
+      import Ex2ms
+
+      spec =
+        fun do
+          {key, value, _, _} when value > 10 -> {key, value}
+        end
+
+      MyCache.all(spec)
+
+  To learn more, check out adapters documentation.
   """
-  @callback keys(opts) :: [key]
+  @callback all(query :: :all | any, opts) :: [any]
+
+  @doc """
+  Similar to `all/2` but returns a lazy enumerable that emits all entries
+  from the cache matching the given `query`.
+
+  May raise `Nebulex.QueryError` if query validation fails.
+
+  ## Options
+
+  Besides the "Shared options" section at the module documentation,
+  it accepts:
+
+    * `:page_size` - Positive integer (>= 1) that defines the page size for
+      the stream (defaults to `10`).
+
+  ## Examples
+
+      # stream all (with default params)
+      MyCache.stream()
+
+      # stream all entries and return values
+      MyCache.stream(:all, return: :value, page_size: 3)
+
+      # stream all entries and return objects
+      MyCache.stream(:all, return: :object, page_size: 3)
+
+      # stream all entries that match with the given query
+      MyCache.stream(myquery, page_size: 3)
+
+      # additional built-in queries for Nebulex.Adapters.Local adapter
+      MyCache.stream(:all_unexpired)
+      MyCache.stream(:all_expired)
+
+      # if we are using Nebulex.Adapters.Local adapter, the stored entry
+      # is a tuple {key, value, version, ttl}, then the match spec
+      # could be something like:
+      spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
+      MyCache.stream(spec, page_size: 3)
+
+      # using Ex2ms
+      import Ex2ms
+
+      spec =
+        fun do
+          {key, value, _, _} when value > 10 -> {key, value}
+        end
+
+      MyCache.stream(spec, page_size: 3)
+
+  To learn more, check out adapters documentation.
+  """
+  @callback stream(query :: :all | any, opts) :: Enum.t()
+
+  ## Nebulex.Adapter.Transaction
+
+  @optional_callbacks transaction: 2, in_transaction?: 0
 
   @doc """
   Runs the given function inside a transaction.

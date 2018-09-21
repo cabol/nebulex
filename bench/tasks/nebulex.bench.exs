@@ -30,7 +30,12 @@ defmodule Mix.Tasks.Nebulex.Bench do
         expected = List.duplicate({:module, mod}, length(nodes))
 
         {^expected, []} =
-          :rpc.multicall(nodes, :code, :load_binary, [mod, to_charlist(file), bin])
+          :rpc.multicall(
+            nodes,
+            :code,
+            :load_binary,
+            [mod, to_charlist(file), bin]
+          )
       end)
     end)
   end

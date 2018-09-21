@@ -8,6 +8,7 @@ defmodule Nebulex.CacheTest do
       @cache Keyword.fetch!(opts, :cache)
 
       use Nebulex.Cache.ObjectTest, cache: @cache
+      use Nebulex.Cache.QueryableTest, cache: @cache
       use Nebulex.Cache.TransactionTest, cache: @cache
     end
   end

@@ -282,21 +282,6 @@ defmodule Nebulex.Cache.ObjectTest do
       end)
     end
 
-    test "keys" do
-      set1 = for x <- 1..50, do: @cache.set(x, x)
-      set2 = for x <- 51..100, do: @cache.set(x, x)
-
-      for x <- 1..100, do: assert(@cache.get(x) == x)
-      expected = set1 ++ set2
-
-      assert expected == :lists.usort(@cache.keys())
-
-      set3 = for x <- 20..60, do: @cache.delete(x, return: :key)
-      expected = :lists.usort(expected -- set3)
-
-      assert expected == @cache.keys()
-    end
-
     test "update" do
       for x <- 1..2, do: @cache.set(x, x)
 

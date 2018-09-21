@@ -219,12 +219,67 @@ Blog.Cache.has_key?(1)
 
 It returns `true` if the ket exist and `false` otherwise.
 
-### Fetching all keys
+### Fetch and/or stream multiple entires
 
-To fetch all keys from cache, Nebulex provides `keys` function:
+Nebulex provides functions to fetch or stream all entries from cache matching
+the given query.
+
+To fetch all entries from cache:
 
 ```elixir
-Blog.Cache.keys()
+# by default, returns all keys
+Blog.Cache.all()
+
+# fetch all entries and return values
+Blog.Cache.all(:all, return: :value)
+
+# fetch all entries and return objects
+Blog.Cache.all(:all, return: :object)
+
+# built-in queries in `Nebulex.Adapters.Local` adapter
+Blog.Cache.all(:all)
+Blog.Cache.all(:all_unexpired)
+Blog.Cache.all(:all_expired)
+
+# if we are using `Nebulex.Adapters.Local` adapter, the stored entry
+# is a tuple `{key, value, version, ttl}`, then the match spec
+# could be something like:
+spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
+Blog.Cache.all(spec)
+
+# using Ex2ms
+import Ex2ms
+
+spec =
+  fun do
+    {key, value, _, _} when value > 10 -> {key, value}
+  end
+
+Blog.Cache.all(spec)
+```
+
+In the same way, we can stream all entries:
+
+```elixir
+Blog.Cache.stream()
+
+Blog.Cache.stream(:all, page_size: 3, return: :value)
+
+Blog.Cache.stream(:all, page_size: 3, return: :object)
+
+# using `Nebulex.Adapters.Local` adapter
+spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
+Blog.Cache.stream(spec, page_size: 3)
+
+# using Ex2ms
+import Ex2ms
+
+spec =
+  fun do
+    {key, value, _, _} when value > 10 -> {key, value}
+  end
+
+Blog.Cache.stream(spec, page_size: 3)
 ```
 
 ## Updating entries

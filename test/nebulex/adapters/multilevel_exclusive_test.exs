@@ -1,6 +1,7 @@
 defmodule Nebulex.Adapters.MultilevelExclusiveTest do
   use ExUnit.Case, async: true
   use Nebulex.MultilevelTest, cache: Nebulex.TestCache.MultilevelExclusive
+  use Nebulex.Cache.QueryableTest, cache: Nebulex.TestCache.MultilevelExclusive
 
   alias Nebulex.TestCache.MultilevelExclusive, as: Multilevel
 

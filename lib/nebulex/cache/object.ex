@@ -19,7 +19,7 @@ defmodule Nebulex.Cache.Object do
     if result = get(cache, key, opts) do
       result
     else
-      raise(KeyError, key: key, term: cache)
+      raise KeyError, key: key, term: cache
     end
   end
 
@@ -78,7 +78,7 @@ defmodule Nebulex.Cache.Object do
         result
 
       :error ->
-        raise(Nebulex.KeyAlreadyExistsError, cache: cache, key: key)
+        raise Nebulex.KeyAlreadyExistsError, cache: cache, key: key
     end
   end
 
@@ -107,7 +107,7 @@ defmodule Nebulex.Cache.Object do
         result
 
       :error ->
-        raise(KeyError, key: key, term: cache)
+        raise KeyError, key: key, term: cache
     end
   end
 
@@ -167,7 +167,7 @@ defmodule Nebulex.Cache.Object do
     if result = take(cache, key, opts) do
       result
     else
-      raise(KeyError, key: key, term: cache)
+      raise KeyError, key: key, term: cache
     end
   end
 
@@ -220,8 +220,12 @@ defmodule Nebulex.Cache.Object do
   @doc """
   Implementation for `Nebulex.Cache.update_counter/3`.
   """
-  def update_counter(cache, key, incr, opts) do
+  def update_counter(cache, key, incr, opts) when is_integer(incr) do
     cache.__adapter__.update_counter(cache, key, incr, opts)
+  end
+
+  def update_counter(_cache, _key, incr, _opts) do
+    raise ArgumentError, "the incr must be a valid integer, got: #{inspect(incr)}"
   end
 
   ## Helpers

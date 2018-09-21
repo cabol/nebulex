@@ -26,6 +26,8 @@ defmodule LocalBench do
     {:ok, key}
   end
 
+  ## Adapter
+
   bench "get" do
     Cache.get(bench_context)
     :ok
@@ -71,11 +73,6 @@ defmodule LocalBench do
     :ok
   end
 
-  bench "keys" do
-    Cache.keys()
-    :ok
-  end
-
   bench "get_and_update" do
     Cache.get_and_update(bench_context, fn v ->
       if v, do: {v, v}, else: {v, 1}
@@ -104,13 +101,22 @@ defmodule LocalBench do
     :ok
   end
 
+  ## Queryable
+
+  bench "all" do
+    Cache.all()
+    :ok
+  end
+
+  ## Transactions
+
   bench "transaction" do
     Cache.transaction(
       fn ->
         Cache.update_counter(bench_context, 1)
         :ok
       end,
-      keys: [1]
+      keys: [bench_context]
     )
   end
 end

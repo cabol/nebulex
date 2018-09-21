@@ -41,7 +41,7 @@ defmodule Nebulex.Object.Version do
           object_or_key :: object | Nebulex.Cache.key(),
           cache :: Nebulex.Cache.t(),
           opts :: Nebulex.Cache.opts()
-        ) :: {:override | :nothing, object | nil} | no_return
+        ) :: {:override | :nothing, object | nil}
         when object: Nebulex.Object.t()
   def validate!(nil, _cache, _opts), do: {:override, nil}
 

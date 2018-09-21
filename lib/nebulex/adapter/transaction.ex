@@ -129,7 +129,7 @@ defmodule Nebulex.Adapter.Transaction do
 
   A successful transaction returns the value returned by the function.
 
-  See `Nebulex.Cache.t()ransaction/2`.
+  See `Nebulex.Cache.transaction/2`.
   """
   @callback transaction(
               cache :: Nebulex.Cache.t(),
@@ -139,6 +139,8 @@ defmodule Nebulex.Adapter.Transaction do
 
   @doc """
   Returns `true` if the given process is inside a transaction.
+
+  See `Nebulex.Cache.in_transaction?/0`.
   """
   @callback in_transaction?(cache :: Nebulex.Cache.t()) :: boolean
 end

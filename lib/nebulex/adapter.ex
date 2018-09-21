@@ -18,14 +18,14 @@ defmodule Nebulex.Adapter do
   @doc """
   Initializes the adapter supervision tree by returning the children
   """
-  @callback init(cache, opts) :: {:ok, [:supervisor.child_spec() | {module(), term()} | module()]}
+  @callback init(opts) :: {:ok, [:supervisor.child_spec() | {module(), term()} | module()]}
 
   @doc """
   Retrieves a single object from cache.
 
   See `Nebulex.Cache.get/2`.
   """
-  @callback get(cache, key, opts) :: nil | object | no_return
+  @callback get(cache, key, opts) :: nil | object
 
   @doc """
   Stores a single object in the cache.
@@ -54,7 +54,7 @@ defmodule Nebulex.Adapter do
 
   See `Nebulex.Cache.set/3`, `Nebulex.Cache.add/3`, `Nebulex.Cache.replace/3`.
   """
-  @callback set(cache, object, opts) :: object | no_return
+  @callback set(cache, object, opts) :: object
 
   @doc """
   Returns a map with the objects for all specified keys. For every key that
@@ -81,14 +81,14 @@ defmodule Nebulex.Adapter do
 
   See `Nebulex.Cache.delete/2`.
   """
-  @callback delete(cache, key, opts) :: object | no_return
+  @callback delete(cache, key, opts) :: object
 
   @doc """
   Returns and removes the object with key `key` in the cache.
 
   See `Nebulex.Cache.take/2`.
   """
-  @callback take(cache, key, opts) :: object | no_return
+  @callback take(cache, key, opts) :: object
 
   @doc """
   Returns whether the given `key` exists in cache.
@@ -102,7 +102,7 @@ defmodule Nebulex.Adapter do
 
   See `Nebulex.Cache.update_counter/3`.
   """
-  @callback update_counter(cache, key, incr :: integer, opts) :: integer | no_return
+  @callback update_counter(cache, key, incr :: integer, opts) :: integer
 
   @doc """
   Returns the total number of cached entries.
@@ -116,12 +116,5 @@ defmodule Nebulex.Adapter do
 
   See `Nebulex.Cache.flush/0`.
   """
-  @callback flush(cache) :: :ok | no_return
-
-  @doc """
-  Returns all cached keys.
-
-  See `Nebulex.Cache.keys/0`.
-  """
-  @callback keys(cache, opts) :: [key] | no_return
+  @callback flush(cache) :: :ok
 end

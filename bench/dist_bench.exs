@@ -29,6 +29,8 @@ defmodule DistBench do
     {:ok, key}
   end
 
+  ## Adapter
+
   bench "get" do
     Dist.get(bench_context)
     :ok
@@ -74,11 +76,6 @@ defmodule DistBench do
     :ok
   end
 
-  bench "keys" do
-    Dist.keys()
-    :ok
-  end
-
   bench "get_and_update" do
     Dist.get_and_update(:non_existent, &Dist.get_and_update_fun/1)
     :ok
@@ -104,13 +101,22 @@ defmodule DistBench do
     :ok
   end
 
+  ## Queryable
+
+  bench "all" do
+    Dist.all()
+    :ok
+  end
+
+  ## Transactions
+
   bench "transaction" do
     Dist.transaction(
       fn ->
         Dist.update_counter(bench_context, 1)
         :ok
       end,
-      keys: [1]
+      keys: [bench_context]
     )
   end
 end

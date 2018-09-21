@@ -73,6 +73,44 @@ defmodule Nebulex.Adapters.Local do
       MyApp.LocalCache.__metadata__
 
   The rest of the functions as we mentioned before, are for internal use.
+
+  ## Queryable API
+
+  The adapter supports as query parameter the following values:
+
+    * `query` - `:all | :all_unexpired | :all_expired | :ets.match_spec()`
+
+  Internally, an entry is represented by the tuple `{key, value, version, ttl}`,
+  which means the match pattern within the `:ets.match_spec()` must be
+  something like `{:"$1", :"$2", :"$3", :"$4"}`. In order to make query
+  building easier, you can use `Ex2ms` library.
+
+  ## Examples
+
+      # built-in queries
+      MyCache.all(:all)
+      MyCache.all(:all_unexpired)
+      MyCache.all(:all_expired)
+
+      # using a custom match spec (all values > 10)
+      spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
+      MyCache.all(spec)
+
+      # using Ex2ms
+      import Ex2ms
+
+      spec =
+        fun do
+          {key, value, _version, _ttl} when value > 10 -> {key, value}
+        end
+
+      MyCache.all(spec)
+
+  The `:return` option applies only for built-in queries, such as:
+  `:all | :all_unexpired | :all_expired`, if you are using a
+  custom `:ets.match_spec()`, the return value depends on it.
+
+  The same applies to `stream` function.
   """
 
   # Inherit default transaction implementation
@@ -80,6 +118,7 @@ defmodule Nebulex.Adapters.Local do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Queryable
 
   alias Nebulex.Adapters.Local.Generation
   alias Nebulex.Object
@@ -123,7 +162,9 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def init(cache, opts) do
+  def init(opts) do
+    cache = Keyword.fetch!(opts, :cache)
+
     children = [
       %{
         id: cache.__shards_sup_name__,
@@ -289,7 +330,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def update_counter(cache, key, incr, opts) when is_integer(incr) do
+  def update_counter(cache, key, incr, opts) do
     ttl =
       opts
       |> Keyword.get(:ttl)
@@ -298,10 +339,6 @@ defmodule Nebulex.Adapters.Local do
     cache.__metadata__.generations
     |> hd()
     |> Local.update_counter(key, {2, incr}, {key, 0, nil, ttl}, cache.__state__)
-  end
-
-  def update_counter(_cache, _key, incr, _opts) do
-    raise ArgumentError, "the incr must be a valid integer, got: #{inspect(incr)}"
   end
 
   @impl true
@@ -320,24 +357,57 @@ defmodule Nebulex.Adapters.Local do
     :ok
   end
 
-  @impl true
-  def keys(cache, _opts) do
-    ms = [{{:"$1", :_, :_, :_}, [], [:"$1"]}]
+  ## Queryable
 
-    cache.__metadata__.generations
-    |> Enum.reduce([], fn gen, acc ->
-      Local.select(gen, ms, cache.__state__) ++ acc
-    end)
-    |> :lists.usort()
+  @impl true
+  def all(cache, query, opts) do
+    query = validate_match_spec(query, opts)
+
+    for gen <- cache.__metadata__.generations,
+        elems <- Local.select(gen, query, cache.__state__),
+        do: elems
+  end
+
+  @impl true
+  def stream(cache, query, opts) do
+    query
+    |> validate_match_spec(opts)
+    |> do_stream(cache, Keyword.get(opts, :page_size, 10))
+  end
+
+  defp do_stream(match_spec, cache, page_size) do
+    Stream.resource(
+      fn ->
+        [newer | _] = generations = cache.__metadata__.generations
+        result = Local.select(newer, match_spec, page_size, cache.__state__)
+        {result, generations}
+      end,
+      fn
+        {:"$end_of_table", [_gen]} ->
+          {:halt, []}
+
+        {:"$end_of_table", [_gen | generations]} ->
+          result =
+            generations
+            |> hd()
+            |> Local.select(match_spec, page_size, cache.__state__)
+
+          {[], {result, generations}}
+
+        {{elements, cont}, [_ | _] = generations} ->
+          {elements, {Local.select(cont), generations}}
+      end,
+      & &1
+    )
   end
 
   ## Transaction
 
   @impl true
   def transaction(cache, fun, opts) do
-    keys = opts[:keys] || []
-    nodes = opts[:nodes] || [node()]
-    retries = opts[:retries] || :infinity
+    keys = Keyword.get(opts, :keys, [])
+    nodes = Keyword.get(opts, :nodes, [node()])
+    retries = Keyword.get(opts, :retries, :infinity)
     do_transaction(cache, keys, nodes, retries, fun)
   end
 
@@ -422,4 +492,44 @@ defmodule Nebulex.Adapters.Local do
   defp diff_epoch(_), do: :infinity
 
   defp unix_time, do: DateTime.to_unix(DateTime.utc_now())
+
+  defp validate_match_spec(spec, opts) when spec in [:all, :all_unexpired, :all_expired] do
+    [
+      {
+        {:"$1", :"$2", :"$3", :"$4"},
+        if(spec = comp_match_spec(spec), do: [spec], else: []),
+        ret_match_spec(opts)
+      }
+    ]
+  end
+
+  defp validate_match_spec(spec, _opts) do
+    %Object{}
+    |> to_tuples()
+    |> Local.test_ms(spec)
+    |> case do
+      {:ok, _result} ->
+        spec
+
+      {:error, _result} ->
+        raise Nebulex.QueryError, message: "invalid match spec", query: spec
+    end
+  end
+
+  defp comp_match_spec(:all),
+    do: nil
+
+  defp comp_match_spec(:all_unexpired),
+    do: {:orelse, {:==, :"$4", nil}, {:>, :"$4", seconds_since_epoch(0)}}
+
+  defp comp_match_spec(:all_expired),
+    do: {:not, comp_match_spec(:all_unexpired)}
+
+  defp ret_match_spec(opts) do
+    case Keyword.get(opts, :return, :key) do
+      :key -> [:"$1"]
+      :value -> [:"$2"]
+      :object -> [%Object{key: :"$1", value: :"$2", version: :"$3", ttl: :"$4"}]
+    end
+  end
 end

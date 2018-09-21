@@ -198,7 +198,7 @@ defmodule Nebulex.TestCache do
     defmacro __before_compile__(_), do: :ok
 
     @impl true
-    def init(_, _), do: {:ok, []}
+    def init(_), do: {:ok, []}
 
     @impl true
     def get(_, _, _), do: :timer.sleep(1000)
@@ -223,9 +223,6 @@ defmodule Nebulex.TestCache do
 
     @impl true
     def flush(_), do: :timer.sleep(1000)
-
-    @impl true
-    def keys(_, _), do: :timer.sleep(1000)
 
     @impl true
     def get_many(_, _, _), do: :timer.sleep(1000)

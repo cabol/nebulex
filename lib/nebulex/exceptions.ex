@@ -39,3 +39,23 @@ defmodule Nebulex.KeyAlreadyExistsError do
     "key #{inspect(key)} already exists in cache #{inspect(cache)}"
   end
 end
+
+defmodule Nebulex.QueryError do
+  @moduledoc """
+  Raised at runtime when the query is invalid.
+  """
+  defexception [:message]
+
+  def exception(opts) do
+    message = Keyword.fetch!(opts, :message)
+    query = Keyword.fetch!(opts, :query)
+
+    message = """
+    #{message} in query:
+
+    #{inspect(query, pretty: true)}
+    """
+
+    %__MODULE__{message: message}
+  end
+end

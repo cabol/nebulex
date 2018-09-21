@@ -212,17 +212,24 @@ defmodule Nebulex.MultilevelTest do
       for x <- 1..30, do: refute(@cache.get(x))
     end
 
-    test "keys" do
+    test "all and stream" do
       l1 = for x <- 1..30, do: @l1.set(x, x)
       l2 = for x <- 20..60, do: @l2.set(x, x)
       l3 = for x <- 50..100, do: @l3.set(x, x)
-      expected = :lists.usort(l1 ++ l2 ++ l3)
 
-      assert expected == @cache.keys()
+      expected = :lists.usort(l1 ++ l2 ++ l3)
+      assert expected == :lists.usort(@cache.all())
+
+      stream = @cache.stream()
+
+      assert expected ==
+               stream
+               |> Enum.to_list()
+               |> :lists.usort()
 
       del = for x <- 20..60, do: @cache.delete(x, return: :key)
-
-      assert @cache.keys() == :lists.usort(expected -- del)
+      expected = :lists.usort(expected -- del)
+      assert expected == :lists.usort(@cache.all())
     end
 
     test "get_and_update" do

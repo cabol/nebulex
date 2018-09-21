@@ -66,7 +66,7 @@ defmodule Nebulex.Cache.Supervisor do
   def init({cache, otp_app, adapter, opts}) do
     case runtime_config(cache, otp_app, opts) do
       {:ok, opts} ->
-        {:ok, children} = adapter.init(cache, opts)
+        {:ok, children} = adapter.init([cache: cache] ++ opts)
         children = maybe_add_stats(opts[:stats], cache, children)
         Supervisor.init(children, strategy: :one_for_one)
 

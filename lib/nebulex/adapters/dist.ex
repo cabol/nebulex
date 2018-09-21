@@ -119,6 +119,7 @@ defmodule Nebulex.Adapters.Dist do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Queryable
 
   alias Nebulex.Adapters.Dist.RPC
   alias Nebulex.Object
@@ -164,7 +165,8 @@ defmodule Nebulex.Adapters.Dist do
   ## Adapter
 
   @impl true
-  def init(cache, _opts) do
+  def init(opts) do
+    cache = Keyword.fetch!(opts, :cache)
     {:ok, [{Task.Supervisor, name: cache.__task_sup__}]}
   end
 
@@ -244,13 +246,49 @@ defmodule Nebulex.Adapters.Dist do
     end)
   end
 
+  ## Queryable
+
   @impl true
-  def keys(cache, opts) do
-    cache.get_nodes()
-    |> Enum.reduce([], fn node, acc ->
-      rpc_call(node, cache, :keys, [opts], opts) ++ acc
-    end)
-    |> :lists.usort()
+  def all(cache, query, opts) do
+    for node <- cache.get_nodes(),
+        elems <- rpc_call(node, cache, :all, [query, opts], opts),
+        do: elems
+  end
+
+  @impl true
+  def stream(cache, query, opts) do
+    Stream.resource(
+      fn ->
+        cache.get_nodes()
+      end,
+      fn
+        [] ->
+          {:halt, []}
+
+        [node | nodes] ->
+          elements =
+            rpc_call(
+              node,
+              __MODULE__,
+              :eval_local_stream,
+              [cache, query, opts],
+              cache.__task_sup__,
+              opts
+            )
+
+          {elements, nodes}
+      end,
+      & &1
+    )
+  end
+
+  @doc """
+  Helper to perform `stream/3` locally.
+  """
+  def eval_local_stream(cache, query, opts) do
+    cache.__local__
+    |> cache.__local__.__adapter__.stream(query, opts)
+    |> Enum.to_list()
   end
 
   ## Private Functions
@@ -262,14 +300,19 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   defp rpc_call(node, cache, fun, args, opts \\ []) do
-    node
-    |> RPC.call(
+    rpc_call(
+      node,
       cache.__local__.__adapter__,
       fun,
       [cache.__local__ | args],
       cache.__task_sup__,
-      Keyword.get(opts, :timeout, 5000)
+      opts
     )
+  end
+
+  defp rpc_call(node, mod, fun, args, supervisor, opts) do
+    node
+    |> RPC.call(mod, fun, args, supervisor, Keyword.get(opts, :timeout, 5000))
     |> case do
       {:badrpc, remote_ex} -> raise remote_ex
       response -> response
