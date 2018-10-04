@@ -46,7 +46,7 @@ defmodule Nebulex.Adapters.LocalTest do
 
     assert {1, 2} == TestCache.get_and_update(1, &{&1, &1 * 2})
 
-    {2, %Object{key: 1, value: 6, ttl: _, version: _}} =
+    {2, %Object{key: 1, value: 6, expire_at: _, version: _}} =
       TestCache.get_and_update(1, &{&1, &1 * 3}, return: :object)
 
     assert {6, nil} == TestCache.get_and_update(1, &{&1, nil})
@@ -235,8 +235,8 @@ defmodule Nebulex.Adapters.LocalTest do
       [] ->
         nil
 
-      [{^key, val, vsn, ttl}] ->
-        %Object{key: key, value: val, version: vsn, ttl: ttl}
+      [{^key, val, vsn, expire_at}] ->
+        %Object{key: key, value: val, version: vsn, expire_at: expire_at}
     end
   end
 

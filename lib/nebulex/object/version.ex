@@ -13,8 +13,8 @@ defmodule Nebulex.Object.Version do
 
         def generate(nil), do: 0
 
-        def generate(%Object{version: version} = object) do
-          %{object | version: version + 1}
+        def generate(%Object{version: version}) do
+          version + 1
         end
       end
 
@@ -23,9 +23,9 @@ defmodule Nebulex.Object.Version do
   """
 
   @doc """
-  Returns a cache object with the new generated version.
+  Generates a new version for the current cached object.
   """
-  @callback generate(cached_object :: Nebulex.Object.t()) :: Nebulex.Object.t()
+  @callback generate(cached_object :: Nebulex.Object.t()) :: any
 
   alias Nebulex.Object
 
@@ -35,43 +35,39 @@ defmodule Nebulex.Object.Version do
   This function is used by cache's adapters which implement
   optimistic locking via object's version.
 
-  For more information, check the different adapter implementations.
+  For more information, check out adapters implementation.
   """
-  @spec validate!(
-          object_or_key :: object | Nebulex.Cache.key(),
+  @spec validate(
+          object_or_key,
           cache :: Nebulex.Cache.t(),
           opts :: Nebulex.Cache.opts()
-        ) :: {:override | :nothing, object | nil}
-        when object: Nebulex.Object.t()
-  def validate!(nil, _cache, _opts), do: {:override, nil}
+        ) :: {:override | :nothing, object_or_key}
+        when object_or_key: Nebulex.Object.t() | Nebulex.Cache.key()
+  def validate(nil, _cache, _opts), do: {:override, nil}
 
-  def validate!(%Object{} = object, cache, opts) do
+  def validate(object_or_key, cache, opts) do
     opts
     |> Keyword.get(:version)
     |> case do
       nil ->
-        {:override, object}
+        {:override, object_or_key}
 
       vsn ->
         # TODO: There is still a race condition between the `get` to retrieve
         # the cached object and the command executed later in the adapter
         cache
-        |> maybe_get(object)
+        |> maybe_get(object_or_key)
         |> on_conflict(vsn, Keyword.get(opts, :on_conflict, :raise))
     end
   end
 
-  def validate!(key, cache, opts) do
-    validate!(%Object{key: key}, cache, opts)
-  end
-
   ## Helpers
-
-  defp maybe_get(cache, %Object{key: key, value: nil}),
-    do: cache.__adapter__.get(cache, key, [])
 
   defp maybe_get(_cache, %Object{} = object),
     do: object
+
+  defp maybe_get(cache, key),
+    do: cache.__adapter__.get(cache, key, [])
 
   defp on_conflict(%Object{version: version} = cached, version, _on_conflict),
     do: {:override, cached}

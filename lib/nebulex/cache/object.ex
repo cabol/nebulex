@@ -2,6 +2,7 @@ defmodule Nebulex.Cache.Object do
   @moduledoc false
 
   alias Nebulex.Object
+  alias Nebulex.Object.Version
 
   @doc """
   Implementation for `Nebulex.Cache.get/2`.
@@ -9,6 +10,8 @@ defmodule Nebulex.Cache.Object do
   def get(cache, key, opts) do
     cache
     |> cache.__adapter__.get(key, opts)
+    |> Version.validate(cache, opts)
+    |> elem(1)
     |> return(opts)
   end
 
@@ -31,13 +34,13 @@ defmodule Nebulex.Cache.Object do
   def get_many(cache, keys, opts) do
     objects_map = cache.__adapter__.get_many(cache, keys, opts)
 
-    case opts[:return] do
+    case Keyword.get(opts, :return) do
       :object ->
         objects_map
 
       _ ->
         Enum.reduce(objects_map, %{}, fn {key, obj}, acc ->
-          Map.put(acc, key, Nebulex.Cache.Object.return(obj, opts))
+          Map.put(acc, key, return(obj, opts))
         end)
     end
   end
@@ -49,8 +52,54 @@ defmodule Nebulex.Cache.Object do
 
   def set(cache, key, value, opts) do
     cache
-    |> cache.__adapter__.set(%Object{key: key, value: value}, opts)
+    |> do_set(key, value, opts)
+    |> elem(1)
     |> return(opts)
+  end
+
+  defp do_set(cache, key, value, opts) do
+    case Version.validate(key, cache, opts) do
+      {:nothing, cached} ->
+        {true, cached}
+
+      {:override, cached} ->
+        object = %Object{
+          key: key,
+          value: value,
+          version: cache.object_vsn(cached),
+          expire_at: Object.expire_at(Keyword.get(opts, :ttl))
+        }
+
+        {cache.__adapter__.set(cache, object, opts), object}
+    end
+  end
+
+  @doc """
+  Implementation for `Nebulex.Cache.set_many/2`.
+  """
+  def set_many(_cache, [], _opts), do: :ok
+  def set_many(_cache, entries, _opts) when map_size(entries) == 0, do: :ok
+
+  def set_many(cache, entries, opts) do
+    ttl = Keyword.get(opts, :ttl)
+
+    objects =
+      for entry <- entries do
+        case entry do
+          {key, value} ->
+            %Object{
+              key: key,
+              value: value,
+              version: cache.object_vsn(nil),
+              expire_at: Object.expire_at(ttl)
+            }
+
+          %Object{} = object ->
+            %{object | version: cache.object_vsn(nil)}
+        end
+      end
+
+    cache.__adapter__.set_many(cache, objects, opts)
   end
 
   @doc """
@@ -59,11 +108,12 @@ defmodule Nebulex.Cache.Object do
   def add(_cache, _key, nil, _opts), do: {:ok, nil}
 
   def add(cache, key, value, opts) do
-    cache
-    |> set(key, value, Keyword.put(opts, :set, :add))
-    |> case do
-      nil -> :error
-      res -> {:ok, res}
+    case do_set(cache, key, value, Keyword.put(opts, :action, :add)) do
+      {true, obj} ->
+        {:ok, return(obj, opts)}
+
+      {false, _} ->
+        :error
     end
   end
 
@@ -71,9 +121,7 @@ defmodule Nebulex.Cache.Object do
   Implementation for `Nebulex.Cache.add!/3`.
   """
   def add!(cache, key, value, opts) do
-    cache
-    |> add(key, value, opts)
-    |> case do
+    case add(cache, key, value, opts) do
       {:ok, result} ->
         result
 
@@ -85,14 +133,13 @@ defmodule Nebulex.Cache.Object do
   @doc """
   Implementation for `Nebulex.Cache.replace/3`.
   """
-  def replace(_cache, _key, nil, _opts), do: {:ok, nil}
-
   def replace(cache, key, value, opts) do
-    cache
-    |> set(key, value, Keyword.put(opts, :set, :replace))
-    |> case do
-      nil -> :error
-      res -> {:ok, res}
+    case do_set(cache, key, value, Keyword.put(opts, :action, :replace)) do
+      {true, obj} ->
+        {:ok, return(obj, opts)}
+
+      {false, _} ->
+        :error
     end
   end
 
@@ -100,9 +147,7 @@ defmodule Nebulex.Cache.Object do
   Implementation for `Nebulex.Cache.replace!/3`.
   """
   def replace!(cache, key, value, opts) do
-    cache
-    |> replace(key, value, opts)
-    |> case do
+    case replace(cache, key, value, opts) do
       {:ok, result} ->
         result
 
@@ -117,35 +162,29 @@ defmodule Nebulex.Cache.Object do
   def add_or_replace!(_cache, _key, nil, _opts), do: nil
 
   def add_or_replace!(cache, key, value, opts) do
-    cache
-    |> set(key, value, Keyword.put(opts, :set, :replace))
-    |> case do
-      nil -> add!(cache, key, value, opts)
-      res -> res
+    case replace(cache, key, value, opts) do
+      {:ok, return} ->
+        return
+
+      :error ->
+        add!(cache, key, value, opts)
     end
-  end
-
-  @doc """
-  Implementation for `Nebulex.Cache.set_many/2`.
-  """
-  def set_many(_cache, [], _opts), do: :ok
-  def set_many(_cache, entries, _opts) when map_size(entries) == 0, do: :ok
-
-  def set_many(cache, entries, opts) do
-    objects =
-      for {key, value} <- entries, value != nil do
-        %Object{key: key, value: value}
-      end
-
-    cache.__adapter__.set_many(cache, objects, opts)
   end
 
   @doc """
   Implementation for `Nebulex.Cache.delete/2`.
   """
   def delete(cache, key, opts) do
-    cache
-    |> cache.__adapter__.delete(key, opts)
+    key
+    |> Version.validate(cache, opts)
+    |> case do
+      {:nothing, cached} ->
+        cached
+
+      {:override, cached} ->
+        :ok = cache.__adapter__.delete(cache, key, opts)
+        cached || %Object{key: key}
+    end
     |> return(Keyword.put_new(opts, :return, :key))
   end
 
@@ -155,8 +194,15 @@ defmodule Nebulex.Cache.Object do
   def take(_cache, nil, _opts), do: nil
 
   def take(cache, key, opts) do
-    cache
-    |> cache.__adapter__.take(key, opts)
+    key
+    |> Version.validate(cache, opts)
+    |> case do
+      {:nothing, cached} ->
+        cached
+
+      {:override, _cached} ->
+        cache.__adapter__.take(cache, key, opts)
+    end
     |> return(opts)
   end
 
@@ -189,7 +235,7 @@ defmodule Nebulex.Cache.Object do
         {nil, set(cache, key, update, opts)}
 
       {get, update} ->
-        {get, set(cache, key, update, Keyword.put(opts, :ttl, Object.ttl(current)))}
+        {get, replace!(cache, key, update, opts)}
 
       :pop ->
         if current.value, do: delete(cache, key, opts)
@@ -206,9 +252,7 @@ defmodule Nebulex.Cache.Object do
   Implementation for `Nebulex.Cache.update/4`.
   """
   def update(cache, key, initial, fun, opts) do
-    cache
-    |> cache.__adapter__.get(key, opts)
-    |> case do
+    case cache.__adapter__.get(cache, key, opts) do
       nil ->
         set(cache, key, initial, opts)
 
@@ -238,5 +282,9 @@ defmodule Nebulex.Cache.Object do
       :value -> object.value
       :key -> object.key
     end
+  end
+
+  def return(key, opts) do
+    return(%Object{key: key}, opts)
   end
 end

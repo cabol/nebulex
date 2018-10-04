@@ -18,8 +18,8 @@ useful and powerful features such as:
     Partitioned, Near, Replicated, etc.
 
   * Different eviction mechanisms, such as: time-based eviction through
-    a `:ttl` (Time-To_Live) property on the cached objects,
-    [Multi-queue][multi_queue] or [generational caching][generational_caching]
+    the expiry time property (`expire_at`) on the cached objects,
+    [multi-queue][multi_queue] or [generational caching][generational_caching]
     (built-in local cache), etc.
 
   * Object versioning (through the `:version` property); enabling
@@ -28,9 +28,6 @@ useful and powerful features such as:
   * [Pre/Post execution hooks](http://hexdocs.pm/nebulex/hooks.html).
 
   * Transactions and key-locking (`Nebulex.Adapter.Transaction`).
-
-  * Data Types support (based on Redis Data Types). Check out extended APIs
-    like: `Nebulex.Adapter.List`.
 
 [ecto]: https://github.com/elixir-ecto/ecto
 [multi_queue]: https://en.wikipedia.org/wiki/Cache_replacement_policies#Multi_queue_(MQ)

@@ -18,10 +18,7 @@ defmodule Nebulex.Adapters.Multilevel do
 
   ## Options
 
-  These options should be set in the config file and require
-  recompilation in order to make an effect.
-
-    * `:adapter` - The adapter name, in this case, `Nebulex.Adapters.Multilevel`
+  These options can be set through the config file:
 
     * `:cache_model` - Specifies the cache model: `:inclusive` or `:exclusive`;
       defaults to `:inclusive`. In an inclusive cache, the same data can be
@@ -218,7 +215,7 @@ defmodule Nebulex.Adapters.Multilevel do
     cache.__levels__
     |> Enum.reduce_while({nil, []}, fun)
     |> maybe_fallback(cache, key, opts)
-    |> maybe_replicate_data(cache, opts)
+    |> maybe_replicate(cache)
   end
 
   @impl true
@@ -239,8 +236,8 @@ defmodule Nebulex.Adapters.Multilevel do
   def set_many(cache, objects, opts) do
     opts
     |> levels(cache)
-    |> Enum.reduce({objects, []}, fn level, {objs, acc} ->
-      do_set_many(level, objs, opts, acc)
+    |> Enum.reduce({objects, []}, fn level, {objects_acc, err_acc} ->
+      do_set_many(level, objects_acc, opts, err_acc)
     end)
     |> case do
       {_, []} -> :ok
@@ -357,9 +354,7 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   defp levels(opts, cache) do
-    opts
-    |> Keyword.get(:level)
-    |> case do
+    case Keyword.get(opts, :level) do
       nil -> cache.__levels__
       level -> [:lists.nth(level, cache.__levels__)]
     end
@@ -384,29 +379,42 @@ defmodule Nebulex.Adapters.Multilevel do
 
   defp maybe_fallback(return, _, _, _), do: return
 
-  defp eval_fallback(fallback, key) when is_function(fallback, 1), do: fallback.(key)
-  defp eval_fallback({m, f}, key) when is_atom(m) and is_atom(f), do: apply(m, f, [key])
+  defp eval_fallback(fallback, key) when is_function(fallback, 1),
+    do: fallback.(key)
 
-  defp maybe_replicate_data({nil, _}, _, _), do: nil
-  defp maybe_replicate_data({%Object{value: nil}, _}, _, _), do: nil
+  defp eval_fallback({m, f}, key) when is_atom(m) and is_atom(f),
+    do: apply(m, f, [key])
 
-  defp maybe_replicate_data({object, levels}, cache, opts) do
+  defp maybe_replicate({nil, _}, _), do: nil
+  defp maybe_replicate({%Object{value: nil}, _}, _), do: nil
+
+  defp maybe_replicate({object, levels}, cache) do
     cache.__model__
     |> case do
       :exclusive -> []
       :inclusive -> levels
     end
-    |> Enum.reduce(object, & &1.__adapter__.set(&1, &2, opts))
+    |> Enum.reduce(object, &replicate(&1, &2))
   end
 
-  defp do_set_many(cache, objs, opts, acc) do
-    case cache.__adapter__.set_many(cache, objs, opts) do
+  defp replicate(cache, %Object{expire_at: expire_at} = object) do
+    object =
+      if expire_at,
+        do: %{object | expire_at: expire_at - DateTime.to_unix(DateTime.utc_now())},
+        else: object
+
+    true = cache.__adapter__.set(cache, object, [])
+    object
+  end
+
+  defp do_set_many(cache, entries, opts, acc) do
+    case cache.__adapter__.set_many(cache, entries, opts) do
       :ok ->
-        {objs, acc}
+        {entries, acc}
 
       {:error, err_keys} ->
-        objs = for %Object{key: key} = obj <- objs, not (key in err_keys), do: obj
-        {objs, err_keys ++ acc}
+        entries = for {k, _} = e <- entries, not (k in err_keys), do: e
+        {entries, err_keys ++ acc}
     end
   end
 end

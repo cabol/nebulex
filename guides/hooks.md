@@ -20,7 +20,9 @@ like this:
 
 ```elixir
 defmodule MyApp.Cache do
-  use Nebulex.Cache, otp_app: :my_app, adapter: Nebulex.Adapters.Local
+  use Nebulex.Cache,
+    otp_app: :my_app,
+    adapter: Nebulex.Adapters.Local
 
   require Logger
 

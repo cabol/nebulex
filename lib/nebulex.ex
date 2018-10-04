@@ -100,11 +100,11 @@ defmodule Nebulex do
   entry, the cache returns only the value of that entry, but you can ask
   for return the whole object:
 
-      iex> MyCache.set "foo", "bar", return: :object
-      %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: nil}
+      iex> MyCache.set("foo", "bar", return: :object)
+      %Nebulex.Object{key: "foo", expire_at: nil, value: "bar", version: nil}
 
-      iex> MyCache.get "foo", return: :object
-      %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: nil}
+      iex> MyCache.get("foo", return: :object)
+      %Nebulex.Object{key: "foo", expire_at: nil, value: "bar", version: nil}
 
   See `Nebulex.Object` to learn more about it.
 
@@ -116,13 +116,13 @@ defmodule Nebulex do
 
   Supposing we have a "serial" version generator:
 
-      iex> MyCache.set "foo", "bar", return: :object
-      %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: 1}
+      iex> MyCache.set("foo", "bar", return: :object)
+      %Nebulex.Object{key: "foo", expire_at: nil, value: "bar", version: 1}
 
-      iex> MyCache.set "foo", "bar", version: 1, return: :object
-      %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: 2}
+      iex> MyCache.set("foo", "bar", version: 1, return: :object)
+      %Nebulex.Object{key: "foo", expire_at: nil, value: "bar", version: 2}
 
-      iex> MyCache.set "foo", "bar", version: 2, return: :object
-      %Nebulex.Object{key: "foo", ttl: :infinity, value: "bar", version: 3}
+      iex> MyCache.set("foo", "bar", version: 2, return: :object)
+      %Nebulex.Object{key: "foo", expire_at: nil, value: "bar", version: 3}
   """
 end

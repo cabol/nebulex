@@ -2,8 +2,8 @@ defmodule Nebulex.Version.Timestamp do
   @behaviour Nebulex.Object.Version
 
   @impl true
-  def generate(object) do
-    %{object | version: DateTime.to_unix(DateTime.utc_now(), :nanoseconds)}
+  def generate(_cached) do
+    DateTime.to_unix(DateTime.utc_now(), :nanoseconds)
   end
 end
 
@@ -130,7 +130,8 @@ defmodule Nebulex.TestCache do
     Application.put_env(
       :nebulex,
       Nebulex.TestCache.Dist,
-      local: Nebulex.TestCache.DistLocal
+      local: Nebulex.TestCache.DistLocal,
+      version_generator: Nebulex.Version.Timestamp
     )
 
   defmodule Dist do
@@ -228,7 +229,7 @@ defmodule Nebulex.TestCache do
     def init(_), do: {:ok, []}
 
     @impl true
-    def get(_, _, _), do: :timer.sleep(1000)
+    def get(_, _, _), do: raise(ArgumentError, "Error")
 
     @impl true
     def set(_, _, _), do: :timer.sleep(1000)

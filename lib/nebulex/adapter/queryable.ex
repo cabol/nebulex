@@ -15,6 +15,8 @@ defmodule Nebulex.Adapter.Queryable do
   recommended to check out adapters documentation. For instance, the built-in
   `Nebulex.Adapters.Local` adapter supports `:ets.match_spec()` as query.
 
+  May raise `Nebulex.QueryError` if query validation fails.
+
   See `Nebulex.Cache.all/2`.
   """
   @callback all(cache, query :: :all | any, opts) :: [any]
@@ -23,6 +25,8 @@ defmodule Nebulex.Adapter.Queryable do
   Streams the given `query`.
 
   It returns a stream of values.
+
+  May raise `Nebulex.QueryError` if query validation fails.
 
   See `Nebulex.Cache.stream/2`.
   """

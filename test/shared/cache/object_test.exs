@@ -151,7 +151,31 @@ defmodule Nebulex.Cache.ObjectTest do
       assert "bar bar bar" == @cache.replace!("foo", "bar bar bar")
 
       %Object{version: v1} = @cache.replace!("foo", "bar", return: :object)
-      %Object{version: v2} = @cache.replace!("foo", "bar bar", version: v1, return: :object)
+      %Object{version: v2} = @cache.replace!("foo", "bar2", version: v1, return: :object)
+      assert v1 != v2
+    end
+
+    test "replace but only ttl or version" do
+      assert "bar" == @cache.set("foo", "bar")
+
+      %Object{value: "bar"} =
+        object =
+        "foo"
+        |> @cache.replace!(nil, ttl: 5, return: :key)
+        |> @cache.get!(return: :object)
+
+      assert 5 == Object.remaining_ttl(object)
+
+      %Object{value: "bar bar"} =
+        object =
+        "foo"
+        |> @cache.replace!("bar bar", return: :key)
+        |> @cache.get!(return: :object)
+
+      assert 5 == Object.remaining_ttl(object.expire_at)
+
+      %Object{value: "bar bar", version: v1} = @cache.get!("foo", return: :object)
+      %Object{value: nil, version: v2} = @cache.replace!("foo", nil, return: :object)
       assert v1 != v2
     end
 
@@ -193,7 +217,7 @@ defmodule Nebulex.Cache.ObjectTest do
 
       refute @cache.get(0)
       for x <- 1..3, do: assert(x == @cache.get(x))
-      _ = :timer.sleep(1200)
+      _ = :timer.sleep(2000)
       for x <- 1..3, do: refute(@cache.get(x))
 
       assert :ok == @cache.set_many(%{"apples" => 1, "bananas" => 3})
@@ -202,6 +226,16 @@ defmodule Nebulex.Cache.ObjectTest do
       assert 3 == @cache.get("bananas")
       assert 2 == @cache.get(:blueberries)
       assert 5 == @cache.get(:strawberries)
+
+      :ok =
+        @cache.set_many([
+          %Object{key: :a, value: 1},
+          %Object{key: :b, value: 2, expire_at: Object.expire_at(5)}
+        ])
+
+      %Object{value: 1, expire_at: nil} = @cache.get!(:a, return: :object)
+      %Object{value: 2} = obj = @cache.get!(:b, return: :object)
+      assert 5 == Object.remaining_ttl(obj)
 
       assert :ok == @cache.set_many([])
       assert :ok == @cache.set_many(%{})
@@ -293,7 +327,8 @@ defmodule Nebulex.Cache.ObjectTest do
       refute @cache.update(4, nil, fun)
       refute @cache.get(4)
 
-      %Object{key: 11, value: 1, ttl: _, version: _} = @cache.update(11, 1, fun, return: :object)
+      %Object{key: 11, value: 1, expire_at: _, version: _} =
+        @cache.update(11, 1, fun, return: :object)
 
       assert 1 == @cache.update(3, 3, fun, version: -1, on_conflict: :nothing)
 
@@ -322,7 +357,7 @@ defmodule Nebulex.Cache.ObjectTest do
       assert 3 == @cache.update_counter(:counter, -2)
       assert 0 == @cache.update_counter(:counter, -3)
 
-      %Object{key: :counter, value: 0, ttl: :infinity} = @cache.get(:counter, return: :object)
+      %Object{key: :counter, value: 0, expire_at: nil} = @cache.get(:counter, return: :object)
 
       assert 1 == @cache.update_counter(:counter_with_ttl, 1, ttl: 1)
       assert 2 == @cache.update_counter(:counter_with_ttl)
@@ -373,43 +408,37 @@ defmodule Nebulex.Cache.ObjectTest do
         |> @cache.get!(return: :object)
 
       for x <- 3..0 do
-        assert x == Object.ttl(obj)
+        assert x == Object.remaining_ttl(obj)
         :timer.sleep(1000)
       end
 
-      assert 3 ==
-               1
-               |> @cache.set(11, ttl: 3, return: :object)
-               |> Object.ttl()
+      ttl =
+        1
+        |> @cache.set(11, ttl: 3, return: :object)
+        |> Object.remaining_ttl()
 
-      assert 3 ==
-               1
-               |> @cache.replace!(22, ttl: 5, return: :key)
-               |> @cache.get!(return: :object)
-               |> Object.ttl()
+      assert ttl > 1
 
-      assert :infinity == Object.ttl(%Object{})
+      assert :infinity == Object.remaining_ttl(nil)
     end
 
     test "get_and_update an existing object with ttl" do
-      assert ttl = @cache.set(1, 1, ttl: 2, return: :object).ttl
-      assert 1 == @cache.get(1)
-
+      %Object{expire_at: expire_at} = @cache.set(1, 1, ttl: 2, return: :object)
       _ = :timer.sleep(500)
+
       assert {1, 2} == @cache.get_and_update(1, &Dist.get_and_update_fun/1)
-      assert ttl == @cache.get(1, return: :object).ttl
+      assert expire_at == @cache.get(1, return: :object).expire_at
 
       _ = :timer.sleep(2000)
       refute @cache.get(1)
     end
 
     test "update an existing object with ttl" do
-      assert ttl = @cache.set(1, 1, ttl: 2, return: :object).ttl
-      assert 1 == @cache.get(1)
-
+      %Object{expire_at: expire_at} = @cache.set(1, 1, ttl: 2, return: :object)
       _ = :timer.sleep(500)
+
       assert "1" == @cache.update(1, 10, &Integer.to_string/1)
-      assert ttl == @cache.get(1, return: :object).ttl
+      assert expire_at == @cache.get(1, return: :object).expire_at
 
       _ = :timer.sleep(2000)
       refute @cache.get(1)

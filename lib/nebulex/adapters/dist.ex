@@ -31,10 +31,7 @@ defmodule Nebulex.Adapters.Dist do
 
   ## Options
 
-  These options should be set in the config file and require
-  recompilation in order to make an effect.
-
-    * `:adapter` - The adapter name, in this case, `Nebulex.Adapters.Dist`.
+  These options can be set through the config file:
 
     * `:local` - The Local Cache module. The value to this option should be
       `Nebulex.Adapters.Local`, unless you want to provide a custom local
@@ -206,7 +203,7 @@ defmodule Nebulex.Adapters.Dist do
         err_keys ++ acc
 
       _, group, acc ->
-        for(o <- group, do: o.key) ++ acc
+        for(obj <- group, do: obj.key) ++ acc
     end)
     |> case do
       [] -> :ok
@@ -315,19 +312,20 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   defp rpc_call(node, mod, fun, args, supervisor, opts) do
-    node
-    |> RPC.call(mod, fun, args, supervisor, Keyword.get(opts, :timeout, 5000))
-    |> case do
-      {:badrpc, remote_ex} -> raise remote_ex
-      response -> response
+    case RPC.call(node, mod, fun, args, supervisor, Keyword.get(opts, :timeout, 5000)) do
+      {:badrpc, remote_ex} ->
+        raise remote_ex
+
+      response ->
+        response
     end
   end
 
-  defp group_keys_by_node(objs_or_keys, cache) do
-    Enum.reduce(objs_or_keys, %{}, fn
-      %Object{} = obj, acc ->
-        node = cache.get_node(obj.key)
-        Map.put(acc, node, [obj | Map.get(acc, node, [])])
+  defp group_keys_by_node(enum, cache) do
+    Enum.reduce(enum, %{}, fn
+      %Object{key: key} = object, acc ->
+        node = cache.get_node(key)
+        Map.put(acc, node, [object | Map.get(acc, node, [])])
 
       key, acc ->
         node = cache.get_node(key)

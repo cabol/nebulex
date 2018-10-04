@@ -5,56 +5,46 @@ defmodule Nebulex.Object do
   This is the struct used by the caches to store and retrieve data.
   """
 
-  defstruct [:key, :value, :version, ttl: :infinity]
+  defstruct [:key, :value, :version, :expire_at]
 
-  @type t :: %__MODULE__{key: any, value: any, version: any, ttl: timeout}
+  @type t :: %__MODULE__{
+          key: any,
+          value: any,
+          version: any,
+          expire_at: integer | nil
+        }
 
   @doc """
-  Returns the remaining time to live for the given object.
+  Returns the UNIX timestamp in seconds for the given `ttl`.
 
   ## Example
 
-      obj = MyCache.set("foo", "bar", return: :object, ttl: 3)
-
-      Nebulex.Object.ttl(obj)
+      iex> Nebulex.Object.expire_at(10)
+      1539787704
   """
-  @spec ttl(Nebulex.Object.t()) :: timeout
-  def ttl(%Nebulex.Object{ttl: :infinity}), do: :infinity
+  @spec expire_at(ttl :: timeout | nil) :: integer | nil
+  def expire_at(nil), do: nil
+  def expire_at(:infinity), do: nil
 
-  def ttl(%Nebulex.Object{ttl: ttl}) when is_integer(ttl) do
-    remaining = ttl - DateTime.to_unix(DateTime.utc_now())
+  def expire_at(ttl) when is_integer(ttl) do
+    DateTime.to_unix(DateTime.utc_now()) + ttl
+  end
+
+  @doc """
+  Returns the remaining time to live for the given timestamp.
+
+  ## Example
+
+      iex> expire_at = Nebulex.Object.expire_at(10)
+      iex> Nebulex.Object.remaining_ttl(expire_at)
+      10
+  """
+  @spec remaining_ttl(object_or_ttl :: Nebulex.Object.t() | integer | nil) :: timeout
+  def remaining_ttl(nil), do: :infinity
+  def remaining_ttl(%Nebulex.Object{expire_at: expire_at}), do: remaining_ttl(expire_at)
+
+  def remaining_ttl(expire_at) when is_integer(expire_at) do
+    remaining = expire_at - DateTime.to_unix(DateTime.utc_now())
     if remaining >= 0, do: remaining, else: 0
-  end
-
-  @doc """
-  Sets the version on `obj_or_objs`. The version is generated using the
-  cache version generator.
-
-  Returns the object or list of objects with the generated version.
-
-  ## Example
-
-      object = %Nebulex.Object{key: "foo", value: "bar"}
-
-      Nebulex.Object.set_version(object, MyCache)
-
-      Nebulex.Object.set_version([object], MyCache)
-  """
-  @spec set_version(obj_or_objs, Nebulex.Cache.t()) :: obj_or_objs
-        when obj_or_objs: Nebulex.Object.t() | [Nebulex.Object.t()]
-  def set_version(obj_or_objs, cache) do
-    if versioner = cache.__version_generator__ do
-      do_set_vsn(obj_or_objs, versioner)
-    else
-      obj_or_objs
-    end
-  end
-
-  defp do_set_vsn(%Nebulex.Object{} = obj, versioner) do
-    versioner.generate(obj)
-  end
-
-  defp do_set_vsn(objs, versioner) do
-    for %Nebulex.Object{} = obj <- objs, do: versioner.generate(obj)
   end
 end

@@ -174,6 +174,12 @@ Now `replace` and `replace!` functions:
 
 # same as previous one but raises `KeyError`
 Blog.Cache.replace!("another", "new value")
+
+# update only the TTL without alter the current value (value is set to nil)
+Blog.Cache.replace!("existing key", nil, ttl: 60)
+
+# updating both, value and TTL
+Blog.Cache.replace!("existing key", "value", ttl: 60)
 ```
 
 ## Retrieving entries
@@ -285,8 +291,9 @@ Blog.Cache.stream(spec, page_size: 3)
 
 ## Updating entries
 
-Updating entries in Nebulex can be achieved in different ways. The basic one,
-using `get` and `set` (the basic functions), like so:
+If you want to generate the new entry based on the current one, you can use
+`get` and then `set`, if you don't care about the current cached value, you
+can use only `set` (or `replace`), like so:
 
 ```elixir
 v1 = Blog.Cache.get(1)
@@ -298,8 +305,8 @@ Blog.Cache.set(1, %{v1 | first_name: "Nebulex"})
 Blog.Cache.set(1, "anything")
 ```
 
-Besides, Nebulex provides `update` and `get_and_update` functions to
-update entries, for example:
+However, Nebulex provides `update` and `get_and_update` functions to update an
+entry value based on current one, for example:
 
 ```elixir
 initial = %{id: 1, first_name: "", last_name: ""}

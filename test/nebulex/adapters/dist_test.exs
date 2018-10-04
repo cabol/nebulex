@@ -46,7 +46,7 @@ defmodule Nebulex.Adapters.DistTest do
     assert {1, 2} == Dist.get_and_update(1, &Dist.get_and_update_fun/1)
     assert {2, 4} == Dist.get_and_update(1, &Dist.get_and_update_fun/1)
 
-    {4, %Object{key: 1, value: 8, ttl: _, version: _}} =
+    {4, %Object{key: 1, value: 8, expire_at: _, version: _}} =
       Dist.get_and_update(1, &Dist.get_and_update_fun/1, return: :object)
 
     assert_raise ArgumentError, fn ->
@@ -58,18 +58,6 @@ defmodule Nebulex.Adapters.DistTest do
       |> Dist.set(1, return: :key)
       |> Dist.get_and_update(&Dist.get_and_update_fun/1, version: -1)
     end
-  end
-
-  test "set_many and get_many errors" do
-    {:ok, pid1} = DistMock.start_link()
-    {:ok, pid2} = LocalMock.start_link()
-
-    assert 0 == map_size(DistMock.get_many([1, 2, 3], timeout: 10))
-
-    {:error, err_keys} = DistMock.set_many(a: 1, b: 2)
-    assert [:a, :b] == :lists.usort(err_keys)
-
-    :ok = Enum.each([pid1, pid2], &DistMock.stop/1)
   end
 
   test "set_many rollback" do
@@ -91,6 +79,22 @@ defmodule Nebulex.Adapters.DistTest do
   test "rpc timeout" do
     assert :ok == Dist.set_many(for x <- 1..100_000, do: {x, x})
     {:timeout, _} = catch_exit(Dist.all(:all, timeout: 1))
+  end
+
+  test "rpc errors" do
+    {:ok, pid1} = DistMock.start_link()
+    {:ok, pid2} = LocalMock.start_link()
+
+    assert 0 == map_size(DistMock.get_many([1, 2, 3], timeout: 10))
+
+    {:error, err_keys} = DistMock.set_many(a: 1, b: 2)
+    assert [:a, :b] == :lists.usort(err_keys)
+
+    assert_raise ArgumentError, fn ->
+      DistMock.get(1)
+    end
+
+    :ok = Enum.each([pid1, pid2], &DistMock.stop/1)
   end
 
   ## Private Functions

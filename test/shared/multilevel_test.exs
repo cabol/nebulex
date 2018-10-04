@@ -104,7 +104,7 @@ defmodule Nebulex.MultilevelTest do
                )
 
       for x <- 1..3, do: assert(x == @cache.get(x))
-      _ = :timer.sleep(1200)
+      _ = :timer.sleep(2000)
       for x <- 1..3, do: refute(@cache.get(x))
 
       assert :ok == @cache.set_many(%{"apples" => 1, "bananas" => 3})

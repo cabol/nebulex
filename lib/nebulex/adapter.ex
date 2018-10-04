@@ -25,36 +25,7 @@ defmodule Nebulex.Adapter do
 
   See `Nebulex.Cache.get/2`.
   """
-  @callback get(cache, key, opts) :: nil | object
-
-  @doc """
-  Stores a single object in the cache.
-
-  ## Options
-
-  Besides the "Shared options" section in `Nebulex.Cache` documentation,
-  it accepts:
-
-    * `:set` - It may be one of `:add`, `:replace`, `nil` (the default).
-      See the "Set" section for more information.
-
-  ## Set
-
-  The `:set` option supports the following values:
-
-    * `:add` - Only set the `key` if it does not already exist. If it does,
-      `nil` is returned.
-
-    * `:replace` - Only set the key if it already exist. If it does not exist,
-      `nil` is returned.
-
-    * `nil` - If key already holds a value, it is overwritten. Any previous
-      `:ttl` (time to live) associated with the key is discarded on successful
-      `set` operation.
-
-  See `Nebulex.Cache.set/3`, `Nebulex.Cache.add/3`, `Nebulex.Cache.replace/3`.
-  """
-  @callback set(cache, object, opts) :: object
+  @callback get(cache, key, opts) :: object | nil
 
   @doc """
   Returns a map with the objects for all specified keys. For every key that
@@ -66,11 +37,49 @@ defmodule Nebulex.Adapter do
   @callback get_many(cache, [key], opts) :: map
 
   @doc """
-  Stores multiple objects in the cache.
+  Sets the given `object` under `key` into the cache.
 
-  Returns `:ok` if the all the objects were successfully set, otherwise
+  ## Options
+
+  Besides the "Shared options" section in `Nebulex.Cache` documentation,
+  it accepts:
+
+    * `:action` - It may be one of `:add`, `:replace`, `:set` (the default).
+      See the "Actions" section for more information.
+
+  ## Actions
+
+  The `:action` option supports the following values:
+
+    * `:add` - Only set the `key` if it does not already exist. If it does,
+      `nil` is returned.
+
+    * `:replace` - Alters the entry stored under `key` into the cache, but
+      only if the entry already exists into the cache. All attributes of the
+      cached object can be updated, either the value if `value` is different
+      than `nil`, or the expiry time if option `:ttl` is set in `opts`. The
+      version is always regenerated.
+
+    * `:set` - Set `key` to hold the given `object`. If key already holds an
+      object, it is overwritten. Any previous `:ttl` (time to live) associated
+      with the key is discarded on successful `set` operation. This action is
+      the default.
+
+  See `Nebulex.Cache.set/3`, `Nebulex.Cache.add/3`, `Nebulex.Cache.replace/3`.
+  """
+  @callback set(cache, object, opts) :: boolean
+
+  @doc """
+  Sets the given `objects`, replacing existing ones, just as regular `set`.
+
+  Returns `:ok` if the all objects were successfully set, otherwise
   `{:error, failed_keys}`, where `failed_keys` contains the keys that
   could not be set.
+
+  Ideally, this operation should be atomic, so all given keys are set at once.
+  But it depends purely on the adapter's implementation and the backend used
+  internally by the adapter. Hence, it is recommended to checkout the
+  adapter's documentation.
 
   See `Nebulex.Cache.set_many/2`.
   """
@@ -81,14 +90,14 @@ defmodule Nebulex.Adapter do
 
   See `Nebulex.Cache.delete/2`.
   """
-  @callback delete(cache, key, opts) :: object
+  @callback delete(cache, key, opts) :: :ok
 
   @doc """
   Returns and removes the object with key `key` in the cache.
 
   See `Nebulex.Cache.take/2`.
   """
-  @callback take(cache, key, opts) :: object
+  @callback take(cache, key, opts) :: object | nil
 
   @doc """
   Returns whether the given `key` exists in cache.
