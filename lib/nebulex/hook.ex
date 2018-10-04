@@ -23,13 +23,14 @@ defmodule Nebulex.Hook do
   ## Example
 
       config :my_app, MyApp.MyCache,
-        adapter: Nebulex.Adapters.Local,
         n_shards: 2,
         pre_hooks_mode: :async,
         post_hooks_mode: :pipe
 
       defmodule MyApp.MyCache do
-        use Nebulex.Cache, adapter: Nebulex.Adapters.Local
+        use Nebulex.Cache,
+          otp_app: :my_app,
+          adapter: Nebulex.Adapters.Local
 
         def pre_hooks do
           [... your pre hook functions ...]
@@ -57,7 +58,9 @@ defmodule Nebulex.Hook do
   ## Examples
 
       defmodule MyCache do
-        use Nebulex.Cache, adapter: Nebulex.Adapters.Local
+        use Nebulex.Cache,
+          otp_app: :my_app,
+          adapter: Nebulex.Adapters.Local
 
         def pre_hooks do
           pre_hook =
@@ -81,7 +84,9 @@ defmodule Nebulex.Hook do
   ## Examples
 
       defmodule MyCache do
-        use Nebulex.Cache, adapter: Nebulex.Adapters.Local
+        use Nebulex.Cache,
+          otp_app: :my_app,
+          adapter: Nebulex.Adapters.Local
 
         def post_hooks do
           {:pipe, [&post_hook/2]}

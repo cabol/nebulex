@@ -56,26 +56,39 @@ defmodule Nebulex.TestCache do
     )
 
   defmodule Local do
-    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
   end
 
   defmodule Versionless do
-    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
   end
 
   defmodule HookableCache do
     defmodule C1 do
-      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+
       use Hooks
     end
 
     defmodule C2 do
-      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+
       use Hooks, post_hooks_mode: :pipe
     end
 
     defmodule C3 do
-      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+
       use Hooks, post_hooks_mode: :sync
     end
   end
@@ -88,7 +101,9 @@ defmodule Nebulex.TestCache do
     )
 
   defmodule CacheStats do
-    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
 
     def post_hooks do
       {:pipe, []}
@@ -105,7 +120,9 @@ defmodule Nebulex.TestCache do
       )
 
     defmodule mod do
-      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
     end
   end
 
@@ -117,7 +134,9 @@ defmodule Nebulex.TestCache do
     )
 
   defmodule Dist do
-    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Dist
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Dist
 
     def reducer_fun(object, {acc1, acc2}) do
       if Map.has_key?(acc1, object.key),
@@ -159,18 +178,26 @@ defmodule Nebulex.TestCache do
     :ok = Application.put_env(:nebulex, mod, config)
 
     defmodule mod do
-      use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Multilevel
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Multilevel
 
       defmodule L1 do
-        use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: Nebulex.Adapters.Local
       end
 
       defmodule L2 do
-        use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: Nebulex.Adapters.Local
       end
 
       defmodule L3 do
-        use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: Nebulex.Adapters.Local
       end
 
       def fallback(_key) do
@@ -232,10 +259,14 @@ defmodule Nebulex.TestCache do
   end
 
   defmodule LocalMock do
-    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.TestCache.AdapterMock
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.TestCache.AdapterMock
   end
 
   defmodule DistMock do
-    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Dist
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Dist
   end
 end

@@ -10,7 +10,9 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
 
       assert_file("lib/cache.ex", """
       defmodule Cache do
-        use Nebulex.Cache, otp_app: :nebulex
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: Nebulex.Adapters.Local
       end
       """)
 
@@ -18,7 +20,6 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
       use Mix.Config
 
       config :nebulex, Cache,
-        adapter: Nebulex.Adapters.Local,
         gc_interval: 86_400 # 24 hrs
       """)
     end)
@@ -41,7 +42,6 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
       use Mix.Config
 
       config :nebulex, Cache,
-        adapter: Nebulex.Adapters.Local,
         gc_interval: 86_400 # 24 hrs
 
       # World
@@ -70,7 +70,9 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
 
       assert_file("lib/cache.ex", """
       defmodule Cache do
-        use Nebulex.Cache, otp_app: :nebulex
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: Nebulex.Adapters.Dist
       end
       """)
 
@@ -78,7 +80,6 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
       use Mix.Config
 
       config :nebulex, Cache,
-        adapter: Nebulex.Adapters.Dist,
         local: :YOUR_LOCAL_CACHE
       """)
     end)
@@ -90,7 +91,9 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
 
       assert_file("lib/cache.ex", """
       defmodule Cache do
-        use Nebulex.Cache, otp_app: :nebulex
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: Nebulex.Adapters.Multilevel
       end
       """)
 
@@ -98,7 +101,6 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
       use Mix.Config
 
       config :nebulex, Cache,
-        adapter: Nebulex.Adapters.Multilevel,
         cache_model: :inclusive,
         levels: []
       """)
@@ -111,7 +113,9 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
 
       assert_file("lib/cache.ex", """
       defmodule Cache do
-        use Nebulex.Cache, otp_app: :nebulex
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: MyAdapter
       end
       """)
 
@@ -119,7 +123,7 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
       use Mix.Config
 
       config :nebulex, Cache,
-        adapter: MyAdapter
+        gc_interval: 86_400 # 24 hrs
       """)
     end)
   end

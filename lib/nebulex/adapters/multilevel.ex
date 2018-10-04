@@ -66,14 +66,20 @@ defmodule Nebulex.Adapters.Multilevel do
   multi-level cache as follows:
 
       defmodule MyApp.MultilevelCache do
-        use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Multilevel
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: Nebulex.Adapters.Multilevel
 
         defmodule L1 do
-          use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+          use Nebulex.Cache,
+            otp_app: :nebulex,
+            adapter: Nebulex.Adapters.Local
         end
 
         defmodule L2 do
-          use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Dist
+          use Nebulex.Cache,
+            otp_app: :nebulex,
+            adapter: Nebulex.Adapters.Dist
         end
 
         def fallback(_key) do
@@ -83,7 +89,9 @@ defmodule Nebulex.Adapters.Multilevel do
       end
 
       defmodule MyApp.LocalCache do
-        use Nebulex.Cache, otp_app: :my_app, adapter: Nebulex.Adapters.Local
+        use Nebulex.Cache,
+          otp_app: :my_app,
+          adapter: Nebulex.Adapters.Local
       end
 
   Where the configuration for the Cache must be in your application

@@ -53,7 +53,6 @@ The first bit of configuration is in `config/config.exs`:
 
 ```elixir
 config :blog, Blog.Cache,
-  adapter: Nebulex.Adapters.Local,
   gc_interval: 86_400 # 24 hrs
 ```
 
@@ -62,7 +61,9 @@ The `Blog.Cache` module is defined in `lib/blog/cache.ex` by our
 
 ```elixir
 defmodule Blog.Cache do
-  use Nebulex.Cache, otp_app: :blog
+  use Nebulex.Cache,
+    otp_app: :blog,
+    adapter: Nebulex.Adapters.Local
 end
 ```
 
@@ -387,7 +388,6 @@ cache; it is defined in `config/config.exs`:
 
 ```elixir
 config :blog, Blog.DistCache,
-  adapter: Nebulex.Adapters.Dist,
   local: :YOUR_LOCAL_CACHE,
   node_selector: Nebulex.Adapters.Dist
 ```
@@ -401,7 +401,9 @@ The `Blog.DistCache` module is defined in `lib/blog/dist_cache.ex` by our
 
 ```elixir
 defmodule Blog.DistCache do
-  use Nebulex.Cache, otp_app: :blog
+  use Nebulex.Cache,
+    otp_app: :blog,
+    adapter: Nebulex.Adapters.Dist
 end
 ```
 
@@ -409,10 +411,14 @@ As mentioned previously, let's add the local backend (local cache):
 
 ```elixir
 defmodule Blog.DistCache do
-  use Nebulex.Cache, otp_app: :blog
+  use Nebulex.Cache,
+    otp_app: :blog,
+    adapter: Nebulex.Adapters.Dist
 
   defmodule Primary do
-    use Nebulex.Cache, otp_app: :blog
+    use Nebulex.Cache,
+      otp_app: :blog,
+      adapter: Nebulex.Adapters.Local
   end
 end
 ```
@@ -424,12 +430,10 @@ distributed cache config.
 ```elixir
 # Local backend for the distributed cache
 config :blog, Blog.DistCache.Primary,
-  adapter: Nebulex.Adapters.Local,
   gc_interval: 86_400 # 24 hrs
 
 # Distributed Cache
 config :blog, Blog.DistCache,
-  adapter: Nebulex.Adapters.Dist,
   local: Blog.DistCache.Primary,
   node_selector: Nebulex.Adapters.Dist
 ```
@@ -503,7 +507,6 @@ cache; it is defined in `config/config.exs`:
 
 ```elixir
 config :blog, Blog.Multilevel,
-  adapter: Nebulex.Adapters.Multilevel,
   cache_model: :inclusive,
   levels: []
 ```
@@ -515,7 +518,6 @@ distributed cache. Therefore, the configuration would be like so:
 
 ```elixir
 config :blog, Blog.Multilevel,
-  adapter: Nebulex.Adapters.Multilevel,
   cache_model: :inclusive,
   levels: [Blog.Cache, Blog.DistCache]
 ```

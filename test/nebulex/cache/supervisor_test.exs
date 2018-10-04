@@ -2,7 +2,9 @@ defmodule Nebulex.Cache.SupervisorTest do
   use ExUnit.Case, async: true
 
   defmodule MyCache do
-    use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Local
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
   end
 
   setup do
@@ -50,7 +52,9 @@ defmodule Nebulex.Cache.SupervisorTest do
       end
 
       defmodule MyCache2 do
-        use Nebulex.Cache, otp_app: :nebulex, adapter: MyAdapter
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: MyAdapter
       end
 
       Nebulex.Cache.Supervisor.compile_config(MyCache2, opts)

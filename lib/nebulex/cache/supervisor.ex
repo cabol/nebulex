@@ -33,7 +33,7 @@ defmodule Nebulex.Cache.Supervisor do
   def compile_config(cache, opts) do
     otp_app = Keyword.fetch!(opts, :otp_app)
     config = Application.get_env(otp_app, cache, [])
-    adapter = opts[:adapter] || config[:adapter]
+    adapter = Keyword.get(opts, :adapter)
 
     unless adapter do
       raise ArgumentError,

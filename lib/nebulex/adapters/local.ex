@@ -45,7 +45,9 @@ defmodule Nebulex.Adapters.Local do
   local cache as follows:
 
       defmodule MyApp.LocalCache do
-        use Nebulex.Cache, otp_app: :my_app, adapter: Nebulex.Adapters.Local
+        use Nebulex.Cache,
+          otp_app: :my_app,
+          adapter: Nebulex.Adapters.Local
       end
 
   Where the configuration for the Cache must be in your application

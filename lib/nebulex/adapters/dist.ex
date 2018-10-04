@@ -62,11 +62,15 @@ defmodule Nebulex.Adapters.Dist do
   local and distributed cache as follows:
 
       defmodule MyApp.LocalCache do
-        use Nebulex.Cache, otp_app: :my_app, adapter: Nebulex.Adapters.Local
+        use Nebulex.Cache,
+          otp_app: :my_app,
+          adapter: Nebulex.Adapters.Local
       end
 
       defmodule MyApp.DistCache do
-        use Nebulex.Cache, otp_app: :my_app, adapter: Nebulex.Adapters.Dist
+        use Nebulex.Cache,
+          otp_app: :my_app,
+          adapter: Nebulex.Adapters.Dist
       end
 
   Where the configuration for the Cache must be in your application

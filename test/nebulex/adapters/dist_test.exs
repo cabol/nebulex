@@ -25,7 +25,9 @@ defmodule Nebulex.Adapters.DistTest do
   test "fail on __before_compile__ because missing local cache" do
     assert_raise ArgumentError, ~r"missing :local configuration", fn ->
       defmodule WrongDist do
-        use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Dist
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: Nebulex.Adapters.Dist
       end
     end
   end

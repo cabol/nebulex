@@ -23,7 +23,9 @@ defmodule Nebulex.MultilevelTest do
     test "fail on __before_compile__ because missing levels config" do
       assert_raise ArgumentError, ~r"missing :levels configuration", fn ->
         defmodule MissingLevelsConfig do
-          use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Multilevel
+          use Nebulex.Cache,
+            otp_app: :nebulex,
+            adapter: Nebulex.Adapters.Multilevel
         end
       end
     end
@@ -40,7 +42,9 @@ defmodule Nebulex.MultilevelTest do
 
       assert_raise ArgumentError, msg, fn ->
         defmodule EmptyLevelList do
-          use Nebulex.Cache, otp_app: :nebulex, adapter: Nebulex.Adapters.Multilevel
+          use Nebulex.Cache,
+            otp_app: :nebulex,
+            adapter: Nebulex.Adapters.Multilevel
         end
       end
     end

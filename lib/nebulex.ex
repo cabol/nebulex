@@ -24,14 +24,15 @@ defmodule Nebulex do
   cache as follows:
 
       defmodule MyApp.MyCache do
-        use Nebulex.Cache, otp_app: :my_app
+        use Nebulex.Cache,
+          otp_app: :my_app,
+          adapter: Nebulex.Adapters.Local
       end
 
   Where the configuration for the Cache must be in your application
   environment, usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.MyCache,
-        adapter: Nebulex.Adapters.Local,
         n_shards: 2,
         gc_interval: 3600
 
@@ -58,6 +59,7 @@ defmodule Nebulex do
   For example, let's suppose we want to handle user sessions in cache:
 
       defmodule MyApp.UserSession do
+        alias MyApp.Repo
         alias MyApp.Cache
         alias MyApp.User
 

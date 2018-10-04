@@ -6,28 +6,27 @@ defmodule Nebulex.Cache do
   adapter. For example, Nebulex ships with a default adapter that
   implements a local generational cache.
 
-  When used, the Cache expects the `:otp_app` as option.
-  The `:otp_app` should point to an OTP application that has
-  the Cache configuration. For example, the Cache:
+  When used, the Cache expects the `:otp_app` and `adapter` as options.
+  The `:otp_app` should point to an OTP application that has the Cache
+  configuration. For example, the Cache:
 
       defmodule MyCache do
-        use Nebulex.Cache, otp_app: :my_app
+        use Nebulex.Cache,
+          otp_app: :my_app,
+          adapter: Nebulex.Adapters.Local
       end
 
   Could be configured with:
 
       config :my_app, MyCache,
-        adapter: Nebulex.Adapters.Local,
-        n_shards: 2
+        version_generator: MyCache.VersionGenerator,
+        stats: true,
+        gc_interval: 3600
 
   Most of the configuration that goes into the `config` is specific
   to the adapter, so check `Nebulex.Adapters.Local` documentation
   for more information. However, some configuration is shared across
   all adapters, they are:
-
-    * `:adapter` - a compile-time option that specifies the adapter itself.
-      As a compile-time option, it may also be given as an option to
-      `use Nebulex.Cache`.
 
     * `:version_generator` - this option specifies the module that
       implements the `Nebulex.Object.Version` interface. This interface

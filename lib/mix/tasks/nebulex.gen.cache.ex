@@ -98,28 +98,22 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
         multilevel_config_template(opts)
 
       _ ->
-        default_config_template(opts)
+        local_config_template(opts)
     end
   end
 
   embed_template(:cache, """
   defmodule <%= inspect @mod %> do
-    use Nebulex.Cache, otp_app: <%= inspect @app %>
+    use Nebulex.Cache,
+      otp_app: <%= inspect @app %>,
+      adapter: <%= inspect @adapter %>
   end
-  """)
-
-  embed_template(:default_config, """
-  use Mix.Config
-
-  config <%= inspect @app %>, <%= inspect @mod %>,
-    adapter: <%= inspect @adapter %>
   """)
 
   embed_template(:local_config, """
   use Mix.Config
 
   config <%= inspect @app %>, <%= inspect @mod %>,
-    adapter: <%= inspect @adapter %>,
     gc_interval: 86_400 # 24 hrs
   """)
 
@@ -127,7 +121,6 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
   use Mix.Config
 
   config <%= inspect @app %>, <%= inspect @mod %>,
-    adapter: <%= inspect @adapter %>,
     local: :YOUR_LOCAL_CACHE
   """)
 
@@ -135,7 +128,6 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
   use Mix.Config
 
   config <%= inspect @app %>, <%= inspect @mod %>,
-    adapter: <%= inspect @adapter %>,
     cache_model: :inclusive,
     levels: []
   """)
