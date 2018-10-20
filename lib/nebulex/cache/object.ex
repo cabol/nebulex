@@ -108,13 +108,9 @@ defmodule Nebulex.Cache.Object do
   def add(_cache, _key, nil, _opts), do: {:ok, nil}
 
   def add(cache, key, value, opts) do
-    case do_set(cache, key, value, Keyword.put(opts, :action, :add)) do
-      {true, obj} ->
-        {:ok, return(obj, opts)}
-
-      {false, _} ->
-        :error
-    end
+    cache
+    |> do_set(key, value, Keyword.put(opts, :action, :add))
+    |> handle_set_response(opts)
   end
 
   @doc """
@@ -133,14 +129,12 @@ defmodule Nebulex.Cache.Object do
   @doc """
   Implementation for `Nebulex.Cache.replace/3`.
   """
-  def replace(cache, key, value, opts) do
-    case do_set(cache, key, value, Keyword.put(opts, :action, :replace)) do
-      {true, obj} ->
-        {:ok, return(obj, opts)}
+  def replace(_cache, _key, nil, _opts), do: {:ok, nil}
 
-      {false, _} ->
-        :error
-    end
+  def replace(cache, key, value, opts) do
+    cache
+    |> do_set(key, value, Keyword.put(opts, :action, :replace))
+    |> handle_set_response(opts)
   end
 
   @doc """
@@ -225,6 +219,24 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
+  Implementation for `Nebulex.Cache.object_info/2`.
+  """
+  def object_info(cache, key, attr) when attr in [:ttl, :version] do
+    cache.__adapter__.object_info(cache, key, attr)
+  end
+
+  def object_info(_cache, _key, attr) do
+    raise ArgumentError, "attr must be `:ttl` or `:version`, got: #{inspect(attr)}"
+  end
+
+  @doc """
+  Implementation for `Nebulex.Cache.expire/2`.
+  """
+  def expire(cache, key, ttl) when (is_integer(ttl) and ttl >= 0) or ttl == :infinity do
+    cache.__adapter__.expire(cache, key, ttl)
+  end
+
+  @doc """
   Implementation for `Nebulex.Cache.get_and_update/3`.
   """
   def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
@@ -273,6 +285,9 @@ defmodule Nebulex.Cache.Object do
   end
 
   ## Helpers
+
+  defp handle_set_response({true, obj}, opts), do: {:ok, return(obj, opts)}
+  defp handle_set_response({false, _}, _opts), do: :error
 
   def return(nil, _), do: nil
 

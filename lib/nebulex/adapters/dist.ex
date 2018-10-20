@@ -227,6 +227,16 @@ defmodule Nebulex.Adapters.Dist do
   end
 
   @impl true
+  def object_info(cache, key, attr) do
+    call(cache, key, :object_info, [key, attr])
+  end
+
+  @impl true
+  def expire(cache, key, ttl) do
+    call(cache, key, :expire, [key, ttl])
+  end
+
+  @impl true
   def update_counter(cache, key, incr, opts) do
     call(cache, key, :update_counter, [key, incr, opts], opts)
   end

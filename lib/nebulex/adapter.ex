@@ -39,6 +39,9 @@ defmodule Nebulex.Adapter do
   @doc """
   Sets the given `object` under `key` into the cache.
 
+  If the object already exists, it is overwritten. Any previous time to live
+  associated with the key is discarded on successful `set` operation.
+
   ## Options
 
   Besides the "Shared options" section in `Nebulex.Cache` documentation,
@@ -54,16 +57,10 @@ defmodule Nebulex.Adapter do
     * `:add` - Only set the `key` if it does not already exist. If it does,
       `nil` is returned.
 
-    * `:replace` - Alters the entry stored under `key` into the cache, but
-      only if the entry already exists into the cache. All attributes of the
-      cached object can be updated, either the value if `value` is different
-      than `nil`, or the expiry time if option `:ttl` is set in `opts`. The
-      version is always regenerated.
+    * `:replace` - Alters the object stored under `key`, but only if the object
+      already exists into the cache.
 
-    * `:set` - Set `key` to hold the given `object`. If key already holds an
-      object, it is overwritten. Any previous `:ttl` (time to live) associated
-      with the key is discarded on successful `set` operation. This action is
-      the default.
+    * `:set` - Set `key` to hold the given `object` (default).
 
   See `Nebulex.Cache.set/3`, `Nebulex.Cache.add/3`, `Nebulex.Cache.replace/3`.
   """
@@ -102,9 +99,27 @@ defmodule Nebulex.Adapter do
   @doc """
   Returns whether the given `key` exists in cache.
 
-  See `Nebulex.Cache.has_key/2`.
+  See `Nebulex.Cache.has_key?/1`.
   """
   @callback has_key?(cache, key) :: boolean
+
+  @doc """
+  Returns the information associated with `attr` for the given `key`,
+  or returns `nil` if `key` doesn't exist.
+
+  See `Nebulex.Cache.object_info/2`.
+  """
+  @callback object_info(cache, key, attr :: :ttl | :version) :: any | nil
+
+  @doc """
+  Returns the expiry timestamp for the given `key`, if the timeout `ttl`
+  (in seconds) is successfully updated.
+
+  If `key` doesn't exist, `nil` is returned.
+
+  See `Nebulex.Cache.expire/2`.
+  """
+  @callback expire(cache, key, ttl :: timeout) :: timeout | nil
 
   @doc """
   Updates (increment or decrement) the counter mapped to the given `key`.

@@ -28,7 +28,7 @@ changing the `deps` definition in that file to this:
 ```elixir
 defp deps do
   [
-    {:nebulex, "~> 1.0.0"}
+    {:nebulex, "~> 1.0"}
   ]
 end
 ```
@@ -340,14 +340,15 @@ Blog.Cache.update_counter(:my_counter, -5)
 ## Deleting entries
 
 We’ve now covered inserting (`set`), reading (`get`, `get!`, `all`) and updating
-entries. The last thing that we’ll cover in this guide is how to delete an entry
-using Nebulex.
+objects. Now let's see how to delete an object using Nebulex; the basic and/or
+main way to do so is through `delete/2` function.
 
 ```elixir
 Blog.Cache.delete(1)
 ```
 
-By default, `delete` returns the `key` either if success or not, therefore.
+By default, `delete` returns the `key` either if success or not, however, it is
+possible also to pass the `:return` option.
 
 ### Take
 
@@ -377,6 +378,33 @@ Nebulex also provides a function to flush all cache entries, like so:
 
 ```elixir
 Blog.Cache.flush()
+```
+
+## Info
+
+The last thing we’ll cover in this guide is how to retrieve information about
+cached objects or the cache itself.
+
+### Object Info
+
+To retrieve the TTL of an object:
+
+```elixir
+Blog.Cache.object_info("mykey", :ttl)
+```
+
+And if we want to retrieve the version:
+
+```elixir
+Blog.Cache.object_info("mykey", :version)
+```
+
+### Cache Info
+
+To get the total number of cached objects:
+
+```elixir
+Blog.Cache.size()
 ```
 
 ## Distributed Cache

@@ -225,6 +225,16 @@ defmodule Nebulex.Cache do
       end
 
       @doc false
+      def object_info(key, attr) do
+        with_hooks(Nebulex.Cache.Object, :object_info, [key, attr])
+      end
+
+      @doc false
+      def expire(key, ttl) do
+        with_hooks(Nebulex.Cache.Object, :expire, [key, ttl])
+      end
+
+      @doc false
       def get_and_update(key, fun, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :get_and_update, [key, fun, opts])
       end
@@ -373,17 +383,22 @@ defmodule Nebulex.Cache do
   Besides the "Shared options" section at the module documentation,
   it accepts:
 
-    * `:on_conflict` - It may be one of `:error` (the default), `:nothing`,
-      `nil`. See the "OnConflict" section for more information.
+    * `:on_conflict` - It may be one of `:raise` (the default), `:nothing`,
+      `:override`. See the "OnConflict" section for more information.
 
   ## Example
 
-      "some value" =
-        :a
-        |> MyCache.set("some value", return: :key)
-        |> MyCache.get()
+      iex> MyCache.set("foo", "bar")
+      "bar"
 
-      nil = MyCache.get(:non_existent_key)
+      iex>  MyCache.get("foo")
+      "bar"
+
+      iex>  MyCache.get("foo", return: :object)
+      %Nebulex.Object{key: "foo", value: "bar", version: nil, expire_at: nil}
+
+       iex> MyCache.get(:non_existent_key)
+       nil
 
   ## OnConflict
 
@@ -396,16 +411,18 @@ defmodule Nebulex.Cache do
   ## Examples
 
       # Set a value
-      1 = MyCache.set(:a, 1)
+      iex> MyCache.set(:a, 1)
+      1
 
       # Gets with an invalid version but do nothing on conflicts.
       # Keep in mind that, although this returns successfully, the returned
       # struct does not reflect the data in the Cache. For instance, in case
       # of "on_conflict: :nothing", it returns the latest version of the
       # cached object.
-      %Nebulex.Object{key: :a, value: 1} =
-        MyCache.get(:a, return: :object, version: :invalid, on_conflict: :nothing)
-      1 = MyCache.get(:a)
+      iex> %Nebulex.Object{value: 1} =
+      ...>   MyCache.get(:a, return: :object, version: :invalid, on_conflict: :nothing)
+      iex> MyCache.get(:a)
+      1
   """
   @callback get(key, opts) :: return | nil
 
@@ -435,20 +452,23 @@ defmodule Nebulex.Cache do
 
   ## Example
 
-      :ok = MyCache.set_many([a: 1, c: 3])
+      iex> MyCache.set_many([a: 1, c: 3])
+      :ok
 
-      %{a: 1, c: 3} = MyCache.get_many([:a, :b, :c])
+      iex> MyCache.get_many([:a, :b, :c])
+      %{a: 1, c: 3}
   """
   @callback get_many([key], opts) :: map
 
   @doc """
   Sets the given `value` under `key` into the cache.
 
-  Returns the inserted `value` if the action is completed successfully.
-  It is also possible to return the key or the object itself,
-  depending on `:return` option.
+  If `key` already holds an object, it is overwritten. Any previous
+  time to live associated with the key is discarded on successful
+  `set` operation.
 
-  If `value` is `nil`, action is skipped and `nil` is returned instead.
+  Returns either the value, key or the object, depending on `:return`
+  option, if the action is completed successfully.
 
   ## Options
 
@@ -460,13 +480,15 @@ defmodule Nebulex.Cache do
 
   ## Example
 
-      "bar" = MyCache.set("foo", "bar")
+      iex> MyCache.set("foo", "bar")
+      "bar"
 
-      %Nebulex.Object{key: "foo"} =
-        MyCache.set("foo", "bar", ttl: 100000, return: :object)
+      iex> MyCache.set("foo", "bar", ttl: 10, return: :object)
+      %Nebulex.Object{key: "foo", value: "bar", version: nil, expire_at: 1540004049}
 
       # if the value is nil, then it is not stored (operation is skipped)
-      nil = MyCache.set("foo", nil)
+      iex> MyCache.set("foo", nil)
+      nil
 
   ## OnConflict
 
@@ -479,25 +501,20 @@ defmodule Nebulex.Cache do
 
   ## Examples
 
-      # Set twice
-      %Nebulex.Object{key: :a, version: v1} =
-        MyCache.set(:a, 1, return: :object)
-
-      %Nebulex.Object{key: :a, version: v2}
-        MyCache.set(:a, 2, return: :object, version: v1)
+      iex> %Nebulex.Object{version: v1} = MyCache.set(:a, 1, return: :object)
+      iex> MyCache.set(:a, 2, version: v1)
+      2
 
       # Set with the same key and wrong version but do nothing on conflicts.
-      # Keep in mind that, although this returns successfully, the returned
-      # struct does not reflect the data in the Cache. For instance, in case
-      # of "on_conflict: :nothing", the returned object isn't set.
-      %Nebulex.Object{key: :a, value: 2} =
-        MyCache.set(:a, 3, return: :object, version: v1, on_conflict: :nothing)
-      2 = MyCache.get(:a)
+      # Keep in mind in case of "on_conflict: :nothing", the returned object
+      # is the current cached object, if there is one
+      iex> MyCache.set(:a, 3, version: v1, on_conflict: :nothing)
+      2
 
       # Set with the same key and wrong version but replace the current
       # value on conflicts.
-      3 = MyCache.set(:a, 3, version: v1, on_conflict: :override)
-      3 = MyCache.get(:a)
+      iex> MyCache.set(:a, 3, version: v1, on_conflict: :override)
+      3
   """
   @callback set(key, value, opts) :: return | nil
 
@@ -521,19 +538,22 @@ defmodule Nebulex.Cache do
 
   ## Example
 
-      :ok = MyCache.set_many(apples: 3, bananas: 1)
+      iex> MyCache.set_many(apples: 3, bananas: 1)
+      :ok
 
-      :ok = MyCache.set_many(%{"apples" => 1, "bananas" => 3})
+      iex> MyCache.set_many(%{"apples" => 1, "bananas" => 3})
+      :ok
 
       # set a custom list of objects
-      :ok =
-        MyCache.set_many([
-          %Nebulex.Object{key: :apples, value: 1},
-          %Nebulex.Object{key: :bananas, value: 2, expire_at: 5}
-        ])
+      iex> MyCache.set_many([
+      ...>   %Nebulex.Object{key: :apples, value: 1},
+      ...>   %Nebulex.Object{key: :bananas, value: 2, expire_at: 5}
+      ...> ])
+      :ok
 
       # for some reason `:c` couldn't be set, so we got an error
-      {:error, [:c]} = MyCache.set_many([a: 1, b: 2, c: 3], ttl: 1000)
+      iex> MyCache.set_many([a: 1, b: 2, c: 3], ttl: 1000)
+      {:error, [:c]}
   """
   @callback set_many(entries, opts) :: :ok | {:error, failed_keys :: [key]}
 
@@ -544,8 +564,6 @@ defmodule Nebulex.Cache do
   If cache doesn't contain the given `key`, then `{:ok, value}` is returned.
   If cache contains `key`, `:error` is returned.
 
-  If `value` is `nil`, then it is not cached and `nil` is returned instead.
-
   ## Options
 
   See the "Shared options" section at the module documentation.
@@ -554,12 +572,15 @@ defmodule Nebulex.Cache do
 
   ## Example
 
-      {ok, "bar"} = MyCache.add("foo", "bar")
+      iex> MyCache.add("foo", "bar")
+      {ok, "bar"}
 
-      :error = MyCache.add("foo", "bar")
+      iex> MyCache.add("foo", "bar")
+      :error
 
       # if the value is nil, it is not stored (operation is skipped)
-      {ok, nil} = MyCache.add("foo", nil)
+      iex> MyCache.add("foo", nil)
+      {ok, nil}
   """
   @callback add(key, value, opts) :: {:ok, return} | :error
 
@@ -578,17 +599,11 @@ defmodule Nebulex.Cache do
   @callback add!(key, value, opts) :: return | no_return
 
   @doc """
-  Alters the entry stored under `key` into the cache, but only if the entry
-  already exists into the cache. All attributes of the cached object can be
-  updated, either the value if `value` is different than `nil`, or the expiry
-  time if option `:ttl` is set in `opts`. The version is always regenerated.
+  Alters the object stored under `key`, but only if the object already exists
+  into the cache.
 
-  If cache contains the given `key`, then `{:ok, value}` is returned.
+  If cache contains the given `key`, then `{:ok, return}` is returned.
   If cache doesn't contain `key`, `:error` is returned.
-
-  In the case the cached object is returned, and `:ttl` option is not set,
-  then the contained `expire_at` might not be the current one, since it
-  is not being modified, but this depends on the adapter.
 
   ## Options
 
@@ -599,18 +614,19 @@ defmodule Nebulex.Cache do
 
   ## Example
 
-      :error = MyCache.replace("foo", "bar")
+      iex> MyCache.replace("foo", "bar")
+      :error
 
-      "bar" = MyCache.set("foo", "bar")
+      iex> MyCache.set("foo", "bar")
+      "bar"
 
       # update only current value
-      {:ok, "bar"} = MyCache.replace("foo", "bar")
+      iex> MyCache.replace("foo", "bar2")
+      {:ok, "bar2"}
 
       # update current value and TTL
-      {:ok, "bar"} = MyCache.replace("foo", "bar", ttl: 10)
-
-      # update only the TTL
-      {:ok, nil} = MyCache.replace("foo", nil, ttl: 30)
+      iex> MyCache.replace("foo", "bar3", ttl: 10)
+      {:ok, "bar3"}
   """
   @callback replace(key, value, opts) :: {:ok, return} | :error
 
@@ -626,20 +642,13 @@ defmodule Nebulex.Cache do
 
   ## Example
 
-      MyCache.set("foo", "bar")
-
       MyCache.replace!("foo", "bar")
-
-      "bar" =
-        "foo"
-        |> MyCache.replace(nil, ttl: 30, return: :key)
-        |> MyCache.get!()
   """
   @callback replace!(key, value, opts) :: return | no_return
 
   @doc """
   When the `key` already exists, the cached value is replaced by `value`,
-  otherwise the entry is created at fisrt time.
+  otherwise the object is created at fisrt time.
 
   Returns the replaced or created value when the function is completed
   successfully. Because this function is a combination of `replace/3`
@@ -679,13 +688,17 @@ defmodule Nebulex.Cache do
 
   ## Example
 
-      nil =
-        :a
-        |> MyCache.set(1, return: :key)
-        |> MyCache.delete()
-        |> MyCache.get()
+      iex> MyCache.set(:a, 1)
+      1
 
-      :non_existent_key = MyCache.delete(:non_existent_key)
+      iex> MyCache.delete(:a)
+      :a
+
+      iex> MyCache.get(:a)
+      nil
+
+      iex> MyCache.delete(:non_existent_key)
+      :non_existent_key
 
   ## OnConflict
 
@@ -699,19 +712,26 @@ defmodule Nebulex.Cache do
   ## Examples
 
       # Set a value
-      1 = MyCache.set(:a, 1)
+      iex> MyCache.set(:a, 1)
+      1
 
       # Delete with an invalid version but do nothing on conflicts.
       # Keep in mind that, although this returns successfully, the returned
-      # `kwy` does not reflect the data in the Cache. For instance, in case
+      # `key` does not reflect the data in the cache. For instance, in case
       # of "on_conflict: :nothing", the returned `key` isn't deleted.
-      :a = MyCache.delete(:a, version: :invalid, on_conflict: :nothing)
-      1 = MyCache.get(:a)
+      iex> MyCache.delete(:a, version: :invalid, on_conflict: :nothing)
+      :a
+
+      iex> MyCache.get(:a)
+      1
 
       # Delete with the same invalid version but force to delete the current
-      # value on conflicts (if exist).
-      :a = MyCache.delete(:a, version: :invalid, on_conflict: :override)
-      nil = MyCache.get(:a)
+      # value on conflicts (if the entry exists).
+      iex> MyCache.delete(:a, version: :invalid, on_conflict: :override)
+      :a
+
+      iex> MyCache.get(:a)
+      nil
   """
   @callback delete(key, opts) :: return | nil
 
@@ -729,15 +749,17 @@ defmodule Nebulex.Cache do
 
   ## Examples
 
-      1 = MyCache.set(:a, 1)
+      iex> MyCache.set(:a, 1)
+      1
 
-      1 = MyCache.take(:a)
-      nil = MyCache.take(:a)
+      iex> MyCache.take(:a)
+      1
 
-      %Nebulex.Object{key: :a, value: 1} =
-        :a
-        |> MyCache.set(1, return: :key)
-        |> MyCache.take(return: :object)
+      iex> MyCache.take(:a)
+      nil
+
+      iex> :a |> MyCache.set(1, return: :key) |> MyCache.take(return: :object)
+      %Nebulex.Object{key: :a, value: 1, version: nil, expire_at: nil}
   """
   @callback take(key, opts) :: return | nil
 
@@ -759,13 +781,70 @@ defmodule Nebulex.Cache do
 
   ## Examples
 
-      1 = MyCache.set(:a, 1)
+      iex> MyCache.set(:a, 1)
+      1
 
-      true = MyCache.has_key?(:a)
+      iex> MyCache.has_key?(:a)
+      true
 
-      false = MyCache.has_key?(:b)
+      iex> MyCache.has_key?(:b)
+      false
   """
   @callback has_key?(key) :: boolean
+
+  @doc """
+  Returns the information associated with `attr` for the given `key`,
+  or returns `nil` if `key` doesn't exist.
+
+  If `attr` is not one of the allowed values, `ArgumentError` is raised.
+
+  The following values are allowed for `attr`:
+
+    * `:ttl` - Returns the remaining time to live for the given `key`,
+      if it has a timeout, otherwise, `:infinity` is returned.
+
+    * `:version` - Returns the current version for the given `key`.
+
+  ## Examples
+
+      iex> MyCache.set(:a, 1, ttl: 5)
+      1
+
+      iex> MyCache.set(:b, 2)
+      2
+
+      iex> MyCache.object_info(:a, :ttl)
+      5
+
+      iex> MyCache.ttl(:b)
+      :infinity
+
+      iex> MyCache.object_info(:a, :version)
+      nil
+  """
+  @callback object_info(key, attr :: :ttl | :version) :: any | nil
+
+  @doc """
+  Returns the expiry timestamp for the given `key`, if the timeout `ttl`
+  (in seconds) is successfully updated.
+
+  If `key` doesn't exist, `nil` is returned.
+
+  ## Examples
+
+      iex> MyCache.set(:a, 1)
+      1
+
+      iex> MyCache.expire(:a, 5)
+      1540004049
+
+      iex> MyCache.expire(:a, :infinity)
+      :infinity
+
+      iex> MyCache.ttl(:b, 5)
+      nil
+  """
+  @callback expire(key, ttl :: timeout) :: timeout | nil
 
   @doc """
   Gets the object/value from `key` and updates it, all in one pass.
@@ -790,30 +869,32 @@ defmodule Nebulex.Cache do
   ## Examples
 
       # update nonexistent key
-      {nil, "value!"} =
-        MyCache.get_and_update(:a, fn current_value ->
-          {current_value, "value!"}
-        end)
+      iex> MyCache.get_and_update(:a, fn current_value ->
+      ...>   {current_value, "value!"}
+      ...> end)
+      {nil, "value!"}
 
       # update existing key
-      {"value!", "new value!"} =
-        MyCache.get_and_update(:a, fn current_value ->
-          {current_value, "new value!"}
-        end)
+      iex> MyCache.get_and_update(:a, fn current_value ->
+      ...>   {current_value, "new value!"}
+      ...> end)
+      {"value!", "new value!"}
 
       # pop/remove value if exist
-      {"new value!", nil} = MyCache.get_and_update(:a, fn _ -> :pop end)
+      iex> MyCache.get_and_update(:a, fn _ -> :pop end)
+      {"new value!", nil}
 
       # pop/remove nonexistent key
-      {nil, nil} = MyCache.get_and_update(:b, fn _ -> :pop end)
+      iex> MyCache.get_and_update(:b, fn _ -> :pop end)
+      {nil, nil}
 
       # update existing key but returning the object
-      {"hello", %Object{key: :a, value: "hello world"}} =
-        :a
-        |> MyCache.set!("hello", return: :key)
-        |> MyCache.get_and_update(fn current_value ->
-          {current_value, "hello world"}
-        end, return: :object)
+      iex> {"hello", %Object{key: :a, value: "hello world"}} =
+      ...>   :a
+      ...>   |> MyCache.set!("hello", return: :key)
+      ...>   |> MyCache.get_and_update(fn current_value ->
+      ...>        {current_value, "hello world"}
+      ...>   end, return: :object)
   """
   @callback get_and_update(key, (value -> {get, update} | :pop), opts) :: {get, update}
             when get: value, update: return
@@ -836,12 +917,14 @@ defmodule Nebulex.Cache do
 
   ## Examples
 
-      1 = MyCache.update(:a, 1, &(&1 * 2))
+      iex> MyCache.update(:a, 1, &(&1 * 2))
+      1
 
-      2 = MyCache.update(:a, 1, &(&1 * 2))
+      iex> MyCache.update(:a, 1, &(&1 * 2))
+      2
 
-      %Nebulex.Object{value: 4} =
-        MyCache.update(:a, 1, &(&1 * 2), return: :object)
+      iex> %Nebulex.Object{value: 4} =
+      ...>   MyCache.update(:a, 1, &(&1 * 2), return: :object)
   """
   @callback update(key, initial :: value, (value -> value), opts) :: return
 
@@ -862,14 +945,17 @@ defmodule Nebulex.Cache do
 
   ## Examples
 
-      1 = MyCache.update_counter(:a)
+      iex> MyCache.update_counter(:a)
+      1
 
-      3 = MyCache.update_counter(:a, 2)
+      iex> MyCache.update_counter(:a, 2)
+      3
 
-      2 = MyCache.update_counter(:a, -1)
+      iex> MyCache.update_counter(:a, -1)
+      2
 
-      %Nebulex.Object{key: :a, value: 2} =
-        MyCache.update_counter(:a, 0, return: :object)
+      iex> %Nebulex.Object{key: :a, value: 2} =
+      ...>   MyCache.update_counter(:a, 0, return: :object)
   """
   @callback update_counter(key, incr :: integer, opts) :: integer
 
@@ -878,13 +964,13 @@ defmodule Nebulex.Cache do
 
   ## Examples
 
-      for x <- 1..10, do: MyCache.set(x, x)
+      iex> :ok = Enum.each(1..10, &MyCache.set(&1, &1))
+      iex> MyCache.size()
+      10
 
-      10 = MyCache.size()
-
-      for x <- 1..5, do: MyCache.delete(x)
-
-      5 = MyCache.size()
+      iex> :ok = Enum.each(1..5, &MyCache.delete(&1))
+      iex> MyCache.size()
+      5
   """
   @callback size() :: integer
 
@@ -893,11 +979,13 @@ defmodule Nebulex.Cache do
 
   ## Examples
 
-      for x <- 1..5, do: MyCache.set(x, x)
+      iex> :ok = Enum.each(1..5, &MyCache.set(&1, &1))
+      iex> MyCache.flush()
+      :ok
 
-      :ok = MyCache.flush()
-
-      for x <- 1..5, do: nil = MyCache.get(x)
+      iex> Enum.each(1..5, fn x ->
+      ...>   nil = MyCache.get(x)
+      ...> end)
   """
   @callback flush() :: :ok
 
@@ -923,17 +1011,25 @@ defmodule Nebulex.Cache do
 
   ## Example
 
+      # set some entries
+      iex> :ok = Enum.each(1..5, &MyCache.set(&1, &1 * 2))
+
       # fetch all (with default params)
-      MyCache.all()
+      iex> MyCache.all()
+      [1, 2, 3, 4, 5]
 
       # fetch all entries and return values
-      MyCache.all(:all, return: :value)
+      iex> MyCache.all(:all, return: :value)
+      [2, 4, 6, 8, 10]
 
       # fetch all entries and return objects
-      MyCache.all(:all, return: :object)
+      iex> [%Nebulex.Object{} | _] = MyCache.all(:all, return: :object)
 
       # fetch all entries that match with the given query
-      MyCache.all(myquery)
+      # assuming we are using Nebulex.Adapters.Local adapter
+      iex> query = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [:"$1"]}]
+      iex> MyCache.all(query)
+      [3, 4, 5]
 
   ## Query
 
@@ -945,24 +1041,27 @@ defmodule Nebulex.Cache do
   ## Examples
 
       # additional built-in queries for Nebulex.Adapters.Local adapter
-      MyCache.all(:all_unexpired)
-      MyCache.all(:all_expired)
+      iex> all_unexpired = MyCache.all(:all_unexpired)
+      iex> all_expired = MyCache.all(:all_expired)
 
       # if we are using Nebulex.Adapters.Local adapter, the stored entry
       # is a tuple {key, value, version, expire_at}, then the match spec
       # could be something like:
-      spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
-      MyCache.all(spec)
+      iex> spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [{{:"$1", :"$2"}}]}]
+      iex> MyCache.all(spec)
+      [{3, 6}, {4, 8}, {5, 10}]
 
-      # using Ex2ms
-      import Ex2ms
+      # the same previous query but using Ex2ms
+      iex> import Ex2ms
+      Ex2ms
 
-      spec =
-        fun do
-          {key, value, _, _} when value > 10 -> {key, value}
-        end
+      iex> spec =
+      ...>   fun do
+      ...>     {key, value, _, _} when value > 5 -> {key, value}
+      ...>   end
 
-      MyCache.all(spec)
+      iex> MyCache.all(spec)
+      [{3, 6}, {4, 8}, {5, 10}]
 
   To learn more, check out adapters documentation.
   """
@@ -984,37 +1083,43 @@ defmodule Nebulex.Cache do
 
   ## Examples
 
+      # set some entries
+      iex> :ok = Enum.each(1..5, &MyCache.set(&1, &1 * 2))
+
       # stream all (with default params)
-      MyCache.stream()
+      iex> MyCache.stream() |> Enum.to_list()
+      [1, 2, 3, 4, 5]
 
       # stream all entries and return values
-      MyCache.stream(:all, return: :value, page_size: 3)
+      iex> MyCache.stream(:all, return: :value, page_size: 3) |> Enum.to_list()
+      [2, 4, 6, 8, 10]
 
       # stream all entries and return objects
-      MyCache.stream(:all, return: :object, page_size: 3)
-
-      # stream all entries that match with the given query
-      MyCache.stream(myquery, page_size: 3)
+      iex> stream = MyCache.stream(:all, return: :object, page_size: 3)
+      iex> [%Nebulex.Object{} | _] = Enum.to_list(stream)
 
       # additional built-in queries for Nebulex.Adapters.Local adapter
-      MyCache.stream(:all_unexpired)
-      MyCache.stream(:all_expired)
+      all_unexpired_stream = MyCache.stream(:all_unexpired)
+      all_expired_stream = MyCache.stream(:all_expired)
 
       # if we are using Nebulex.Adapters.Local adapter, the stored entry
       # is a tuple {key, value, version, expire_at}, then the match spec
       # could be something like:
-      spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
-      MyCache.stream(spec, page_size: 3)
+      iex> spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [{{:"$1", :"$2"}}]}]
+      iex> MyCache.stream(spec, page_size: 3) |> Enum.to_list()
+      [{3, 6}, {4, 8}, {5, 10}]
 
-      # using Ex2ms
-      import Ex2ms
+      # the same previous query but using Ex2ms
+      iex> import Ex2ms
+      Ex2ms
 
-      spec =
-        fun do
-          {key, value, _, _} when value > 10 -> {key, value}
-        end
+      iex> spec =
+      ...>   fun do
+      ...>     {key, value, _, _} when value > 5 -> {key, value}
+      ...>   end
 
-      MyCache.stream(spec, page_size: 3)
+      iex> spec |> MyCache.stream(page_size: 3) |> Enum.to_list()
+      [{3, 6}, {4, 8}, {5, 10}]
 
   To learn more, check out adapters documentation.
   """

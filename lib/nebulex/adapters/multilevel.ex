@@ -275,6 +275,20 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
+  def object_info(cache, key, attr) do
+    eval_while(cache, :object_info, [key, attr], nil)
+  end
+
+  @impl true
+  def expire(cache, key, ttl) do
+    Enum.reduce(cache.__levels__, nil, fn level_cache, acc ->
+      if exp = level_cache.__adapter__.expire(level_cache, key, ttl),
+        do: exp,
+        else: acc
+    end)
+  end
+
+  @impl true
   def update_counter(cache, key, incr, opts) do
     eval(cache, :update_counter, [key, incr, opts], opts)
   end

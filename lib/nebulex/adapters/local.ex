@@ -79,7 +79,7 @@ defmodule Nebulex.Adapters.Local do
 
     * `query` - `:all | :all_unexpired | :all_expired | :ets.match_spec()`
 
-  Internally, an entry is represented by the tuple `{key, value, version, ttl}`,
+  Internally, an entry is represented by the tuple `{key, value, version, exp}`,
   which means the match pattern within the `:ets.match_spec()` must be
   something like `{:"$1", :"$2", :"$3", :"$4"}`. In order to make query
   building easier, you can use `Ex2ms` library.
@@ -100,7 +100,7 @@ defmodule Nebulex.Adapters.Local do
 
       spec =
         fun do
-          {key, value, _version, _ttl} when value > 10 -> {key, value}
+          {key, value, _version, _exp} when value > 10 -> {key, value}
         end
 
       MyCache.all(spec)
@@ -209,10 +209,10 @@ defmodule Nebulex.Adapters.Local do
         nil ->
           {:cont, {gen, nil}}
 
-        {k, v, vsn, ttl} ->
+        {k, v, vsn, exp} ->
           # make sure we take the old timestamp since it will get set to
           # the default :infinity otherwise.
-          entry = {k, v, vsn, diff_epoch(ttl)}
+          entry = {k, v, vsn, diff_epoch(exp)}
           true = Local.insert(newer, entry, cache.__state__)
           {:halt, {gen, entry}}
       end
@@ -230,35 +230,23 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def set(cache, object, opts) do
-    case Keyword.get(opts, :action, :set) do
-      :set ->
-        set(cache, object)
-
-      :add ->
-        add(cache, object)
-
-      :replace ->
-        replace(cache, object, opts)
-    end
+    opts
+    |> Keyword.get(:action, :set)
+    |> do_set(cache, object)
   end
 
-  defp set(cache, %Object{key: key, value: val, version: vsn, expire_at: expire_at}) do
-    local_set(cache, {key, val, vsn, expire_at})
+  defp do_set(:set, cache, %Object{key: key, value: val, version: vsn, expire_at: exp}) do
+    local_set(cache, {key, val, vsn, exp})
   end
 
-  defp add(cache, %Object{key: key, value: val, version: vsn, expire_at: expire_at}) do
+  defp do_set(:add, cache, %Object{key: key, value: val, version: vsn, expire_at: exp}) do
     cache.__metadata__.generations
     |> hd()
-    |> Local.insert_new({key, val, vsn, expire_at}, cache.__state__)
+    |> Local.insert_new({key, val, vsn, exp}, cache.__state__)
   end
 
-  defp replace(cache, %Object{key: key, value: val, version: vsn, expire_at: expire_at}, opts) do
-    updates = if val, do: [{2, val}, {3, vsn}], else: [{3, vsn}]
-    updates = if Keyword.get(opts, :ttl), do: [{4, expire_at} | updates], else: updates
-
-    cache.__metadata__.generations
-    |> hd()
-    |> Local.update_element(key, updates, cache.__state__)
+  defp do_set(:replace, cache, %Object{key: key, value: val, version: vsn, expire_at: exp}) do
+    local_update(cache, key, [{2, val}, {3, vsn}, {4, exp}])
   end
 
   @impl true
@@ -300,15 +288,41 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
+  def object_info(cache, key, attr) do
+    Enum.reduce_while(cache.__metadata__.generations, nil, fn gen, acc ->
+      case {fetch(cache, gen, key), attr} do
+        {{_, _, _, exp}, :ttl} ->
+          {:halt, Object.remaining_ttl(exp)}
+
+        {{_, _, vsn, _}, :version} ->
+          {:halt, vsn}
+
+        {nil, _} ->
+          {:cont, acc}
+      end
+    end)
+  end
+
+  @impl true
+  def expire(cache, key, ttl) do
+    expire_at = Object.expire_at(ttl)
+
+    case local_update(cache, key, {4, expire_at}) do
+      true -> expire_at || :infinity
+      false -> nil
+    end
+  end
+
+  @impl true
   def update_counter(cache, key, incr, opts) do
-    ttl =
+    exp =
       opts
       |> Keyword.get(:ttl)
-      |> seconds_since_epoch()
+      |> Object.expire_at()
 
     cache.__metadata__.generations
     |> hd()
-    |> Local.update_counter(key, {2, incr}, {key, 0, nil, ttl}, cache.__state__)
+    |> Local.update_counter(key, {2, incr}, {key, 0, nil, exp}, cache.__state__)
   end
 
   @impl true
@@ -403,6 +417,12 @@ defmodule Nebulex.Adapters.Local do
     |> Local.insert(entries, cache.__state__)
   end
 
+  defp local_update(cache, key, updates) do
+    cache.__metadata__.generations
+    |> hd()
+    |> Local.update_element(key, updates, cache.__state__)
+  end
+
   defp entry_to_object(nil), do: nil
 
   defp entry_to_object({key, val, vsn, expire_at}) do
@@ -413,16 +433,13 @@ defmodule Nebulex.Adapters.Local do
   defp validate_ttl({_, _, _, nil} = entry, _, _), do: entry
 
   defp validate_ttl({key, _, _, expire_at} = entry, gen, cache) do
-    if expire_at > seconds_since_epoch(0) do
+    if expire_at > now() do
       entry
     else
       true = Local.delete(gen, key, cache.__state__)
       nil
     end
   end
-
-  defp seconds_since_epoch(diff) when is_integer(diff), do: now() + diff
-  defp seconds_since_epoch(_), do: :infinity
 
   defp diff_epoch(ttl) when is_integer(ttl), do: ttl - now()
   defp diff_epoch(_), do: :infinity
@@ -453,7 +470,7 @@ defmodule Nebulex.Adapters.Local do
     do: nil
 
   defp comp_match_spec(:all_unexpired),
-    do: {:orelse, {:==, :"$4", nil}, {:>, :"$4", seconds_since_epoch(0)}}
+    do: {:orelse, {:==, :"$4", nil}, {:>, :"$4", now()}}
 
   defp comp_match_spec(:all_expired),
     do: {:not, comp_match_spec(:all_unexpired)}

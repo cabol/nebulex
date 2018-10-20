@@ -190,6 +190,37 @@ defmodule Nebulex.MultilevelTest do
       refute @cache.has_key?(4)
     end
 
+    test "object_info" do
+      %Object{value: 1, version: vsn} = @cache.set(:a, 1, ttl: 3, return: :object)
+      assert 2 == @cache.set(:b, 2, level: 2)
+
+      assert 3 == @cache.object_info(:a, :ttl)
+      _ = :timer.sleep(1000)
+      assert 1 < @cache.object_info(:a, :ttl)
+      assert :infinity == @cache.object_info(:b, :ttl)
+      refute @cache.object_info(:c, :ttl)
+
+      assert vsn == @cache.object_info(:a, :version)
+    end
+
+    test "expire" do
+      assert 1 == @cache.set(:a, 1, ttl: 3)
+      assert 3 == @cache.object_info(:a, :ttl)
+
+      exp = @cache.expire(:a, 5)
+      assert 5 == @l1.object_info(:a, :ttl)
+      assert 5 == @l2.object_info(:a, :ttl)
+      assert 5 == @l3.object_info(:a, :ttl)
+      assert 5 == Object.remaining_ttl(exp)
+
+      assert 2 == @l2.set(:b, 2)
+      exp = @cache.expire(:b, 5)
+      assert 5 == Object.remaining_ttl(exp)
+      refute @l1.expire(:b, 5)
+      refute @l3.expire(:b, 5)
+      assert 5 == @cache.object_info(:b, :ttl)
+    end
+
     test "size" do
       for x <- 1..10, do: @l1.set(x, x)
       for x <- 11..20, do: @l2.set(x, x)

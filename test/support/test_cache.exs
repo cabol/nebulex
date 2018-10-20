@@ -235,22 +235,28 @@ defmodule Nebulex.TestCache do
     def set(_, _, _), do: :timer.sleep(1000)
 
     @impl true
-    def delete(_, _, _), do: :timer.sleep(1000)
+    def delete(_, _, _), do: :ok
 
     @impl true
-    def take(_, _, _), do: :timer.sleep(1000)
+    def take(_, _, _), do: nil
 
     @impl true
-    def has_key?(_, _), do: :timer.sleep(1000)
+    def has_key?(_, _), do: nil
 
     @impl true
-    def update_counter(_, _, _, _), do: :timer.sleep(1000)
+    def object_info(_, _, _), do: nil
 
     @impl true
-    def size(_), do: :timer.sleep(1000)
+    def expire(_, _, _), do: nil
 
     @impl true
-    def flush(_), do: :timer.sleep(1000)
+    def update_counter(_, _, _, _), do: 1
+
+    @impl true
+    def size(_), do: 0
+
+    @impl true
+    def flush(_), do: :ok
 
     @impl true
     def get_many(_, _, _), do: :timer.sleep(1000)

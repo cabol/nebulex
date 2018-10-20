@@ -111,6 +111,27 @@ defmodule Nebulex.Adapters.LocalTest do
     assert {:error, ["apples"]} == TestCache.set_many(%{"apples" => 1})
   end
 
+  test "update_counter with ttl" do
+    assert 1 == TestCache.update_counter(:counter_with_ttl, 1, ttl: 1)
+    assert 2 == TestCache.update_counter(:counter_with_ttl)
+    assert 2 == TestCache.get(:counter_with_ttl)
+    _ = :timer.sleep(1010)
+    refute TestCache.get(:counter_with_ttl)
+
+    assert 1 == TestCache.update_counter(:counter_with_ttl, 1, ttl: 5)
+    assert 5 == TestCache.object_info(:counter_with_ttl, :ttl)
+
+    assert 1 == :counter_with_ttl |> TestCache.expire(1) |> Object.remaining_ttl()
+    _ = :timer.sleep(1010)
+    refute TestCache.get(:counter_with_ttl)
+  end
+
+  test "update_counter over an existing object" do
+    assert 0 == TestCache.set(:counter, 0)
+    assert 1 == TestCache.update_counter(:counter)
+    assert 3 == TestCache.update_counter(:counter, 2)
+  end
+
   test "all and stream using match_spec queries" do
     values = for x <- 1..5, do: TestCache.set(x, x * 2)
     TestCache.new_generation()
