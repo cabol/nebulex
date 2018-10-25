@@ -10,9 +10,8 @@
 # Where 3rd-party dependencies like ExDoc output generated docs.
 /doc
 /docs
-
-# Bench files
-/bench/snapshots
+/benchmarks
+!/benchmarks/benchmark.exs
 
 # Ignore .fetch files in case you like to edit your project deps locally.
 /.fetch

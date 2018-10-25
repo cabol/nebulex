@@ -5,6 +5,8 @@
 [![Build Status](https://travis-ci.org/cabol/nebulex.svg?branch=master)](https://travis-ci.org/cabol/nebulex)
 [![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
 [![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
+[![Hex Version](https://img.shields.io/hexpm/v/nebulex.svg)](https://hex.pm/packages/nebulex)
+[![Docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/nebulex)
 
 Nebulex is an in-process and distributed caching framework with a set of
 useful and powerful features such as:
@@ -108,13 +110,13 @@ before running the tests.
 
 ## Benchmarks
 
-Simple and/or basic benchmarks were added using [benchfella](https://github.com/alco/benchfella);
-to learn more, see the [bench](./bench) directory.
+Simple and/or basic benchmarks were added using [benchee](https://github.com/PragTob/benchee);
+to learn more, see the [benchmarks](./benchmarks) directory.
 
 To run the benchmarks:
 
 ```
-$ mix nebulex.bench
+$ mix run benchmarks/benchmark.exs
 ```
 
 If you are interested to run more sophisticated load tests, perhaps you should

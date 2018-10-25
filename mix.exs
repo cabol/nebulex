@@ -30,7 +30,7 @@ defmodule Nebulex.Mixfile do
 
       # Hex
       package: package(),
-      description: "Fast, flexible and powerful cache wrapper for Elixir"
+      description: "A fast, flexible and powerful distributed caching framework for Elixir."
     ]
   end
 
@@ -45,25 +45,26 @@ defmodule Nebulex.Mixfile do
       {:shards, "~> 0.6"},
 
       # Test
-      {:excoveralls, "~> 0.6", only: :test},
-      {:benchfella, "~> 0.3", optional: true, only: [:dev, :test]},
+      {:excoveralls, "~> 0.10", only: :test},
       {:ex2ms, "~> 1.5", only: :test},
-      {:mock, "~> 0.2", only: :test},
+      {:mock, "~> 0.3", only: :test},
+      {:benchee, "~> 0.13", optional: true, only: :dev},
+      {:benchee_html, "~> 0.5", optional: true, only: :dev},
 
       # Code Analysis
       {:dialyxir, "~> 0.5", only: :dev, runtime: false},
-      {:credo, "~> 0.7", only: [:dev, :test]},
+      {:credo, "~> 0.10", only: [:dev, :test]},
 
       # Docs
-      {:ex_doc, "~> 0.17", only: :docs},
-      {:inch_ex, "~> 0.5", only: :docs}
+      {:ex_doc, "~> 0.19", only: :docs},
+      {:inch_ex, "~> 1.0", only: :docs}
     ]
   end
 
   defp package do
     [
       name: :nebulex,
-      maintainers: ["Carlos A Bolanos"],
+      maintainers: ["Carlos Bolanos"],
       licenses: ["MIT"],
       links: %{"GitHub" => "https://github.com/cabol/nebulex"}
     ]
@@ -71,7 +72,7 @@ defmodule Nebulex.Mixfile do
 
   defp docs do
     [
-      main: "getting-started",
+      main: "Nebulex",
       source_ref: "v#{@version}",
       canonical: "http://hexdocs.pm/nebulex",
       source_url: "https://github.com/cabol/nebulex",
