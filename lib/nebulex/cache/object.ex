@@ -298,8 +298,4 @@ defmodule Nebulex.Cache.Object do
       :key -> object.key
     end
   end
-
-  def return(key, opts) do
-    return(%Object{key: key}, opts)
-  end
 end

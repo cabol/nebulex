@@ -1,10 +1,13 @@
 defmodule Nebulex.Version.Timestamp do
   @behaviour Nebulex.Object.Version
 
+  alias Nebulex.Object
+
   @impl true
-  def generate(_cached) do
-    DateTime.to_unix(DateTime.utc_now(), :nanoseconds)
-  end
+  def generate(nil), do: now()
+  def generate(%Object{}), do: now()
+
+  defp now, do: DateTime.to_unix(DateTime.utc_now(), :nanoseconds)
 end
 
 defmodule Nebulex.TestCache do

@@ -24,17 +24,17 @@ defmodule Nebulex.Cache.QueryableTest do
       assert :ok == @cache.set_many(entries)
 
       expected = Keyword.keys(entries)
-      assert expected == :all |> @cache.stream() |> Enum.to_list() |> :lists.usort()
+      assert expected == nil |> @cache.stream() |> Enum.to_list() |> :lists.usort()
 
       expected = Keyword.values(entries)
 
       assert expected ==
-               :all
+               nil
                |> @cache.stream(return: :value, page_size: 3)
                |> Enum.to_list()
                |> :lists.usort()
 
-      stream = @cache.stream(:all, return: :object, page_size: 3)
+      stream = @cache.stream(nil, return: :object, page_size: 3)
       [%Object{key: 1, value: 2} | _] = stream |> Enum.to_list() |> :lists.usort()
 
       assert_raise Nebulex.QueryError, fn ->

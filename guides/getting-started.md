@@ -238,18 +238,18 @@ To fetch all entries from cache:
 Blog.Cache.all()
 
 # fetch all entries and return values
-Blog.Cache.all(:all, return: :value)
+Blog.Cache.all(nil, return: :value)
 
 # fetch all entries and return objects
-Blog.Cache.all(:all, return: :object)
+Blog.Cache.all(nil, return: :object)
 
 # built-in queries in `Nebulex.Adapters.Local` adapter
-Blog.Cache.all(:all)
+Blog.Cache.all(nil)
 Blog.Cache.all(:all_unexpired)
 Blog.Cache.all(:all_expired)
 
 # if we are using `Nebulex.Adapters.Local` adapter, the stored entry
-# is a tuple `{key, value, version, ttl}`, then the match spec
+# is a tuple `{key, value, version, expire_at}`, then the match spec
 # could be something like:
 spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
 Blog.Cache.all(spec)
@@ -270,9 +270,9 @@ In the same way, we can stream all entries:
 ```elixir
 Blog.Cache.stream()
 
-Blog.Cache.stream(:all, page_size: 3, return: :value)
+Blog.Cache.stream(nil, page_size: 3, return: :value)
 
-Blog.Cache.stream(:all, page_size: 3, return: :object)
+Blog.Cache.stream(nil, page_size: 3, return: :object)
 
 # using `Nebulex.Adapters.Local` adapter
 spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]

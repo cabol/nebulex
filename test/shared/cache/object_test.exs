@@ -301,7 +301,7 @@ defmodule Nebulex.Cache.ObjectTest do
       assert 2 == @cache.set(:b, 2)
 
       assert 3 == @cache.object_info(:a, :ttl)
-      _ = :timer.sleep(1000)
+      _ = :timer.sleep(500)
       assert 1 < @cache.object_info(:a, :ttl)
       assert :infinity == @cache.object_info(:b, :ttl)
       refute @cache.object_info(:c, :ttl)

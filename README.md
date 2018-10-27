@@ -1,6 +1,6 @@
 # Nebulex
-> ### In-Process and Distributed Caching Framework.
-> A fast, flexible and powerful distributed caching framework for Elixir.
+> ### In-Process and Distributed Caching Framework for Elixir.
+> Easily craft and deploy different distributed caching topologies in Elixir.
 
 [![Build Status](https://travis-ci.org/cabol/nebulex.svg?branch=master)](https://travis-ci.org/cabol/nebulex)
 [![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
@@ -14,17 +14,17 @@ useful and powerful features such as:
   * Inspired by [Ecto][ecto]; simple and fluent API, flexible and
     pluggable architecture (based on adapters).
 
-  * Built-in adapters; supporting local, distributed and multi-level caching.
+  * Built-in adapters: local (generational cache), distributed and multi-level.
 
   * Support for different distributed caching topologies, such as:
     Partitioned, Near, Replicated, etc.
 
-  * Different eviction mechanisms, such as: time-based eviction through
-    the expiry time property (`expire_at`) on the cached objects,
+  * Different eviction mechanisms, such as: time-based eviction through the
+    expiry time property (`expire_at`) on the cached objects,
     [multi-queue][multi_queue] or [generational caching][generational_caching]
-    (built-in local cache), etc.
+    (built-in adapter), etc.
 
-  * Object versioning (through the `:version` property); enabling
+  * Object versioning (via `:version` property); enabling
     [Optimistic offline locks][offline_locks].
 
   * [Pre/Post execution hooks](http://hexdocs.pm/nebulex/hooks.html).
@@ -69,7 +69,9 @@ def deps do
 end
 ```
 
-Then run `mix deps.get` in your shell to fetch the dependencies.
+Then run `mix deps.get` in your shell to fetch the dependencies. If you want to
+use another cache adapter, just choose the proper dependency from the table
+above.
 
 Finally, in the cache definition, you will need to specify the `adapter`
 respective to the chosen dependency. For the local built-in cache it is:
@@ -110,8 +112,8 @@ before running the tests.
 
 ## Benchmarks
 
-Simple and/or basic benchmarks were added using [benchee](https://github.com/PragTob/benchee);
-to learn more, see the [benchmarks](./benchmarks) directory.
+Some basic benchmarks were added using [benchee](https://github.com/PragTob/benchee);
+to learn more, check out the [benchmarks](./benchmarks) directory.
 
 To run the benchmarks:
 
@@ -123,6 +125,28 @@ If you are interested to run more sophisticated load tests, perhaps you should
 checkout the [Nebulex Load Tests](https://github.com/cabol/nebulex_examples/tree/master/nebulex_bench)
 example, it allows you to run your own performance/load tests against Nebulex,
 and it also comes with load tests results.
+
+## Contributing
+
+Contributions to Nebulex are very welcome and appreciated!
+
+Use the [issue tracker](https://github.com/cabol/nebulex/issues) for bug reports
+or feature requests. Open a [pull request](https://github.com/cabol/nebulex/pulls)
+when you are ready to contribute.
+
+When submitting a pull request you should not update the [CHANGELOG.md](CHANGELOG.md),
+and also make sure you test your changes thoroughly, include unit tests
+alongside new or changed code.
+
+Before to submit a PR it is highly recommended to run:
+
+ * `mix test` to run tests
+ * `mix coveralls.html && open cover/excoveralls.html` to run tests and check
+   out code coverage (expected 100%).
+ * `mix format && mix credo --strict` to format your code properly and find code
+   style issues
+ * `mix dialyzer` to run dialyzer for type checking; might take a while on the
+   first invocation
 
 ## Copyright and License
 

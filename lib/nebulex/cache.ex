@@ -61,7 +61,7 @@ defmodule Nebulex.Cache do
       take place. The version can be any term (default: `nil`).
 
     * `:ttl` - Time To Live (TTL) or expiration time in seconds for a key
-      (default: `:infinity`) – applies only to `set/3`.
+      (default: `:infinity`).
 
   Such cases will be explicitly documented as well as any extra option.
 
@@ -263,12 +263,12 @@ defmodule Nebulex.Cache do
 
       if Nebulex.Adapter.Queryable in behaviours do
         @doc false
-        def all(query \\ :all, opts \\ []) do
+        def all(query \\ nil, opts \\ []) do
           with_hooks(Nebulex.Cache.Queryable, :all, [query, opts])
         end
 
         @doc false
-        def stream(query \\ :all, opts \\ []) do
+        def stream(query \\ nil, opts \\ []) do
           with_hooks(Nebulex.Cache.Queryable, :stream, [query, opts])
         end
       end
@@ -996,8 +996,8 @@ defmodule Nebulex.Cache do
   @doc """
   Fetches all entries from cache matching the given `query`.
 
-  If the `query` is `:all`, it streams all entries from cache; this is common
-  for all adapters. However, the `query` may have any other value, which
+  If the `query` is `nil`, it fetches all entries from cache; this is common
+  for all adapters. However, the `query` could be any other value, which
   depends entirely on the adapter's implementation; check out the "Query"
   section below.
 
@@ -1019,11 +1019,11 @@ defmodule Nebulex.Cache do
       [1, 2, 3, 4, 5]
 
       # fetch all entries and return values
-      iex> MyCache.all(:all, return: :value)
+      iex> MyCache.all(nil, return: :value)
       [2, 4, 6, 8, 10]
 
       # fetch all entries and return objects
-      iex> [%Nebulex.Object{} | _] = MyCache.all(:all, return: :object)
+      iex> [%Nebulex.Object{} | _] = MyCache.all(nil, return: :object)
 
       # fetch all entries that match with the given query
       # assuming we are using Nebulex.Adapters.Local adapter
@@ -1035,7 +1035,7 @@ defmodule Nebulex.Cache do
 
   Query spec is defined by the adapter, hence, it is recommended to check out
   adapters documentation. For instance, the built-in `Nebulex.Adapters.Local`
-  adapter supports `:all | :all_unexpired | :all_expired | :ets.match_spec()`
+  adapter supports `nil | :all_unexpired | :all_expired | :ets.match_spec()`
   as query value.
 
   ## Examples
@@ -1065,7 +1065,7 @@ defmodule Nebulex.Cache do
 
   To learn more, check out adapters documentation.
   """
-  @callback all(query :: :all | any, opts) :: [any]
+  @callback all(query :: nil | any, opts) :: [any]
 
   @doc """
   Similar to `all/2` but returns a lazy enumerable that emits all entries
@@ -1091,11 +1091,11 @@ defmodule Nebulex.Cache do
       [1, 2, 3, 4, 5]
 
       # stream all entries and return values
-      iex> MyCache.stream(:all, return: :value, page_size: 3) |> Enum.to_list()
+      iex> MyCache.stream(nil, return: :value, page_size: 3) |> Enum.to_list()
       [2, 4, 6, 8, 10]
 
       # stream all entries and return objects
-      iex> stream = MyCache.stream(:all, return: :object, page_size: 3)
+      iex> stream = MyCache.stream(nil, return: :object, page_size: 3)
       iex> [%Nebulex.Object{} | _] = Enum.to_list(stream)
 
       # additional built-in queries for Nebulex.Adapters.Local adapter
@@ -1123,7 +1123,7 @@ defmodule Nebulex.Cache do
 
   To learn more, check out adapters documentation.
   """
-  @callback stream(query :: :all | any, opts) :: Enum.t()
+  @callback stream(query :: nil | any, opts) :: Enum.t()
 
   ## Nebulex.Adapter.Transaction
 

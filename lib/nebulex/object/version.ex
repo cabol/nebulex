@@ -38,30 +38,34 @@ defmodule Nebulex.Object.Version do
   For more information, check out adapters implementation.
   """
   @spec validate(
-          object_or_key,
+          object_or_key :: object | Nebulex.Cache.key(),
           cache :: Nebulex.Cache.t(),
           opts :: Nebulex.Cache.opts()
-        ) :: {:override | :nothing, object_or_key}
-        when object_or_key: Nebulex.Object.t() | Nebulex.Cache.key()
+        ) :: {:override | :nothing, object | nil}
+        when object: Nebulex.Object.t()
   def validate(nil, _cache, _opts), do: {:override, nil}
 
   def validate(object_or_key, cache, opts) do
     opts
     |> Keyword.get(:version)
-    |> case do
-      nil ->
-        {:override, object_or_key}
-
-      vsn ->
-        # TODO: There is still a race condition between the `get` to retrieve
-        # the cached object and the command executed later in the adapter
-        cache
-        |> maybe_get(object_or_key)
-        |> on_conflict(vsn, Keyword.get(opts, :on_conflict, :raise))
-    end
+    |> validate(object_or_key, cache, opts)
   end
 
   ## Helpers
+
+  defp validate(nil, %Object{} = object, _cache, _opts) do
+    {:override, object}
+  end
+
+  defp validate(nil, key, _cache, _opts) do
+    {:override, %Object{key: key}}
+  end
+
+  defp validate(vsn, object_or_key, cache, opts) do
+    cache
+    |> maybe_get(object_or_key)
+    |> on_conflict(vsn, Keyword.get(opts, :on_conflict, :raise))
+  end
 
   defp maybe_get(_cache, %Object{} = object),
     do: object

@@ -55,8 +55,8 @@ defmodule Nebulex.Adapters.Dist do
 
   ## Example
 
-  `Nebulex.Cache` is the wrapper around the Cache. We can define the
-  local and distributed cache as follows:
+  `Nebulex.Cache` is the wrapper around the cache. We can define the local
+  and distributed cache as follows:
 
       defmodule MyApp.LocalCache do
         use Nebulex.Cache,
@@ -70,8 +70,8 @@ defmodule Nebulex.Adapters.Dist do
           adapter: Nebulex.Adapters.Dist
       end
 
-  Where the configuration for the Cache must be in your application
-  environment, usually defined in your `config/config.exs`:
+  Where the configuration for the cache must be in your application environment,
+  usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.LocalCache,
         n_shards: 2,
@@ -80,7 +80,7 @@ defmodule Nebulex.Adapters.Dist do
       config :my_app, MyApp.DistCache,
         local: MyApp.LocalCache
 
-  For more information about the usage, check `Nebulex.Cache`.
+  For more information about the usage, check out `Nebulex.Cache`.
 
   ## Extended API
 
@@ -125,7 +125,7 @@ defmodule Nebulex.Adapters.Dist do
   alias Nebulex.Adapters.Dist.RPC
   alias Nebulex.Object
 
-  ## Adapter Impl
+  ## Adapter
 
   @impl true
   defmacro __before_compile__(env) do
@@ -162,8 +162,6 @@ defmodule Nebulex.Adapters.Dist do
       end
     end
   end
-
-  ## Adapter
 
   @impl true
   def init(opts) do

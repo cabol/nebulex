@@ -38,7 +38,7 @@ defmodule Nebulex.Adapters.Local do
 
   ## Example
 
-  `Nebulex.Cache` is the wrapper around the Cache. We can define a
+  `Nebulex.Cache` is the wrapper around the cache. We can define a
   local cache as follows:
 
       defmodule MyApp.LocalCache do
@@ -47,7 +47,7 @@ defmodule Nebulex.Adapters.Local do
           adapter: Nebulex.Adapters.Local
       end
 
-  Where the configuration for the Cache must be in your application
+  Where the configuration for the cache must be in your application
   environment, usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.LocalCache,
@@ -55,7 +55,7 @@ defmodule Nebulex.Adapters.Local do
         gc_interval: 3600,
         write_concurrency: true
 
-  For more information about the usage, check `Nebulex.Cache`.
+  For more information about the usage, check out `Nebulex.Cache`.
 
   ## Extended API
 
@@ -77,9 +77,9 @@ defmodule Nebulex.Adapters.Local do
 
   The adapter supports as query parameter the following values:
 
-    * `query` - `:all | :all_unexpired | :all_expired | :ets.match_spec()`
+    * `query` - `nil | :all_unexpired | :all_expired | :ets.match_spec()`
 
-  Internally, an entry is represented by the tuple `{key, value, version, exp}`,
+  Internally, an entry is represented by the tuple `{key, val, vsn, exp}`,
   which means the match pattern within the `:ets.match_spec()` must be
   something like `{:"$1", :"$2", :"$3", :"$4"}`. In order to make query
   building easier, you can use `Ex2ms` library.
@@ -87,7 +87,7 @@ defmodule Nebulex.Adapters.Local do
   ## Examples
 
       # built-in queries
-      MyCache.all(:all)
+      MyCache.all()
       MyCache.all(:all_unexpired)
       MyCache.all(:all_expired)
 
@@ -100,13 +100,13 @@ defmodule Nebulex.Adapters.Local do
 
       spec =
         fun do
-          {key, value, _version, _exp} when value > 10 -> {key, value}
+          {key, value, _version, _expire_at} when value > 10 -> {key, value}
         end
 
       MyCache.all(spec)
 
   The `:return` option applies only for built-in queries, such as:
-  `:all | :all_unexpired | :all_expired`, if you are using a
+  `nil | :all_unexpired | :all_expired`, if you are using a
   custom `:ets.match_spec()`, the return value depends on it.
 
   The same applies to `stream` function.
@@ -446,7 +446,7 @@ defmodule Nebulex.Adapters.Local do
 
   defp now, do: DateTime.to_unix(DateTime.utc_now())
 
-  defp validate_match_spec(spec, opts) when spec in [:all, :all_unexpired, :all_expired] do
+  defp validate_match_spec(spec, opts) when spec in [nil, :all_unexpired, :all_expired] do
     [
       {
         {:"$1", :"$2", :"$3", :"$4"},
@@ -466,7 +466,7 @@ defmodule Nebulex.Adapters.Local do
     end
   end
 
-  defp comp_match_spec(:all),
+  defp comp_match_spec(nil),
     do: nil
 
   defp comp_match_spec(:all_unexpired),

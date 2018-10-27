@@ -40,8 +40,9 @@ defmodule Nebulex.Adapters.LocalTest do
 
   test "get_and_update" do
     assert {nil, 1} ==
-             TestCache.get_and_update(1, fn v ->
-               if v, do: {v, v * 2}, else: {v, 1}
+             TestCache.get_and_update(1, fn
+               nil -> {nil, 1}
+               val -> {val, val * 2}
              end)
 
     assert {1, 2} == TestCache.get_and_update(1, &{&1, &1 * 2})
@@ -138,7 +139,7 @@ defmodule Nebulex.Adapters.LocalTest do
     values = values ++ for x <- 6..10, do: TestCache.set(x, x * 2)
 
     assert values ==
-             :all
+             nil
              |> TestCache.stream(page_size: 3, return: :value)
              |> Enum.to_list()
              |> :lists.usort()
@@ -169,7 +170,7 @@ defmodule Nebulex.Adapters.LocalTest do
 
       opts = [page_size: 3, return: :value]
 
-      assert all == all_or_stream(action, :all, opts)
+      assert all == all_or_stream(action, nil, opts)
       assert all == all_or_stream(action, :all_unexpired, opts)
       assert [] == all_or_stream(action, :all_expired, opts)
 
