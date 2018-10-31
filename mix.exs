@@ -3,7 +3,7 @@ Enum.each(Path.wildcard("bench/tasks/*.exs"), &Code.require_file/1)
 defmodule Nebulex.Mixfile do
   use Mix.Project
 
-  @version "1.0.0-dev"
+  @version "1.0.0"
 
   def project do
     [

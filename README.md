@@ -64,7 +64,7 @@ For example, if you want to use a built-in cache, you just need to add
 ```elixir
 def deps do
   [
-    {:nebulex, "~> 1.0.0-rc.3"}
+    {:nebulex, "~> 1.0"}
   ]
 end
 ```

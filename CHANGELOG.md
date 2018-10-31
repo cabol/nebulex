@@ -1,5 +1,25 @@
 # Change Log
 
+## [v1.0.0](https://github.com/cabol/nebulex/tree/v1.0.0) (2018-10-30)
+[Full Changelog](https://github.com/cabol/nebulex/compare/v1.0.0-rc.3...v1.0.0)
+
+**Implemented enhancements:**
+
+- Refactor `Nebulex.Adapters.Dist` to use `Task` instead of `:rpc` [\#24](https://github.com/cabol/nebulex/issues/24)
+- Create first cache generation by default when the cache is started [\#21](https://github.com/cabol/nebulex/issues/21)
+
+**Closed issues:**
+
+- Performance Problem. [\#27](https://github.com/cabol/nebulex/issues/27)
+- Cache Failing to Start on Production [\#26](https://github.com/cabol/nebulex/issues/26)
+- Adapter for Redis [\#23](https://github.com/cabol/nebulex/issues/23)
+- For `update` and `get\_and\_update` functions, the :ttl is being overridden [\#19](https://github.com/cabol/nebulex/issues/19)
+- Invalidate keys cluster-wide [\#18](https://github.com/cabol/nebulex/issues/18)
+- TTL and EXPIRE functions? [\#17](https://github.com/cabol/nebulex/issues/17)
+- Publish a rc.3 release [\#16](https://github.com/cabol/nebulex/issues/16)
+- Replicated cache adapter [\#15](https://github.com/cabol/nebulex/issues/15)
+- Fulfil the open-source checklist [\#1](https://github.com/cabol/nebulex/issues/1)
+
 ## [v1.0.0-rc.3](https://github.com/cabol/nebulex/tree/v1.0.0-rc.3) (2018-01-10)
 [Full Changelog](https://github.com/cabol/nebulex/compare/v1.0.0-rc.2...v1.0.0-rc.3)
 
