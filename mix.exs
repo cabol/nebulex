@@ -52,7 +52,7 @@ defmodule Nebulex.Mixfile do
       {:benchee_html, "~> 0.5", optional: true, only: :dev},
 
       # Code Analysis
-      {:dialyxir, "~> 0.5", optional: true, only: :dev, runtime: false},
+      {:dialyxir, "~> 0.5", optional: true, only: [:dev, :test], runtime: false},
       {:credo, "~> 0.10", optional: true, only: [:dev, :test]},
 
       # Docs

@@ -21,6 +21,10 @@ before_script:
   - mix deps.get --only test
 script:
   - mix coveralls.travis
+  - mix dialyzer --plt
+  - mix dialyzer --halt-exit-status
+  - mix credo --strict
+  #- mix format --check-formatted # enable it when Elixir 1.5 be deprecated
 after_script:
   - mix deps.get --only docs
   - MIX_ENV=docs mix inch.report
