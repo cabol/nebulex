@@ -71,8 +71,8 @@ See how our hooks are logging all cache calls!
 
 ## Configuration
 
-It is possible to configure the strategy how the hooks are evaluated,
-the available strategies are:
+It is possible to setup the mode how the hooks are evaluated. The available
+modes are:
 
   * `:async` - all hooks are evaluated asynchronously (in parallel) and their
     results are ignored.
@@ -82,17 +82,6 @@ the available strategies are:
 
   * `:pipe` - similar to `:sync` but each hook result is passed to the
     next one and so on, until the last hook evaluation is returned.
-
-These strategy values applies to the compile-time options
-`:pre_hooks_strategy` and `:post_hooks_strategy`.
-
-For example:
-
-```elixir
-config :my_app, MyApp.MyCache,
-  adapter: Nebulex.Adapters.Local,
-  n_shards: 2
-```
 
 You have to be careful with `:pipe` option, because the result of the hook is
 passed to the next one and so on, and the final result will be the result of

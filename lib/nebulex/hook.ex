@@ -7,9 +7,10 @@ defmodule Nebulex.Hook do
 
   ## Execution modes
 
-  It is possible to configure the `mode` how the hooks are evaluated, using the
-  compile-time options `:pre_hooks_mode` and `:post_hooks_mode`. The
-  available modes are:
+  It is possible to setup the mode how the hooks are evaluated. The
+  `pre_hooks/0` and `post_hooks/0` callbacks must return a tuple
+  `{mode, hook_funs}`, where the first element `mode` is the one
+  that defines the execution mode. The available modes are:
 
     * `:async` - (the default) all hooks are evaluated asynchronously
       (in parallel) and their results are ignored.
@@ -22,22 +23,17 @@ defmodule Nebulex.Hook do
 
   ## Example
 
-      config :my_app, MyApp.MyCache,
-        n_shards: 2,
-        pre_hooks_mode: :async,
-        post_hooks_mode: :pipe
-
       defmodule MyApp.MyCache do
         use Nebulex.Cache,
           otp_app: :my_app,
           adapter: Nebulex.Adapters.Local
 
         def pre_hooks do
-          [... your pre hook functions ...]
+          {:async, [... your pre hook functions ...]}
         end
 
         def post_hooks do
-          [... your post hook functions ...]
+          {:pipe, [... your post hook functions ...]}
         end
       end
   """

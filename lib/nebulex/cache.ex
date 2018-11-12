@@ -6,7 +6,7 @@ defmodule Nebulex.Cache do
   adapter. For example, Nebulex ships with a default adapter that
   implements a local generational cache.
 
-  When used, the Cache expects the `:otp_app` and `adapter` as options.
+  When used, the Cache expects the `:otp_app` and `:adapter` as options.
   The `:otp_app` should point to an OTP application that has the Cache
   configuration. For example, the Cache:
 
