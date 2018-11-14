@@ -79,7 +79,7 @@ respective to the chosen dependency. For the local built-in cache it is:
 ```elixir
 defmodule MyApp.Cache do
   use Nebulex.Cache,
-    otp_app: :my_app
+    otp_app: :my_app,
     adapter: Nebulex.Adapters.Local
   ...
 ```
