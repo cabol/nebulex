@@ -174,7 +174,7 @@ defmodule Nebulex.Adapters.LocalTest do
       assert all == all_or_stream(action, :all_unexpired, opts)
       assert [] == all_or_stream(action, :all_expired, opts)
 
-      :timer.sleep(3500)
+      :timer.sleep(4100)
 
       assert unexpired == all_or_stream(action, :all_unexpired, opts)
       assert expired == all_or_stream(action, :all_expired, opts)

@@ -281,10 +281,23 @@ defmodule Nebulex.Adapters.Local do
   @impl true
   def has_key?(cache, key) do
     Enum.reduce_while(cache.__metadata__.generations, false, fn gen, acc ->
-      if Local.member(gen, key, cache.__state__),
+      if has_key?(gen, key, now(), cache.__state__),
         do: {:halt, true},
         else: {:cont, acc}
     end)
+  end
+
+  defp has_key?(gen, key, now, state) do
+    case Local.lookup_element(gen, key, 4, state) do
+      exp when not is_nil(exp) and exp <= now ->
+        true = Local.delete(gen, key, state)
+        false
+
+      _ ->
+        true
+    end
+  rescue
+    ArgumentError -> false
   end
 
   @impl true

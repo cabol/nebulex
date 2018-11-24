@@ -296,6 +296,14 @@ defmodule Nebulex.Cache.ObjectTest do
       refute @cache.has_key?(3)
     end
 
+    test "has_key? expired key" do
+      assert "bar" == @cache.set("foo", "bar", ttl: 1)
+      assert @cache.has_key?("foo")
+
+      :timer.sleep(2100)
+      refute @cache.has_key?("foo")
+    end
+
     test "object_info ttl" do
       assert 1 == @cache.set(:a, 1, ttl: 3)
       assert 2 == @cache.set(:b, 2)
