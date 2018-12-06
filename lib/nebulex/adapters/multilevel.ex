@@ -411,6 +411,11 @@ defmodule Nebulex.Adapters.Multilevel do
     |> Enum.reduce(object, &replicate(&1, &2))
   end
 
+  defp replicate(cache, %Object{expire_at: :infinity} = object) do
+    true = cache.__adapter__.set(cache, object, [])
+    object
+  end
+
   defp replicate(cache, %Object{expire_at: expire_at} = object) do
     object =
       if expire_at,
