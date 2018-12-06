@@ -438,6 +438,10 @@ defmodule Nebulex.Adapters.Local do
 
   defp entry_to_object(nil), do: nil
 
+  defp entry_to_object({key, val, vsn, :infinity}) do
+    %Object{key: key, value: val, version: vsn}
+  end
+
   defp entry_to_object({key, val, vsn, expire_at}) do
     %Object{key: key, value: val, version: vsn, expire_at: expire_at}
   end

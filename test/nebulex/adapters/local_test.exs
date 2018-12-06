@@ -181,6 +181,17 @@ defmodule Nebulex.Adapters.LocalTest do
     end
   end
 
+  test "unexpired objects through generations" do
+    object = TestCache.set("foo", "bar", return: :object)
+    assert "foo" == object.key
+    assert "bar" == object.value
+    refute object.expire_at
+
+    assert object == TestCache.get("foo", return: :object)
+    TestCache.new_generation()
+    assert object == TestCache.get("foo", return: :object)
+  end
+
   test "push generations" do
     # should be empty
     refute TestCache.get(1)
