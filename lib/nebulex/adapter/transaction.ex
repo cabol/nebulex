@@ -7,7 +7,7 @@ defmodule Nebulex.Adapter.Transaction do
   This module also provides a default implementation which uses the Erlang
   library `:global`.
 
-  Theis implementation accepts the following options:
+  This implementation accepts the following options:
 
     * `:keys` - The list of the keys that will be locked. Since the lock id is
       generated based on the key, if this option is not set, a fixed/constant
