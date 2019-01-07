@@ -36,9 +36,7 @@ defmodule Nebulex.Cache.Supervisor do
     adapter = Keyword.get(opts, :adapter)
 
     unless adapter do
-      raise ArgumentError,
-            "missing :adapter configuration in " <>
-              "config #{inspect(otp_app)}, #{inspect(cache)}"
+      raise ArgumentError, "missing :adapter option on use Nebulex.Cache"
     end
 
     unless Code.ensure_loaded?(adapter) do

@@ -15,7 +15,8 @@
         {Credo.Check.Readability.MaxLineLength, priority: :low, max_length: 100},
 
         ## Refactoring Opportunities
-        {Credo.Check.Refactor.LongQuoteBlocks, false}
+        {Credo.Check.Refactor.LongQuoteBlocks, false},
+        {Credo.Check.Refactor.CyclomaticComplexity, max_complexity: 15}
       ]
     }
   ]

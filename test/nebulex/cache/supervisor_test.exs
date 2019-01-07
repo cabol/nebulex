@@ -8,7 +8,7 @@ defmodule Nebulex.Cache.SupervisorTest do
   end
 
   setup do
-    _ = Application.put_env(:nebulex, MyCache, n_shards: 2)
+    :ok = Application.put_env(:nebulex, MyCache, n_shards: 2)
     {:ok, pid} = MyCache.start_link()
     :ok
 
@@ -20,19 +20,16 @@ defmodule Nebulex.Cache.SupervisorTest do
 
   test "fail on compile_config because missing adapter" do
     opts = [otp_app: :nebulex, n_shards: 2]
-    _ = Application.put_env(:nebulex, MyCache, opts)
+    :ok = Application.put_env(:nebulex, MyCache, opts)
 
-    msg =
-      "missing :adapter configuration in config :nebulex, Nebulex.Cache.SupervisorTest.MyCache"
-
-    assert_raise ArgumentError, msg, fn ->
+    assert_raise ArgumentError, "missing :adapter option on use Nebulex.Cache", fn ->
       Nebulex.Cache.Supervisor.compile_config(MyCache, opts)
     end
   end
 
   test "fail on compile_config because adapter was not compiled" do
     opts = [otp_app: :nebulex, n_shards: 2, adapter: TestAdapter]
-    _ = Application.put_env(:nebulex, MyCache, opts)
+    :ok = Application.put_env(:nebulex, MyCache, opts)
 
     msg = ~r"adapter TestAdapter was not compiled, ensure"
 
@@ -43,7 +40,7 @@ defmodule Nebulex.Cache.SupervisorTest do
 
   test "fail on compile_config because adapter error" do
     opts = [otp_app: :nebulex, n_shards: 2]
-    _ = Application.put_env(:nebulex, MyCache2, opts)
+    :ok = Application.put_env(:nebulex, MyCache2, opts)
 
     msg = "expected :adapter option given to Nebulex.Cache to list Nebulex.Adapter as a behaviour"
 

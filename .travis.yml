@@ -1,18 +1,10 @@
 language: elixir
 elixir:
-  - 1.5
   - 1.6
   - 1.7
 otp_release:
-  - 19.3
   - 20.3
-  - 21.0
-matrix:
-  exclude:
-    - elixir: 1.5
-      otp_release: 21.0
-    - elixir: 1.7
-      otp_release: 19.3
+  - 21.1
 sudo: false
 env:
   - MIX_ENV=test
@@ -24,7 +16,7 @@ script:
   - mix dialyzer --plt
   - mix dialyzer --halt-exit-status
   - mix credo --strict
-  #- mix format --check-formatted # enable it when Elixir 1.5 be deprecated
+  - mix format --check-formatted
 after_script:
   - mix deps.get --only docs
   - MIX_ENV=docs mix inch.report

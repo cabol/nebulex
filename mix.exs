@@ -1,9 +1,7 @@
-Enum.each(Path.wildcard("bench/tasks/*.exs"), &Code.require_file/1)
-
 defmodule Nebulex.Mixfile do
   use Mix.Project
 
-  @version "1.0.0"
+  @version "1.0.1-dev"
 
   def project do
     [
@@ -56,7 +54,7 @@ defmodule Nebulex.Mixfile do
       {:credo, "~> 0.10", optional: true, only: [:dev, :test]},
 
       # Docs
-      {:ex_doc, "~> 0.19", only: :docs},
+      {:ex_doc, "~> 0.19", only: :dev, runtime: false},
       {:inch_ex, "~> 1.0", only: :docs}
     ]
   end

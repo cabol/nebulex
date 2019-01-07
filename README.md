@@ -31,6 +31,8 @@ useful and powerful features such as:
 
   * Transactions and key-locking (`Nebulex.Adapter.Transaction`).
 
+  * [Caching utility macros](lib/nebulex/caching.ex).
+
 [ecto]: https://github.com/elixir-ecto/ecto
 [multi_queue]: https://en.wikipedia.org/wiki/Cache_replacement_policies#Multi_queue_(MQ)
 [generational_caching]: http://fairwaytech.com/2012/09/write-through-and-generational-caching
@@ -53,10 +55,10 @@ Generational | Nebulex.Adapters.Local         | Built-In
 Partitioned  | Nebulex.Adapters.Dist          | Built-In
 Multi-level  | Nebulex.Adapters.Multilevel    | Built-In
 Redis        | NebulexRedisAdapter            | [nebulex_redis_adapter][nebulex_redis_adapter]
-Replicated   | NebulexExt.Adapters.Replicated | [nebulex_ext][nebulex_ext]
+Memcached    | NebulexMemcachedAdapter        | [nebulex_memcached_adapter][nebulex_memcached_adapter]
 
 [nebulex_redis_adapter]: https://github.com/cabol/nebulex_redis_adapter
-[nebulex_ext]: https://github.com/amilkr/nebulex_ext
+[nebulex_memcached_adapter]: https://github.com/cabol/nebulex_memcached_adapter
 
 For example, if you want to use a built-in cache, you just need to add
 `nebulex` to your `mix.exs` file:
