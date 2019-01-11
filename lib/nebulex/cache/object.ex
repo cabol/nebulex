@@ -5,7 +5,7 @@ defmodule Nebulex.Cache.Object do
   alias Nebulex.Object.Version
 
   @doc """
-  Implementation for `Nebulex.Cache.get/2`.
+  Implementation for `c:Nebulex.Cache.get/2`.
   """
   def get(cache, key, opts) do
     cache
@@ -16,7 +16,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.get!/2`.
+  Implementation for `c:Nebulex.Cache.get!/2`.
   """
   def get!(cache, key, opts) do
     if result = get(cache, key, opts) do
@@ -27,7 +27,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.get_many/2`.
+  Implementation for `c:Nebulex.Cache.get_many/2`.
   """
   def get_many(_cache, [], _opts), do: %{}
 
@@ -46,7 +46,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.set/3`.
+  Implementation for `c:Nebulex.Cache.set/3`.
   """
   def set(_cache, _key, nil, _opts), do: nil
 
@@ -75,7 +75,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.set_many/2`.
+  Implementation for `c:Nebulex.Cache.set_many/2`.
   """
   def set_many(_cache, [], _opts), do: :ok
   def set_many(_cache, entries, _opts) when map_size(entries) == 0, do: :ok
@@ -103,7 +103,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.add/3`.
+  Implementation for `c:Nebulex.Cache.add/3`.
   """
   def add(_cache, _key, nil, _opts), do: {:ok, nil}
 
@@ -114,7 +114,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.add!/3`.
+  Implementation for `c:Nebulex.Cache.add!/3`.
   """
   def add!(cache, key, value, opts) do
     case add(cache, key, value, opts) do
@@ -127,7 +127,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.replace/3`.
+  Implementation for `c:Nebulex.Cache.replace/3`.
   """
   def replace(_cache, _key, nil, _opts), do: {:ok, nil}
 
@@ -138,7 +138,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.replace!/3`.
+  Implementation for `c:Nebulex.Cache.replace!/3`.
   """
   def replace!(cache, key, value, opts) do
     case replace(cache, key, value, opts) do
@@ -151,7 +151,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.add_or_replace!/3`.
+  Implementation for `c:Nebulex.Cache.add_or_replace!/3`.
   """
   def add_or_replace!(_cache, _key, nil, _opts), do: nil
 
@@ -166,7 +166,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.delete/2`.
+  Implementation for `c:Nebulex.Cache.delete/2`.
   """
   def delete(cache, key, opts) do
     key
@@ -183,7 +183,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.take/2`.
+  Implementation for `c:Nebulex.Cache.take/2`.
   """
   def take(_cache, nil, _opts), do: nil
 
@@ -201,7 +201,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.take!/2`.
+  Implementation for `c:Nebulex.Cache.take!/2`.
   """
   def take!(cache, key, opts) do
     if result = take(cache, key, opts) do
@@ -212,14 +212,14 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.has_key?/1`.
+  Implementation for `c:Nebulex.Cache.has_key?/1`.
   """
   def has_key?(cache, key) do
     cache.__adapter__.has_key?(cache, key)
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.object_info/2`.
+  Implementation for `c:Nebulex.Cache.object_info/2`.
   """
   def object_info(cache, key, attr) when attr in [:ttl, :version] do
     cache.__adapter__.object_info(cache, key, attr)
@@ -230,14 +230,14 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.expire/2`.
+  Implementation for `c:Nebulex.Cache.expire/2`.
   """
   def expire(cache, key, ttl) when (is_integer(ttl) and ttl >= 0) or ttl == :infinity do
     cache.__adapter__.expire(cache, key, ttl)
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.get_and_update/3`.
+  Implementation for `c:Nebulex.Cache.get_and_update/3`.
   """
   def get_and_update(cache, key, fun, opts) when is_function(fun, 1) do
     current = cache.__adapter__.get(cache, key, opts) || %Object{key: key}
@@ -261,7 +261,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.update/4`.
+  Implementation for `c:Nebulex.Cache.update/4`.
   """
   def update(cache, key, initial, fun, opts) do
     case cache.__adapter__.get(cache, key, opts) do
@@ -274,7 +274,7 @@ defmodule Nebulex.Cache.Object do
   end
 
   @doc """
-  Implementation for `Nebulex.Cache.update_counter/3`.
+  Implementation for `c:Nebulex.Cache.update_counter/3`.
   """
   def update_counter(cache, key, incr, opts) when is_integer(incr) do
     cache.__adapter__.update_counter(cache, key, incr, opts)

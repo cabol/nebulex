@@ -92,7 +92,7 @@ defmodule Nebulex.Adapters.Dist do
 
   ### `get_node/1`
 
-  This function invokes `Nebulex.Adapter.NodeSelector.get_node/2` internally.
+  This function invokes `c:Nebulex.Adapter.NodeSelector.get_node/2` internally.
 
       MyCache.get_node("mykey")
 

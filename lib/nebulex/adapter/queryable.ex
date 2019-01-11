@@ -17,7 +17,7 @@ defmodule Nebulex.Adapter.Queryable do
 
   May raise `Nebulex.QueryError` if query validation fails.
 
-  See `Nebulex.Cache.all/2`.
+  See `c:Nebulex.Cache.all/2`.
   """
   @callback all(cache, query :: nil | any, opts) :: [any]
 
@@ -28,7 +28,7 @@ defmodule Nebulex.Adapter.Queryable do
 
   May raise `Nebulex.QueryError` if query validation fails.
 
-  See `Nebulex.Cache.stream/2`.
+  See `c:Nebulex.Cache.stream/2`.
   """
   @callback stream(cache, query :: nil | any, opts) :: Enumerable.t()
 end

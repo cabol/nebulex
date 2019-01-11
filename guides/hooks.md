@@ -5,7 +5,7 @@ before or after particular methods. Hooks mechanism is very powerful but
 dangerous at the same time, so you have to be careful.
 
 When we define a cache, we are able to override `pre_hooks/0` and `post_hooks/0`
-functions by providing ours; these callbacks are defined by `Nebulex.Cache.Hook`
+functions by providing ours; these callbacks are defined by `c:Nebulex.Cache.Hook`
 behaviour. Let's check out the example just below in order to understand better
 how it works.
 

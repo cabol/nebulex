@@ -23,7 +23,7 @@ defmodule Nebulex.Adapter do
   @doc """
   Retrieves a single object from cache.
 
-  See `Nebulex.Cache.get/2`.
+  See `c:Nebulex.Cache.get/2`.
   """
   @callback get(cache, key, opts) :: object | nil
 
@@ -32,7 +32,7 @@ defmodule Nebulex.Adapter do
   does not hold a value or does not exist, that key is simply ignored.
   Because of this, the operation never fails.
 
-  See `Nebulex.Cache.get_many/2`.
+  See `c:Nebulex.Cache.get_many/2`.
   """
   @callback get_many(cache, [key], opts) :: map
 
@@ -62,7 +62,7 @@ defmodule Nebulex.Adapter do
 
     * `:set` - Set `key` to hold the given `object` (default).
 
-  See `Nebulex.Cache.set/3`, `Nebulex.Cache.add/3`, `Nebulex.Cache.replace/3`.
+  See `c:Nebulex.Cache.set/3`, `c:Nebulex.Cache.add/3`, `c:Nebulex.Cache.replace/3`.
   """
   @callback set(cache, object, opts) :: boolean
 
@@ -78,28 +78,28 @@ defmodule Nebulex.Adapter do
   internally by the adapter. Hence, it is recommended to checkout the
   adapter's documentation.
 
-  See `Nebulex.Cache.set_many/2`.
+  See `c:Nebulex.Cache.set_many/2`.
   """
   @callback set_many(cache, [object], opts) :: :ok | {:error, failed_keys :: [key]}
 
   @doc """
   Deletes a single object from cache.
 
-  See `Nebulex.Cache.delete/2`.
+  See `c:Nebulex.Cache.delete/2`.
   """
   @callback delete(cache, key, opts) :: :ok
 
   @doc """
   Returns and removes the object with key `key` in the cache.
 
-  See `Nebulex.Cache.take/2`.
+  See `c:Nebulex.Cache.take/2`.
   """
   @callback take(cache, key, opts) :: object | nil
 
   @doc """
   Returns whether the given `key` exists in cache.
 
-  See `Nebulex.Cache.has_key?/1`.
+  See `c:Nebulex.Cache.has_key?/1`.
   """
   @callback has_key?(cache, key) :: boolean
 
@@ -107,7 +107,7 @@ defmodule Nebulex.Adapter do
   Returns the information associated with `attr` for the given `key`,
   or returns `nil` if `key` doesn't exist.
 
-  See `Nebulex.Cache.object_info/2`.
+  See `c:Nebulex.Cache.object_info/2`.
   """
   @callback object_info(cache, key, attr :: :ttl | :version) :: any | nil
 
@@ -117,28 +117,28 @@ defmodule Nebulex.Adapter do
 
   If `key` doesn't exist, `nil` is returned.
 
-  See `Nebulex.Cache.expire/2`.
+  See `c:Nebulex.Cache.expire/2`.
   """
   @callback expire(cache, key, ttl :: timeout) :: timeout | nil
 
   @doc """
   Updates (increment or decrement) the counter mapped to the given `key`.
 
-  See `Nebulex.Cache.update_counter/3`.
+  See `c:Nebulex.Cache.update_counter/3`.
   """
   @callback update_counter(cache, key, incr :: integer, opts) :: integer
 
   @doc """
   Returns the total number of cached entries.
 
-  See `Nebulex.Cache.size/0`.
+  See `c:Nebulex.Cache.size/0`.
   """
   @callback size(cache) :: integer
 
   @doc """
   Flushes the cache.
 
-  See `Nebulex.Cache.flush/0`.
+  See `c:Nebulex.Cache.flush/0`.
   """
   @callback flush(cache) :: :ok
 end

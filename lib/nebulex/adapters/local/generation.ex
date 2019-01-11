@@ -8,8 +8,6 @@ defmodule Nebulex.Adapters.Local.Generation do
   is created, a generations handler associated to that Cache is started
   at the same time, therefore, this server MUST NOT be started directly.
 
-  See `Nebulex.Adapters.Local.children_specs/2`.
-
   ## Options
 
   * `:gc_interval` - Interval time in seconds to garbage collection to run,
