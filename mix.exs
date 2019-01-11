@@ -1,7 +1,7 @@
 defmodule Nebulex.Mixfile do
   use Mix.Project
 
-  @version "1.0.1-dev"
+  @version "1.0.1"
 
   def project do
     [

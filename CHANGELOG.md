@@ -1,6 +1,28 @@
 # Change Log
 
-## [v1.0.0](https://github.com/cabol/nebulex/tree/v1.0.0) (2018-10-30)
+## [v1.0.1](https://github.com/cabol/nebulex/tree/v1.0.1) (2019-01-11)
+[Full Changelog](https://github.com/cabol/nebulex/compare/v1.0.0...v1.0.1)
+
+**Fixed bugs:**
+
+- The `:infinity` atom is being set for unexpired object when is retrieved from an older generation [\#37](https://github.com/cabol/nebulex/issues/37)
+
+**Closed issues:**
+
+- Caching utility macros: `defcacheable`, `defevict` and `defupdatable` [\#39](https://github.com/cabol/nebulex/issues/39)
+- Multilevel Cache: replicate/2 is attempting to subtract from :infinity [\#34](https://github.com/cabol/nebulex/issues/34)
+- has\_key?/1 does not respect ttl [\#33](https://github.com/cabol/nebulex/issues/33)
+- Add dialyzer and credo checks to the CI pipeline [\#31](https://github.com/cabol/nebulex/issues/31)
+- Fix documentation about hooks [\#30](https://github.com/cabol/nebulex/issues/30)
+- FAQ list [\#25](https://github.com/cabol/nebulex/issues/25)
+
+**Merged pull requests:**
+
+- typo in transaction docs [\#38](https://github.com/cabol/nebulex/pull/38) ([fredr](https://github.com/fredr))
+- Handle an :infinity expiration in multilevel replication. [\#36](https://github.com/cabol/nebulex/pull/36) ([sdost](https://github.com/sdost))
+- add missing coma in conf section of readme file [\#32](https://github.com/cabol/nebulex/pull/32) ([Kociamber](https://github.com/Kociamber))
+
+## [v1.0.0](https://github.com/cabol/nebulex/tree/v1.0.0) (2018-10-31)
 [Full Changelog](https://github.com/cabol/nebulex/compare/v1.0.0-rc.3...v1.0.0)
 
 **Implemented enhancements:**
