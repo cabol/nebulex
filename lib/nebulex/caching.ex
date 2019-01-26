@@ -14,6 +14,9 @@ defmodule Nebulex.Caching do
       tuple; first element is the function's name and the second one the
       list of arguments (e.g: `:erlang.phash2({name, args})`).
 
+    * `:opts` - Defines the cache options that will be passed as argument
+      to the invoked cache function (optional).
+
   ## Example
 
   Suppose we are using `Ecto` and we want to define some caching functions in
@@ -27,7 +30,7 @@ defmodule Nebulex.Caching do
         alias MyApp.Cache
         alias MyApp.Repo
 
-        defcacheable get_user!(id), cache: Cache, key: {User, id} do
+        defcacheable get_user!(id), cache: Cache, key: {User, id}, opts: [ttl: 3600] do
           Repo.get!(User, id)
         end
 
@@ -63,12 +66,17 @@ defmodule Nebulex.Caching do
 
       defmodule MyApp.Example do
         import Nebulex.Caching
+        alias MyApp.Cache
 
-        defcacheable get_by_name(name, age), cache: MyApp.Cache, key: name do
+        defcacheable get_by_name(name, age), cache: Cache, key: name do
           # your logic (maybe query the database)
         end
 
-        defcacheable all(query), cache: MyApp.Cache do
+        defcacheable get_by_age(age), cache: Cache, key: age, opts: [ttl: 3600] do
+          # your logic (maybe query the database)
+        end
+
+        defcacheable all(query), cache: Cache do
           # your logic (maybe query the database)
         end
       end
@@ -92,12 +100,13 @@ defmodule Nebulex.Caching do
 
       defmodule MyApp.Example do
         import Nebulex.Caching
+        alias MyApp.Cache
 
-        defevict evict(name), cache: MyApp.Cache, key: name do
+        defevict evict(name), cache: Cache, key: name do
           # your logic (maybe update the database)
         end
 
-        defevict evict_all(name), cache: MyApp.Cache, all_entries: true do
+        defevict evict_all(name), cache: Cache, all_entries: true do
           # your logic (maybe update the database)
         end
       end
@@ -126,8 +135,13 @@ defmodule Nebulex.Caching do
 
       defmodule MyApp.Example do
         import Nebulex.Caching
+        alias MyApp.Cache
 
-        defupdatable update(name), cache: MyApp.Cache, key: name do
+        defupdatable update(name), cache: Cache, key: name do
+          # your logic (maybe update the database)
+        end
+
+        defupdatable update_with_ttl(name), cache: Cache, opts: [ttl: 3600] do
           # your logic (maybe update the database)
         end
       end
@@ -150,12 +164,14 @@ defmodule Nebulex.Caching do
 
     as_args = build_as_args(args)
     key_var = Keyword.get(opts, :key)
+    opts_var = Keyword.get(opts, :opts, [])
     action_logic = action_logic(action, block, opts)
 
     quote do
       def unquote(name)(unquote_splicing(args)) do
         cache = unquote(cache)
         key = unquote(key_var) || :erlang.phash2({unquote(name), unquote(as_args)})
+        opts = unquote(opts_var)
         unquote(action_logic)
       end
     end
@@ -163,11 +179,11 @@ defmodule Nebulex.Caching do
 
   defp action_logic(:defcacheable, block, _opts) do
     quote do
-      if value = cache.get(key) do
+      if value = cache.get(key, opts) do
         value
       else
         value = unquote(block)
-        cache.set(key, value)
+        cache.set(key, value, opts)
       end
     end
   end
@@ -178,7 +194,7 @@ defmodule Nebulex.Caching do
     quote do
       if unquote(all_entries?),
         do: cache.flush(),
-        else: cache.delete(key)
+        else: cache.delete(key, opts)
 
       unquote(block)
     end
@@ -187,7 +203,7 @@ defmodule Nebulex.Caching do
   defp action_logic(:defupdatable, block, _opts) do
     quote do
       value = unquote(block)
-      cache.set(key, value)
+      cache.set(key, value, opts)
     end
   end
 

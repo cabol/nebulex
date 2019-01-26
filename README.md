@@ -31,7 +31,7 @@ useful and powerful features such as:
 
   * Transactions and key-locking (`Nebulex.Adapter.Transaction`).
 
-  * [Caching utility macros](lib/nebulex/caching.ex).
+  * [Caching utility macros](http://hexdocs.pm/nebulex/Nebulex.Caching.html).
 
 [ecto]: https://github.com/elixir-ecto/ecto
 [multi_queue]: https://en.wikipedia.org/wiki/Cache_replacement_policies#Multi_queue_(MQ)

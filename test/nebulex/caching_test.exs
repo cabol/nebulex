@@ -56,6 +56,19 @@ defmodule Nebulex.CachingTest do
     refute Cache.get({"x", "y"})
     assert {"x", "y"} == get_by_xy("x", "y")
     assert {"x", "y"} == Cache.get({"x", "y"})
+
+    _ = :timer.sleep(1100)
+    assert {"x", "y"} == Cache.get("x")
+    assert {"x", "y"} == Cache.get({"x", "y"})
+  end
+
+  test "cacheable with opts" do
+    refute Cache.get("x")
+    assert 1 == get_with_opts(1)
+    assert 1 == Cache.get(1)
+
+    _ = :timer.sleep(1100)
+    refute Cache.get(1)
   end
 
   test "cacheable with default key" do
@@ -107,17 +120,39 @@ defmodule Nebulex.CachingTest do
     assert 2 == Cache.get(:y)
     assert 3 == Cache.get(:z)
 
-    assert :ok == cache_put(:x)
-    assert :ok == cache_put(:y)
-    assert :ok == Cache.get(:x)
-    assert :ok == Cache.get(:y)
+    assert :x == cache_put(:x)
+    assert :y == cache_put(:y)
+    assert :x == Cache.get(:x)
+    assert :y == Cache.get(:y)
     assert 3 == Cache.get(:z)
+
+    _ = :timer.sleep(1100)
+    assert :x == Cache.get(:x)
+    assert :y == Cache.get(:y)
+    assert 3 == Cache.get(:z)
+  end
+
+  test "updatable with opts" do
+    Cache.set_many(x: 1, y: 2, z: 3)
+    assert 1 == Cache.get(:x)
+    assert 2 == Cache.get(:y)
+
+    assert :x == cache_put_with_opts(:x)
+    assert :y == cache_put_with_opts(:y)
+
+    _ = :timer.sleep(1100)
+    refute Cache.get(:x)
+    refute Cache.get(:y)
   end
 
   ## Caching Functions
 
   defcacheable get_by_x(x, y \\ "y"), cache: Cache, key: x do
     {x, y}
+  end
+
+  defcacheable get_with_opts(x), cache: Cache, key: x, opts: [ttl: 1] do
+    x
   end
 
   defcacheable get_by_xy(x, y), cache: Cache, key: {x, y} do
@@ -145,6 +180,10 @@ defmodule Nebulex.CachingTest do
   end
 
   defupdatable cache_put(x), cache: Cache, key: x do
-    :ok
+    x
+  end
+
+  defupdatable cache_put_with_opts(x), cache: Cache, key: x, opts: [ttl: 1] do
+    x
   end
 end
