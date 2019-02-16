@@ -33,9 +33,7 @@ defmodule Nebulex.Mixfile do
   end
 
   def application do
-    [
-      applications: []
-    ]
+    []
   end
 
   defp deps do
