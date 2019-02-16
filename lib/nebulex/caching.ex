@@ -34,6 +34,10 @@ defmodule Nebulex.Caching do
           Repo.get!(User, id)
         end
 
+        defcacheable get_user_by!(clauses), cache: Cache, key: {User, clauses} do
+          Repo.get_by!(User, clauses)
+        end
+
         defcacheable users_by_segment(segment \\\\ "standard"), cache: Cache do
           query = from(q in User, where: q.segment == ^segment)
           Repo.all(query)
@@ -45,7 +49,9 @@ defmodule Nebulex.Caching do
           |> Repo.update!()
         end
 
-        defevict delete_user(%User{} = user), cache: Cache, key: {User, user.id} do
+        defevict delete_user(%User{} = user),
+          cache: Cache,
+          keys: [{User, user.id}, {User, [username: user.username]}] do
           Repo.delete(user)
         end
       end
@@ -87,9 +93,14 @@ defmodule Nebulex.Caching do
 
   @doc """
   Defines a function with cache eviction enabled on function completion
-  (one or all values are removed on function completion).
+  (one, multiple or all values are removed on function completion).
 
   ## Options
+
+    * `:keys` - Defines the set of keys meant to be evicted from cache
+      on function completion. This option supersedes the `:key` option.
+      Therefore, if `:keys` is set and is different than `[]`, then
+      `:key` is ignored.
 
     * `:all_entries` - Defines if all entries must be removed on function
       completion. Defaults to `false`.
@@ -103,6 +114,10 @@ defmodule Nebulex.Caching do
         alias MyApp.Cache
 
         defevict evict(name), cache: Cache, key: name do
+          # your logic (maybe update the database)
+        end
+
+        defevict evict_many(name), cache: Cache, keys: [name, id] do
           # your logic (maybe update the database)
         end
 
@@ -150,6 +165,21 @@ defmodule Nebulex.Caching do
     caching_action(:defupdatable, fun, opts, block)
   end
 
+  ## Hepers
+
+  @doc false
+  def evict(cache, _key, _keys, true) do
+    cache.flush()
+  end
+
+  def evict(cache, _key, [_ | _] = keys, _all_entries?) do
+    Enum.each(keys, &cache.delete(&1))
+  end
+
+  def evict(cache, key, _keys, _all_entries?) do
+    cache.delete(key)
+  end
+
   ## Private Functions
 
   defp caching_action(action, fun, opts, block) do
@@ -164,6 +194,7 @@ defmodule Nebulex.Caching do
 
     as_args = build_as_args(args)
     key_var = Keyword.get(opts, :key)
+    keys_var = Keyword.get(opts, :keys)
     opts_var = Keyword.get(opts, :opts, [])
     action_logic = action_logic(action, block, opts)
 
@@ -171,7 +202,9 @@ defmodule Nebulex.Caching do
       def unquote(name)(unquote_splicing(args)) do
         cache = unquote(cache)
         key = unquote(key_var) || :erlang.phash2({unquote(name), unquote(as_args)})
+        keys = unquote(keys_var)
         opts = unquote(opts_var)
+
         unquote(action_logic)
       end
     end
@@ -192,10 +225,7 @@ defmodule Nebulex.Caching do
     all_entries? = Keyword.get(opts, :all_entries, false)
 
     quote do
-      if unquote(all_entries?),
-        do: cache.flush(),
-        else: cache.delete(key, opts)
-
+      unquote(__MODULE__).evict(cache, key, keys, unquote(all_entries?))
       unquote(block)
     end
   end

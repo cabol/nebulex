@@ -90,36 +90,37 @@ defmodule Nebulex.CachingTest do
   end
 
   test "evict" do
-    Cache.set_many(x: 1, y: 2, z: 3)
-    assert 1 == Cache.get(:x)
+    assert :ok == set_keys(x: 1, y: 2, z: 3)
+
+    assert :x == cache_evict(:x)
+    refute Cache.get(:x)
     assert 2 == Cache.get(:y)
     assert 3 == Cache.get(:z)
 
-    assert :ok == cache_evict(:x)
-    assert :ok == cache_evict(:y)
+    assert :y == cache_evict(:y)
+    refute Cache.get(:x)
+    refute Cache.get(:y)
+    assert 3 == Cache.get(:z)
+  end
+
+  test "evict with multiple keys" do
+    assert :ok == set_keys(x: 1, y: 2, z: 3)
+    assert :ok == cache_evict_keys(:x, :y)
     refute Cache.get(:x)
     refute Cache.get(:y)
     assert 3 == Cache.get(:z)
   end
 
   test "evict all entries" do
-    Cache.set_many(x: 1, y: 2, z: 3)
-    assert 1 == Cache.get(:x)
-    assert 2 == Cache.get(:y)
-    assert 3 == Cache.get(:z)
-
-    assert :ok == cache_evict_all("hello")
+    assert :ok == set_keys(x: 1, y: 2, z: 3)
+    assert "hello" == cache_evict_all("hello")
     refute Cache.get(:x)
     refute Cache.get(:y)
     refute Cache.get(:z)
   end
 
   test "updatable" do
-    Cache.set_many(x: 1, y: 2, z: 3)
-    assert 1 == Cache.get(:x)
-    assert 2 == Cache.get(:y)
-    assert 3 == Cache.get(:z)
-
+    assert :ok == set_keys(x: 1, y: 2, z: 3)
     assert :x == cache_put(:x)
     assert :y == cache_put(:y)
     assert :x == Cache.get(:x)
@@ -133,10 +134,7 @@ defmodule Nebulex.CachingTest do
   end
 
   test "updatable with opts" do
-    Cache.set_many(x: 1, y: 2, z: 3)
-    assert 1 == Cache.get(:x)
-    assert 2 == Cache.get(:y)
-
+    assert :ok == set_keys(x: 1, y: 2, z: 3)
     assert :x == cache_put_with_opts(:x)
     assert :y == cache_put_with_opts(:y)
 
@@ -172,11 +170,15 @@ defmodule Nebulex.CachingTest do
   end
 
   defevict cache_evict(x), cache: Cache, key: x do
+    x
+  end
+
+  defevict cache_evict_keys(x, y), cache: Cache, keys: [x, y] do
     :ok
   end
 
   defevict cache_evict_all(x), cache: Cache, all_entries: true do
-    :ok
+    x
   end
 
   defupdatable cache_put(x), cache: Cache, key: x do
@@ -185,5 +187,15 @@ defmodule Nebulex.CachingTest do
 
   defupdatable cache_put_with_opts(x), cache: Cache, key: x, opts: [ttl: 1] do
     x
+  end
+
+  ## Private Functions
+
+  defp set_keys(entries) do
+    assert :ok == Cache.set_many(entries)
+
+    Enum.each(entries, fn {k, v} ->
+      assert v == Cache.get(k)
+    end)
   end
 end

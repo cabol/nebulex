@@ -7,7 +7,7 @@ defmodule Nebulex.Version.Timestamp do
   def generate(nil), do: now()
   def generate(%Object{}), do: now()
 
-  defp now, do: DateTime.to_unix(DateTime.utc_now(), :nanoseconds)
+  defp now, do: DateTime.to_unix(DateTime.utc_now(), :nanosecond)
 end
 
 defmodule Nebulex.TestCache do
