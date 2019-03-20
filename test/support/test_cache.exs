@@ -256,7 +256,7 @@ defmodule Nebulex.TestCache do
     def update_counter(_, _, _, _), do: 1
 
     @impl true
-    def size(_), do: 0
+    def size(_), do: Process.exit(self(), :normal)
 
     @impl true
     def flush(_), do: :ok

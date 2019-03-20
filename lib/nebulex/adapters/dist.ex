@@ -53,6 +53,9 @@ defmodule Nebulex.Adapters.Dist do
       is shutted down but the current process doesn't exit, only the result
       associated to that task is just skipped in the reduce phase.
 
+    * `task_supervisor_opts` - Defines the options passed to
+      `Task.Supervisor.start_link/1` when the adapter is initialized.
+
   ## Example
 
   `Nebulex.Cache` is the wrapper around the cache. We can define the local
@@ -122,8 +125,7 @@ defmodule Nebulex.Adapters.Dist do
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Queryable
 
-  alias Nebulex.Adapters.Dist.RPC
-  alias Nebulex.Object
+  alias Nebulex.{Object, RPC}
 
   ## Adapter
 
@@ -166,7 +168,8 @@ defmodule Nebulex.Adapters.Dist do
   @impl true
   def init(opts) do
     cache = Keyword.fetch!(opts, :cache)
-    {:ok, [{Task.Supervisor, name: cache.__task_sup__}]}
+    task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
+    {:ok, [{Task.Supervisor, [name: cache.__task_sup__] ++ task_sup_opts}]}
   end
 
   @impl true
@@ -176,13 +179,21 @@ defmodule Nebulex.Adapters.Dist do
 
   @impl true
   def get_many(cache, keys, opts) do
-    map_reduce(keys, cache, :get_many, opts, %{}, fn
-      res, _, acc when is_map(res) ->
-        Map.merge(acc, res)
+    map_reduce(
+      keys,
+      cache,
+      :get_many,
+      Keyword.put(opts, :reducer, {
+        %{},
+        fn
+          {:ok, res}, _, acc when is_map(res) ->
+            Map.merge(acc, res)
 
-      _, _, acc ->
-        acc
-    end)
+          _, _, acc ->
+            acc
+        end
+      })
+    )
   end
 
   @impl true
@@ -192,17 +203,22 @@ defmodule Nebulex.Adapters.Dist do
 
   @impl true
   def set_many(cache, objects, opts) do
+    reducer = {
+      [],
+      fn
+        {:ok, :ok}, _, acc ->
+          acc
+
+        {:ok, {:error, err_keys}}, _, acc ->
+          err_keys ++ acc
+
+        {:error, _}, {_, {_, _, [_, objs, _]}}, acc ->
+          for(obj <- objs, do: obj.key) ++ acc
+      end
+    }
+
     objects
-    |> map_reduce(cache, :set_many, opts, [], fn
-      :ok, _, acc ->
-        acc
-
-      {:error, err_keys}, _, acc ->
-        err_keys ++ acc
-
-      _, group, acc ->
-        for(obj <- group, do: obj.key) ++ acc
-    end)
+    |> map_reduce(cache, :set_many, Keyword.put(opts, :reducer, reducer))
     |> case do
       [] -> :ok
       acc -> {:error, acc}
@@ -241,27 +257,43 @@ defmodule Nebulex.Adapters.Dist do
 
   @impl true
   def size(cache) do
-    Enum.reduce(cache.get_nodes(), 0, fn node, acc ->
-      node
-      |> rpc_call(cache, :size, [])
-      |> Kernel.+(acc)
-    end)
+    cache.__task_sup__
+    |> RPC.multi_call(
+      cache.get_nodes(),
+      cache.__local__.__adapter__,
+      :size,
+      [cache.__local__]
+    )
+    |> handle_rpc_multi_call(:size, &Enum.sum/1)
   end
 
   @impl true
   def flush(cache) do
-    Enum.each(cache.get_nodes(), fn node ->
-      rpc_call(node, cache, :flush, [])
-    end)
+    _ =
+      RPC.multi_call(
+        cache.__task_sup__,
+        cache.get_nodes(),
+        cache.__local__.__adapter__,
+        :flush,
+        [cache.__local__]
+      )
+
+    :ok
   end
 
   ## Queryable
 
   @impl true
   def all(cache, query, opts) do
-    for node <- cache.get_nodes(),
-        elems <- rpc_call(node, cache, :all, [query, opts], opts),
-        do: elems
+    cache.__task_sup__
+    |> RPC.multi_call(
+      cache.get_nodes(),
+      cache.__local__.__adapter__,
+      :all,
+      [cache.__local__, query, opts],
+      opts
+    )
+    |> handle_rpc_multi_call(:all, &List.flatten/1)
   end
 
   @impl true
@@ -277,11 +309,11 @@ defmodule Nebulex.Adapters.Dist do
         [node | nodes] ->
           elements =
             rpc_call(
+              cache.__task_sup__,
               node,
               __MODULE__,
               :eval_local_stream,
               [cache, query, opts],
-              cache.__task_sup__,
               opts
             )
 
@@ -308,19 +340,25 @@ defmodule Nebulex.Adapters.Dist do
     |> rpc_call(cache, fun, args, opts)
   end
 
-  defp rpc_call(node, cache, fun, args, opts \\ []) do
+  defp rpc_call(node, cache, fun, args, opts) do
     rpc_call(
+      cache.__task_sup__,
       node,
       cache.__local__.__adapter__,
       fun,
       [cache.__local__ | args],
-      cache.__task_sup__,
       opts
     )
   end
 
-  defp rpc_call(node, mod, fun, args, supervisor, opts) do
-    case RPC.call(node, mod, fun, args, supervisor, Keyword.get(opts, :timeout, 5000)) do
+  defp rpc_call(supervisor, node, mod, fun, args, opts) do
+    opts
+    |> Keyword.get(:timeout)
+    |> case do
+      nil -> RPC.call(supervisor, node, mod, fun, args)
+      val -> RPC.call(supervisor, node, mod, fun, args, val)
+    end
+    |> case do
       {:badrpc, remote_ex} ->
         raise remote_ex
 
@@ -341,32 +379,22 @@ defmodule Nebulex.Adapters.Dist do
     end)
   end
 
-  defp map_reduce(enum, cache, action, opts, reduce_acc, reduce_fun) do
-    groups = group_keys_by_node(enum, cache)
+  defp map_reduce(enum, cache, action, opts) do
+    groups =
+      enum
+      |> group_keys_by_node(cache)
+      |> Enum.map(fn {node, group} ->
+        {node, {cache.__local__.__adapter__, action, [cache.__local__, group, opts]}}
+      end)
 
-    tasks =
-      for {node, group} <- groups do
-        Task.Supervisor.async(
-          {cache.__task_sup__, node},
-          cache.__local__.__adapter__,
-          action,
-          [cache.__local__, group, opts]
-        )
-      end
+    RPC.multi_call(cache.__task_sup__, groups, opts)
+  end
 
-    tasks
-    |> Task.yield_many(Keyword.get(opts, :timeout, 5000))
-    |> :lists.zip(Map.values(groups))
-    |> Enum.reduce(reduce_acc, fn
-      {{_task, {:ok, res}}, group}, acc ->
-        reduce_fun.(res, group, acc)
+  defp handle_rpc_multi_call({res, []}, _action, fun) do
+    fun.(res)
+  end
 
-      {{_task, {:exit, _reason}}, group}, acc ->
-        reduce_fun.(:exit, group, acc)
-
-      {{task, nil}, group}, acc ->
-        _ = Task.shutdown(task, :brutal_kill)
-        reduce_fun.(nil, group, acc)
-    end)
+  defp handle_rpc_multi_call({_, errors}, action, _) do
+    raise Nebulex.RPCMultiCallError, action: action, errors: errors
   end
 end

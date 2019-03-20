@@ -16,11 +16,12 @@ defmodule Nebulex.Adapter.NodeSelector do
         @behaviour Nebulex.Adapter.NodeSelector
 
         def get_node(nodes, key) do
-          key
-          |> :erlang.phash2()
-          |> :jchash.compute(length(nodes))
-          |> Kernel.+(1)
-          |> :lists.nth(nodes)
+          index =
+            key
+            |> :erlang.phash2()
+            |> :jchash.compute(length(nodes))
+
+          Enum.at(nodes, index)
         end
       end
 
@@ -34,10 +35,7 @@ defmodule Nebulex.Adapter.NodeSelector do
 
       @doc false
       def get_node(nodes, key) do
-        key
-        |> :erlang.phash2(length(nodes))
-        |> Kernel.+(1)
-        |> :lists.nth(nodes)
+        Enum.at(nodes, :erlang.phash2(key, length(nodes)))
       end
 
       defoverridable get_node: 2

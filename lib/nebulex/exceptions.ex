@@ -59,3 +59,25 @@ defmodule Nebulex.QueryError do
     %__MODULE__{message: message}
   end
 end
+
+defmodule Nebulex.RPCMultiCallError do
+  @moduledoc """
+  Raised at runtime when a RPC multi_call error occurs.
+  """
+  defexception [:message]
+
+  def exception(opts) do
+    action = Keyword.fetch!(opts, :action)
+    errors = Keyword.fetch!(opts, :errors)
+
+    message = """
+    RPC error executing action: #{action}
+
+    Errors:
+
+    #{inspect(errors, pretty: true)}
+    """
+
+    %__MODULE__{message: message}
+  end
+end

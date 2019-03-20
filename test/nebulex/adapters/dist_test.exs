@@ -77,11 +77,19 @@ defmodule Nebulex.Adapters.DistTest do
   end
 
   test "rpc timeout" do
-    assert :ok == Dist.set_many(for x <- 1..100_000, do: {x, x})
-    {:timeout, _} = catch_exit(Dist.all(nil, timeout: 1))
+    assert :ok == Dist.set_many(for(x <- 1..100_000, do: {x, x}), timeout: 60_000)
+    assert 1 == Dist.get(1, timeout: 1000)
+
+    msg = ~r"RPC error executing action: all\n\nErrors:\n\n\[\n  timeout:"
+
+    assert_raise Nebulex.RPCMultiCallError, msg, fn ->
+      Dist.all(nil, timeout: 1)
+    end
   end
 
   test "rpc errors" do
+    _ = Process.flag(:trap_exit, true)
+
     {:ok, pid1} = DistMock.start_link()
     {:ok, pid2} = LocalMock.start_link()
 
@@ -92,6 +100,12 @@ defmodule Nebulex.Adapters.DistTest do
 
     assert_raise ArgumentError, fn ->
       DistMock.get(1)
+    end
+
+    msg = ~r"RPC error executing action: size\n\nErrors:\n\n\[\n  {{:exit,"
+
+    assert_raise Nebulex.RPCMultiCallError, msg, fn ->
+      DistMock.size()
     end
 
     :ok = Enum.each([pid1, pid2], &DistMock.stop/1)
