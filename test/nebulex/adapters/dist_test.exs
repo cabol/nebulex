@@ -3,7 +3,8 @@ defmodule Nebulex.Adapters.DistTest do
   use Nebulex.CacheTest, cache: Nebulex.TestCache.Dist
 
   alias Nebulex.Adapters.Dist.Cluster
-  alias Nebulex.TestCache.{Dist, DistLocal, DistMock, LocalMock}
+  alias Nebulex.TestCache.{Dist, DistLocal, DistMock, DistWithCustomHashSlot, LocalMock}
+  alias Nebulex.TestCache.DistWithCustomHashSlot.Local, as: DistLocalWithCustomHashSlot
 
   @primary :"primary@127.0.0.1"
   @cluster :lists.usort([@primary | Application.get_env(:nebulex, :nodes, [])])
@@ -35,10 +36,10 @@ defmodule Nebulex.Adapters.DistTest do
   test "check cluster nodes" do
     assert @primary == node()
     assert @cluster -- [node()] == :lists.usort(Node.list())
-    assert @cluster == Dist.get_nodes()
+    assert @cluster == Dist.__nodes__()
 
     :ok = Cluster.leave(Dist)
-    assert @cluster -- [node()] == Dist.get_nodes()
+    assert @cluster -- [node()] == Dist.__nodes__()
   end
 
   test "get_and_update" do
@@ -107,6 +108,17 @@ defmodule Nebulex.Adapters.DistTest do
     assert_raise Nebulex.RPCMultiCallError, msg, fn ->
       DistMock.size()
     end
+
+    :ok = Enum.each([pid1, pid2], &DistMock.stop/1)
+  end
+
+  test "custom hash_slot" do
+    {:ok, pid1} = DistWithCustomHashSlot.start_link()
+    {:ok, pid2} = DistLocalWithCustomHashSlot.start_link()
+
+    refute DistWithCustomHashSlot.get("foo")
+    assert "bar" == DistWithCustomHashSlot.set("foo", "bar")
+    assert "bar" == DistWithCustomHashSlot.get("foo")
 
     :ok = Enum.each([pid1, pid2], &DistMock.stop/1)
   end

@@ -162,6 +162,31 @@ defmodule Nebulex.TestCache do
     def update_fun(current) when is_integer(current), do: current * 2
   end
 
+  defmodule DistWithCustomHashSlot do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Dist,
+      local: Nebulex.TestCache.DistWithCustomHashSlot.Local,
+      hash_slot: Nebulex.TestCache.DistWithCustomHashSlot.HashSlot
+
+    defmodule Local do
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+    end
+
+    defmodule HashSlot do
+      @behaviour Nebulex.Adapter.HashSlot
+
+      @impl true
+      def keyslot(key, range) do
+        key
+        |> :erlang.phash2()
+        |> rem(range)
+      end
+    end
+  end
+
   for mod <- [Nebulex.TestCache.Multilevel, Nebulex.TestCache.MultilevelExclusive] do
     levels =
       for l <- 1..3 do

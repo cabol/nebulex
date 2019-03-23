@@ -3,6 +3,8 @@ defmodule Nebulex.Adapters.Dist.Cluster do
   # distributed caching related functionality.
   @moduledoc false
 
+  use Nebulex.Adapter.HashSlot
+
   @doc """
   Joins the node where `cache`'s supervisor process is running to the
   `cache`'s node group.
@@ -42,6 +44,18 @@ defmodule Nebulex.Adapters.Dist.Cluster do
     |> :lists.usort()
   end
 
+  @doc """
+  Selects only one node based on the `keyslot` computation of the `key`.
+  """
+  @spec get_node(Nebulex.Cache.t(), Nebulex.Cache.key(), module) :: node
+  def get_node(cache, key, nil) do
+    do_get_node(cache, key, __MODULE__)
+  end
+
+  def get_node(cache, key, module) do
+    do_get_node(cache, key, module)
+  end
+
   ## Private Functions
 
   defp ensure_namespace(cache) do
@@ -51,4 +65,10 @@ defmodule Nebulex.Adapters.Dist.Cluster do
   end
 
   defp namespace(cache), do: {:nebulex, cache}
+
+  def do_get_node(cache, key, module) do
+    nodes = get_nodes(cache)
+    index = module.keyslot(key, length(nodes))
+    Enum.at(nodes, index)
+  end
 end

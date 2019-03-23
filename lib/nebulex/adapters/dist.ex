@@ -37,9 +37,8 @@ defmodule Nebulex.Adapters.Dist do
       `Nebulex.Adapters.Local`, unless you want to provide a custom local
       cache adapter.
 
-    * `:node_selector` - The module that implements the node picker interface
-      `Nebulex.Adapter.NodeSelector`. If this option is not set, the default
-      implementation provided by the interface is used.
+    * `:hash_slot` - The module that implements `Nebulex.Adapter.Hash`
+      behaviour. Defaults to `Nebulex.Adapter.Hash.keyslot/2`.
 
   ## Runtime options
 
@@ -93,17 +92,19 @@ defmodule Nebulex.Adapters.Dist do
 
   Returns the local cache adapter (the local backend).
 
+  ### `__task_sup__`
+
+  Returns the task supervisor module that manages RPC calls.
+
+  ### `__nodes__`
+
+  Returns the nodes that belongs to the caller Cache.
+
   ### `get_node/1`
 
   This function invokes `c:Nebulex.Adapter.NodeSelector.get_node/2` internally.
 
       MyCache.get_node("mykey")
-
-  ### `get_nodes/0`
-
-  Returns the nodes that belongs to the caller Cache.
-
-      MyCache.get_nodes()
 
   ## Limitations
 
@@ -114,9 +115,6 @@ defmodule Nebulex.Adapters.Dist do
   work as expected, you must provide functions from modules existing in all
   nodes of the group.
   """
-
-  # Inherit default node selector function
-  use Nebulex.Adapter.NodeSelector
 
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
@@ -133,7 +131,7 @@ defmodule Nebulex.Adapters.Dist do
   defmacro __before_compile__(env) do
     otp_app = Module.get_attribute(env.module, :otp_app)
     config = Module.get_attribute(env.module, :config)
-    node_selector = Keyword.get(config, :node_selector, __MODULE__)
+    hash_slot = Keyword.get(config, :hash_slot)
     task_supervisor = Module.concat([env.module, TaskSupervisor])
 
     unless local = Keyword.get(config, :local) do
@@ -150,12 +148,10 @@ defmodule Nebulex.Adapters.Dist do
 
       def __task_sup__, do: unquote(task_supervisor)
 
-      def get_nodes do
-        Cluster.get_nodes(__MODULE__)
-      end
+      def __nodes__, do: Cluster.get_nodes(__MODULE__)
 
       def get_node(key) do
-        unquote(node_selector).get_node(get_nodes(), key)
+        Cluster.get_node(__MODULE__, key, unquote(hash_slot))
       end
 
       def init(config) do
@@ -259,7 +255,7 @@ defmodule Nebulex.Adapters.Dist do
   def size(cache) do
     cache.__task_sup__
     |> RPC.multi_call(
-      cache.get_nodes(),
+      cache.__nodes__,
       cache.__local__.__adapter__,
       :size,
       [cache.__local__]
@@ -272,7 +268,7 @@ defmodule Nebulex.Adapters.Dist do
     _ =
       RPC.multi_call(
         cache.__task_sup__,
-        cache.get_nodes(),
+        cache.__nodes__,
         cache.__local__.__adapter__,
         :flush,
         [cache.__local__]
@@ -287,7 +283,7 @@ defmodule Nebulex.Adapters.Dist do
   def all(cache, query, opts) do
     cache.__task_sup__
     |> RPC.multi_call(
-      cache.get_nodes(),
+      cache.__nodes__,
       cache.__local__.__adapter__,
       :all,
       [cache.__local__, query, opts],
@@ -300,7 +296,7 @@ defmodule Nebulex.Adapters.Dist do
   def stream(cache, query, opts) do
     Stream.resource(
       fn ->
-        cache.get_nodes()
+        cache.__nodes__
       end,
       fn
         [] ->

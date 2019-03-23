@@ -32,7 +32,6 @@ defmodule Nebulex.Cache.Supervisor do
   """
   def compile_config(cache, opts) do
     otp_app = Keyword.fetch!(opts, :otp_app)
-    config = Application.get_env(otp_app, cache, [])
     adapter = Keyword.get(opts, :adapter)
 
     unless adapter do
@@ -54,6 +53,12 @@ defmodule Nebulex.Cache.Supervisor do
       raise ArgumentError,
             "expected :adapter option given to Nebulex.Cache to list Nebulex.Adapter as a behaviour"
     end
+
+    config =
+      otp_app
+      |> Application.get_env(cache, [])
+      |> Keyword.merge(opts)
+      |> Keyword.put(:otp_app, otp_app)
 
     {otp_app, adapter, behaviours, config}
   end
