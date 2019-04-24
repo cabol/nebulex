@@ -19,16 +19,14 @@ defmodule Nebulex.Object do
 
   ## Example
 
-      iex> Nebulex.Object.expire_at(10)
-      1539787704
+      iex> expire_at = Nebulex.Object.expire_at(10)
+      iex> expire_at - Nebulex.Object.ts()
+      10
   """
   @spec expire_at(ttl :: timeout | nil) :: integer | nil
   def expire_at(nil), do: nil
   def expire_at(:infinity), do: nil
-
-  def expire_at(ttl) when is_integer(ttl) do
-    DateTime.to_unix(DateTime.utc_now()) + ttl
-  end
+  def expire_at(ttl) when is_integer(ttl), do: ts() + ttl
 
   @doc """
   Returns the remaining time to live for the given timestamp.
@@ -44,7 +42,20 @@ defmodule Nebulex.Object do
   def remaining_ttl(%Nebulex.Object{expire_at: expire_at}), do: remaining_ttl(expire_at)
 
   def remaining_ttl(expire_at) when is_integer(expire_at) do
-    remaining = expire_at - DateTime.to_unix(DateTime.utc_now())
+    remaining = expire_at - ts()
     if remaining >= 0, do: remaining, else: 0
+  end
+
+  @doc """
+  Wrapper for `DateTime.to_unix/2`.
+
+  ## Example
+
+      iex> 1_464_096_368 |> DateTime.from_unix!() |> Nebulex.Object.ts()
+      1464096368
+  """
+  @spec ts(datetime :: Calendar.datetime()) :: integer()
+  def ts(datetime \\ DateTime.utc_now()) do
+    DateTime.to_unix(datetime)
   end
 end

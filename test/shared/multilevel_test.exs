@@ -391,6 +391,22 @@ defmodule Nebulex.MultilevelTest do
       refute @cache.get("foo", fallback: {@cache, :fallback})
     end
 
+    test "object ttl" do
+      assert obj1 = @cache.set(1, 1, ttl: 3, return: :object)
+      :timer.sleep(1000)
+      assert obj2 = @cache.get(1, return: :object)
+      assert obj1.expire_at == obj2.expire_at
+
+      assert obj1 = @cache.set(2, 2, level: 3, ttl: 2, return: :object)
+      :timer.sleep(1000)
+      assert obj2 = @cache.get(2, return: :object)
+      assert obj1.expire_at == obj2.expire_at
+
+      :timer.sleep(2000)
+      refute @cache.get(1)
+      refute @cache.get(2)
+    end
+
     ## Helpers
 
     defp start_levels do

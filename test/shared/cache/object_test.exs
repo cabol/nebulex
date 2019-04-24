@@ -215,11 +215,11 @@ defmodule Nebulex.Cache.ObjectTest do
 
     test "set_many" do
       entries = [{0, nil} | for(x <- 1..3, do: {x, x})]
-      assert :ok == @cache.set_many(entries, ttl: 1)
+      assert :ok == @cache.set_many(entries, ttl: 2)
 
       refute @cache.get(0)
       for x <- 1..3, do: assert(x == @cache.get(x))
-      _ = :timer.sleep(2000)
+      _ = :timer.sleep(3000)
       for x <- 1..3, do: refute(@cache.get(x))
 
       assert :ok == @cache.set_many(%{"apples" => 1, "bananas" => 3})

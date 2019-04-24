@@ -206,7 +206,7 @@ defmodule Nebulex.Adapters.Multilevel do
   def get(cache, key, opts) do
     fun = fn current, {_, prev} ->
       if object = current.__adapter__.get(current, key, opts) do
-        {:halt, {object, [current | prev]}}
+        {:halt, {object, prev}}
       else
         {:cont, {nil, [current | prev]}}
       end
@@ -408,17 +408,10 @@ defmodule Nebulex.Adapters.Multilevel do
       :exclusive -> []
       :inclusive -> levels
     end
-    |> Enum.reduce(object, &replicate(&1, &2))
-  end
-
-  defp replicate(cache, %Object{expire_at: expire_at} = object) do
-    object =
-      if expire_at,
-        do: %{object | expire_at: expire_at - DateTime.to_unix(DateTime.utc_now())},
-        else: object
-
-    true = cache.__adapter__.set(cache, object, [])
-    object
+    |> Enum.reduce(object, fn level, acc ->
+      true = level.__adapter__.set(level, acc, [])
+      acc
+    end)
   end
 
   defp do_set_many(cache, entries, opts, acc) do

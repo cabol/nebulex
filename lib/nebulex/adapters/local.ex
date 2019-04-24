@@ -281,7 +281,7 @@ defmodule Nebulex.Adapters.Local do
   @impl true
   def has_key?(cache, key) do
     Enum.reduce_while(cache.__metadata__.generations, false, fn gen, acc ->
-      if has_key?(gen, key, now(), cache.__state__),
+      if has_key?(gen, key, Object.ts(), cache.__state__),
         do: {:halt, true},
         else: {:cont, acc}
     end)
@@ -450,7 +450,7 @@ defmodule Nebulex.Adapters.Local do
   defp validate_ttl({_, _, _, nil} = entry, _, _), do: entry
 
   defp validate_ttl({key, _, _, expire_at} = entry, gen, cache) do
-    if expire_at > now() do
+    if expire_at > Object.ts() do
       entry
     else
       true = Local.delete(gen, key, cache.__state__)
@@ -458,10 +458,8 @@ defmodule Nebulex.Adapters.Local do
     end
   end
 
-  defp diff_epoch(ttl) when is_integer(ttl), do: ttl - now()
+  defp diff_epoch(ttl) when is_integer(ttl), do: ttl - Object.ts()
   defp diff_epoch(_), do: :infinity
-
-  defp now, do: DateTime.to_unix(DateTime.utc_now())
 
   defp validate_match_spec(spec, opts) when spec in [nil, :all_unexpired, :all_expired] do
     [
@@ -487,7 +485,7 @@ defmodule Nebulex.Adapters.Local do
     do: nil
 
   defp comp_match_spec(:all_unexpired),
-    do: {:orelse, {:==, :"$4", nil}, {:>, :"$4", now()}}
+    do: {:orelse, {:==, :"$4", nil}, {:>, :"$4", Object.ts()}}
 
   defp comp_match_spec(:all_expired),
     do: {:not, comp_match_spec(:all_unexpired)}

@@ -5,7 +5,7 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
 
   alias Nebulex.TestCache.Multilevel
 
-  test "get on an inclusive cache" do
+  test "get for inclusive mode" do
     1 = @l1.set(1, 1)
     2 = @l2.set(2, 2)
     3 = @l3.set(3, 3)
