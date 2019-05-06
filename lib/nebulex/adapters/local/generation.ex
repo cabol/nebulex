@@ -96,7 +96,8 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   def handle_call(:flush, _from, %{cache: cache} = state) do
-    {:reply, do_flush(cache), %{state | gen_index: 0}}
+    :ok = Enum.each(cache.__metadata__.generations, &Local.delete_all_objects/1)
+    {:reply, :ok, %{state | gen_index: 0}}
   end
 
   @impl true
@@ -155,11 +156,5 @@ defmodule Nebulex.Adapters.Local.Generation do
   defp maybe_reset_timeout(true, %{gc_interval: time, time_ref: ref} = state) do
     {:ok, :cancel} = :timer.cancel(ref)
     %{state | time_ref: start_timer(time)}
-  end
-
-  defp do_flush(cache) do
-    :ok = Enum.each(cache.__metadata__.generations, &Local.delete/1)
-    _ = Metadata.update(%{cache.__metadata__ | generations: []}, cache)
-    :ok
   end
 end

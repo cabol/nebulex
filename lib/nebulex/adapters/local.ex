@@ -349,9 +349,7 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def flush(cache) do
-    :ok = Generation.flush(cache)
-    _ = cache.new_generation()
-    :ok
+    Generation.flush(cache)
   end
 
   ## Queryable
