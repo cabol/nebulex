@@ -16,27 +16,31 @@ useful and powerful features such as:
 
   * Built-in adapters: local (generational cache), distributed and multi-level.
 
+  * [Caching DSL](http://hexdocs.pm/nebulex/caching-dsl.html) to implement
+    different [cache usage patterns][EHCache].
+
   * Support for different distributed caching topologies, such as:
     Partitioned, Near, Replicated, etc.
 
-  * Different eviction mechanisms, such as: time-based eviction through the
+  * Different eviction mechanisms, such as time-based eviction through the
     expiry time property (`expire_at`) on the cached objects,
     [multi-queue][multi_queue] or [generational caching][generational_caching]
     (built-in adapter), etc.
 
-  * Object versioning (via `:version` property); enabling
-    [Optimistic offline locks][offline_locks].
+  * Object versioning (via `:version` property); useful for
+    [Optimistic offline locks][offline_locks] implementation.
 
-  * [Pre/Post execution hooks](http://hexdocs.pm/nebulex/hooks.html).
+  * [Pre/Post execution hooks](http://hexdocs.pm/nebulex/hooks.html). Ability
+    to hook any function call for a cache and add custom logic before and/or
+    after function execution.
 
   * Transactions and key-locking (`Nebulex.Adapter.Transaction`).
-
-  * [Caching utility macros](http://hexdocs.pm/nebulex/Nebulex.Caching.html).
 
 [ecto]: https://github.com/elixir-ecto/ecto
 [multi_queue]: https://en.wikipedia.org/wiki/Cache_replacement_policies#Multi_queue_(MQ)
 [generational_caching]: http://fairwaytech.com/2012/09/write-through-and-generational-caching
 [offline_locks]: https://martinfowler.com/eaaCatalog/optimisticOfflineLock.html
+[EHCache]: https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc
 
 See the [getting started](http://hexdocs.pm/nebulex/getting-started.html) guide
 and the [online documentation](http://hexdocs.pm/nebulex/Nebulex.html).
@@ -49,13 +53,13 @@ also have to add the proper dependency to your `mix.exs` file.
 
 The supported caches and their adapters are:
 
-Cache        | Nebulex Adapter                | Dependency
-:----------- | :----------------------------- | :-------------------------
-Generational | Nebulex.Adapters.Local         | Built-In
-Partitioned  | Nebulex.Adapters.Dist          | Built-In
-Multi-level  | Nebulex.Adapters.Multilevel    | Built-In
-Redis        | NebulexRedisAdapter            | [nebulex_redis_adapter][nebulex_redis_adapter]
-Memcached    | NebulexMemcachedAdapter        | [nebulex_memcached_adapter][nebulex_memcached_adapter]
+Cache        | Nebulex Adapter             | Dependency
+:----------- | :---------------------------| :---------
+Generational | Nebulex.Adapters.Local      | Built-In
+Partitioned  | Nebulex.Adapters.Dist       | Built-In
+Multi-level  | Nebulex.Adapters.Multilevel | Built-In
+Redis        | NebulexRedisAdapter         | [nebulex_redis_adapter][nebulex_redis_adapter]
+Memcached    | NebulexMemcachedAdapter     | [nebulex_memcached_adapter][nebulex_memcached_adapter]
 
 [nebulex_redis_adapter]: https://github.com/cabol/nebulex_redis_adapter
 [nebulex_memcached_adapter]: https://github.com/vasuadari/nebulex_memcached_adapter

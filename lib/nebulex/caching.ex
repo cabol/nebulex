@@ -1,6 +1,9 @@
 defmodule Nebulex.Caching do
   @moduledoc """
-  Caching utility macros.
+  DSL for cache usage patterns implementation.
+
+  The DSL is composed of a set of macros for the implementation of caching
+  patterns such as **Read-through**, **Write-through**, **Cache-as-SoR**, etc.
 
   ## Shared Options
 
@@ -75,17 +78,21 @@ defmodule Nebulex.Caching do
         alias MyApp.Cache
 
         defcacheable get_by_name(name, age), cache: Cache, key: name do
-          # your logic (maybe query the database)
+          # your logic (maybe the loader to retrieve the value from the SoR)
         end
 
         defcacheable get_by_age(age), cache: Cache, key: age, opts: [ttl: 3600] do
-          # your logic (maybe query the database)
+          # your logic (maybe the loader to retrieve the value from the SoR)
         end
 
         defcacheable all(query), cache: Cache do
-          # your logic (maybe query the database)
+          # your logic (maybe the loader to retrieve the value from the SoR)
         end
       end
+
+  The **Read-through** pattern is supported by this macro. The loader to
+  retrieve the value from the system-of-record (SoR) is your function's logic
+  and the rest is provided by the macro under-the-hood.
   """
   defmacro defcacheable(fun, opts \\ [], do: block) do
     caching_action(:defcacheable, fun, opts, block)
@@ -114,17 +121,23 @@ defmodule Nebulex.Caching do
         alias MyApp.Cache
 
         defevict evict(name), cache: Cache, key: name do
-          # your logic (maybe update the database)
+          # your logic (maybe write/delete data to the SoR)
         end
 
         defevict evict_many(name), cache: Cache, keys: [name, id] do
-          # your logic (maybe update the database)
+          # your logic (maybe write/delete data to the SoR)
         end
 
         defevict evict_all(name), cache: Cache, all_entries: true do
-          # your logic (maybe update the database)
+          # your logic (maybe write/delete data to the SoR)
         end
       end
+
+  The **Write-through** pattern is supported by this macro. Your function
+  provides the logic to write data to the system-of-record (SoR) and the rest
+  is provided by the macro under-the-hood. But in contrast with `defupdatable`,
+  when the data is written to the SoR, the key for that value is deleted from
+  cache instead of updated.
   """
   defmacro defevict(fun, opts \\ [], do: block) do
     caching_action(:defevict, fun, opts, block)
@@ -153,13 +166,17 @@ defmodule Nebulex.Caching do
         alias MyApp.Cache
 
         defupdatable update(name), cache: Cache, key: name do
-          # your logic (maybe update the database)
+          # your logic (maybe write data to the SoR)
         end
 
         defupdatable update_with_ttl(name), cache: Cache, opts: [ttl: 3600] do
-          # your logic (maybe update the database)
+          # your logic (maybe write data to the SoR)
         end
       end
+
+  The **Write-through** pattern is supported by this macro. Your function
+  provides the logic to write data to the system-of-record (SoR) and the rest
+  is provided by the macro under-the-hood.
   """
   defmacro defupdatable(fun, opts \\ [], do: block) do
     caching_action(:defupdatable, fun, opts, block)

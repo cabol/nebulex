@@ -74,7 +74,8 @@ defmodule Nebulex.Mixfile do
       source_url: "https://github.com/cabol/nebulex",
       extras: [
         "guides/getting-started.md",
-        "guides/hooks.md"
+        "guides/hooks.md",
+        "guides/caching-dsl.md"
       ]
     ]
   end

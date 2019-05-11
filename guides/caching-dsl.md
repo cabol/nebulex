@@ -1,0 +1,148 @@
+# Cache Usage Patterns via Nebulex.Caching DSL
+
+There are several common access patterns when using a cache. **Nebulex**
+supports most of these patterns by means of [Nebulex.Caching DSL][DSL].
+
+[DSL]: https://github.com/cabol/nebulex/blob/master/lib/nebulex/caching.ex
+
+> Most of the following documentation about caching patterns it has been taken
+  from [EHCache Doc][EHCache]
+
+[EHCache]: https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc
+
+## Cache-aside
+
+With the cache-aside pattern, application code uses the cache directly.
+
+This means that application code which accesses the system-of-record (SoR)
+should consult the cache first, and if the cache contains the data, then return
+the data directly from the cache, bypassing the SoR. Otherwise, the application
+code must fetch the data from the system-of-record, store the data in the cache,
+and then return it. When data is written, the cache must be updated along with
+the system-of-record.
+
+### Reading values
+
+```elixir
+if value = MyCache.get(key) do
+  value
+else
+  value = SoR.get(key) # maybe Ecto?
+  MyCache.set(key, value)
+end
+```
+
+### Writing values
+
+```elixir
+MyCache.set(key, value)
+SoR.insert(key, value) # maybe Ecto?
+```
+
+As you may have noticed, this is the default behavior for most of the caches,
+we have to interact directly with the cache as well as the SoR (most likely the
+Database).
+
+## Cache-as-SoR
+
+The cache-as-SoR pattern implies using the cache as though it were the
+primary system-of-record (SoR).
+
+The pattern delegates SoR reading and writing activities to the cache, so that
+application code is (at least directly) absolved of this responsibility.
+To implement the cache-as-SoR pattern, use a combination of the following
+read and write patterns:
+
+ * **Read-through**
+
+ * **Write-through**
+
+Advantages of using the cache-as-SoR pattern are:
+
+ * Less cluttered application code (improved maintainability through centralized
+   SoR read/write operations)
+
+ * Choice of write-through or write-behind strategies on a per-cache basis
+
+ * Allows the cache to solve the thundering-herd problem
+
+A disadvantage of using the cache-as-SoR pattern is:
+
+ * Less directly visible code-path
+
+But how to get all this out-of-box? This is where [Nebulex.Caching DSL][DSL]
+comes in. It provides a set of macros to abstract most of the logic behind
+**Read-through** and **Write-through** patterns and make the implementation
+extremely easy. But let's go over these patterns more in detail and how to
+implement them using [Nebulex.Caching DSL][DSL].
+
+## Read-through
+
+Under the read-through pattern, the cache is configured with a loader component
+that knows how to load data from the system-of-record (SoR).
+
+When the cache is asked for the value associated with a given key and such an
+entry does not exist within the cache, the cache invokes the loader to retrieve
+the value from the SoR, then caches the value, then returns it to the caller.
+
+The next time the cache is asked for the value for the same key it can be
+returned from the cache without using the loader (unless the entry has been
+evicted or expired).
+
+This pattern can be easily implemented using `defcacheable` macro from
+[Nebulex.Caching DSL][DSL] as follows:
+
+```elixir
+defmodule MyApp.Example do
+  import Nebulex.Caching
+  alias MyApp.Cache
+
+  defcacheable get_by_name(name, age), cache: Cache, key: name do
+    # your logic (the loader to retrieve the value from the SoR)
+  end
+
+  defcacheable get_by_age(age), cache: Cache, key: age, opts: [ttl: 3600] do
+    # your logic (the loader to retrieve the value from the SoR)
+  end
+
+  defcacheable all(query), cache: Cache do
+    # your logic (the loader to retrieve the value from the SoR)
+  end
+end
+```
+
+As you can see, the loader to retrieve the value from the system-of-record (SoR)
+is the function logic itself.
+
+## Write-through
+
+Under the write-through pattern, the cache is configured with a writer component
+that knows how to write data to the system-of-record (SoR).
+
+When the cache is asked to store a value for a key, the cache invokes the writer
+to store the value in the SoR, as well as updating (or deleting) the cache.
+
+This pattern can be implemented using `defevict` or `defupdatable`. When the
+data is written to the system-of-record (SoR), you can update the cached value
+associated with the given key using `defupdatable`, or just delete it using
+`defevict`.
+
+```elixir
+defmodule MyApp.Example do
+  import Nebulex.Caching
+  alias MyApp.Cache
+
+  # When the data is written to the SoR, it is updated in the cache
+  defupdatable update(something), cache: Cache, key: something do
+    # Write data to the SoR (most likely the Database)
+  end
+
+  # When the data is written to the SoR, it is deleted (evicted) from the cache
+  defevict update_something(something), cache: Cache, key: something do
+    # Write data to the SoR (most likely the Database)
+  end
+end
+```
+
+As you can see, the logic to write data to the system-of-record (SoR) is the
+function logic itself.
