@@ -1,4 +1,4 @@
-# Nebulex
+# Nebulex 🌌
 > ### In-Process and Distributed Caching Framework for Elixir.
 > Easily craft and deploy different distributed caching topologies in Elixir.
 
@@ -70,7 +70,7 @@ For example, if you want to use a built-in cache, you just need to add
 ```elixir
 def deps do
   [
-    {:nebulex, "~> 1.0"}
+    {:nebulex, "~> 1.1"}
   ]
 end
 ```

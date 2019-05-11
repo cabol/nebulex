@@ -28,7 +28,7 @@ changing the `deps` definition in that file to this:
 ```elixir
 defp deps do
   [
-    {:nebulex, "~> 1.0"}
+    {:nebulex, "~> 1.1"}
   ]
 end
 ```
@@ -630,6 +630,11 @@ To learn more about how multilevel-cache works, please check
 `Nebulex.Adapters.Multilevel` documentation, and also it is recommended see the
 [near cache example](https://github.com/cabol/nebulex_examples/tree/master/near_cache)
 
-## Pre/Post Hooks
+## Other important guides
 
-See [hooks documentation](http://hexdocs.pm/nebulex/hooks.html).
+ * [Nebulex.Caching DSL](http://hexdocs.pm/nebulex/caching-dsl.html)  - Tailored
+   DSL to implement different cache usage patterns.
+
+ * [Pre and Post Hooks](http://hexdocs.pm/nebulex/hooks.html) - Ability
+   to hook any function call for a cache and add custom logic before and/or
+   after function execution.

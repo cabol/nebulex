@@ -1,5 +1,32 @@
 # Change Log
 
+## [v1.1.0](https://github.com/cabol/nebulex/tree/v1.1.0) (2019-05-10)
+[Full Changelog](https://github.com/cabol/nebulex/compare/v1.0.1...v1.1.0)
+
+**Implemented enhancements:**
+
+- Refactor flush action in the local adapter to delete all objects instead of deleting all generation tables [\#48](https://github.com/cabol/nebulex/issues/48)
+- Write a guide for `Nebulex.Caching` [\#45](https://github.com/cabol/nebulex/issues/45)
+- Turn `Nebulex.Adapter.NodeSelector` into a generic hash behavior `Nebulex.Adapter.Hash` [\#44](https://github.com/cabol/nebulex/issues/44)
+- Turn `Nebulex.Adapters.Dist.RPC` into a reusable utility [\#43](https://github.com/cabol/nebulex/issues/43)
+- Add support to evict multiple keys from cache in `defevict`  [\#42](https://github.com/cabol/nebulex/issues/42)
+
+**Fixed bugs:**
+
+- Custom ttl on mulltilevel cache gets overwritten [\#46](https://github.com/cabol/nebulex/issues/46)
+
+**Closed issues:**
+
+- Will nebulex support replicating cache partitions? [\#47](https://github.com/cabol/nebulex/issues/47)
+- Add support to define `:opts` in `defcacheable` and `defupdatable` [\#40](https://github.com/cabol/nebulex/issues/40)
+- Random test failure - UndefinedFunctionError [\#28](https://github.com/cabol/nebulex/issues/28)
+- Adapter for Memcached [\#22](https://github.com/cabol/nebulex/issues/22)
+- Invalidate keys cluster-wide [\#18](https://github.com/cabol/nebulex/issues/18)
+
+**Merged pull requests:**
+
+- Fix error when running in a release [\#41](https://github.com/cabol/nebulex/pull/41) ([peburrows](https://github.com/peburrows))
+
 ## [v1.0.1](https://github.com/cabol/nebulex/tree/v1.0.1) (2019-01-11)
 [Full Changelog](https://github.com/cabol/nebulex/compare/v1.0.0...v1.0.1)
 
@@ -36,7 +63,6 @@
 - Cache Failing to Start on Production [\#26](https://github.com/cabol/nebulex/issues/26)
 - Adapter for Redis [\#23](https://github.com/cabol/nebulex/issues/23)
 - For `update` and `get\_and\_update` functions, the :ttl is being overridden [\#19](https://github.com/cabol/nebulex/issues/19)
-- Invalidate keys cluster-wide [\#18](https://github.com/cabol/nebulex/issues/18)
 - TTL and EXPIRE functions? [\#17](https://github.com/cabol/nebulex/issues/17)
 - Publish a rc.3 release [\#16](https://github.com/cabol/nebulex/issues/16)
 - Replicated cache adapter [\#15](https://github.com/cabol/nebulex/issues/15)

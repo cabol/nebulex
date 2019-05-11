@@ -1,7 +1,7 @@
 defmodule Nebulex.Mixfile do
   use Mix.Project
 
-  @version "1.0.1"
+  @version "1.1.0"
 
   def project do
     [
@@ -41,7 +41,7 @@ defmodule Nebulex.Mixfile do
       {:shards, "~> 0.6"},
 
       # Test
-      {:excoveralls, "~> 0.10", only: :test},
+      {:excoveralls, "~> 0.11", only: :test},
       {:ex2ms, "~> 1.5", only: :test},
       {:mock, "~> 0.3", only: :test},
       {:benchee, "~> 1.0", optional: true, only: :dev},
