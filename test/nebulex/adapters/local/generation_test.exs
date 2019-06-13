@@ -21,6 +21,8 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       assert i == length(TestCache.__metadata__().generations)
     end
 
+    assert :ok == TestCache.flush()
+
     for _ <- 1..12 do
       _ = :timer.sleep(1020)
       assert 3 == length(TestCache.__metadata__().generations)
