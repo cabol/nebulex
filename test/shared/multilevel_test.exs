@@ -104,7 +104,7 @@ defmodule Nebulex.MultilevelTest do
                )
 
       for x <- 1..3, do: assert(x == @cache.get(x))
-      _ = :timer.sleep(2000)
+      :ok = Process.sleep(2000)
       for x <- 1..3, do: refute(@cache.get(x))
 
       assert :ok == @cache.set_many(%{"apples" => 1, "bananas" => 3})
@@ -195,7 +195,7 @@ defmodule Nebulex.MultilevelTest do
       assert 2 == @cache.set(:b, 2, level: 2)
 
       assert 3 == @cache.object_info(:a, :ttl)
-      _ = :timer.sleep(1000)
+      :ok = Process.sleep(1000)
       assert 1 < @cache.object_info(:a, :ttl)
       assert :infinity == @cache.object_info(:b, :ttl)
       refute @cache.object_info(:c, :ttl)
@@ -242,7 +242,7 @@ defmodule Nebulex.MultilevelTest do
       for x <- 21..30, do: @l3.set(x, x)
 
       assert :ok == @cache.flush()
-      _ = :timer.sleep(500)
+      :ok = Process.sleep(500)
 
       for x <- 1..30, do: refute(@cache.get(x))
     end
@@ -418,7 +418,7 @@ defmodule Nebulex.MultilevelTest do
 
     defp stop_levels(levels_and_pids) do
       for {level, pid} <- levels_and_pids do
-        _ = :timer.sleep(10)
+        :ok = Process.sleep(10)
         if Process.alive?(pid), do: level.stop(pid)
       end
     end

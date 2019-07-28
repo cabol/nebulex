@@ -19,7 +19,7 @@ defmodule Nebulex.CachingTest do
     :ok
 
     on_exit(fn ->
-      _ = :timer.sleep(10)
+      :ok = Process.sleep(10)
       if Process.alive?(pid), do: Cache.stop(pid)
     end)
   end
@@ -57,7 +57,7 @@ defmodule Nebulex.CachingTest do
     assert {"x", "y"} == get_by_xy("x", "y")
     assert {"x", "y"} == Cache.get({"x", "y"})
 
-    _ = :timer.sleep(1100)
+    :ok = Process.sleep(1100)
     assert {"x", "y"} == Cache.get("x")
     assert {"x", "y"} == Cache.get({"x", "y"})
   end
@@ -67,7 +67,7 @@ defmodule Nebulex.CachingTest do
     assert 1 == get_with_opts(1)
     assert 1 == Cache.get(1)
 
-    _ = :timer.sleep(1100)
+    :ok = Process.sleep(1100)
     refute Cache.get(1)
   end
 
@@ -127,7 +127,7 @@ defmodule Nebulex.CachingTest do
     assert :y == Cache.get(:y)
     assert 3 == Cache.get(:z)
 
-    _ = :timer.sleep(1100)
+    :ok = Process.sleep(1100)
     assert :x == Cache.get(:x)
     assert :y == Cache.get(:y)
     assert 3 == Cache.get(:z)
@@ -138,7 +138,7 @@ defmodule Nebulex.CachingTest do
     assert :x == cache_put_with_opts(:x)
     assert :y == cache_put_with_opts(:y)
 
-    _ = :timer.sleep(1100)
+    :ok = Process.sleep(1100)
     refute Cache.get(:x)
     refute Cache.get(:y)
   end

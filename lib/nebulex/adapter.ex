@@ -42,6 +42,9 @@ defmodule Nebulex.Adapter do
   If the object already exists, it is overwritten. Any previous time to live
   associated with the key is discarded on successful `set` operation.
 
+  Returns `true` if an object with key `key` is found and successfully inserted,
+  otherwise `false`.
+
   ## Options
 
   Besides the "Shared options" section in `Nebulex.Cache` documentation,
@@ -55,7 +58,7 @@ defmodule Nebulex.Adapter do
   The `:action` option supports the following values:
 
     * `:add` - Only set the `key` if it does not already exist. If it does,
-      `nil` is returned.
+      `false` is returned.
 
     * `:replace` - Alters the object stored under `key`, but only if the object
       already exists into the cache.

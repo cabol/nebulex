@@ -219,7 +219,7 @@ defmodule Nebulex.Cache.ObjectTest do
 
       refute @cache.get(0)
       for x <- 1..3, do: assert(x == @cache.get(x))
-      _ = :timer.sleep(3000)
+      :ok = Process.sleep(3000)
       for x <- 1..3, do: refute(@cache.get(x))
 
       assert :ok == @cache.set_many(%{"apples" => 1, "bananas" => 3})
@@ -309,7 +309,7 @@ defmodule Nebulex.Cache.ObjectTest do
       assert 2 == @cache.set(:b, 2)
 
       assert 3 == @cache.object_info(:a, :ttl)
-      _ = :timer.sleep(500)
+      :ok = Process.sleep(500)
       assert 1 < @cache.object_info(:a, :ttl)
       assert :infinity == @cache.object_info(:b, :ttl)
       refute @cache.object_info(:c, :ttl)
@@ -359,7 +359,7 @@ defmodule Nebulex.Cache.ObjectTest do
         for x <- 1..100, do: @cache.set(x, x)
 
         assert @cache.flush() == :ok
-        _ = :timer.sleep(500)
+        :ok = Process.sleep(500)
 
         for x <- 1..100, do: refute(@cache.get(x))
       end)
@@ -417,7 +417,7 @@ defmodule Nebulex.Cache.ObjectTest do
       assert :infinity == @cache.object_info(:counter, :ttl)
 
       assert 1 == :counter |> @cache.expire(1) |> Object.remaining_ttl()
-      _ = :timer.sleep(1010)
+      :ok = Process.sleep(1010)
       refute @cache.get(:counter)
     end
 
@@ -427,9 +427,9 @@ defmodule Nebulex.Cache.ObjectTest do
                |> @cache.set(11, ttl: 2, return: :key)
                |> @cache.get!()
 
-      _ = :timer.sleep(500)
+      :ok = Process.sleep(500)
       assert 11 == @cache.get(1)
-      _ = :timer.sleep(1510)
+      :ok = Process.sleep(1510)
       refute @cache.get(1)
 
       ops = [
@@ -439,15 +439,15 @@ defmodule Nebulex.Cache.ObjectTest do
 
       for {action, args} <- ops do
         assert apply(@cache, action, args)
-        _ = :timer.sleep(900)
+        :ok = Process.sleep(900)
         assert "bar" == @cache.get("foo")
-        _ = :timer.sleep(1200)
+        :ok = Process.sleep(1200)
         refute @cache.get("foo")
 
         assert apply(@cache, action, args)
-        _ = :timer.sleep(900)
+        :ok = Process.sleep(900)
         assert "bar" == @cache.get("foo")
-        _ = :timer.sleep(1200)
+        :ok = Process.sleep(1200)
         refute @cache.get("foo")
       end
     end
@@ -479,12 +479,12 @@ defmodule Nebulex.Cache.ObjectTest do
                |> @cache.set(1, ttl: 2, return: :object)
                |> Object.remaining_ttl()
 
-      _ = :timer.sleep(500)
+      :ok = Process.sleep(500)
 
       assert {1, 2} == @cache.get_and_update(1, &Dist.get_and_update_fun/1)
       refute @cache.get(1, return: :object).expire_at
 
-      _ = :timer.sleep(2000)
+      :ok = Process.sleep(2000)
       assert 2 == @cache.get(1)
     end
 
@@ -494,12 +494,12 @@ defmodule Nebulex.Cache.ObjectTest do
                |> @cache.set(1, ttl: 2, return: :object)
                |> Object.remaining_ttl()
 
-      _ = :timer.sleep(500)
+      :ok = Process.sleep(500)
 
       assert "1" == @cache.update(1, 10, &Integer.to_string/1)
       refute @cache.get(1, return: :object).expire_at
 
-      _ = :timer.sleep(2000)
+      :ok = Process.sleep(2000)
       assert "1" == @cache.get(1)
     end
 

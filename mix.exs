@@ -1,13 +1,13 @@
 defmodule Nebulex.Mixfile do
   use Mix.Project
 
-  @version "1.1.0"
+  @version "1.1.1-dev"
 
   def project do
     [
       app: :nebulex,
       version: @version,
-      elixir: "~> 1.5",
+      elixir: "~> 1.6",
       deps: deps(),
 
       # Docs

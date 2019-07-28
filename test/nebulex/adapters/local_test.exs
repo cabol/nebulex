@@ -13,7 +13,7 @@ defmodule Nebulex.Adapters.LocalTest do
     :ok
 
     on_exit(fn ->
-      _ = :timer.sleep(10)
+      :ok = Process.sleep(10)
       if Process.alive?(pid), do: TestCache.stop(pid)
     end)
   end
@@ -116,14 +116,14 @@ defmodule Nebulex.Adapters.LocalTest do
     assert 1 == TestCache.update_counter(:counter_with_ttl, 1, ttl: 1)
     assert 2 == TestCache.update_counter(:counter_with_ttl)
     assert 2 == TestCache.get(:counter_with_ttl)
-    _ = :timer.sleep(1010)
+    :ok = Process.sleep(1010)
     refute TestCache.get(:counter_with_ttl)
 
     assert 1 == TestCache.update_counter(:counter_with_ttl, 1, ttl: 5)
     assert 5 == TestCache.object_info(:counter_with_ttl, :ttl)
 
     assert 1 == :counter_with_ttl |> TestCache.expire(1) |> Object.remaining_ttl()
-    _ = :timer.sleep(1010)
+    :ok = Process.sleep(1010)
     refute TestCache.get(:counter_with_ttl)
   end
 

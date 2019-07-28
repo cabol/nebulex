@@ -16,7 +16,7 @@ defmodule Nebulex.Adapters.DistTest do
     :ok
 
     on_exit(fn ->
-      _ = :timer.sleep(100)
+      :ok = Process.sleep(100)
       if Process.alive?(local), do: DistLocal.stop(local)
       if Process.alive?(dist), do: Dist.stop(dist)
       stop_caches(node_pid_list)

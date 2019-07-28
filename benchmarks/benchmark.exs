@@ -22,10 +22,10 @@ Enum.each(required_files, fn {file, loaded} ->
 end)
 
 alias Nebulex.NodeCase
-alias Nebulex.TestCache.{Dist, DistLocal, Versionless}
+alias Nebulex.TestCache.{Dist, DistLocal, Local}
 
 # start caches
-{:ok, local} = Versionless.start_link()
+{:ok, local} = Local.start_link()
 {:ok, primary} = DistLocal.start_link()
 {:ok, dist} = Dist.start_link()
 node_pid_list = NodeCase.start_caches(Node.list(), [DistLocal, Dist])
@@ -36,12 +36,12 @@ bulk = for x <- 1..100, do: {x, x}
 
 # init caches
 Enum.each(1..5000, fn x ->
-  Versionless.set(x, x)
+  Local.set(x, x)
   Dist.set(x, x)
 end)
 
 inputs = %{
-  "Generational Local Cache" => Versionless,
+  "Generational Local Cache" => Local,
   "Distributed Cache" => Dist
 }
 
@@ -114,18 +114,9 @@ Benchee.run(
   before_scenario: fn cache ->
     {cache, Enum.random(keys)}
   end,
-  console: [
-    comparison: false,
-    extended_statistics: true
-  ],
   formatters: [
-    Benchee.Formatters.Console,
-    Benchee.Formatters.HTML
-  ],
-  formatter_options: [
-    html: [
-      auto_open: false
-    ]
+    {Benchee.Formatters.Console, comparison: false, extended_statistics: true},
+    {Benchee.Formatters.HTML, extended_statistics: true}
   ],
   print: [
     fast_warning: false
@@ -133,7 +124,7 @@ Benchee.run(
 )
 
 # stop caches s
-if Process.alive?(local), do: Nebulex.TestCache.Versionless.stop(local)
+if Process.alive?(local), do: Local.stop(local)
 if Process.alive?(primary), do: DistLocal.stop(primary)
 if Process.alive?(dist), do: Dist.stop(dist)
 NodeCase.stop_caches(node_pid_list)

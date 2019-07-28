@@ -11,8 +11,6 @@ defmodule Nebulex.Version.Timestamp do
 end
 
 defmodule Nebulex.TestCache do
-  :ok = Application.put_env(:nebulex, :nodes, [:"node1@127.0.0.1", :"node2@127.0.0.1"])
-
   defmodule Hooks do
     defmacro __using__(opts) do
       quote bind_quoted: [opts: opts] do
@@ -50,13 +48,6 @@ defmodule Nebulex.TestCache do
       end
     end
   end
-
-  :ok =
-    Application.put_env(
-      :nebulex,
-      Nebulex.TestCache.Local,
-      version_generator: Nebulex.Version.Timestamp
-    )
 
   defmodule Local do
     use Nebulex.Cache,
@@ -96,13 +87,6 @@ defmodule Nebulex.TestCache do
     end
   end
 
-  :ok =
-    Application.put_env(
-      :nebulex,
-      Nebulex.TestCache.CacheStats,
-      stats: true
-    )
-
   defmodule CacheStats do
     use Nebulex.Cache,
       otp_app: :nebulex,
@@ -113,29 +97,23 @@ defmodule Nebulex.TestCache do
     end
   end
 
-  for mod <- [Nebulex.TestCache.LocalWithGC, Nebulex.TestCache.DistLocal] do
-    :ok =
-      Application.put_env(
-        :nebulex,
-        mod,
-        gc_interval: 3600,
-        version_generator: Nebulex.Version.Timestamp
-      )
-
-    defmodule mod do
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Local
-    end
+  defmodule LocalWithGC do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
   end
 
-  :ok =
-    Application.put_env(
-      :nebulex,
-      Nebulex.TestCache.Dist,
-      local: Nebulex.TestCache.DistLocal,
-      version_generator: Nebulex.Version.Timestamp
-    )
+  defmodule LocalWithSizeLimit do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
+  end
+
+  defmodule DistLocal do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
+  end
 
   defmodule Dist do
     use Nebulex.Cache,
@@ -154,7 +132,7 @@ defmodule Nebulex.TestCache do
     def get_and_update_bad_fun(_), do: :other
 
     def get_and_update_timeout_fun(value) do
-      _ = :timer.sleep(5000)
+      :ok = Process.sleep(5000)
       {value, value}
     end
 

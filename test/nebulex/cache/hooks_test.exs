@@ -76,7 +76,7 @@ defmodule Nebulex.Cache.HooksTest do
 
   defp stop_caches(caches_and_pids) do
     for {cache, pid} <- caches_and_pids do
-      _ = :timer.sleep(10)
+      :ok = Process.sleep(10)
       if Process.alive?(pid), do: cache.stop(pid)
     end
   end
