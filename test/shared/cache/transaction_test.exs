@@ -23,6 +23,42 @@ defmodule Nebulex.Cache.TransactionTest do
       end
     end
 
+    test "nested transaction" do
+      refute @cache.transaction(
+               fn ->
+                 @cache.transaction(
+                   fn ->
+                     1
+                     |> @cache.set(11, return: :key)
+                     |> @cache.get!(return: :key)
+                     |> @cache.delete(return: :key)
+                     |> @cache.get
+                   end,
+                   keys: [2]
+                 )
+               end,
+               keys: [1]
+             )
+    end
+
+    test "set and get within a transaction" do
+      assert ["old value"] == @cache.set(:test, ["old value"])
+
+      assert ["new value", "old value"] ==
+               @cache.transaction(
+                 fn ->
+                   value = @cache.get(:test)
+
+                   assert ["old value"] == value
+
+                   @cache.set(:test, ["new value" | value])
+                 end,
+                 keys: [:test]
+               )
+
+      assert ["new value", "old value"] == @cache.get(:test)
+    end
+
     test "transaction aborted" do
       spawn_link(fn ->
         @cache.transaction(

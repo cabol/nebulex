@@ -328,62 +328,6 @@ defmodule Nebulex.MultilevelTest do
       assert 0 == @l3.get(4)
     end
 
-    test "transaction" do
-      refute @cache.transaction(fn ->
-               1
-               |> @cache.set(11, return: :key)
-               |> @cache.get!(return: :key)
-               |> @cache.delete(return: :key)
-               |> @cache.get
-             end)
-
-      assert_raise MatchError, fn ->
-        @cache.transaction(fn ->
-          res =
-            1
-            |> @cache.set(11, return: :key)
-            |> @cache.get!(return: :key)
-            |> @cache.delete(return: :key)
-            |> @cache.get
-
-          :ok = res
-        end)
-      end
-    end
-
-    test "transaction aborted" do
-      spawn_link(fn ->
-        @cache.transaction(
-          fn ->
-            :timer.sleep(1100)
-          end,
-          keys: [1],
-          retries: 1
-        )
-      end)
-
-      :timer.sleep(200)
-
-      assert_raise RuntimeError, "transaction aborted", fn ->
-        @cache.transaction(
-          fn ->
-            @cache.get(1)
-          end,
-          keys: [1],
-          retries: 1
-        )
-      end
-    end
-
-    test "in_transaction?" do
-      refute @cache.in_transaction?
-
-      @cache.transaction(fn ->
-        _ = @cache.set(1, 11, return: :key)
-        true = @cache.in_transaction?
-      end)
-    end
-
     test "get with fallback" do
       assert_for_all_levels(nil, 1)
       assert 2 == @cache.get(1, fallback: fn key -> key * 2 end)

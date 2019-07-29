@@ -58,12 +58,13 @@ defmodule Nebulex.Adapter.Transaction do
         keys = opts[:keys]
         nodes = opts[:nodes] || [node() | Node.list()]
         retries = opts[:retries] || :infinity
+
         do_transaction(cache, keys, nodes, retries, fun)
       end
 
       @doc false
       def in_transaction?(cache) do
-        if Process.get(cache), do: true, else: false
+        if Process.get({cache, self()}), do: true, else: false
       end
 
       defoverridable transaction: 3, in_transaction?: 1
@@ -71,15 +72,25 @@ defmodule Nebulex.Adapter.Transaction do
       ## Helpers
 
       defp do_transaction(cache, keys, nodes, retries, fun) do
+        cache
+        |> in_transaction?()
+        |> do_transaction(cache, keys, nodes, retries, fun)
+      end
+
+      defp do_transaction(true, _cache, _keys, _nodes, _retries, fun) do
+        fun.()
+      end
+
+      defp do_transaction(false, cache, keys, nodes, retries, fun) do
         ids = lock_ids(cache, keys)
 
         case set_locks(ids, nodes, retries) do
           true ->
             try do
-              _ = Process.put(cache, %{keys: keys, nodes: nodes})
+              _ = Process.put({cache, self()}, %{keys: keys, nodes: nodes})
               fun.()
             after
-              _ = Process.delete(cache)
+              _ = Process.delete({cache, self()})
               del_locks(ids, nodes)
             end
 

@@ -161,10 +161,12 @@ defmodule Nebulex.Adapters.Multilevel do
   documentation of the used adapters.
   """
 
+  # Inherit default transaction implementation
+  use Nebulex.Adapter.Transaction
+
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Queryable
-  @behaviour Nebulex.Adapter.Transaction
 
   alias Nebulex.Object
 
@@ -338,27 +340,12 @@ defmodule Nebulex.Adapters.Multilevel do
     )
   end
 
-  ## Transaction
-
-  @impl true
-  def transaction(cache, fun, opts) do
-    eval(cache, :transaction, [fun, opts], [])
-  end
-
-  @impl true
-  def in_transaction?(cache) do
-    results =
-      Enum.reduce(cache.__levels__, [], fn level, acc ->
-        [level.in_transaction?() | acc]
-      end)
-
-    true in results
-  end
-
   ## Helpers
 
   defp eval(ml_cache, fun, args, opts) do
-    eval(levels(opts, ml_cache), fun, args)
+    opts
+    |> levels(ml_cache)
+    |> eval(fun, args)
   end
 
   defp eval([l1 | next], fun, args) do
