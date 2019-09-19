@@ -2,20 +2,21 @@ language: elixir
 elixir:
   - 1.9
   - 1.8
-  - 1.7
 otp_release:
+  - 22.0
   - 21.3
   - 20.3
 sudo: false
 env:
-  - MIX_ENV=test
+  - CI=true MIX_ENV=test
 before_script:
   - epmd -daemon
   - mix deps.get --only test
 script:
-  - mix coveralls.travis
+  - mix compile --warnings-as-errors
   - mix credo --strict
   - mix format --check-formatted
+  - mix coveralls.travis
   - mix dialyzer --plt
   - mix dialyzer --halt-exit-status
 after_script:

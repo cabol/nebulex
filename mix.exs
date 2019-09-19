@@ -7,8 +7,9 @@ defmodule Nebulex.Mixfile do
     [
       app: :nebulex,
       version: @version,
-      elixir: "~> 1.6",
+      elixir: "~> 1.8",
       deps: deps(),
+      elixirc_options: [warnings_as_errors: System.get_env("CI") == "true"],
 
       # Docs
       name: "Nebulex",
