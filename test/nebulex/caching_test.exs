@@ -71,6 +71,16 @@ defmodule Nebulex.CachingTest do
     refute Cache.get(1)
   end
 
+  test "cacheable with match" do
+    refute Cache.get(:x)
+    assert :x == get_with_match(:x)
+    refute Cache.get(:x)
+
+    refute Cache.get(:y)
+    assert :y == get_with_match(:y)
+    assert Cache.get(:y)
+  end
+
   test "cacheable with default key" do
     key = :erlang.phash2({:get_with_default_key, [123, {:foo, "bar"}]})
 
@@ -143,6 +153,14 @@ defmodule Nebulex.CachingTest do
     refute Cache.get(:y)
   end
 
+  test "updatable with match" do
+    assert :ok == set_keys(x: 0, y: 0, z: 0)
+    assert :x == cache_put_with_match(:x)
+    assert :y == cache_put_with_match(:y)
+    assert 0 == Cache.get(:x)
+    assert :y == Cache.get(:y)
+  end
+
   ## Caching Functions
 
   defcacheable get_by_x(x, y \\ "y"), cache: Cache, key: x do
@@ -150,6 +168,10 @@ defmodule Nebulex.CachingTest do
   end
 
   defcacheable get_with_opts(x), cache: Cache, key: x, opts: [ttl: 1] do
+    x
+  end
+
+  defcacheable get_with_match(x), cache: Cache, key: x, match: fn x -> x != :x end do
     x
   end
 
@@ -186,6 +208,10 @@ defmodule Nebulex.CachingTest do
   end
 
   defupdatable cache_put_with_opts(x), cache: Cache, key: x, opts: [ttl: 1] do
+    x
+  end
+
+  defupdatable cache_put_with_match(x), cache: Cache, key: x, match: fn x -> x != :x end do
     x
   end
 

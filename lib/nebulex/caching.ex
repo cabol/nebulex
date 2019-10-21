@@ -20,6 +20,11 @@ defmodule Nebulex.Caching do
     * `:opts` - Defines the cache options that will be passed as argument
       to the invoked cache function (optional).
 
+    * `:match` - Defines a function that takes one argument and will be used to decide
+      if the cache should be updated or not (optional). If this option is not present,
+      the value will always be updated. Does not have any effect upon eviction
+      since values are always evicted before executing the function logic.
+
   ## Example
 
   Suppose we are using `Ecto` and we want to define some caching functions in
@@ -44,6 +49,10 @@ defmodule Nebulex.Caching do
         defcacheable users_by_segment(segment \\\\ "standard"), cache: Cache do
           query = from(q in User, where: q.segment == ^segment)
           Repo.all(query)
+        end
+
+        defcacheable get_newest_user(), cache: Cache, key: {User, :latest}, match: &(not is_nil(&1)) do
+          Repo.get_newest(User)
         end
 
         defupdatable update_user!(%User{} = user, attrs), cache: Cache, key: {User, user.id} do
@@ -87,6 +96,10 @@ defmodule Nebulex.Caching do
 
         defcacheable all(query), cache: Cache do
           # your logic (maybe the loader to retrieve the value from the SoR)
+        end
+
+        defcacheable get_newest_user(), cache: Cache, key: {User, :latest}, match: &(not is_nil(&1)) do
+          Repo.get_newest(User)
         end
       end
 
@@ -172,6 +185,14 @@ defmodule Nebulex.Caching do
         defupdatable update_with_ttl(name), cache: Cache, opts: [ttl: 3600] do
           # your logic (maybe write data to the SoR)
         end
+
+        defcacheable update_when_not_nil(), cache: Cache, match: &match_function/1 do
+          # your logic (maybe write data to the SoR)
+        end
+
+        defp match_function(value) do
+          # your condition to skip updating the cache
+        edn
       end
 
   The **Write-through** pattern is supported by this macro. Your function
@@ -213,6 +234,7 @@ defmodule Nebulex.Caching do
     key_var = Keyword.get(opts, :key)
     keys_var = Keyword.get(opts, :keys)
     opts_var = Keyword.get(opts, :opts, [])
+    match_var = Keyword.get(opts, :match)
     action_logic = action_logic(action, block, opts)
 
     quote do
@@ -221,6 +243,7 @@ defmodule Nebulex.Caching do
         key = unquote(key_var) || :erlang.phash2({unquote(name), unquote(as_args)})
         keys = unquote(keys_var)
         opts = unquote(opts_var)
+        match = unquote(match_var) || fn _ -> true end
 
         unquote(action_logic)
       end
@@ -233,7 +256,12 @@ defmodule Nebulex.Caching do
         value
       else
         value = unquote(block)
-        cache.set(key, value, opts)
+
+        if apply(match, [value]) do
+          cache.set(key, value, opts)
+        else
+          value
+        end
       end
     end
   end
@@ -250,7 +278,12 @@ defmodule Nebulex.Caching do
   defp action_logic(:defupdatable, block, _opts) do
     quote do
       value = unquote(block)
-      cache.set(key, value, opts)
+
+      if apply(match, [value]) do
+        cache.set(key, value, opts)
+      else
+        value
+      end
     end
   end
 
