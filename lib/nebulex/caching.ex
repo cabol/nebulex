@@ -20,10 +20,10 @@ defmodule Nebulex.Caching do
     * `:opts` - Defines the cache options that will be passed as argument
       to the invoked cache function (optional).
 
-  * `:match` - Defines a function that takes one argument and will be used to decide if the
-     cache should be updated or not (optional). If this option is not present,
-     the value will always be updated. Does not have any effect upon eviction
-     since values are always evicted before executing the function logic.
+    * `:match` - Defines a function that takes one argument and will be used to decide
+      if the cache should be updated or not (optional). If this option is not present,
+      the value will always be updated. Does not have any effect upon eviction
+      since values are always evicted before executing the function logic.
 
   ## Example
 
