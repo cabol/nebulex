@@ -13,7 +13,7 @@ config :nebulex, Nebulex.TestCache.LocalWithSizeLimit,
   version_generator: Nebulex.Version.Timestamp,
   gc_interval: 3600,
   n_generations: 3,
-  generation_size: 100_000,
+  allocated_memory: 100_000,
   gc_cleanup_interval: 2
 
 config :nebulex, Nebulex.TestCache.DistLocal,

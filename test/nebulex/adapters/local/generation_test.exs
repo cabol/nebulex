@@ -1,6 +1,8 @@
 defmodule Nebulex.Adapters.Local.GenerationTest do
   use ExUnit.Case, async: true
 
+  alias Nebulex.Adapters.Local.Generation
+  alias Nebulex.Adapters.Local.Generation.State
   alias Nebulex.TestCache.LocalWithGC, as: TestCache
   alias Nebulex.TestCache.LocalWithSizeLimit
 
@@ -15,69 +17,103 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
   end
 
   test "garbage collection" do
-    assert 1 == length(TestCache.__metadata__().generations)
+    assert 1 == n_generations(TestCache)
 
     for i <- 2..3 do
       :ok = Process.sleep(1020)
-      assert i == length(TestCache.__metadata__().generations)
+      assert i == n_generations(TestCache)
     end
 
     assert :ok == TestCache.flush()
 
     for _ <- 1..12 do
       :ok = Process.sleep(1020)
-      assert 3 == length(TestCache.__metadata__().generations)
+      assert 3 == n_generations(TestCache)
     end
   end
 
   test "create new generation and reset timeout" do
-    assert 1 == length(TestCache.__metadata__().generations)
+    assert 1 == n_generations(TestCache)
 
     :ok = Process.sleep(800)
     assert 2 == length(TestCache.new_generation())
 
     :ok = Process.sleep(500)
-    assert 2 == length(TestCache.__metadata__().generations)
+    assert 2 == n_generations(TestCache)
 
     :ok = Process.sleep(520)
-    assert 3 == length(TestCache.__metadata__().generations)
+    assert 3 == n_generations(TestCache)
   end
 
   test "create new generation without reset timeout" do
-    assert 1 == length(TestCache.__metadata__().generations)
+    assert 1 == n_generations(TestCache)
 
     :ok = Process.sleep(800)
     assert 2 == length(TestCache.new_generation(reset_timeout: false))
 
     :ok = Process.sleep(500)
-    assert 3 == length(TestCache.__metadata__().generations)
+    assert 3 == n_generations(TestCache)
   end
 
   test "cleanup is triggered when max generation size is reached" do
     assert {:ok, pid} = LocalWithSizeLimit.start_link()
-    assert 1 == length(LocalWithSizeLimit.__metadata__().generations)
+    assert 1 == n_generations(LocalWithSizeLimit)
 
-    assert_generations(1, 10_000, 1)
-    assert_generations(2, 100, 2)
+    %State{memory: mem_size} = Generation.get_state(LocalWithSizeLimit)
+    :ok = Generation.realloc(LocalWithSizeLimit, mem_size * 2)
 
-    assert_generations(3, 100, 2)
-    assert_generations(4, 100, 2)
+    :ok = flood_cache(mem_size, mem_size * 2)
+    assert 1 == n_generations(LocalWithSizeLimit)
+    assert_mem_size(:>)
 
-    assert_generations(5, 15_000, 2)
-    assert_generations(6, 100, 3)
+    _ = LocalWithSizeLimit.set("a", generate_value(10))
+    :ok = Process.sleep(1000)
+    assert 2 == n_generations(LocalWithSizeLimit)
+    assert_mem_size(:<=)
+
+    :ok = flood_cache(mem_size, mem_size * 2)
+    assert 2 == n_generations(LocalWithSizeLimit)
+    assert_mem_size(:>)
+
+    _ = LocalWithSizeLimit.set("a", generate_value(10))
+    :ok = Process.sleep(1000)
+    assert 3 == n_generations(LocalWithSizeLimit)
+    assert_mem_size(:<=)
 
     assert :ok == LocalWithSizeLimit.stop(pid)
   end
 
   ## Private Functions
 
-  defp assert_generations(key, n, n_gens) do
-    _ = LocalWithSizeLimit.set(key, rand_bytes(n))
-    :ok = Process.sleep(1000)
-    assert n_gens == length(LocalWithSizeLimit.__metadata__().generations)
+  defp flood_cache(mem_size, max_size) when mem_size > max_size do
+    :ok
   end
 
-  defp rand_bytes(n) do
+  defp flood_cache(mem_size, max_size) when mem_size <= max_size do
+    _ =
+      100_000
+      |> :rand.uniform()
+      |> LocalWithSizeLimit.set(generate_value(1000))
+
+    :ok = Process.sleep(500)
+    %State{memory: mem_size} = Generation.get_state(LocalWithSizeLimit)
+    flood_cache(mem_size, max_size)
+  end
+
+  defp assert_mem_size(greater_or_less) do
+    %State{
+      allocated_memory: max_size,
+      memory: mem_size
+    } = Generation.get_state(LocalWithSizeLimit)
+
+    assert apply(Kernel, greater_or_less, [mem_size, max_size])
+  end
+
+  defp generate_value(n) do
     for(_ <- 1..n, do: "a")
+  end
+
+  defp n_generations(cache) do
+    length(cache.__metadata__().generations)
   end
 end

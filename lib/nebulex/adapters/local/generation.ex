@@ -18,20 +18,39 @@ defmodule Nebulex.Adapters.Local.Generation do
     not set, garbage collection is never executed, so new generations
     must be created explicitly, e.g.: `new(cache, [])`.
 
-  * `:generation_size` - Max size in bytes for a cache generation. If this
-    option is set and the configured value is reached, a new generation is
-    created so the oldest is deleted and force releasing memory space.
+  * `:allocated_memory` - Max size in bytes allocated for a cache generation.
+    If this option is set and the configured value is reached, a new generation
+    is created so the oldest is deleted and force releasing memory space.
     If it is not set (`nil`), the cleanup check to release memory is not
     performed (the default).
 
   * `:gc_cleanup_interval` - The number of writes needed to run the cleanup
-    check. Once this value is reached and only if `generation_size` option
+    check. Once this value is reached and only if `allocated_memory` option
     is set, the cleanup check is performed. Defaults to `10`, so after 10
     write operations the cleanup check is performed.
   """
 
+  defmodule State do
+    @moduledoc false
+
+    defstruct [
+      :cache,
+      :gc_interval,
+      :time_ref,
+      :gen_name,
+      :gen_index,
+      :allocated_memory,
+      :gc_cleanup_interval,
+      :gc_cleanup_counts,
+      :memory
+    ]
+
+    @type t :: %__MODULE__{}
+  end
+
   use GenServer
 
+  alias Nebulex.Adapters.Local.Generation.State
   alias Nebulex.Adapters.Local.Metadata
   alias :shards_local, as: Local
 
@@ -48,10 +67,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   @doc """
   Creates a new cache generation. Once the max number of generations
   is reached, when a new generation is created, the oldest one is
-  deleted
-
-    * `cache` - Cache Module
-    * `opts` - List of options
+  deleted.
 
   ## Options
 
@@ -72,8 +88,6 @@ defmodule Nebulex.Adapters.Local.Generation do
   @doc """
   Flushes the cache (including all its generations).
 
-    * `cache` - Cache Module
-
   ## Example
 
       Nebulex.Adapters.Local.Generation.flush(MyCache)
@@ -90,8 +104,6 @@ defmodule Nebulex.Adapters.Local.Generation do
   has been reached. If so, a new generation is pushed in order to release memory
   and keep it within the configured limit.
 
-    * `cache` - Cache Module
-
   ## Example
 
       Nebulex.Adapters.Local.Generation.cleanup(MyCache)
@@ -101,6 +113,36 @@ defmodule Nebulex.Adapters.Local.Generation do
     cache
     |> server_name()
     |> GenServer.cast(:cleanup)
+  end
+
+  @doc """
+  Reallocates the block of memory that was previously allocated for the given
+  `cache` with the new `size`. In other words, reallocates the max memory size
+  for a cache generation.
+
+  ## Example
+
+      Nebulex.Adapters.Local.Generation.realloc(MyCache, 1_000_000)
+  """
+  @spec realloc(Nebulex.Cache.t(), pos_integer) :: :ok
+  def realloc(cache, size) do
+    cache
+    |> server_name()
+    |> GenServer.call({:realloc, size})
+  end
+
+  @doc """
+  Returns the `GenServer` state (mostly for testing purposes).
+
+  ## Example
+
+      Nebulex.Adapters.Local.Generation.get_state(MyCache)
+  """
+  @spec get_state(Nebulex.Cache.t()) :: State.t()
+  def get_state(cache) do
+    cache
+    |> server_name()
+    |> GenServer.call(:get_state)
   end
 
   ## GenServer Callbacks
@@ -114,13 +156,13 @@ defmodule Nebulex.Adapters.Local.Generation do
         do: {new_gen(cache, 0), start_timer(gc_interval)},
         else: {new_gen(cache, 0), nil}
 
-    init_state = %{
+    init_state = %State{
       cache: cache,
       gc_interval: gc_interval,
       time_ref: ref,
       gen_name: gen_name,
       gen_index: gen_index,
-      generation_size: Keyword.get(opts, :generation_size),
+      allocated_memory: Keyword.get(opts, :allocated_memory),
       gc_cleanup_interval: Keyword.get(opts, :gc_cleanup_interval, 10),
       gc_cleanup_counts: 1
     }
@@ -129,7 +171,11 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   @impl true
-  def handle_call({:new_generation, opts}, _from, %{cache: cache, gen_index: gen_index} = state) do
+  def handle_call(
+        {:new_generation, opts},
+        _from,
+        %State{cache: cache, gen_index: gen_index} = state
+      ) do
     {generations, gen_name, gen_index} = new_gen(cache, gen_index)
 
     state =
@@ -140,25 +186,33 @@ defmodule Nebulex.Adapters.Local.Generation do
     {:reply, generations, %{state | gen_name: gen_name, gen_index: gen_index}}
   end
 
-  def handle_call(:flush, _from, %{cache: cache} = state) do
+  def handle_call(:flush, _from, %State{cache: cache} = state) do
     :ok = Enum.each(cache.__metadata__.generations, &Local.delete_all_objects/1)
     {:reply, :ok, state}
+  end
+
+  def handle_call({:realloc, mem_size}, _from, %State{} = state) do
+    {:reply, :ok, %{state | allocated_memory: mem_size}}
+  end
+
+  def handle_call(:get_state, _from, %State{gen_name: name} = state) do
+    {:reply, %{state | memory: memory_info(name)}, state}
   end
 
   @impl true
   def handle_cast(
         :cleanup,
-        %{
+        %State{
           gen_name: name,
           gen_index: index,
           cache: cache,
-          generation_size: max_size,
+          allocated_memory: max_size,
           gc_cleanup_interval: cleanup_interval,
           gc_cleanup_counts: cleanup_counts
         } = state
       )
       when cleanup_counts >= cleanup_interval do
-    if Local.info(name, :memory) * :erlang.system_info(:wordsize) >= max_size do
+    if memory_info(name) >= max_size do
       {_, name, index} = new_gen(cache, index)
       {:noreply, %{reset_timeout(state) | gc_cleanup_counts: 1, gen_name: name, gen_index: index}}
     else
@@ -171,9 +225,20 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   @impl true
-  def handle_info(:timeout, %{cache: cache, gc_interval: time, gen_index: gen_index} = state) do
+  def handle_info(
+        :timeout,
+        %State{cache: cache, gc_interval: time_interval, gen_index: gen_index} = state
+      ) do
     {_, gen_name, gen_index} = new_gen(cache, gen_index)
-    {:noreply, %{state | gen_name: gen_name, gen_index: gen_index, time_ref: start_timer(time)}}
+
+    state = %{
+      state
+      | gen_name: gen_name,
+        gen_index: gen_index,
+        time_ref: start_timer(time_interval)
+    }
+
+    {:noreply, state}
   end
 
   ## Private Functions
@@ -221,12 +286,16 @@ defmodule Nebulex.Adapters.Local.Generation do
     ref
   end
 
-  defp maybe_reset_timeout(_, %{gc_interval: nil} = state), do: state
+  defp maybe_reset_timeout(_, %State{gc_interval: nil} = state), do: state
   defp maybe_reset_timeout(false, state), do: state
   defp maybe_reset_timeout(true, state), do: reset_timeout(state)
 
-  defp reset_timeout(%{gc_interval: time, time_ref: ref} = state) do
+  defp reset_timeout(%State{gc_interval: time, time_ref: ref} = state) do
     {:ok, :cancel} = :timer.cancel(ref)
     %{state | time_ref: start_timer(time)}
+  end
+
+  defp memory_info(name) do
+    Local.info(name, :memory) * :erlang.system_info(:wordsize)
   end
 end
