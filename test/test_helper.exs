@@ -1,3 +1,6 @@
+# Set nodes
+:ok = Application.put_env(:nebulex, :nodes, [:"node1@127.0.0.1", :"node2@127.0.0.1"])
+
 # Load support files
 required_files =
   for file <- File.ls!("test/support") do

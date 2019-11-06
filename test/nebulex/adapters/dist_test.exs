@@ -3,7 +3,8 @@ defmodule Nebulex.Adapters.DistTest do
   use Nebulex.CacheTest, cache: Nebulex.TestCache.Dist
 
   alias Nebulex.Adapters.Dist.Cluster
-  alias Nebulex.TestCache.{Dist, DistLocal, DistMock, DistWithCustomHashSlot, LocalMock}
+  alias Nebulex.TestCache.{Dist, DistMock, DistWithCustomHashSlot, LocalMock}
+  alias Nebulex.TestCache.Dist.Local, as: DistLocal
   alias Nebulex.TestCache.DistWithCustomHashSlot.Local, as: DistLocalWithCustomHashSlot
 
   @primary :"primary@127.0.0.1"

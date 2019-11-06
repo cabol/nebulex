@@ -1,5 +1,7 @@
 ## Benchmarks
 
+:ok = Application.put_env(:nebulex, :nodes, [:"node1@127.0.0.1", :"node2@127.0.0.1"])
+
 required_files =
   for file <- File.ls!("test/support") do
     {file, Code.require_file("../test/support/" <> file, __DIR__)}
@@ -22,7 +24,8 @@ Enum.each(required_files, fn {file, loaded} ->
 end)
 
 alias Nebulex.NodeCase
-alias Nebulex.TestCache.{Dist, DistLocal, Local}
+alias Nebulex.TestCache.{Dist, Local}
+alias Nebulex.TestCache.Dist.Local, as: DistLocal
 
 # start caches
 {:ok, local} = Local.start_link()

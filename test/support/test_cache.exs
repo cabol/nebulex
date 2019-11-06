@@ -52,7 +52,8 @@ defmodule Nebulex.TestCache do
   defmodule Local do
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
+      adapter: Nebulex.Adapters.Local,
+      version_generator: Nebulex.Version.Timestamp
   end
 
   defmodule Versionless do
@@ -87,6 +88,8 @@ defmodule Nebulex.TestCache do
     end
   end
 
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.CacheStats, stats: true)
+
   defmodule CacheStats do
     use Nebulex.Cache,
       otp_app: :nebulex,
@@ -100,25 +103,40 @@ defmodule Nebulex.TestCache do
   defmodule LocalWithGC do
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
+      adapter: Nebulex.Adapters.Local,
+      version_generator: Nebulex.Version.Timestamp
   end
+
+  :ok =
+    Application.put_env(
+      :nebulex,
+      Nebulex.TestCache.LocalWithSizeLimit,
+      allocated_memory: 100_000,
+      gc_cleanup_interval: 2
+    )
 
   defmodule LocalWithSizeLimit do
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
-  end
-
-  defmodule DistLocal do
-    use Nebulex.Cache,
-      otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
+      adapter: Nebulex.Adapters.Local,
+      version_generator: Nebulex.Version.Timestamp,
+      gc_interval: 3600,
+      n_generations: 3
   end
 
   defmodule Dist do
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Dist
+      adapter: Nebulex.Adapters.Dist,
+      local: Nebulex.TestCache.Dist.Local,
+      version_generator: Nebulex.Version.Timestamp
+
+    defmodule Local do
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local,
+        gc_interval: 3600
+    end
 
     def reducer_fun(object, {acc1, acc2}) do
       if Map.has_key?(acc1, object.key),

@@ -36,14 +36,14 @@ defmodule Nebulex.Adapters.Local do
       not set, garbage collection is never executed, so new generations
       must be created explicitly, e.g.: `MyCache.new_generation([])`.
 
-    * `:generation_size` - Max size in bytes for a cache generation. If this
-      option is set and the configured value is reached, a new generation is
-      created so the oldest is deleted and force releasing memory space.
-      If it is not set (`nil`), the cleanup check to release memory is not
-      performed (the default).
+    * `:allocated_memory` - Max size in bytes allocated for a cache generation.
+      If this option is set and the configured value is reached, a new
+      generation is created so the oldest is deleted and force releasing memory
+      space. If it is not set (`nil`), the cleanup check to release memory
+      is not performed (the default).
 
     * `:gc_cleanup_interval` - The number of writes needed to run the cleanup
-      check. Once this value is reached and only if `generation_size` option
+      check. Once this value is reached and only if `allocated_memory` option
       is set, the cleanup check is performed. Defaults to `10`, so after 10
       write operations the cleanup check is performed.
 
@@ -143,7 +143,7 @@ defmodule Nebulex.Adapters.Local do
     n_shards = Keyword.get(config, :n_shards, System.schedulers_online())
     r_concurrency = Keyword.get(config, :read_concurrency, true)
     w_concurrency = Keyword.get(config, :write_concurrency, true)
-    generation_size = Keyword.get(config, :generation_size)
+    allocated_memory = Keyword.get(config, :allocated_memory)
     shards_sup_name = Module.concat([cache, ShardsSupervisor])
 
     quote do
@@ -169,7 +169,7 @@ defmodule Nebulex.Adapters.Local do
         Generation.new(__MODULE__, opts)
       end
 
-      if unquote(generation_size) do
+      if unquote(allocated_memory) do
         def cleanup(bypass_arg) do
           :ok = Generation.cleanup(__MODULE__)
           bypass_arg

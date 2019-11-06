@@ -60,9 +60,11 @@ Partitioned  | Nebulex.Adapters.Dist       | Built-In
 Multi-level  | Nebulex.Adapters.Multilevel | Built-In
 Redis        | NebulexRedisAdapter         | [nebulex_redis_adapter][nebulex_redis_adapter]
 Memcached    | NebulexMemcachedAdapter     | [nebulex_memcached_adapter][nebulex_memcached_adapter]
+FoundationDB | NebulexFdbAdapter           | [nebulex_fdb_adapter][nebulex_fdb_adapter]
 
 [nebulex_redis_adapter]: https://github.com/cabol/nebulex_redis_adapter
 [nebulex_memcached_adapter]: https://github.com/vasuadari/nebulex_memcached_adapter
+[nebulex_fdb_adapter]: https://github.com/fire/nebulex_fdb_adapter
 
 For example, if you want to use a built-in cache, you just need to add
 `nebulex` to your `mix.exs` file:
