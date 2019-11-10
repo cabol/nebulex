@@ -14,7 +14,7 @@ useful and powerful features such as:
   * Inspired by [Ecto][ecto]; simple and fluent API, flexible and
     pluggable architecture (based on adapters).
 
-  * Built-in adapters: local (generational cache), distributed and multi-level.
+  * Built-in adapters: local (generational cache), partitioned and multi-level.
 
   * [Caching DSL](http://hexdocs.pm/nebulex/caching-dsl.html) to implement
     different [cache usage patterns][EHCache].
@@ -53,14 +53,14 @@ also have to add the proper dependency to your `mix.exs` file.
 
 The supported caches and their adapters are:
 
-Cache        | Nebulex Adapter             | Dependency
-:----------- | :---------------------------| :---------
-Generational | Nebulex.Adapters.Local      | Built-In
-Partitioned  | Nebulex.Adapters.Dist       | Built-In
-Multi-level  | Nebulex.Adapters.Multilevel | Built-In
-Redis        | NebulexRedisAdapter         | [nebulex_redis_adapter][nebulex_redis_adapter]
-Memcached    | NebulexMemcachedAdapter     | [nebulex_memcached_adapter][nebulex_memcached_adapter]
-FoundationDB | NebulexFdbAdapter           | [nebulex_fdb_adapter][nebulex_fdb_adapter]
+Cache        | Nebulex Adapter              | Dependency
+:----------- | :----------------------------| :---------
+Generational | Nebulex.Adapters.Local       | Built-In
+Partitioned  | Nebulex.Adapters.Partitioned | Built-In
+Multi-level  | Nebulex.Adapters.Multilevel  | Built-In
+Redis        | NebulexRedisAdapter          | [nebulex_redis_adapter][nebulex_redis_adapter]
+Memcached    | NebulexMemcachedAdapter      | [nebulex_memcached_adapter][nebulex_memcached_adapter]
+FoundationDB | NebulexFdbAdapter            | [nebulex_fdb_adapter][nebulex_fdb_adapter]
 
 [nebulex_redis_adapter]: https://github.com/cabol/nebulex_redis_adapter
 [nebulex_memcached_adapter]: https://github.com/vasuadari/nebulex_memcached_adapter

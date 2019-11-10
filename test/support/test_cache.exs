@@ -124,14 +124,14 @@ defmodule Nebulex.TestCache do
       n_generations: 3
   end
 
-  defmodule Dist do
+  defmodule Partitioned do
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Dist,
-      local: Nebulex.TestCache.Dist.Local,
+      adapter: Nebulex.Adapters.Partitioned,
+      primary: Nebulex.TestCache.Partitioned.Primary,
       version_generator: Nebulex.Version.Timestamp
 
-    defmodule Local do
+    defmodule Primary do
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.Adapters.Local,
@@ -158,14 +158,14 @@ defmodule Nebulex.TestCache do
     def update_fun(current) when is_integer(current), do: current * 2
   end
 
-  defmodule DistWithCustomHashSlot do
+  defmodule PartitionedWithCustomHashSlot do
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Dist,
-      local: Nebulex.TestCache.DistWithCustomHashSlot.Local,
-      hash_slot: Nebulex.TestCache.DistWithCustomHashSlot.HashSlot
+      adapter: Nebulex.Adapters.Partitioned,
+      primary: Nebulex.TestCache.PartitionedWithCustomHashSlot.Primary,
+      hash_slot: Nebulex.TestCache.PartitionedWithCustomHashSlot.HashSlot
 
-    defmodule Local do
+    defmodule Primary do
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.Adapters.Local
@@ -237,8 +237,8 @@ defmodule Nebulex.TestCache do
   :ok =
     Application.put_env(
       :nebulex,
-      Nebulex.TestCache.DistMock,
-      local: Nebulex.TestCache.LocalMock
+      Nebulex.TestCache.PartitionedMock,
+      primary: Nebulex.TestCache.LocalMock
     )
 
   :ok = Application.put_env(:nebulex, Nebulex.TestCache.LocalMock, [])
@@ -295,9 +295,9 @@ defmodule Nebulex.TestCache do
       adapter: Nebulex.TestCache.AdapterMock
   end
 
-  defmodule DistMock do
+  defmodule PartitionedMock do
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Dist
+      adapter: Nebulex.Adapters.Partitioned
   end
 end

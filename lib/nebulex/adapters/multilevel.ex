@@ -76,7 +76,7 @@ defmodule Nebulex.Adapters.Multilevel do
         defmodule L2 do
           use Nebulex.Cache,
             otp_app: :nebulex,
-            adapter: Nebulex.Adapters.Dist
+            adapter: Nebulex.Adapters.Partitioned
         end
 
         def fallback(_key) do
@@ -106,7 +106,7 @@ defmodule Nebulex.Adapters.Multilevel do
         gc_interval: 3600
 
       config :my_app, MyApp.MultilevelCache.L2,
-        local: MyApp.LocalCache
+        primary: MyApp.LocalCache
 
       config :my_app, MyApp.LocalCache,
         n_shards: 2,
