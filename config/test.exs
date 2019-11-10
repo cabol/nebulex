@@ -16,10 +16,10 @@ config :nebulex, Nebulex.TestCache.LocalWithSizeLimit,
   allocated_memory: 100_000,
   gc_cleanup_interval: 2
 
-config :nebulex, Nebulex.TestCache.DistLocal,
+config :nebulex, Nebulex.TestCache.Partitioned.Primary,
   version_generator: Nebulex.Version.Timestamp,
   gc_interval: 3600
 
-config :nebulex, Nebulex.TestCache.Dist,
-  local: Nebulex.TestCache.DistLocal,
+config :nebulex, Nebulex.TestCache.Partitioned,
+  primary: Nebulex.TestCache.Partitioned.Primary,
   version_generator: Nebulex.Version.Timestamp

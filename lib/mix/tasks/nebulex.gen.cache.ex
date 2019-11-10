@@ -40,7 +40,7 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
 
       To specify other adapter different than default, use -a option:
 
-          mix nebulex.gen.cache -c MyApp.Cache -a Nebulex.Adapters.Dist
+          mix nebulex.gen.cache -c MyApp.Cache -a Nebulex.Adapters.Partitioned
       """)
     end
 
@@ -91,8 +91,8 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
       Nebulex.Adapters.Local ->
         local_config_template(opts)
 
-      Nebulex.Adapters.Dist ->
-        dist_config_template(opts)
+      Nebulex.Adapters.Partitioned ->
+        partitioned_config_template(opts)
 
       Nebulex.Adapters.Multilevel ->
         multilevel_config_template(opts)
@@ -117,11 +117,11 @@ defmodule Mix.Tasks.Nebulex.Gen.Cache do
     gc_interval: 86_400 # 24 hrs
   """)
 
-  embed_template(:dist_config, """
+  embed_template(:partitioned_config, """
   use Mix.Config
 
   config <%= inspect @app %>, <%= inspect @mod %>,
-    local: :YOUR_LOCAL_CACHE
+    primary: :YOUR_LOCAL_CACHE
   """)
 
   embed_template(:multilevel_config, """

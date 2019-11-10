@@ -109,16 +109,16 @@ defmodule Nebulex.TestCache do
       adapter: Nebulex.Adapters.Local
   end
 
-  defmodule DistLocal do
+  defmodule Partitioned do
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
-  end
+      adapter: Nebulex.Adapters.Partitioned
 
-  defmodule Dist do
-    use Nebulex.Cache,
-      otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Dist
+    defmodule Primary do
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+    end
 
     def reducer_fun(object, {acc1, acc2}) do
       if Map.has_key?(acc1, object.key),
@@ -140,14 +140,14 @@ defmodule Nebulex.TestCache do
     def update_fun(current) when is_integer(current), do: current * 2
   end
 
-  defmodule DistWithCustomHashSlot do
+  defmodule PartitionedWithCustomHashSlot do
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Dist,
-      local: Nebulex.TestCache.DistWithCustomHashSlot.Local,
-      hash_slot: Nebulex.TestCache.DistWithCustomHashSlot.HashSlot
+      adapter: Nebulex.Adapters.Partitioned,
+      primary: Nebulex.TestCache.PartitionedWithCustomHashSlot.Primary,
+      hash_slot: Nebulex.TestCache.PartitionedWithCustomHashSlot.HashSlot
 
-    defmodule Local do
+    defmodule Primary do
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.Adapters.Local
@@ -219,8 +219,8 @@ defmodule Nebulex.TestCache do
   :ok =
     Application.put_env(
       :nebulex,
-      Nebulex.TestCache.DistMock,
-      local: Nebulex.TestCache.LocalMock
+      Nebulex.TestCache.PartitionedMock,
+      primary: Nebulex.TestCache.LocalMock
     )
 
   :ok = Application.put_env(:nebulex, Nebulex.TestCache.LocalMock, [])
@@ -277,9 +277,9 @@ defmodule Nebulex.TestCache do
       adapter: Nebulex.TestCache.AdapterMock
   end
 
-  defmodule DistMock do
+  defmodule PartitionedMock do
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Dist
+      adapter: Nebulex.Adapters.Partitioned
   end
 end

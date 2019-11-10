@@ -407,48 +407,48 @@ To get the total number of cached objects:
 Blog.Cache.size()
 ```
 
-## Distributed Cache
+## Partitioned Cache
 
-Nebulex provides the adapter `Nebulex.Adapters.Dist`, which allows to setup a
+Nebulex provides the adapter `Nebulex.Adapters.Partitioned`, which allows to setup a
 partitioned cache topology.
 
-Let's setup our distributed cache by running this command:
+Let's setup our partitioned cache by running this command:
 
 ```
-mix nebulex.gen.cache -c Blog.DistCache -a Nebulex.Adapters.Dist
+mix nebulex.gen.cache -c Blog.PartitionedCache -a Nebulex.Adapters.Partitioned
 ```
 
-This command will generate the configuration required to use our distributed
+This command will generate the configuration required to use our partitioned
 cache; it is defined in `config/config.exs`:
 
 ```elixir
-config :blog, Blog.DistCache,
-  local: :YOUR_LOCAL_CACHE,
-  node_selector: Nebulex.Adapters.Dist
+config :blog, Blog.PartitionedCache,
+  primary: :YOUR_LOCAL_CACHE,
+  node_selector: Nebulex.Adapters.Partitioned
 ```
 
 Replace the `local` config value `:YOUR_LOCAL_CACHE` by an existing local cache
 (e.g.: we can set the local cache we created previously), or create a new
-one (we will create a new one within `Blog.DistCache`).
+one (we will create a new one within `Blog.PartitionedCache`).
 
-The `Blog.DistCache` module is defined in `lib/blog/dist_cache.ex` by our
-`mix nebulex.gen.cache` command:
+The `Blog.PartitionedCache` module is defined in `lib/blog/partitioned_cache.ex`
+by our `mix nebulex.gen.cache` command:
 
 ```elixir
-defmodule Blog.DistCache do
+defmodule Blog.PartitionedCache do
   use Nebulex.Cache,
     otp_app: :blog,
-    adapter: Nebulex.Adapters.Dist
+    adapter: Nebulex.Adapters.Partitioned
 end
 ```
 
 As mentioned previously, let's add the local backend (local cache):
 
 ```elixir
-defmodule Blog.DistCache do
+defmodule Blog.PartitionedCache do
   use Nebulex.Cache,
     otp_app: :blog,
-    adapter: Nebulex.Adapters.Dist
+    adapter: Nebulex.Adapters.Partitioned
 
   defmodule Primary do
     use Nebulex.Cache,
@@ -460,21 +460,21 @@ end
 
 Now we have to add the new local cache to the config, and also replace the
 `local` config value `:YOUR_LOCAL_CACHE` by our new local cache in the
-distributed cache config.
+partitioned cache config.
 
 ```elixir
-# Local backend for the distributed cache
-config :blog, Blog.DistCache.Primary,
+# Local backend for the partitioned cache
+config :blog, Blog.PartitionedCache.Primary,
   gc_interval: 86_400 # 24 hrs
 
-# Distributed Cache
-config :blog, Blog.DistCache,
-  local: Blog.DistCache.Primary,
-  node_selector: Nebulex.Adapters.Dist
+# Partitioned Cache
+config :blog, Blog.PartitionedCache,
+  primary: Blog.PartitionedCache.Primary,
+  node_selector: Nebulex.Adapters.Partitioned
 ```
 
-And remember to setup the `Blog.DistCache` and its local backend
-`Blog.DistCache.Primary` as supervisors within the application's
+And remember to setup the `Blog.PartitionedCache` and its local backend
+`Blog.PartitionedCache.Primary` as supervisors within the application's
 supervision tree (such as we did it previously):
 
 `Elixir < 1.5.0`:
@@ -485,8 +485,8 @@ def start(_type, _args) do
 
   children = [
     supervisor(Blog.Cache, []),            # Previous created local cache
-    supervisor(Blog.DistCache, []),        # Distributed cache
-    supervisor(Blog.DistCache.Primary, []) # Local cache that will be used by the distributed cache
+    supervisor(Blog.PartitionedCache, []),        # Partitioned cache
+    supervisor(Blog.PartitionedCache.Primary, []) # Local cache that will be used by the partitioned cache
   ]
 
   ...
@@ -500,30 +500,30 @@ def start(_type, _args) do
 
   children = [
     Blog.Cache,            # Previous created local cache
-    Blog.DistCache,        # Distributed cache
-    Blog.DistCache.Primary # Local cache that will be used by the distributed cache
+    Blog.PartitionedCache,        # Partitioned cache
+    Blog.PartitionedCache.Primary # Local cache that will be used by the partitioned cache
   ]
 
   ...
 ```
 
-Now we are ready to start using our distributed cache!
+Now we are ready to start using our partitioned cache!
 
 ### Timeout option
 
-The `Nebulex.Adapters.Dist` supports `:timeout` option, it is a value in
+The `Nebulex.Adapters.Partitioned` supports `:timeout` option, it is a value in
 milliseconds for the command that will be executed.
 
 ```elixir
-Blog.DistCache.get("foo", timeout: 10)
+Blog.PartitionedCache.get("foo", timeout: 10)
 
 # if the timeout is exceeded, then the current process will exit
-Blog.DistCache.set("foo", "bar", timeout: 10)
+Blog.PartitionedCache.set("foo", "bar", timeout: 10)
 # ** (EXIT) time out
 ```
 
-To learn more about how distributed cache works, please check
-`Nebulex.Adapters.Dist` documentation, and also it is recommended see the
+To learn more about how partitioned cache works, please check
+`Nebulex.Adapters.Partitioned` documentation, and also it is recommended see the
 [partitioned cache example](https://github.com/cabol/nebulex_examples/tree/master/partitioned_cache)
 
 ## Multilevel Cache
@@ -549,16 +549,16 @@ config :blog, Blog.Multilevel,
 Next step is to set the `levels` config value, with the caches that will be part
 of the caching hierarchy. Let's suppose we want a two levels cache, L1 and L2
 cache, where L1 (first level) is our local cache and L2 (second level) the
-distributed cache. Therefore, the configuration would be like so:
+partitioned cache. Therefore, the configuration would be like so:
 
 ```elixir
 config :blog, Blog.Multilevel,
   cache_model: :inclusive,
-  levels: [Blog.Cache, Blog.DistCache]
+  levels: [Blog.Cache, Blog.PartitionedCache]
 ```
 
-Note that the `Blog.DistCache.Primary` cannot be part of the levels, since it
-is the backend used by `Blog.DistCache` behind scenes.
+Note that the `Blog.PartitionedCache.Primary` cannot be part of the levels, since it
+is the backend used by `Blog.PartitionedCache` behind scenes.
 
 And remember to setup the `Blog.Multilevel` as a supervisor within the
 application's supervision tree (such as we did it previously):
@@ -571,8 +571,8 @@ def start(_type, _args) do
 
   children = [
     supervisor(Blog.Cache, []),             # Previous created local cache
-    supervisor(Blog.DistCache, []),         # Distributed cache
-    supervisor(Blog.DistCache.Primary, []), # Local cache that will be used by the distributed cache
+    supervisor(Blog.PartitionedCache, []),         # Partitioned cache
+    supervisor(Blog.PartitionedCache.Primary, []), # Local cache that will be used by the partitioned cache
     supervisor(Blog.MultilevelCache, [])    # Multilevel cache
   ]
 
@@ -587,8 +587,8 @@ def start(_type, _args) do
 
   children = [
     Blog.Cache,             # Previous created local cache
-    Blog.DistCache,         # Distributed cache
-    Blog.DistCache.Primary, # Local cache that will be used by the distributed cache
+    Blog.PartitionedCache,         # Partitioned cache
+    Blog.PartitionedCache.Primary, # Local cache that will be used by the partitioned cache
     Blog.Multilevel         # Multilevel cache
   ]
 
@@ -597,16 +597,16 @@ def start(_type, _args) do
 
 Let's try it out!
 
-Insert some date into the distributed cache:
+Insert some date into the partitioned cache:
 
 ```elixir
-iex> Blog.DistCache.set("foo", "bar")
+iex> Blog.PartitionedCache.set("foo", "bar")
 "bar"
 
 iex> Blog.Cache.get("foo")
 nil
 
-iex> Blog.DistCache.get("foo")
+iex> Blog.PartitionedCache.get("foo")
 "bar"
 ```
 
@@ -619,7 +619,7 @@ iex> Blog.Multilevel.get("foo")
 iex> Blog.Cache.get("foo")
 "bar"
 
-iex> Blog.DistCache.get("foo")
+iex> Blog.PartitionedCache.get("foo")
 "bar"
 ```
 
