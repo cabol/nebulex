@@ -1,6 +1,6 @@
 # Changelog
 
-## [v1.1.1](https://github.com/cabol/nebulex/tree/v1.1.1) (2019-11-07)
+## [v1.1.1](https://github.com/cabol/nebulex/tree/v1.1.1) (2019-11-11)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v1.1.0...v1.1.1)
 
@@ -16,6 +16,7 @@
 
 **Closed issues:**
 
+- Pre Expire Hook [\#57](https://github.com/cabol/nebulex/issues/57)
 - Add matching option on returned result to Nebulex.Caching [\#55](https://github.com/cabol/nebulex/issues/55)
 - Multi Level with dist not working as expected [\#54](https://github.com/cabol/nebulex/issues/54)
 - Adapter for FoundationDB [\#51](https://github.com/cabol/nebulex/issues/51)
