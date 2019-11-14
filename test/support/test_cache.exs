@@ -232,16 +232,21 @@ defmodule Nebulex.TestCache do
     end
   end
 
+  defmodule Replicated do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Replicated,
+      version_generator: Nebulex.Version.Timestamp,
+      primary: Nebulex.TestCache.Replicated.Primary
+
+    defmodule Primary do
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+    end
+  end
+
   ## Mocks
-
-  :ok =
-    Application.put_env(
-      :nebulex,
-      Nebulex.TestCache.PartitionedMock,
-      primary: Nebulex.TestCache.LocalMock
-    )
-
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.LocalMock, [])
 
   defmodule AdapterMock do
     @behaviour Nebulex.Adapter
@@ -256,7 +261,7 @@ defmodule Nebulex.TestCache do
     def get(_, _, _), do: raise(ArgumentError, "Error")
 
     @impl true
-    def set(_, _, _), do: :timer.sleep(1000)
+    def set(_, _, _), do: Process.sleep(1000)
 
     @impl true
     def delete(_, _, _), do: :ok
@@ -280,24 +285,50 @@ defmodule Nebulex.TestCache do
     def size(_), do: Process.exit(self(), :normal)
 
     @impl true
-    def flush(_), do: :ok
+    def flush(_), do: Process.sleep(2000)
 
     @impl true
-    def get_many(_, _, _), do: :timer.sleep(1000)
+    def get_many(_, _, _), do: Process.sleep(1000)
 
     @impl true
     def set_many(_, _, _), do: Process.exit(self(), :normal)
   end
 
-  defmodule LocalMock do
-    use Nebulex.Cache,
-      otp_app: :nebulex,
-      adapter: Nebulex.TestCache.AdapterMock
-  end
+  :ok =
+    Application.put_env(
+      :nebulex,
+      Nebulex.TestCache.PartitionedMock,
+      primary: Nebulex.TestCache.PartitionedMock.Primary
+    )
 
   defmodule PartitionedMock do
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Partitioned
+
+    defmodule Primary do
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.TestCache.AdapterMock
+    end
+  end
+
+  :ok =
+    Application.put_env(
+      :nebulex,
+      Nebulex.TestCache.ReplicatedMock,
+      primary: Nebulex.TestCache.ReplicatedMock.Primary
+    )
+
+  defmodule ReplicatedMock do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Replicated
+
+    defmodule Primary do
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.TestCache.AdapterMock
+    end
   end
 end

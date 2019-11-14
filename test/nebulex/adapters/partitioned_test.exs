@@ -2,31 +2,27 @@ defmodule Nebulex.Adapters.PartitionedTest do
   use Nebulex.NodeCase
   use Nebulex.CacheTest, cache: Nebulex.TestCache.Partitioned
 
-  alias Nebulex.Adapters.Partitioned.Cluster
+  alias Nebulex.Cache.Cluster
 
   alias Nebulex.TestCache.{
-    LocalMock,
     Partitioned,
     PartitionedMock,
     PartitionedWithCustomHashSlot
   }
 
   alias Nebulex.TestCache.Partitioned.Primary, as: PartitionedPrimary
+  alias Nebulex.TestCache.PartitionedMock.Primary, as: PartitionedMockPrimary
   alias Nebulex.TestCache.PartitionedWithCustomHashSlot.Primary, as: PrimaryWithCustomHashSlot
 
   @primary :"primary@127.0.0.1"
   @cluster :lists.usort([@primary | Application.get_env(:nebulex, :nodes, [])])
 
   setup do
-    {:ok, local} = PartitionedPrimary.start_link()
-    {:ok, partitioned} = Partitioned.start_link()
-    node_pid_list = start_caches(Node.list(), [PartitionedPrimary, Partitioned])
+    node_pid_list = start_caches([node() | Node.list()], [PartitionedPrimary, Partitioned])
     :ok
 
     on_exit(fn ->
       :ok = Process.sleep(100)
-      if Process.alive?(local), do: PartitionedPrimary.stop(local)
-      if Process.alive?(partitioned), do: Partitioned.stop(partitioned)
       stop_caches(node_pid_list)
     end)
   end
@@ -100,7 +96,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
     _ = Process.flag(:trap_exit, true)
 
     {:ok, pid1} = PartitionedMock.start_link()
-    {:ok, pid2} = LocalMock.start_link()
+    {:ok, pid2} = PartitionedMockPrimary.start_link()
 
     assert 0 == map_size(PartitionedMock.get_many([1, 2, 3], timeout: 10))
 

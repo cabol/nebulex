@@ -63,14 +63,14 @@ defmodule Nebulex.Cache.TransactionTest do
       spawn_link(fn ->
         @cache.transaction(
           fn ->
-            :timer.sleep(1100)
+            Process.sleep(1100)
           end,
           keys: [1],
           retries: 1
         )
       end)
 
-      :timer.sleep(200)
+      Process.sleep(200)
 
       assert_raise RuntimeError, "transaction aborted", fn ->
         @cache.transaction(

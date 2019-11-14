@@ -1,9 +1,7 @@
-defmodule Nebulex.Adapters.Partitioned.Cluster do
-  # The module invoked by cache adapters for
-  # distributed caching related functionality.
+defmodule Nebulex.Cache.Cluster do
+  # The module used by cache adapters for
+  # distributed caching functionality.
   @moduledoc false
-
-  use Nebulex.Adapter.HashSlot
 
   @doc """
   Joins the node where `cache`'s supervisor process is running to the
@@ -48,12 +46,10 @@ defmodule Nebulex.Adapters.Partitioned.Cluster do
   Selects only one node based on the `keyslot` computation of the `key`.
   """
   @spec get_node(Nebulex.Cache.t(), Nebulex.Cache.key(), module) :: node
-  def get_node(cache, key, nil) do
-    do_get_node(cache, key, __MODULE__)
-  end
-
   def get_node(cache, key, module) do
-    do_get_node(cache, key, module)
+    nodes = get_nodes(cache)
+    index = module.keyslot(key, length(nodes))
+    Enum.at(nodes, index)
   end
 
   ## Private Functions
@@ -65,10 +61,4 @@ defmodule Nebulex.Adapters.Partitioned.Cluster do
   end
 
   defp namespace(cache), do: {:nebulex, cache}
-
-  def do_get_node(cache, key, module) do
-    nodes = get_nodes(cache)
-    index = module.keyslot(key, length(nodes))
-    Enum.at(nodes, index)
-  end
 end

@@ -1,32 +1,34 @@
 defmodule Nebulex.Adapters.Partitioned do
   @moduledoc """
-  Adapter module for partitioned or partitioned cache.
+  Built-in adapter for partitioned cache topology.
 
-  A partitioned, or partitioned, cache is a clustered, fault-tolerant cache
-  that has linear scalability. Data is partitioned among all the machines
-  of the cluster. For fault-tolerance, partitioned caches can be configured
-  to keep each piece of data on one or more unique machines within a cluster.
-  This adapter in particular hasn't fault-tolerance built-in, each piece of
-  data is kept in a single node/machine (sharding), therefore, if a node fails,
-  the data kept by this node won't be available for the rest of the cluster.
+  A partitioned cache is a clustered, fault-tolerant cache that has linear
+  scalability. Data is partitioned among all the machines of the cluster.
+  For fault-tolerance, partitioned caches can be configured to keep each piece
+  of data on one or more unique machines within a cluster. This adapter
+  in particular hasn't fault-tolerance built-in, each piece of data is kept
+  in a single node/machine (sharding), therefore, if a node fails, the data
+  kept by this node won't be available for the rest of the cluster.
 
-  This adapter depends on a local cache adapter, it adds a thin layer
-  on top of it in order to distribute requests across a group of nodes,
-  where is supposed the local cache is running already.
+  This adapter depends on a local cache adapter (primary storage), it adds
+  a thin layer on top of it in order to distribute requests across a group
+  of nodes, where is supposed the local cache is running already.
 
-  PG2 is used by the adapter to manage the cluster nodes. When the partitioned
-  cache is started in a node, it creates a PG2 group and joins it (the cache
-  supervisor PID is joined to the group). Then, when a function is invoked,
-  the adapter picks a node from the node list (using the PG2 group members),
-  and then the function is executed on that node. In the same way, when the
-  supervisor process of the partitioned cache dies, the PID of that process
-  is automatically removed from the PG2 group; this is why it's recommended
-  to use a partitioned hashing algorithm for the node picker.
+  PG2 is used under-the-hood by the adapter to manage the cluster nodes.
+  When the partitioned cache is started in a node, it creates a PG2 group
+  and joins it (the cache supervisor PID is joined to the group). Then,
+  when a function is invoked, the adapter picks a node from the node list
+  (using the PG2 group members), and then the function is executed on that
+  node. In the same way, when the supervisor process of the partitioned cache
+  dies, the PID of that process is automatically removed from the PG2 group;
+  this is why it's recommended to use a consistent hashing algorithm for the
+  node selector.
 
   ## Features
 
     * Support for partitioned topology (Sharding Distribution Model)
     * Support for transactions via Erlang global name registration facility
+    * Configurable hash-slot module to compute the node
 
   ## Options
 
@@ -37,8 +39,8 @@ defmodule Nebulex.Adapters.Partitioned do
       the data in there. For example, you can set the `Nebulex.Adapters.Local`
       as value, unless you want to provide another one.
 
-    * `:hash_slot` - The module that implements `Nebulex.Adapter.Hash`
-      behaviour. Defaults to `Nebulex.Adapter.Hash.keyslot/2`.
+    * `:hash_slot` - The module that implements `Nebulex.Adapter.HashSlot`
+      behaviour.
 
   ## Runtime options
 
@@ -57,30 +59,30 @@ defmodule Nebulex.Adapters.Partitioned do
 
   ## Example
 
-  `Nebulex.Cache` is the wrapper around the cache. We can define the local
-  and partitioned cache as follows:
-
-      defmodule MyApp.LocalCache do
-        use Nebulex.Cache,
-          otp_app: :my_app,
-          adapter: Nebulex.Adapters.Local
-      end
+  `Nebulex.Cache` is the wrapper around the cache. We can define the
+  partitioned cache as follows:
 
       defmodule MyApp.PartitionedCache do
         use Nebulex.Cache,
           otp_app: :my_app,
           adapter: Nebulex.Adapters.Partitioned
+
+        defmodule Primary do
+          use Nebulex.Cache,
+            otp_app: :my_app,
+            adapter: Nebulex.Adapters.Local
+        end
       end
 
   Where the configuration for the cache must be in your application environment,
   usually defined in your `config/config.exs`:
 
-      config :my_app, MyApp.LocalCache,
+      config :my_app, MyApp.PartitionedCache.Primary,
         n_shards: 2,
         gc_interval: 3600
 
       config :my_app, MyApp.PartitionedCache,
-        primary: MyApp.LocalCache
+        primary: MyApp.PartitionedCache.Primary
 
   For more information about the usage, check out `Nebulex.Cache`.
 
@@ -119,6 +121,9 @@ defmodule Nebulex.Adapters.Partitioned do
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
 
+  # Inherit default keyslot callback
+  use Nebulex.Adapter.HashSlot
+
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Queryable
@@ -131,7 +136,7 @@ defmodule Nebulex.Adapters.Partitioned do
   defmacro __before_compile__(env) do
     otp_app = Module.get_attribute(env.module, :otp_app)
     config = Module.get_attribute(env.module, :config)
-    hash_slot = Keyword.get(config, :hash_slot)
+    hash_slot = Keyword.get(config, :hash_slot, __MODULE__)
     task_supervisor = Module.concat([env.module, TaskSupervisor])
 
     unless primary = Keyword.get(config, :primary) do
@@ -142,7 +147,7 @@ defmodule Nebulex.Adapters.Partitioned do
 
     quote do
       alias Nebulex.Adapters.Local.Generation
-      alias Nebulex.Adapters.Partitioned.Cluster
+      alias Nebulex.Cache.Cluster
 
       def __primary__, do: unquote(primary)
 
@@ -165,6 +170,7 @@ defmodule Nebulex.Adapters.Partitioned do
   def init(opts) do
     cache = Keyword.fetch!(opts, :cache)
     task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
+
     {:ok, [{Task.Supervisor, [name: cache.__task_sup__] ++ task_sup_opts}]}
   end
 

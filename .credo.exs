@@ -16,7 +16,11 @@
 
         ## Refactoring Opportunities
         {Credo.Check.Refactor.LongQuoteBlocks, false},
-        {Credo.Check.Refactor.CyclomaticComplexity, max_complexity: 15}
+        {Credo.Check.Refactor.CyclomaticComplexity, max_complexity: 15},
+
+        ## TODO and FIXME do not cause the build to fail
+        {Credo.Check.Design.TagTODO, exit_status: 0},
+        {Credo.Check.Design.TagFIXME, exit_status: 0}
       ]
     }
   ]

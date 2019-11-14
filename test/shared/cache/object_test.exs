@@ -300,7 +300,7 @@ defmodule Nebulex.Cache.ObjectTest do
       assert "bar" == @cache.set("foo", "bar", ttl: 1)
       assert @cache.has_key?("foo")
 
-      :timer.sleep(2100)
+      Process.sleep(2100)
       refute @cache.has_key?("foo")
     end
 
@@ -460,7 +460,7 @@ defmodule Nebulex.Cache.ObjectTest do
 
       for x <- 3..0 do
         assert x == Object.remaining_ttl(obj)
-        :timer.sleep(1000)
+        Process.sleep(1000)
       end
 
       ttl =
