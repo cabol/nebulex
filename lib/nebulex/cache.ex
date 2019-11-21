@@ -68,7 +68,7 @@ defmodule Nebulex.Cache do
   ## Extended API
 
   Some adapters might extend the API with additional functions, therefore,
-  it is important to check out adapters documentation.
+  it is important to check out adapters' documentation.
   """
 
   @type t :: module
@@ -110,13 +110,13 @@ defmodule Nebulex.Cache do
 
       ## Config and metadata
 
-      @doc false
+      @impl true
       def config do
         {:ok, config} = Nebulex.Cache.Supervisor.runtime_config(__MODULE__, @otp_app, [])
         config
       end
 
-      @doc false
+      @impl true
       def __adapter__, do: @adapter
 
       ## Process lifecycle
@@ -130,12 +130,12 @@ defmodule Nebulex.Cache do
         }
       end
 
-      @doc false
+      @impl true
       def start_link(opts \\ []) do
         Nebulex.Cache.Supervisor.start_link(__MODULE__, @otp_app, @adapter, opts)
       end
 
-      @doc false
+      @impl true
       def stop(pid, timeout \\ 5000) do
         Supervisor.stop(pid, :normal, timeout)
       end
@@ -154,107 +154,107 @@ defmodule Nebulex.Cache do
 
       ## Objects
 
-      @doc false
+      @impl true
       def get(key, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :get, [key, opts])
       end
 
-      @doc false
+      @impl true
       def get!(key, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :get!, [key, opts])
       end
 
-      @doc false
+      @impl true
       def get_many(keys, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :get_many, [keys, opts])
       end
 
-      @doc false
+      @impl true
       def set(key, value, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :set, [key, value, opts])
       end
 
-      @doc false
+      @impl true
       def set_many(entries, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :set_many, [entries, opts])
       end
 
-      @doc false
+      @impl true
       def add(key, value, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :add, [key, value, opts])
       end
 
-      @doc false
+      @impl true
       def add!(key, value, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :add!, [key, value, opts])
       end
 
-      @doc false
+      @impl true
       def replace(key, value, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :replace, [key, value, opts])
       end
 
-      @doc false
+      @impl true
       def replace!(key, value, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :replace!, [key, value, opts])
       end
 
-      @doc false
+      @impl true
       def add_or_replace!(key, value, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :add_or_replace!, [key, value, opts])
       end
 
-      @doc false
+      @impl true
       def delete(key, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :delete, [key, opts])
       end
 
-      @doc false
+      @impl true
       def take(key, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :take, [key, opts])
       end
 
-      @doc false
+      @impl true
       def take!(key, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :take!, [key, opts])
       end
 
-      @doc false
+      @impl true
       def has_key?(key) do
         with_hooks(Nebulex.Cache.Object, :has_key?, [key])
       end
 
-      @doc false
+      @impl true
       def object_info(key, attr) do
         with_hooks(Nebulex.Cache.Object, :object_info, [key, attr])
       end
 
-      @doc false
+      @impl true
       def expire(key, ttl) do
         with_hooks(Nebulex.Cache.Object, :expire, [key, ttl])
       end
 
-      @doc false
+      @impl true
       def get_and_update(key, fun, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :get_and_update, [key, fun, opts])
       end
 
-      @doc false
+      @impl true
       def update(key, initial, fun, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :update, [key, initial, fun, opts])
       end
 
-      @doc false
+      @impl true
       def update_counter(key, incr \\ 1, opts \\ []) do
         with_hooks(Nebulex.Cache.Object, :update_counter, [key, incr, opts])
       end
 
-      @doc false
+      @impl true
       def size do
         with_hooks(@adapter, :size)
       end
 
-      @doc false
+      @impl true
       def flush do
         with_hooks(@adapter, :flush)
       end
@@ -262,26 +262,40 @@ defmodule Nebulex.Cache do
       ## Queryable
 
       if Nebulex.Adapter.Queryable in behaviours do
-        @doc false
+        @impl true
         def all(query \\ nil, opts \\ []) do
           with_hooks(Nebulex.Cache.Queryable, :all, [query, opts])
         end
 
-        @doc false
+        @impl true
         def stream(query \\ nil, opts \\ []) do
           with_hooks(Nebulex.Cache.Queryable, :stream, [query, opts])
+        end
+      end
+
+      ## Persistence
+
+      if Nebulex.Adapter.Persistence in behaviours do
+        @impl true
+        def dump(path, opts \\ []) do
+          with_hooks(Nebulex.Cache.Persistence, :dump, [path, opts])
+        end
+
+        @impl true
+        def load(path, opts \\ []) do
+          with_hooks(Nebulex.Cache.Persistence, :load, [path, opts])
         end
       end
 
       ## Transactions
 
       if Nebulex.Adapter.Transaction in behaviours do
-        @doc false
+        @impl true
         def transaction(fun, opts \\ []) do
           with_hooks(Nebulex.Cache.Transaction, :transaction, [fun, opts])
         end
 
-        @doc false
+        @impl true
         def in_transaction? do
           with_hooks(Nebulex.Cache.Transaction, :in_transaction?)
         end
@@ -289,10 +303,10 @@ defmodule Nebulex.Cache do
 
       ## Hooks
 
-      @doc false
+      @impl true
       def pre_hooks, do: {:async, []}
 
-      @doc false
+      @impl true
       def post_hooks, do: {:async, []}
 
       defoverridable pre_hooks: 0, post_hooks: 0
@@ -329,9 +343,16 @@ defmodule Nebulex.Cache do
     end
   end
 
-  ## Nebulex.Adapter
+  ## User callbacks
 
   @optional_callbacks init: 1
+
+  @doc """
+  A callback executed when the cache starts or when configuration is read.
+  """
+  @callback init(config :: Keyword.t()) :: {:ok, Keyword.t()} | :ignore
+
+  ## Nebulex.Adapter
 
   @doc """
   Returns the adapter tied to the cache.
@@ -361,11 +382,6 @@ defmodule Nebulex.Cache do
               {:ok, pid}
               | {:error, {:already_started, pid}}
               | {:error, term}
-
-  @doc """
-  A callback executed when the cache starts or when configuration is read.
-  """
-  @callback init(config :: Keyword.t()) :: {:ok, Keyword.t()} | :ignore
 
   @doc """
   Shuts down the cache represented by the given pid.
@@ -822,7 +838,7 @@ defmodule Nebulex.Cache do
       iex> MyCache.object_info(:a, :version)
       nil
   """
-  @callback object_info(key, attr :: :ttl | :version) :: any | nil
+  @callback object_info(key, attr :: :ttl | :version) :: term | nil
 
   @doc """
   Returns the expiry timestamp for the given `key`, if the timeout `ttl`
@@ -1063,9 +1079,9 @@ defmodule Nebulex.Cache do
       iex> MyCache.all(spec)
       [{3, 6}, {4, 8}, {5, 10}]
 
-  To learn more, check out adapters documentation.
+  To learn more, check out adapters' documentation.
   """
-  @callback all(query :: nil | any, opts) :: [any]
+  @callback all(query :: term | nil, opts) :: [any]
 
   @doc """
   Similar to `all/2` but returns a lazy enumerable that emits all entries
@@ -1121,9 +1137,73 @@ defmodule Nebulex.Cache do
       iex> spec |> MyCache.stream(page_size: 3) |> Enum.to_list()
       [{3, 6}, {4, 8}, {5, 10}]
 
-  To learn more, check out adapters documentation.
+  To learn more, check out adapters' documentation.
   """
-  @callback stream(query :: nil | any, opts) :: Enum.t()
+  @callback stream(query :: term | nil, opts) :: Enum.t()
+
+  ## Nebulex.Adapter.Persistence
+
+  @optional_callbacks dump: 2, load: 2
+
+  @doc """
+  Dumps a cache to the given file `path`.
+
+  Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
+
+  ## Options
+
+  This operation relies entirely on the adapter implementation, which means the
+  options depend on each of them. For that reason, it is recommended to check
+  the documentation of the adapter to be used. The built-in adapters inherit
+  the default implementation from `Nebulex.Adapter.Persistence`, so check out
+  the available options there.
+
+  ## Examples
+
+      # set some entries
+      iex> entries = for x <- 1..10, into: %{}, do: {x, x}
+      iex> MyCache.set_many(entries)
+      :ok
+
+      # dump cache to a file
+      iex> MyCache.dump("my_cache")
+      :ok
+
+  To learn more, check out adapters' documentation.
+  """
+  @callback dump(path :: Path.t(), opts) :: :ok | {:error, term}
+
+  @doc """
+  Loads a dumped cache from the given `path`.
+
+  Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
+
+  ## Options
+
+  Similar to `dump/2`, this operation relies entirely on the adapter
+  implementation, therefore, it is recommended to check the documentation
+  of the adapter to be used. Similarly, the built-in adapters inherit the
+  default implementation from `Nebulex.Adapter.Persistence`, so check out
+  the available options there.
+
+  ## Examples
+
+      # set some entries
+      iex> entries = for x <- 1..10, into: %{}, do: {x, x}
+      iex> MyCache.set_many(entries)
+      :ok
+
+      # dump cache to a file
+      iex> MyCache.dump("my_cache")
+      :ok
+
+      # load the cache from a file
+      iex> MyCache.load("my_cache")
+      :ok
+
+  To learn more, check out adapters' documentation.
+  """
+  @callback load(path :: Path.t(), opts) :: :ok | {:error, term}
 
   ## Nebulex.Adapter.Transaction
 
@@ -1155,7 +1235,7 @@ defmodule Nebulex.Cache do
         MyCache.set(:bob, %{bob | balance: bob.balance + 100})
       end, keys: [:alice, :bob]
   """
-  @callback transaction(function :: fun, opts) :: any
+  @callback transaction(function :: fun, opts) :: term
 
   @doc """
   Returns `true` if the current process is inside a transaction.

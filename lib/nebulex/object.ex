@@ -43,7 +43,7 @@ defmodule Nebulex.Object do
 
   def remaining_ttl(expire_at) when is_integer(expire_at) do
     remaining = expire_at - ts()
-    if remaining >= 0, do: remaining, else: 0
+    if remaining > 0, do: remaining, else: 0
   end
 
   @doc """
@@ -57,5 +57,30 @@ defmodule Nebulex.Object do
   @spec ts(datetime :: Calendar.datetime()) :: integer()
   def ts(datetime \\ DateTime.utc_now()) do
     DateTime.to_unix(datetime)
+  end
+
+  @doc """
+  Returns whether the given `object` has expired or not.
+
+  ## Example
+
+      iex> Nebulex.Object.expired?(%Nebulex.Object{})
+      false
+  """
+  @spec expired?(Nebulex.Object.t()) :: boolean
+  def expired?(%Nebulex.Object{expire_at: expire_at}) do
+    remaining_ttl(expire_at) <= 0
+  end
+
+  def encode(data, opts \\ []) do
+    data
+    |> :erlang.term_to_binary(opts)
+    |> Base.url_encode64()
+  end
+
+  def decode(data, opts \\ []) when is_binary(data) do
+    data
+    |> Base.url_decode64!()
+    |> :erlang.binary_to_term(opts)
   end
 end

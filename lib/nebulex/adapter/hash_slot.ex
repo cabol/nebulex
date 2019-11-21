@@ -29,7 +29,7 @@ defmodule Nebulex.Adapter.HashSlot do
     quote do
       @behaviour Nebulex.Adapter.HashSlot
 
-      @doc false
+      @impl true
       defdelegate keyslot(key, range), to: :erlang, as: :phash2
 
       defoverridable keyslot: 2

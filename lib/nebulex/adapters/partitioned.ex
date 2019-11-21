@@ -121,6 +121,9 @@ defmodule Nebulex.Adapters.Partitioned do
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
 
+  # Inherit default persistence implementation
+  use Nebulex.Adapter.Persistence
+
   # Inherit default keyslot callback
   use Nebulex.Adapter.HashSlot
 

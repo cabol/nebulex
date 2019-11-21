@@ -108,6 +108,9 @@ defmodule Nebulex.Adapters.Replicated do
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
 
+  # Inherit default persistence implementation
+  use Nebulex.Adapter.Persistence
+
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Queryable
@@ -131,6 +134,7 @@ defmodule Nebulex.Adapters.Replicated do
     quote do
       alias Nebulex.Adapters.Local.Generation
       alias Nebulex.Cache.Cluster
+      alias Nebulex.Object
 
       def __primary__, do: unquote(primary)
 
@@ -166,8 +170,8 @@ defmodule Nebulex.Adapters.Replicated do
       defp stream_entries(node, acc) do
         stream_fun = fn ->
           nil
-          |> __MODULE__.stream(return: :object, page_size: 100)
-          |> Enum.to_list()
+          |> __MODULE__.stream(return: :object, page_size: 10)
+          |> Enum.filter(&(not Object.expired?(&1)))
         end
 
         case :rpc.call(node, Kernel, :apply, [stream_fun, []]) do

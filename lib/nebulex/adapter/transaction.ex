@@ -53,7 +53,7 @@ defmodule Nebulex.Adapter.Transaction do
     quote do
       @behaviour Nebulex.Adapter.Transaction
 
-      @doc false
+      @impl true
       def transaction(cache, fun, opts) do
         keys = Keyword.get(opts, :keys, [])
         nodes = Keyword.get(opts, :nodes, get_nodes(cache))
@@ -62,7 +62,7 @@ defmodule Nebulex.Adapter.Transaction do
         do_transaction(cache, keys, nodes, retries, fun)
       end
 
-      @doc false
+      @impl true
       def in_transaction?(cache) do
         if Process.get({cache, self()}), do: true, else: false
       end
