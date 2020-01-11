@@ -64,15 +64,15 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
     end
   end
 
-  test "generates a new distributed cache" do
+  test "generates a new partitioned cache" do
     in_tmp(fn _ ->
-      run(["-c", "Cache", "-a", "Nebulex.Adapters.Dist"])
+      run(["-c", "Cache", "-a", "Nebulex.Adapters.Partitioned"])
 
       assert_file("lib/cache.ex", """
       defmodule Cache do
         use Nebulex.Cache,
           otp_app: :nebulex,
-          adapter: Nebulex.Adapters.Dist
+          adapter: Nebulex.Adapters.Partitioned
       end
       """)
 
@@ -80,7 +80,7 @@ defmodule Mix.Tasks.Nebulex.Gen.CacheTest do
       use Mix.Config
 
       config :nebulex, Cache,
-        local: :YOUR_LOCAL_CACHE
+        primary: :YOUR_LOCAL_CACHE
       """)
     end)
   end

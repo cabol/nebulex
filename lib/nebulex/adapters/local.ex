@@ -126,6 +126,9 @@ defmodule Nebulex.Adapters.Local do
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
 
+  # Inherit default persistence implementation
+  use Nebulex.Adapter.Persistence
+
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Queryable

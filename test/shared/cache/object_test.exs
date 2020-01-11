@@ -3,7 +3,7 @@ defmodule Nebulex.Cache.ObjectTest do
 
   deftests do
     alias Nebulex.Object
-    alias Nebulex.TestCache.Dist
+    alias Nebulex.TestCache.Partitioned
 
     ## Objects
 
@@ -300,7 +300,7 @@ defmodule Nebulex.Cache.ObjectTest do
       assert "bar" == @cache.set("foo", "bar", ttl: 1)
       assert @cache.has_key?("foo")
 
-      :timer.sleep(2100)
+      Process.sleep(2100)
       refute @cache.has_key?("foo")
     end
 
@@ -460,7 +460,7 @@ defmodule Nebulex.Cache.ObjectTest do
 
       for x <- 3..0 do
         assert x == Object.remaining_ttl(obj)
-        :timer.sleep(1000)
+        Process.sleep(1000)
       end
 
       ttl =
@@ -481,7 +481,7 @@ defmodule Nebulex.Cache.ObjectTest do
 
       :ok = Process.sleep(500)
 
-      assert {1, 2} == @cache.get_and_update(1, &Dist.get_and_update_fun/1)
+      assert {1, 2} == @cache.get_and_update(1, &Partitioned.get_and_update_fun/1)
       refute @cache.get(1, return: :object).expire_at
 
       :ok = Process.sleep(2000)

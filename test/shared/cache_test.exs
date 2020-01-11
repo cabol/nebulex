@@ -10,6 +10,7 @@ defmodule Nebulex.CacheTest do
       use Nebulex.Cache.ObjectTest, cache: @cache
       use Nebulex.Cache.QueryableTest, cache: @cache
       use Nebulex.Cache.TransactionTest, cache: @cache
+      use Nebulex.Cache.PersistenceTest, cache: @cache
     end
   end
 end

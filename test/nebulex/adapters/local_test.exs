@@ -96,7 +96,7 @@ defmodule Nebulex.Adapters.LocalTest do
     assert 10 == TestCache.update(:counter, 1, &(&1 * 2))
     assert 0 == TestCache.update_counter(:counter, -10)
 
-    TestCache.set("foo", "bar")
+    assert "bar" == TestCache.set("foo", "bar")
 
     assert_raise ArgumentError, fn ->
       TestCache.update_counter("foo")
@@ -135,7 +135,7 @@ defmodule Nebulex.Adapters.LocalTest do
 
   test "all and stream using match_spec queries" do
     values = for x <- 1..5, do: TestCache.set(x, x * 2)
-    TestCache.new_generation()
+    _ = TestCache.new_generation()
     values = values ++ for x <- 6..10, do: TestCache.set(x, x * 2)
 
     assert values ==
@@ -174,7 +174,7 @@ defmodule Nebulex.Adapters.LocalTest do
       assert all == all_or_stream(action, :all_unexpired, opts)
       assert [] == all_or_stream(action, :all_expired, opts)
 
-      :timer.sleep(4100)
+      :ok = Process.sleep(4100)
 
       assert unexpired == all_or_stream(action, :all_unexpired, opts)
       assert expired == all_or_stream(action, :all_expired, opts)
@@ -188,7 +188,7 @@ defmodule Nebulex.Adapters.LocalTest do
     refute object.expire_at
 
     assert object == TestCache.get("foo", return: :object)
-    TestCache.new_generation()
+    _ = TestCache.new_generation()
     assert object == TestCache.get("foo", return: :object)
   end
 
@@ -207,7 +207,7 @@ defmodule Nebulex.Adapters.LocalTest do
     refute TestCache.get(:non_existent)
 
     # create a new generation
-    TestCache.new_generation()
+    _ = TestCache.new_generation()
 
     # both entries should be in the old generation
     refute get_from_new(1)
@@ -223,7 +223,7 @@ defmodule Nebulex.Adapters.LocalTest do
     assert 2 == get_from_old(2).value
 
     # create a new generation, the old generation should be deleted
-    TestCache.new_generation()
+    _ = TestCache.new_generation()
 
     # entry 1 should be into the old generation and entry 2 deleted
     refute get_from_new(1)
@@ -236,13 +236,13 @@ defmodule Nebulex.Adapters.LocalTest do
     assert 1 == TestCache.set(1, 1, ttl: 2)
     assert 1 == TestCache.get(1)
 
-    TestCache.new_generation()
+    _ = TestCache.new_generation()
 
     refute get_from_new(1)
     assert 1 == get_from_old(1).value
     assert 1 == TestCache.get(1)
 
-    :timer.sleep(2010)
+    :ok = Process.sleep(2010)
 
     refute TestCache.get(1)
     refute get_from_new(1)

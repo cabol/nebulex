@@ -35,7 +35,7 @@ defmodule Nebulex.Object.Version do
   This function is used by cache's adapters which implement
   optimistic locking via object's version.
 
-  For more information, check out adapters implementation.
+  For more information, check out adapters' implementation.
   """
   @spec validate(
           object_or_key :: object | Nebulex.Cache.key(),

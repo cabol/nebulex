@@ -1,44 +1,46 @@
-defmodule Nebulex.Adapters.Dist do
+defmodule Nebulex.Adapters.Partitioned do
   @moduledoc """
-  Adapter module for distributed or partitioned cache.
+  Built-in adapter for partitioned cache topology.
 
-  A distributed, or partitioned, cache is a clustered, fault-tolerant cache
-  that has linear scalability. Data is partitioned among all the machines
-  of the cluster. For fault-tolerance, partitioned caches can be configured
-  to keep each piece of data on one or more unique machines within a cluster.
-  This adapter in particular hasn't fault-tolerance built-in, each piece of
-  data is kept in a single node/machine (sharding), therefore, if a node fails,
-  the data kept by this node won't be available for the rest of the cluster.
+  A partitioned cache is a clustered, fault-tolerant cache that has linear
+  scalability. Data is partitioned among all the machines of the cluster.
+  For fault-tolerance, partitioned caches can be configured to keep each piece
+  of data on one or more unique machines within a cluster. This adapter
+  in particular hasn't fault-tolerance built-in, each piece of data is kept
+  in a single node/machine (sharding), therefore, if a node fails, the data
+  kept by this node won't be available for the rest of the cluster.
 
-  This adapter depends on a local cache adapter, it adds a thin layer
-  on top of it in order to distribute requests across a group of nodes,
-  where is supposed the local cache is running already.
+  This adapter depends on a local cache adapter (primary storage), it adds
+  a thin layer on top of it in order to distribute requests across a group
+  of nodes, where is supposed the local cache is running already.
 
-  PG2 is used by the adapter to manage the cluster nodes. When the distributed
-  cache is started in a node, it creates a PG2 group and joins it (the cache
-  supervisor PID is joined to the group). Then, when a function is invoked,
-  the adapter picks a node from the node list (using the PG2 group members),
-  and then the function is executed on that node. In the same way, when the
-  supervisor process of the distributed cache dies, the PID of that process
-  is automatically removed from the PG2 group; this is why it's recommended
-  to use a distributed hashing algorithm for the node picker.
+  PG2 is used under-the-hood by the adapter to manage the cluster nodes.
+  When the partitioned cache is started in a node, it creates a PG2 group
+  and joins it (the cache supervisor PID is joined to the group). Then,
+  when a function is invoked, the adapter picks a node from the node list
+  (using the PG2 group members), and then the function is executed on that
+  node. In the same way, when the supervisor process of the partitioned cache
+  dies, the PID of that process is automatically removed from the PG2 group;
+  this is why it's recommended to use a consistent hashing algorithm for the
+  node selector.
 
   ## Features
 
-    * Support for Distributed Cache
-    * Support for Sharding; handled by `Nebulex.Adapter.NodeSelector`
+    * Support for partitioned topology (Sharding Distribution Model)
     * Support for transactions via Erlang global name registration facility
+    * Configurable hash-slot module to compute the node
 
   ## Options
 
   These options can be set through the config file:
 
-    * `:local` - The Local Cache module. The value to this option should be
-      `Nebulex.Adapters.Local`, unless you want to provide a custom local
-      cache adapter.
+    * `:primary` - The module for the primary storage. The value must be a
+      valid local cache adapter so that the partitioned adapter can store
+      the data in there. For example, you can set the `Nebulex.Adapters.Local`
+      as value, unless you want to provide another one.
 
-    * `:hash_slot` - The module that implements `Nebulex.Adapter.Hash`
-      behaviour. Defaults to `Nebulex.Adapter.Hash.keyslot/2`.
+    * `:hash_slot` - The module that implements `Nebulex.Adapter.HashSlot`
+      behaviour.
 
   ## Runtime options
 
@@ -57,30 +59,30 @@ defmodule Nebulex.Adapters.Dist do
 
   ## Example
 
-  `Nebulex.Cache` is the wrapper around the cache. We can define the local
-  and distributed cache as follows:
+  `Nebulex.Cache` is the wrapper around the cache. We can define the
+  partitioned cache as follows:
 
-      defmodule MyApp.LocalCache do
+      defmodule MyApp.PartitionedCache do
         use Nebulex.Cache,
           otp_app: :my_app,
-          adapter: Nebulex.Adapters.Local
-      end
+          adapter: Nebulex.Adapters.Partitioned
 
-      defmodule MyApp.DistCache do
-        use Nebulex.Cache,
-          otp_app: :my_app,
-          adapter: Nebulex.Adapters.Dist
+        defmodule Primary do
+          use Nebulex.Cache,
+            otp_app: :my_app,
+            adapter: Nebulex.Adapters.Local
+        end
       end
 
   Where the configuration for the cache must be in your application environment,
   usually defined in your `config/config.exs`:
 
-      config :my_app, MyApp.LocalCache,
+      config :my_app, MyApp.PartitionedCache.Primary,
         n_shards: 2,
         gc_interval: 3600
 
-      config :my_app, MyApp.DistCache,
-        local: MyApp.LocalCache
+      config :my_app, MyApp.PartitionedCache,
+        primary: MyApp.PartitionedCache.Primary
 
   For more information about the usage, check out `Nebulex.Cache`.
 
@@ -88,7 +90,7 @@ defmodule Nebulex.Adapters.Dist do
 
   This adapter provides some additional functions to the `Nebulex.Cache` API.
 
-  ### `__local__`
+  ### `__primary__`
 
   Returns the local cache adapter (the local backend).
 
@@ -119,6 +121,12 @@ defmodule Nebulex.Adapters.Dist do
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
 
+  # Inherit default persistence implementation
+  use Nebulex.Adapter.Persistence
+
+  # Inherit default keyslot callback
+  use Nebulex.Adapter.HashSlot
+
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Queryable
@@ -131,20 +139,20 @@ defmodule Nebulex.Adapters.Dist do
   defmacro __before_compile__(env) do
     otp_app = Module.get_attribute(env.module, :otp_app)
     config = Module.get_attribute(env.module, :config)
-    hash_slot = Keyword.get(config, :hash_slot)
+    hash_slot = Keyword.get(config, :hash_slot, __MODULE__)
     task_supervisor = Module.concat([env.module, TaskSupervisor])
 
-    unless local = Keyword.get(config, :local) do
+    unless primary = Keyword.get(config, :primary) do
       raise ArgumentError,
-            "missing :local configuration in " <>
+            "missing :primary configuration in " <>
               "config #{inspect(otp_app)}, #{inspect(env.module)}"
     end
 
     quote do
-      alias Nebulex.Adapters.Dist.Cluster
       alias Nebulex.Adapters.Local.Generation
+      alias Nebulex.Cache.Cluster
 
-      def __local__, do: unquote(local)
+      def __primary__, do: unquote(primary)
 
       def __task_sup__, do: unquote(task_supervisor)
 
@@ -165,6 +173,7 @@ defmodule Nebulex.Adapters.Dist do
   def init(opts) do
     cache = Keyword.fetch!(opts, :cache)
     task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
+
     {:ok, [{Task.Supervisor, [name: cache.__task_sup__] ++ task_sup_opts}]}
   end
 
@@ -256,9 +265,9 @@ defmodule Nebulex.Adapters.Dist do
     cache.__task_sup__
     |> RPC.multi_call(
       cache.__nodes__,
-      cache.__local__.__adapter__,
+      cache.__primary__.__adapter__,
       :size,
-      [cache.__local__]
+      [cache.__primary__]
     )
     |> handle_rpc_multi_call(:size, &Enum.sum/1)
   end
@@ -269,9 +278,9 @@ defmodule Nebulex.Adapters.Dist do
       RPC.multi_call(
         cache.__task_sup__,
         cache.__nodes__,
-        cache.__local__.__adapter__,
+        cache.__primary__.__adapter__,
         :flush,
-        [cache.__local__]
+        [cache.__primary__]
       )
 
     :ok
@@ -284,9 +293,9 @@ defmodule Nebulex.Adapters.Dist do
     cache.__task_sup__
     |> RPC.multi_call(
       cache.__nodes__,
-      cache.__local__.__adapter__,
+      cache.__primary__.__adapter__,
       :all,
-      [cache.__local__, query, opts],
+      [cache.__primary__, query, opts],
       opts
     )
     |> handle_rpc_multi_call(:all, &List.flatten/1)
@@ -323,8 +332,8 @@ defmodule Nebulex.Adapters.Dist do
   Helper to perform `stream/3` locally.
   """
   def eval_local_stream(cache, query, opts) do
-    cache.__local__
-    |> cache.__local__.__adapter__.stream(query, opts)
+    cache.__primary__
+    |> cache.__primary__.__adapter__.stream(query, opts)
     |> Enum.to_list()
   end
 
@@ -340,9 +349,9 @@ defmodule Nebulex.Adapters.Dist do
     rpc_call(
       cache.__task_sup__,
       node,
-      cache.__local__.__adapter__,
+      cache.__primary__.__adapter__,
       fun,
-      [cache.__local__ | args],
+      [cache.__primary__ | args],
       opts
     )
   end
@@ -380,7 +389,7 @@ defmodule Nebulex.Adapters.Dist do
       enum
       |> group_keys_by_node(cache)
       |> Enum.map(fn {node, group} ->
-        {node, {cache.__local__.__adapter__, action, [cache.__local__, group, opts]}}
+        {node, {cache.__primary__.__adapter__, action, [cache.__primary__, group, opts]}}
       end)
 
     RPC.multi_call(cache.__task_sup__, groups, opts)

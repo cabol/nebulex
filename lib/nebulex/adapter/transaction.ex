@@ -53,16 +53,16 @@ defmodule Nebulex.Adapter.Transaction do
     quote do
       @behaviour Nebulex.Adapter.Transaction
 
-      @doc false
+      @impl true
       def transaction(cache, fun, opts) do
-        keys = opts[:keys]
-        nodes = opts[:nodes] || [node() | Node.list()]
-        retries = opts[:retries] || :infinity
+        keys = Keyword.get(opts, :keys, [])
+        nodes = Keyword.get(opts, :nodes, get_nodes(cache))
+        retries = Keyword.get(opts, :retries, :infinity)
 
         do_transaction(cache, keys, nodes, retries, fun)
       end
 
-      @doc false
+      @impl true
       def in_transaction?(cache) do
         if Process.get({cache, self()}), do: true, else: false
       end
@@ -125,12 +125,20 @@ defmodule Nebulex.Adapter.Transaction do
         end)
       end
 
-      defp lock_ids(cache, nil) do
+      defp lock_ids(cache, []) do
         [{cache, self()}]
       end
 
       defp lock_ids(cache, keys) do
         for key <- keys, do: {{cache, key}, self()}
+      end
+
+      defp get_nodes(cache) do
+        if function_exported?(cache, :__nodes__, 0) do
+          cache.__nodes__
+        else
+          [node() | Node.list()]
+        end
       end
     end
   end

@@ -112,7 +112,7 @@ defmodule Nebulex.Adapter do
 
   See `c:Nebulex.Cache.object_info/2`.
   """
-  @callback object_info(cache, key, attr :: :ttl | :version) :: any | nil
+  @callback object_info(cache, key, attr :: :ttl | :version) :: term | nil
 
   @doc """
   Returns the expiry timestamp for the given `key`, if the timeout `ttl`
