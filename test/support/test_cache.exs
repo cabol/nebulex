@@ -56,6 +56,8 @@ defmodule Nebulex.TestCache do
       version_generator: Nebulex.Version.Timestamp
   end
 
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Versionless, compressed: true)
+
   defmodule Versionless do
     use Nebulex.Cache,
       otp_app: :nebulex,

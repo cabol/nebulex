@@ -24,14 +24,14 @@ Enum.each(required_files, fn {file, loaded} ->
 end)
 
 alias Nebulex.NodeCase
-alias Nebulex.TestCache.{Dist, Local}
-alias Nebulex.TestCache.Dist.Local, as: DistLocal
+alias Nebulex.TestCache.{Local, Partitioned}
+alias Nebulex.TestCache.Partitioned.Primary
 
 # start caches
 {:ok, local} = Local.start_link()
-{:ok, primary} = DistLocal.start_link()
-{:ok, dist} = Dist.start_link()
-node_pid_list = NodeCase.start_caches(Node.list(), [DistLocal, Dist])
+{:ok, primary} = Primary.start_link()
+{:ok, dist} = Partitioned.start_link()
+node_pid_list = NodeCase.start_caches(Node.list(), [Primary, Partitioned])
 
 # samples
 keys = Enum.to_list(1..10_000)
@@ -40,12 +40,12 @@ bulk = for x <- 1..100, do: {x, x}
 # init caches
 Enum.each(1..5000, fn x ->
   Local.set(x, x)
-  Dist.set(x, x)
+  Partitioned.set(x, x)
 end)
 
 inputs = %{
   "Generational Local Cache" => Local,
-  "Distributed Cache" => Dist
+  "Partitioned Cache" => Partitioned
 }
 
 benchmarks = %{
@@ -89,7 +89,7 @@ benchmarks = %{
     cache.expire(random, 1)
   end,
   "get_and_update" => fn {cache, random} ->
-    cache.get_and_update(random, &Dist.get_and_update_fun/1)
+    cache.get_and_update(random, &Partitioned.get_and_update_fun/1)
   end,
   "update" => fn {cache, random} ->
     cache.update(random, 1, &Kernel.+(&1, 1))
@@ -128,6 +128,6 @@ Benchee.run(
 
 # stop caches s
 if Process.alive?(local), do: Local.stop(local)
-if Process.alive?(primary), do: DistLocal.stop(primary)
-if Process.alive?(dist), do: Dist.stop(dist)
+if Process.alive?(primary), do: Primary.stop(primary)
+if Process.alive?(dist), do: Partitioned.stop(dist)
 NodeCase.stop_caches(node_pid_list)

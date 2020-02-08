@@ -20,16 +20,22 @@ defmodule Nebulex.Adapters.Local do
 
   These options can be set through the config file:
 
-    * `:n_shards` - The number of partitions for each Cache generation table.
-      Defaults to `:erlang.system_info(:schedulers_online)`.
-
     * `:n_generations` - Max number of Cache generations, defaults to `2`.
 
+    * `:n_shards` - The number of partitions for each Cache generation table.
+      Defaults to `System.schedulers_online()`. See `:shards.new/2`.
+
     * `:read_concurrency` - Indicates whether the tables that `:shards`
-      creates uses `:read_concurrency` or not (default: true).
+      creates uses `:read_concurrency` or not (default: `true`).
+      See `:ets.new/2`.
 
     * `:write_concurrency` - Indicates whether the tables that `:shards`
-      creates uses `:write_concurrency` or not (default: true).
+      creates uses `:write_concurrency` or not (default: `true`).
+      See `:ets.new/2`.
+
+    * `:compressed` - If this option is present, the table data is stored in a
+      more compact format to consume less memory. However, it will make table
+      operations slower (default: `false`). See `:ets.new/2`.
 
     * `:gc_interval` - Interval time in seconds to garbage collection to run,
       delete the oldest generation and create a new one. If this option is
@@ -143,11 +149,23 @@ defmodule Nebulex.Adapters.Local do
   defmacro __before_compile__(env) do
     cache = env.module
     config = Module.get_attribute(cache, :config)
-    n_shards = Keyword.get(config, :n_shards, System.schedulers_online())
-    r_concurrency = Keyword.get(config, :read_concurrency, true)
-    w_concurrency = Keyword.get(config, :write_concurrency, true)
     allocated_memory = Keyword.get(config, :allocated_memory)
+    n_shards = Keyword.get(config, :n_shards, System.schedulers_online())
     shards_sup_name = Module.concat([cache, ShardsSupervisor])
+
+    shards_state =
+      n_shards
+      |> :shards_state.new(:shards_local, shards_sup_name)
+      |> Macro.escape()
+
+    tab_opts = [
+      :set,
+      {:sup_name, shards_sup_name},
+      {:n_shards, n_shards},
+      {:read_concurrency, Keyword.get(config, :read_concurrency, true)},
+      {:write_concurrency, Keyword.get(config, :write_concurrency, true)}
+      | if(Keyword.get(config, :compressed), do: [:compressed], else: [])
+    ]
 
     quote do
       alias Nebulex.Adapters.Local.Generation
@@ -155,18 +173,11 @@ defmodule Nebulex.Adapters.Local do
 
       def __metadata__, do: Metadata.get(__MODULE__)
 
-      def __state__, do: :shards_state.new(unquote(n_shards))
+      def __state__, do: unquote(shards_state)
 
       def __shards_sup_name__, do: unquote(shards_sup_name)
 
-      def __tab_opts__ do
-        [
-          n_shards: unquote(n_shards),
-          sup_name: unquote(shards_sup_name),
-          read_concurrency: unquote(r_concurrency),
-          write_concurrency: unquote(w_concurrency)
-        ]
-      end
+      def __tab_opts__, do: unquote(tab_opts)
 
       def new_generation(opts \\ []) do
         Generation.new(__MODULE__, opts)
