@@ -18,11 +18,20 @@ defmodule Nebulex.Cache.SupervisorTest do
     end)
   end
 
+  test "fail on compile_config because missing otp_app" do
+    opts = [:nebulex, n_shards: 2, adapter: TestAdapter]
+    :ok = Application.put_env(:nebulex, MyCache, opts)
+
+    assert_raise ArgumentError, "expected otp_app: to be given as argument", fn ->
+      Nebulex.Cache.Supervisor.compile_config(MyCache, opts)
+    end
+  end
+
   test "fail on compile_config because missing adapter" do
     opts = [otp_app: :nebulex, n_shards: 2]
     :ok = Application.put_env(:nebulex, MyCache, opts)
 
-    assert_raise ArgumentError, "missing :adapter option on use Nebulex.Cache", fn ->
+    assert_raise ArgumentError, "expected adapter: to be given as argument", fn ->
       Nebulex.Cache.Supervisor.compile_config(MyCache, opts)
     end
   end

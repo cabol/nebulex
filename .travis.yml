@@ -3,7 +3,7 @@ elixir:
   - 1.9
   - 1.8
 otp_release:
-  - 22.1
+  - 22.2
   - 21.3
   - 20.3
 sudo: false

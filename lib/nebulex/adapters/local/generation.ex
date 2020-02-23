@@ -187,7 +187,12 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   def handle_call(:flush, _from, %State{cache: cache} = state) do
-    :ok = Enum.each(cache.__metadata__.generations, &Local.delete_all_objects/1)
+    :ok =
+      Enum.each(
+        cache.__metadata__.generations,
+        &Local.delete_all_objects(&1, cache.__state__)
+      )
+
     {:reply, :ok, state}
   end
 

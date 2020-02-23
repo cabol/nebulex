@@ -20,7 +20,7 @@ useful and powerful features such as:
     different [cache usage patterns][EHCache].
 
   * Support for different distributed caching topologies, such as:
-    Partitioned, Near, Replicated, etc.
+    Replicated, Partitioned, Near, etc.
 
   * Different eviction mechanisms, such as time-based eviction through the
     expiry time property (`expire_at`) on the cached objects,
@@ -57,6 +57,7 @@ Cache        | Nebulex Adapter              | Dependency
 :----------- | :----------------------------| :---------
 Generational | Nebulex.Adapters.Local       | Built-In
 Partitioned  | Nebulex.Adapters.Partitioned | Built-In
+Replicated   | Nebulex.Adapters.Replicated  | Built-In
 Multi-level  | Nebulex.Adapters.Multilevel  | Built-In
 Redis        | NebulexRedisAdapter          | [nebulex_redis_adapter][nebulex_redis_adapter]
 Memcached    | NebulexMemcachedAdapter      | [nebulex_memcached_adapter][nebulex_memcached_adapter]
