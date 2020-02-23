@@ -221,8 +221,7 @@ defmodule Nebulex.Caching do
   ## Private Functions
 
   defp caching_action(action, fun, opts, block) do
-    cache =
-      Keyword.get(opts, :cache) || raise ArgumentError, "expected cache: to be given as argument"
+    cache = opts[:cache] || raise ArgumentError, "expected cache: to be given as argument"
 
     {name, args} =
       case Macro.decompose_call(fun) do

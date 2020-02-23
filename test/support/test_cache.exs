@@ -56,6 +56,8 @@ defmodule Nebulex.TestCache do
       version_generator: Nebulex.Version.Timestamp
   end
 
+  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Versionless, compressed: true)
+
   defmodule Versionless do
     use Nebulex.Cache,
       otp_app: :nebulex,
@@ -222,7 +224,8 @@ defmodule Nebulex.TestCache do
       defmodule L3 do
         use Nebulex.Cache,
           otp_app: :nebulex,
-          adapter: Nebulex.Adapters.Local
+          adapter: Nebulex.Adapters.Local,
+          n_shards: 2
       end
 
       def fallback(_key) do

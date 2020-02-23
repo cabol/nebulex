@@ -31,12 +31,8 @@ defmodule Nebulex.Cache.Supervisor do
   Retrieves the compile time configuration.
   """
   def compile_config(cache, opts) do
-    otp_app = Keyword.fetch!(opts, :otp_app)
-    adapter = Keyword.get(opts, :adapter)
-
-    unless adapter do
-      raise ArgumentError, "missing :adapter option on use Nebulex.Cache"
-    end
+    otp_app = opts[:otp_app] || raise ArgumentError, "expected otp_app: to be given as argument"
+    adapter = opts[:adapter] || raise ArgumentError, "expected adapter: to be given as argument"
 
     unless Code.ensure_loaded?(adapter) do
       raise ArgumentError,
