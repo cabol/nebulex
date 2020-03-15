@@ -1,5 +1,5 @@
 defmodule Nebulex.Adapters.Partitioned do
-  @moduledoc """
+  @moduledoc ~S"""
   Built-in adapter for partitioned cache topology.
 
   A partitioned cache is a clustered, fault-tolerant cache that has linear

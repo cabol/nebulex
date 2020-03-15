@@ -1,5 +1,5 @@
 defmodule Nebulex.Adapters.Replicated do
-  @moduledoc """
+  @moduledoc ~S"""
   Built-in adapter for replicated cache topology.
 
   The replicated cache excels in its ability to handle data replication,

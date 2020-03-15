@@ -632,7 +632,7 @@ To learn more about how multilevel-cache works, please check
 
 ## Other important guides
 
- * [Nebulex.Caching DSL](http://hexdocs.pm/nebulex/caching-dsl.html)  - Tailored
+ * [Nebulex.Caching DSL](http://hexdocs.pm/nebulex/caching-decorators.html)  - Tailored
    DSL to implement different cache usage patterns.
 
  * [Pre and Post Hooks](http://hexdocs.pm/nebulex/hooks.html) - Ability

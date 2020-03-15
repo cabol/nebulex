@@ -14,10 +14,11 @@ useful and powerful features such as:
   * Inspired by [Ecto][ecto]; simple and fluent API, flexible and
     pluggable architecture (based on adapters).
 
-  * Built-in adapters: local (generational cache), partitioned and multi-level.
+  * Built-in adapters: local (generational cache), replicated, partitioned and
+    multi-level.
 
-  * [Caching DSL](http://hexdocs.pm/nebulex/caching-dsl.html) to implement
-    different [cache usage patterns][EHCache].
+  * [Caching Decorators/Annotations](http://hexdocs.pm/nebulex/Nebulex.Caching.Decorators.html)
+    to implement different [cache usage patterns][EHCache].
 
   * Support for different distributed caching topologies, such as:
     Replicated, Partitioned, Near, etc.
@@ -99,8 +100,9 @@ defmodule MyApp.Cache do
 ## Important links
 
  * [Documentation](http://hexdocs.pm/nebulex/Nebulex.html)
+ * [Getting Started](http://hexdocs.pm/nebulex/getting-started.html)
+ * [Caching Decorators](http://hexdocs.pm/nebulex/caching-decorators.html)
  * [Examples](https://github.com/cabol/nebulex_examples)
- * [Ecto Integration](https://github.com/cabol/nebulex_ecto)
 
 ## Testing
 

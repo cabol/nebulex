@@ -40,6 +40,7 @@ defmodule Nebulex.Mixfile do
   defp deps do
     [
       {:shards, "~> 0.6"},
+      {:decorator, "~> 1.3"},
 
       # Test
       {:excoveralls, "~> 0.12", only: :test},
@@ -76,7 +77,7 @@ defmodule Nebulex.Mixfile do
       extras: [
         "guides/getting-started.md",
         "guides/hooks.md",
-        "guides/caching-dsl.md"
+        "guides/caching-decorators.md"
       ]
     ]
   end

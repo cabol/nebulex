@@ -1,5 +1,5 @@
 defmodule Nebulex.Hook do
-  @moduledoc """
+  @moduledoc ~S"""
   This module specifies the behaviour for pre/post hooks callbacks.
   These functions are defined in order to intercept any cache operation
   and be able to execute a set of actions before and/or after the operation

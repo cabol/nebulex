@@ -1,5 +1,5 @@
 defmodule Nebulex.Adapter.HashSlot do
-  @moduledoc """
+  @moduledoc ~S"""
   This behaviour provides a callback to compute the hash slot for a specific
   key based on the number of slots/nodes.
 
