@@ -19,7 +19,7 @@ defmodule Nebulex.Adapter.Queryable do
 
   See `c:Nebulex.Cache.all/2`.
   """
-  @callback all(cache, query :: nil | any, opts) :: [any]
+  @callback all(cache, query :: any, opts) :: [any]
 
   @doc """
   Streams the given `query`.
@@ -30,5 +30,5 @@ defmodule Nebulex.Adapter.Queryable do
 
   See `c:Nebulex.Cache.stream/2`.
   """
-  @callback stream(cache, query :: nil | any, opts) :: Enumerable.t()
+  @callback stream(cache, query :: any, opts) :: Enumerable.t()
 end

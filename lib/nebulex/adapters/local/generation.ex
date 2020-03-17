@@ -24,10 +24,13 @@ defmodule Nebulex.Adapters.Local.Generation do
       If it is not set (`nil`), the cleanup check to release memory is not
       performed (the default).
 
-    * `:gc_cleanup_interval` - The number of writes needed to run the cleanup
-      check. Once this value is reached and only if `allocated_memory` option
-      is set, the cleanup check is performed. Defaults to `10`, so after 10
-      write operations the cleanup check is performed.
+    * `:gc_cleanup_min_timeout` - The min timeout in seconds for triggering the
+      next cleanup and memory check. This will be the timeout to use when the
+      max allocated memory is reached. Defaults to `30`sec.
+
+    * `:gc_cleanup_max_timeout` - The max timeout in seconds for triggering the
+      next cleanup and memory check. This is the timeout used when the cache
+      starts or the consumed memory is `0`. Defaults to `300`sec.
   """
 
   defmodule State do
@@ -35,13 +38,15 @@ defmodule Nebulex.Adapters.Local.Generation do
 
     defstruct [
       :cache,
+      :backend_opts,
       :gc_interval,
-      :time_ref,
+      :gc_heartbeat_ref,
       :gen_name,
       :gen_index,
       :allocated_memory,
-      :gc_cleanup_interval,
-      :gc_cleanup_counts,
+      :gc_cleanup_min_timeout,
+      :gc_cleanup_max_timeout,
+      :gc_cleanup_ref,
       :memory
     ]
 
@@ -50,9 +55,10 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   use GenServer
 
+  import Nebulex.Helpers
+
   alias Nebulex.Adapters.Local.Generation.State
   alias Nebulex.Adapters.Local.Metadata
-  alias :shards_local, as: Local
 
   ## API
 
@@ -71,18 +77,16 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   ## Options
 
-    * `:reset_timeout` - Indicates if the poll frequency time-out should
+    * `:reset_timer` - Indicates if the poll frequency time-out should
       be reset or not (default: true).
 
   ## Example
 
-      Nebulex.Adapters.Local.Generation.new(MyCache, reset_timeout: :false)
+      Nebulex.Adapters.Local.Generation.new(MyCache, reset_timer: :false)
   """
   @spec new(Nebulex.Cache.t(), Nebulex.Cache.opts()) :: [atom]
   def new(cache, opts \\ []) do
-    cache
-    |> server_name()
-    |> GenServer.call({:new_generation, opts})
+    do_call(cache, {:new_generation, opts})
   end
 
   @doc """
@@ -92,27 +96,9 @@ defmodule Nebulex.Adapters.Local.Generation do
 
       Nebulex.Adapters.Local.Generation.flush(MyCache)
   """
-  @spec flush(Nebulex.Cache.t()) :: :ok
+  @spec flush(Nebulex.Cache.t()) :: integer
   def flush(cache) do
-    cache
-    |> server_name()
-    |> GenServer.call(:flush)
-  end
-
-  @doc """
-  Triggers the cleanup process to check whether or not the max generation size
-  has been reached. If so, a new generation is pushed in order to release memory
-  and keep it within the configured limit.
-
-  ## Example
-
-      Nebulex.Adapters.Local.Generation.cleanup(MyCache)
-  """
-  @spec cleanup(Nebulex.Cache.t()) :: :ok
-  def cleanup(cache) do
-    cache
-    |> server_name()
-    |> GenServer.cast(:cleanup)
+    do_call(cache, :flush)
   end
 
   @doc """
@@ -126,9 +112,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   """
   @spec realloc(Nebulex.Cache.t(), pos_integer) :: :ok
   def realloc(cache, size) do
-    cache
-    |> server_name()
-    |> GenServer.call({:realloc, size})
+    do_call(cache, {:realloc, size})
   end
 
   @doc """
@@ -140,10 +124,17 @@ defmodule Nebulex.Adapters.Local.Generation do
   """
   @spec get_state(Nebulex.Cache.t()) :: State.t()
   def get_state(cache) do
-    cache
-    |> server_name()
-    |> GenServer.call(:get_state)
+    do_call(cache, :get_state)
   end
+
+  @doc """
+  Returns the name of the GC server for the given `cache`.
+
+  ## Example
+
+      Nebulex.Adapters.Local.Generation.server_name(MyCache)
+  """
+  def server_name(cache), do: Module.concat(cache, Generation)
 
   ## GenServer Callbacks
 
@@ -151,20 +142,32 @@ defmodule Nebulex.Adapters.Local.Generation do
   def init({cache, opts}) do
     _ = init_metadata(cache, opts)
 
+    # backend options for creating new tables
+    backend_opts = Keyword.get(opts, :backend_opts, [])
+
+    # memory check options
+    allocated_memory = get_option(opts, :allocated_memory, &(is_integer(&1) and &1 > 0))
+    cleanup_min = get_option(opts, :gc_cleanup_min_timeout, &(is_integer(&1) and &1 > 0), 30)
+    cleanup_max = get_option(opts, :gc_cleanup_max_timeout, &(is_integer(&1) and &1 > 0), 300)
+    gc_cleanup_ref = if allocated_memory, do: start_timer(cleanup_max, nil, :cleanup)
+
+    # GC options
     {{_, gen_name, gen_index}, ref} =
-      if gc_interval = opts[:gc_interval],
-        do: {new_gen(cache, 0), start_timer(gc_interval)},
-        else: {new_gen(cache, 0), nil}
+      if gc_interval = get_option(opts, :gc_interval, &(is_integer(&1) and &1 > 0)),
+        do: {new_gen(cache, 0, backend_opts), start_timer(gc_interval)},
+        else: {new_gen(cache, 0, backend_opts), nil}
 
     init_state = %State{
       cache: cache,
+      backend_opts: backend_opts,
       gc_interval: gc_interval,
-      time_ref: ref,
       gen_name: gen_name,
       gen_index: gen_index,
-      allocated_memory: Keyword.get(opts, :allocated_memory),
-      gc_cleanup_interval: Keyword.get(opts, :gc_cleanup_interval, 10),
-      gc_cleanup_counts: 1
+      gc_heartbeat_ref: ref,
+      allocated_memory: allocated_memory,
+      gc_cleanup_min_timeout: cleanup_min,
+      gc_cleanup_max_timeout: cleanup_max,
+      gc_cleanup_ref: gc_cleanup_ref
     }
 
     {:ok, init_state}
@@ -174,133 +177,167 @@ defmodule Nebulex.Adapters.Local.Generation do
   def handle_call(
         {:new_generation, opts},
         _from,
-        %State{cache: cache, gen_index: gen_index} = state
+        %State{cache: cache, gen_index: gen_index, backend_opts: backend_opts} = state
       ) do
-    {generations, gen_name, gen_index} = new_gen(cache, gen_index)
+    {generations, gen_name, gen_index} = new_gen(cache, gen_index, backend_opts)
 
-    state =
+    ref =
       opts
-      |> Keyword.get(:reset_timeout, true)
-      |> maybe_reset_timeout(state)
+      |> get_option(:reset_timer, &is_boolean/1, true, & &1)
+      |> maybe_reset_timer(state)
 
-    {:reply, generations, %{state | gen_name: gen_name, gen_index: gen_index}}
+    state = %{state | gen_name: gen_name, gen_index: gen_index, gc_heartbeat_ref: ref}
+    {:reply, generations, state}
   end
 
   def handle_call(:flush, _from, %State{cache: cache} = state) do
+    size = cache.__adapter__.size(cache)
+
     :ok =
       Enum.each(
         cache.__metadata__.generations,
-        &Local.delete_all_objects(&1, cache.__state__)
+        &cache.__backend__.delete_all_objects(&1)
       )
 
-    {:reply, :ok, state}
+    {:reply, size, state}
   end
 
   def handle_call({:realloc, mem_size}, _from, %State{} = state) do
     {:reply, :ok, %{state | allocated_memory: mem_size}}
   end
 
-  def handle_call(:get_state, _from, %State{gen_name: name, cache: cache} = state) do
-    {:reply, %{state | memory: memory_info(name, cache.__state__)}, state}
-  end
-
-  @impl true
-  def handle_cast(
-        :cleanup,
-        %State{
-          gen_name: name,
-          gen_index: index,
-          cache: cache,
-          allocated_memory: max_size,
-          gc_cleanup_interval: cleanup_interval,
-          gc_cleanup_counts: cleanup_counts
-        } = state
-      )
-      when cleanup_counts >= cleanup_interval do
-    if memory_info(name, cache.__state__) >= max_size do
-      {_, name, index} = new_gen(cache, index)
-      {:noreply, %{reset_timeout(state) | gc_cleanup_counts: 1, gen_name: name, gen_index: index}}
-    else
-      {:noreply, %{state | gc_cleanup_counts: 1}}
-    end
-  end
-
-  def handle_cast(:cleanup, %{gc_cleanup_counts: counts} = state) do
-    {:noreply, %{state | gc_cleanup_counts: counts + 1}}
+  def handle_call(:get_state, _from, %State{cache: cache, gen_name: name} = state) do
+    {:reply, %{state | memory: memory_info(cache, name)}, state}
   end
 
   @impl true
   def handle_info(
-        :timeout,
-        %State{cache: cache, gc_interval: time_interval, gen_index: gen_index} = state
+        :heartbeat,
+        %State{
+          cache: cache,
+          gc_interval: time_interval,
+          gc_heartbeat_ref: ref,
+          gen_index: gen_index,
+          backend_opts: backend_opts
+        } = state
       ) do
-    {_, gen_name, gen_index} = new_gen(cache, gen_index)
+    {_, gen_name, gen_index} = new_gen(cache, gen_index, backend_opts)
 
     state = %{
       state
       | gen_name: gen_name,
         gen_index: gen_index,
-        time_ref: start_timer(time_interval)
+        gc_heartbeat_ref: start_timer(time_interval, ref)
     }
 
     {:noreply, state}
   end
 
+  def handle_info(
+        :cleanup,
+        %State{
+          gen_name: name,
+          gen_index: index,
+          cache: cache,
+          backend_opts: backend_opts,
+          allocated_memory: max_size,
+          gc_cleanup_min_timeout: min_timeout,
+          gc_cleanup_max_timeout: max_timeout,
+          gc_cleanup_ref: cleanup_ref,
+          gc_interval: gc_interval,
+          gc_heartbeat_ref: heartbeat_ref
+        } = state
+      )
+      when not is_nil(max_size) and max_size > 0 do
+    # get current memory size
+    size = memory_info(cache, name)
+
+    if size >= max_size do
+      {_, name, index} = new_gen(cache, index, backend_opts)
+
+      state = %{
+        state
+        | gen_name: name,
+          gen_index: index,
+          gc_cleanup_ref: start_timer(max_timeout, cleanup_ref, :cleanup),
+          gc_heartbeat_ref: start_timer(gc_interval, heartbeat_ref)
+      }
+
+      {:noreply, state}
+    else
+      cleanup_ref =
+        size
+        |> linear_inverse_backoff(max_size, min_timeout, max_timeout)
+        |> start_timer(cleanup_ref, :cleanup)
+
+      {:noreply, %{state | gc_cleanup_ref: cleanup_ref}}
+    end
+  end
+
+  def handle_info(_message, state) do
+    {:noreply, state}
+  end
+
   ## Private Functions
 
-  defp server_name(cache), do: Module.concat([cache, Generation])
+  defp do_call(cache, message) do
+    cache
+    |> server_name()
+    |> GenServer.call(message)
+  end
 
   defp init_metadata(cache, opts) do
-    n_gens = Keyword.get(opts, :n_generations, 2)
-
-    cache
-    |> Metadata.create(%Metadata{n_generations: n_gens})
-    |> init_indexes(cache)
+    n_gens = get_option(opts, :n_generations, &is_integer/1, 2)
+    Metadata.create(cache, %Metadata{n_generations: n_gens})
   end
 
-  defp init_indexes(metadata, cache) do
-    :ok = Enum.each(0..metadata.n_generations, &String.to_atom("#{cache}.#{&1}"))
-    metadata
-  end
-
-  defp new_gen(cache, gen_index) do
-    gen_name = String.to_existing_atom("#{cache}.#{gen_index}")
+  defp new_gen(cache, gen_index, backend_opts) do
+    gen_name = Module.concat(cache, "." <> Integer.to_string(gen_index))
 
     gens =
       gen_name
-      |> Local.new(cache.__tab_opts__)
+      |> cache.__backend__.new(backend_opts)
       |> Metadata.new_generation(cache)
-      |> maybe_delete_gen()
+      |> maybe_delete_gen(cache)
 
     {gens, gen_name, incr_gen_index(cache, gen_index)}
   end
 
-  defp maybe_delete_gen({generations, nil}), do: generations
+  defp maybe_delete_gen({generations, nil}, _cache), do: generations
 
-  defp maybe_delete_gen({generations, dropped_gen}) do
-    _ = Local.delete(dropped_gen)
+  defp maybe_delete_gen({generations, dropped_gen}, cache) do
+    _ = cache.__backend__.delete(dropped_gen)
     generations
   end
 
   defp incr_gen_index(cache, gen_index) do
-    if gen_index < cache.__metadata__.n_generations, do: gen_index + 1, else: 0
+    if gen_index < cache.__metadata__.n_generations,
+      do: gen_index + 1,
+      else: 0
   end
 
-  defp start_timer(time) do
-    {:ok, ref} = :timer.send_after(time * 1000, :timeout)
-    ref
+  defp start_timer(time, ref \\ nil, event \\ :heartbeat) do
+    _ = if ref, do: Process.cancel_timer(ref)
+    Process.send_after(self(), event, time * 1000)
   end
 
-  defp maybe_reset_timeout(_, %State{gc_interval: nil} = state), do: state
-  defp maybe_reset_timeout(false, state), do: state
-  defp maybe_reset_timeout(true, state), do: reset_timeout(state)
-
-  defp reset_timeout(%State{gc_interval: time, time_ref: ref} = state) do
-    {:ok, :cancel} = :timer.cancel(ref)
-    %{state | time_ref: start_timer(time)}
+  defp maybe_reset_timer(_, %State{gc_interval: nil} = state) do
+    state.gc_heartbeat_ref
   end
 
-  defp memory_info(name, state) do
-    Local.info(name, :memory, state) * :erlang.system_info(:wordsize)
+  defp maybe_reset_timer(false, state) do
+    state.gc_heartbeat_ref
+  end
+
+  defp maybe_reset_timer(true, %State{} = state) do
+    start_timer(state.gc_interval, state.gc_heartbeat_ref)
+  end
+
+  defp memory_info(cache, name) do
+    cache.__backend__.info(name, :memory) * :erlang.system_info(:wordsize)
+  end
+
+  defp linear_inverse_backoff(size, max_size, min_timeout, max_timeout) do
+    round((min_timeout - max_timeout) / max_size * size + max_timeout)
   end
 end

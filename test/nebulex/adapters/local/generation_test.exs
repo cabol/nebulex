@@ -6,6 +6,16 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
   alias Nebulex.TestCache.LocalWithGC, as: TestCache
   alias Nebulex.TestCache.LocalWithSizeLimit
 
+  :ok = Application.put_env(:nebulex, LocalWithGC, compressed: true)
+
+  :ok =
+    Application.put_env(
+      :nebulex,
+      LocalWithSizeLimit,
+      allocated_memory: 100_000,
+      gc_cleanup_interval: 2
+    )
+
   setup do
     {:ok, pid} = TestCache.start_link(gc_interval: 1, n_generations: 3)
     :ok
@@ -24,7 +34,7 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       assert i == n_generations(TestCache)
     end
 
-    assert :ok == TestCache.flush()
+    assert 0 == TestCache.flush()
 
     for _ <- 1..12 do
       :ok = Process.sleep(1020)
@@ -49,7 +59,7 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
     assert 1 == n_generations(TestCache)
 
     :ok = Process.sleep(800)
-    assert 2 == length(TestCache.new_generation(reset_timeout: false))
+    assert 2 == length(TestCache.new_generation(reset_timer: false))
 
     :ok = Process.sleep(500)
     assert 3 == n_generations(TestCache)
@@ -61,7 +71,8 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
         gc_interval: 3600,
         n_generations: 3,
         allocated_memory: 100_000,
-        gc_cleanup_interval: 2
+        gc_cleanup_min_timeout: 1,
+        gc_cleanup_max_timeout: 3
       )
 
     assert 1 == n_generations(LocalWithSizeLimit)
@@ -69,38 +80,98 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
     %State{memory: mem_size} = Generation.get_state(LocalWithSizeLimit)
     :ok = Generation.realloc(LocalWithSizeLimit, mem_size * 2)
 
+    # triggers the cleanup event
+    :ok = check_cache_size(LocalWithSizeLimit)
+
     :ok = flood_cache(mem_size, mem_size * 2)
     assert 1 == n_generations(LocalWithSizeLimit)
     assert_mem_size(:>)
 
-    _ = LocalWithSizeLimit.set("a", generate_value(10))
-    :ok = Process.sleep(1000)
+    # wait until the cleanup event is triggered
+    :ok = Process.sleep(3000)
+
     assert 2 == n_generations(LocalWithSizeLimit)
     assert_mem_size(:<=)
 
     :ok = flood_cache(mem_size, mem_size * 2)
-    assert 2 == n_generations(LocalWithSizeLimit)
+    assert 3 == n_generations(LocalWithSizeLimit)
     assert_mem_size(:>)
 
-    _ = LocalWithSizeLimit.set("a", generate_value(10))
-    :ok = Process.sleep(1000)
+    :ok = flood_cache(mem_size, mem_size * 2)
     assert 3 == n_generations(LocalWithSizeLimit)
-    assert_mem_size(:<=)
+    assert_mem_size(:>)
 
-    assert :ok == LocalWithSizeLimit.stop(pid)
+    # triggers the cleanup event
+    :ok = check_cache_size(LocalWithSizeLimit)
+
+    assert 3 == n_generations(LocalWithSizeLimit)
+
+    :ok = LocalWithSizeLimit.stop(pid)
+  end
+
+  test "default options" do
+    {:ok, pid} =
+      LocalWithSizeLimit.start_link(
+        gc_interval: :invalid,
+        gc_cleanup_min_timeout: -1,
+        gc_cleanup_max_timeout: -1
+      )
+
+    assert %State{
+             gc_interval: nil,
+             gc_cleanup_min_timeout: 30,
+             gc_cleanup_max_timeout: 300
+           } = Generation.get_state(LocalWithSizeLimit)
+
+    :ok = LocalWithSizeLimit.stop(pid)
+  end
+
+  test "cleanup while cache is being used" do
+    {:ok, pid} =
+      LocalWithSizeLimit.start_link(
+        gc_interval: 3600,
+        n_generations: 3,
+        allocated_memory: 100,
+        gc_cleanup_min_timeout: 1,
+        gc_cleanup_max_timeout: 3
+      )
+
+    assert 1 == n_generations(LocalWithSizeLimit)
+
+    tasks = for i <- 1..3, do: Task.async(fn -> task_fun(LocalWithSizeLimit, i) end)
+
+    for _ <- 1..100 do
+      :ok = Process.sleep(10)
+
+      LocalWithSizeLimit
+      |> Generation.server_name()
+      |> send(:cleanup)
+    end
+
+    for task <- tasks, do: Task.shutdown(task)
+    :ok = LocalWithSizeLimit.stop(pid)
   end
 
   ## Private Functions
+
+  defp check_cache_size(cache) do
+    :cleanup =
+      cache
+      |> Generation.server_name()
+      |> send(:cleanup)
+
+    :ok = Process.sleep(1000)
+  end
 
   defp flood_cache(mem_size, max_size) when mem_size > max_size do
     :ok
   end
 
   defp flood_cache(mem_size, max_size) when mem_size <= max_size do
-    _ =
+    :ok =
       100_000
       |> :rand.uniform()
-      |> LocalWithSizeLimit.set(generate_value(1000))
+      |> LocalWithSizeLimit.put(generate_value(1000))
 
     :ok = Process.sleep(500)
     %State{memory: mem_size} = Generation.get_state(LocalWithSizeLimit)
@@ -122,5 +193,11 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
 
   defp n_generations(cache) do
     length(cache.__metadata__().generations)
+  end
+
+  defp task_fun(cache, i) do
+    :ok = cache.put("#{inspect(self())}.#{i}", i)
+    :ok = Process.sleep(1)
+    task_fun(cache, i + 1)
   end
 end

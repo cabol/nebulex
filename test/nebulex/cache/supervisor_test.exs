@@ -8,7 +8,6 @@ defmodule Nebulex.Cache.SupervisorTest do
   end
 
   setup do
-    :ok = Application.put_env(:nebulex, MyCache, n_shards: 2)
     {:ok, pid} = MyCache.start_link()
     :ok
 
@@ -19,36 +18,36 @@ defmodule Nebulex.Cache.SupervisorTest do
   end
 
   test "fail on compile_config because missing otp_app" do
-    opts = [:nebulex, n_shards: 2, adapter: TestAdapter]
+    opts = [adapter: TestAdapter]
     :ok = Application.put_env(:nebulex, MyCache, opts)
 
     assert_raise ArgumentError, "expected otp_app: to be given as argument", fn ->
-      Nebulex.Cache.Supervisor.compile_config(MyCache, opts)
+      Nebulex.Cache.Supervisor.compile_config(opts)
     end
   end
 
   test "fail on compile_config because missing adapter" do
-    opts = [otp_app: :nebulex, n_shards: 2]
+    opts = [otp_app: :nebulex]
     :ok = Application.put_env(:nebulex, MyCache, opts)
 
     assert_raise ArgumentError, "expected adapter: to be given as argument", fn ->
-      Nebulex.Cache.Supervisor.compile_config(MyCache, opts)
+      Nebulex.Cache.Supervisor.compile_config(opts)
     end
   end
 
   test "fail on compile_config because adapter was not compiled" do
-    opts = [otp_app: :nebulex, n_shards: 2, adapter: TestAdapter]
+    opts = [otp_app: :nebulex, adapter: TestAdapter]
     :ok = Application.put_env(:nebulex, MyCache, opts)
 
     msg = ~r"adapter TestAdapter was not compiled, ensure"
 
     assert_raise ArgumentError, msg, fn ->
-      Nebulex.Cache.Supervisor.compile_config(MyCache, opts)
+      Nebulex.Cache.Supervisor.compile_config(opts)
     end
   end
 
   test "fail on compile_config because adapter error" do
-    opts = [otp_app: :nebulex, n_shards: 2]
+    opts = [otp_app: :nebulex]
     :ok = Application.put_env(:nebulex, MyCache2, opts)
 
     msg = "expected :adapter option given to Nebulex.Cache to list Nebulex.Adapter as a behaviour"
@@ -63,7 +62,7 @@ defmodule Nebulex.Cache.SupervisorTest do
           adapter: MyAdapter
       end
 
-      Nebulex.Cache.Supervisor.compile_config(MyCache2, opts)
+      Nebulex.Cache.Supervisor.compile_config(opts)
     end
   end
 end

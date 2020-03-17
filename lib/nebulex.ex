@@ -1,15 +1,15 @@
 defmodule Nebulex do
-  @moduledoc """
+  @moduledoc ~S"""
   Nebulex is split into 2 main components:
 
     * `Nebulex.Cache` - caches are wrappers around the in-memory data store.
-      Via the cache, we can insert, retrieve, update and delete entries from
-      the in-memory data store. A cache needs an adapter to communicate to
-      the in-memory data store.
+      Via the cache, we can put, get, update, delete and query existing entries.
+      A cache needs an adapter to communicate to the in-memory data store.
 
-    * `Nebulex.Object` - this is the struct used by caches to handle data
-      back and forth, entries in cache are stored and retrieved as objects,
-      but this is totally handled by the cache adapter.
+    * `Nebulex.Decorators` - decorators provide an elegant way of annotating
+      functions to be cached or evicted. By means of these decorators, it is
+      possible the implementation of cache usage patterns like **Read-through**,
+      **Write-through**, **Cache-as-SoR**, etc.
 
   In the following sections, we will provide an overview of those components and
   how they interact with each other. Feel free to access their respective module
@@ -26,15 +26,16 @@ defmodule Nebulex do
       defmodule MyApp.MyCache do
         use Nebulex.Cache,
           otp_app: :my_app,
-          adapter: Nebulex.Adapters.Local
+          adapter: Nebulex.Adapters.Local,
+          backend: :shards
       end
 
   Where the configuration for the Cache must be in your application
   environment, usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.MyCache,
-        n_shards: 2,
-        gc_interval: 3600
+        gc_interval: 3600,
+        partitions: 2
 
   Each cache in Nebulex defines a `start_link/1` function that needs to be
   invoked before using the cache. In general, this function is not called
@@ -55,74 +56,42 @@ defmodule Nebulex do
         Supervisor.start_link(children, opts)
       end
 
-  You can use the cache from your application whatever you want.
-  For example, let's suppose we want to handle user sessions in cache:
+  ## Decorators
 
-      defmodule MyApp.UserSession do
-        alias MyApp.Repo
+  Decorators are a set of caching annotations to make easier the implementation
+  of different [cache patterns](https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc).
+
+      defmodule MyApp.Accounts do
+        use Nebulex.Decorators
+
+        alias MyApp.Accounts.User
         alias MyApp.Cache
-        alias MyApp.User
+        alias MyApp.Repo
 
-        def new(username, password) do
-          case Repo.get(User, username) do
-            %User{password: ^password} = user ->
-              sesion_token =
-                username
-                |> generate_token(password)
-                |> Cache.set(user, ttl: 3600)
-
-              {:ok, sesion_token}
-
-            _ ->
-              {:error, :unauthorized}
-          end
+        @decorate cache(cache: Cache, key: {User, id}, opts: [ttl: 3600])
+        def get_user!(id) do
+          Repo.get!(User, id)
         end
 
-        def get(token) do
-          case Cache.get(token) do
-            nil -> {:error, :not_found}
-            user -> {:ok, user}
-          end
+        @decorate cache(cache: Cache, key: {User, [email: email]})
+        def get_user_by_email!(email) do
+          Repo.get_by!(User, email: email)
         end
 
-        ## Helpers
+        @decorate update(cache: Cache, key: {User, user.id})
+        def update_user!(%User{} = user, attrs) do
+          user
+          |> User.changeset(attrs)
+          |> Repo.update!()
+        end
 
-        defp generate_token(username, password) do
-          # your code ...
+        @decorate evict(cache: Cache, keys: [{User, user.id}, {User, [email: user.email]}])
+        def delete_user(%User{} = user) do
+          Repo.delete(user)
         end
       end
 
-  ## Object
-
-  `Nebulex.Object` is the struct used by the caches to store and retrieve data.
-
-  By default, when we perform an action (set, get, delete, etc.) on a cache
-  entry, the cache returns only the value of that entry, but you can ask
-  for return the whole object:
-
-      iex> MyCache.set("foo", "bar", return: :object)
-      %Nebulex.Object{key: "foo", expire_at: nil, value: "bar", version: nil}
-
-      iex> MyCache.get("foo", return: :object)
-      %Nebulex.Object{key: "foo", expire_at: nil, value: "bar", version: nil}
-
-  See `Nebulex.Object` to learn more about it.
-
-  ### Object Versioning (Optimistic Offline Locks)
-
-  It is also possible to set a version (or ETag) on the object to be cached;
-  in the case you want to implement something like *"Optimistic Locking"*
-  through a version property on cached objects.
-
-  Supposing we have a "serial" version generator:
-
-      iex> MyCache.set("foo", "bar", return: :object)
-      %Nebulex.Object{key: "foo", expire_at: nil, value: "bar", version: 1}
-
-      iex> MyCache.set("foo", "bar", version: 1, return: :object)
-      %Nebulex.Object{key: "foo", expire_at: nil, value: "bar", version: 2}
-
-      iex> MyCache.set("foo", "bar", version: 2, return: :object)
-      %Nebulex.Object{key: "foo", expire_at: nil, value: "bar", version: 3}
+  It also provides a decorator to define hooked functions, a way to support
+  pre/post hooks. See `Nebulex.Decorators` for more information.
   """
 end

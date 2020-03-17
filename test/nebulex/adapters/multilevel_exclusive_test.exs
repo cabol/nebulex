@@ -7,13 +7,12 @@ defmodule Nebulex.Adapters.MultilevelExclusiveTest do
   alias Nebulex.TestCache.MultilevelExclusive, as: Multilevel
 
   test "get for exclusive mode" do
-    1 = @l1.set(1, 1)
-    2 = @l2.set(2, 2)
-    3 = @l3.set(3, 3)
+    :ok = @l1.put(1, 1)
+    :ok = @l2.put(2, 2)
+    :ok = @l3.put(3, 3)
 
     assert 1 == Multilevel.get(1)
     assert 2 == Multilevel.get(2, return: :key)
-    %Object{value: 2, key: 2, version: _} = Multilevel.get(2, return: :object)
     assert 3 == Multilevel.get(3)
     refute @l1.get(2)
     refute @l1.get(3)

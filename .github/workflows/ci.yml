@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  mix_test:
+    name: 'mix test (Elixir ${{ matrix.elixir }} OTP ${{ matrix.otp }})'
+    strategy:
+      matrix:
+        elixir:
+          - 1.10.2
+          - 1.9.4
+        otp:
+          - 22.3
+          - 21.3
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-elixir@v1
+        with:
+          otp-version: '${{ matrix.otp }}'
+          elixir-version: '${{ matrix.elixir }}'
+      - name: Install Dependencies
+        run: mix deps.get
+      - name: Compile Code
+        run: mix compile --warnings-as-errors
+      - name: Check Format
+        run: mix format --check-formatted
+      - name: Check Style
+        run: mix credo --strict
+      - name: Run Tests and Coverage
+        run: |
+          epmd -daemon
+          MIX_ENV=test mix coveralls.github
+      - name: Generate PLT
+        run: mix dialyzer --plt
+      - name: Run Dialyzer
+        run: mix dialyzer --halt-exit-status
+      - name: Run Xref
+        run: |
+          mix xref unreachable --abort-if-any
+          mix xref deprecated --abort-if-any
+      - name: Report Doc Coverage
+        run: MIX_ENV=docs mix inch.report

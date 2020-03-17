@@ -2,18 +2,19 @@ defmodule Nebulex.Cache.QueryableTest do
   import Nebulex.SharedTestCase
 
   deftests do
-    alias Nebulex.Object
+    import Nebulex.CacheHelpers
 
     test "all" do
-      set1 = for x <- 1..50, do: @cache.set(x, x)
-      set2 = for x <- 51..100, do: @cache.set(x, x)
+      set1 = cache_put(@cache, 1..50)
+      set2 = cache_put(@cache, 51..100)
 
       for x <- 1..100, do: assert(@cache.get(x) == x)
       expected = set1 ++ set2
 
       assert expected == :lists.usort(@cache.all())
 
-      set3 = for x <- 20..60, do: @cache.delete(x, return: :key)
+      set3 = Enum.to_list(20..60)
+      :ok = Enum.each(set3, &@cache.delete(&1))
       expected = :lists.usort(expected -- set3)
 
       assert expected == :lists.usort(@cache.all())
@@ -21,7 +22,7 @@ defmodule Nebulex.Cache.QueryableTest do
 
     test "stream" do
       entries = for x <- 1..10, do: {x, x * 2}
-      assert :ok == @cache.set_many(entries)
+      assert :ok == @cache.put_all(entries)
 
       expected = Keyword.keys(entries)
       assert expected == nil |> @cache.stream() |> Enum.to_list() |> :lists.usort()
@@ -33,9 +34,6 @@ defmodule Nebulex.Cache.QueryableTest do
                |> @cache.stream(return: :value, page_size: 3)
                |> Enum.to_list()
                |> :lists.usort()
-
-      stream = @cache.stream(nil, return: :object, page_size: 3)
-      [%Object{key: 1, value: 2} | _] = stream |> Enum.to_list() |> :lists.usort()
 
       assert_raise Nebulex.QueryError, fn ->
         :invalid_query

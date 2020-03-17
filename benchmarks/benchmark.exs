@@ -5,22 +5,19 @@ Nebulex.Cluster.spawn(nodes)
 
 alias Nebulex.NodeCase
 alias Nebulex.TestCache.{Local, Partitioned}
-alias Nebulex.TestCache.Partitioned.Primary
 
 # start caches
 {:ok, local} = Local.start_link()
-{:ok, primary} = Primary.start_link()
 {:ok, dist} = Partitioned.start_link()
-node_pid_list = NodeCase.start_caches(Node.list(), [Primary, Partitioned])
+node_pid_list = NodeCase.start_caches(Node.list(), [Partitioned])
 
 # samples
 keys = Enum.to_list(1..10_000)
-bulk = for x <- 1..100, do: {x, x}
 
 # init caches
 Enum.each(1..5000, fn x ->
-  Local.set(x, x)
-  Partitioned.set(x, x)
+  Local.put(x, x)
+  Partitioned.put(x, x)
 end)
 
 inputs = %{
@@ -32,23 +29,20 @@ benchmarks = %{
   "get" => fn {cache, random} ->
     cache.get(random)
   end,
-  "set" => fn {cache, random} ->
-    cache.set(random, random)
+  "get_all" => fn {cache, random} ->
+    cache.get_all([random])
   end,
-  "add" => fn {cache, random} ->
-    cache.add(random, random)
+  "put" => fn {cache, random} ->
+    cache.put(random, random)
+  end,
+  "put_new" => fn {cache, random} ->
+    cache.put_new(random, random)
   end,
   "replace" => fn {cache, random} ->
     cache.replace(random, random)
   end,
-  "add_or_replace!" => fn {cache, random} ->
-    cache.add_or_replace!(random, random)
-  end,
-  "get_many" => fn {cache, _random} ->
-    cache.get_many(1..10)
-  end,
-  "set_many" => fn {cache, _random} ->
-    cache.set_many(bulk)
+  "put_all" => fn {cache, random} ->
+    cache.put_all([{random, random}])
   end,
   "delete" => fn {cache, random} ->
     cache.delete(random)
@@ -62,8 +56,8 @@ benchmarks = %{
   "size" => fn {cache, _random} ->
     cache.size()
   end,
-  "object_info" => fn {cache, random} ->
-    cache.object_info(random, :ttl)
+  "ttl" => fn {cache, random} ->
+    cache.ttl(random)
   end,
   "expire" => fn {cache, random} ->
     cache.expire(random, 1)
@@ -74,20 +68,16 @@ benchmarks = %{
   "update" => fn {cache, random} ->
     cache.update(random, 1, &Kernel.+(&1, 1))
   end,
-  "update_counter" => fn {cache, _random} ->
-    cache.update_counter(:counter, 1)
+  "incr" => fn {cache, _random} ->
+    cache.incr(:counter, 1)
   end,
   "all" => fn {cache, _random} ->
     cache.all()
   end,
   "transaction" => fn {cache, random} ->
-    cache.transaction(
-      fn ->
-        cache.update_counter(random, 1)
-        :ok
-      end,
-      keys: [random]
-    )
+    cache.transaction([keys: [random]], fn ->
+      cache.incr(random, 1)
+    end)
   end
 }
 
@@ -108,6 +98,5 @@ Benchee.run(
 
 # stop caches s
 if Process.alive?(local), do: Local.stop(local)
-if Process.alive?(primary), do: Primary.stop(primary)
 if Process.alive?(dist), do: Partitioned.stop(dist)
 NodeCase.stop_caches(node_pid_list)

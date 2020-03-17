@@ -1,128 +1,126 @@
 defmodule Nebulex.Hook do
   @moduledoc ~S"""
-  This module specifies the behaviour for pre/post hooks callbacks.
+  This module specifies the behaviour for pre and post hooks.
+
   These functions are defined in order to intercept any cache operation
   and be able to execute a set of actions before and/or after the operation
   takes place.
 
-  ## Execution modes
-
-  It is possible to setup the mode how the hooks are evaluated. The
-  `pre_hooks/0` and `post_hooks/0` callbacks must return a tuple
-  `{mode, hook_funs}`, where the first element `mode` is the one
-  that defines the execution mode. The available modes are:
-
-    * `:async` - (the default) all hooks are evaluated asynchronously
-      (in parallel) and their results are ignored.
-
-    * `:sync` - hooks are evaluated synchronously (sequentially) and their
-      results are ignored.
-
-    * `:pipe` - similar to `:sync` but each hook result is passed to the
-      next one and so on, until the last hook evaluation is returned.
-
   ## Example
 
+      defmodule MyApp.TraceHook do
+        use Nebulex.Hook
+        use GenServer
+
+        alias Nebulex.Hook.Event
+
+        require Logger
+
+        @hookable_actions [:get, :put]
+
+        @doc false
+        def start_link(opts \\ []) do
+          GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+        end
+
+        ## Nebulex.Hook
+
+        @impl Nebulex.Hook
+        def handle_pre(%Event{name: name}) when name in @hookable_actions do
+          System.system_time(:microsecond)
+        end
+
+        def handle_pre(event), do: event
+
+        @impl Nebulex.Hook
+        def handle_post(%Event{name: name} = event) when name in @hookable_actions do
+          GenServer.cast(__MODULE__, {:trace, event})
+        end
+
+        def handle_post(event), do: event
+
+        ## GenServer
+
+        @impl GenServer
+        def init(_opts) do
+          {:ok, %{}}
+        end
+
+        @impl GenServer
+        def handle_cast({:trace, %Event{acc: start} = event}, state) do
+          diff = System.system_time(:microsecond) - start
+          Logger.info("#=> #{event.module}.#{event.name}/#{event.arity}, Duration: #{diff}")
+          {:noreply, state}
+        end
+      end
+
       defmodule MyApp.MyCache do
+        use Nebulex.Decorators
+        @decorate_all hook(MyApp.TraceHook)
+
         use Nebulex.Cache,
           otp_app: :my_app,
           adapter: Nebulex.Adapters.Local
 
-        def pre_hooks do
-          {:async, [... your pre hook functions ...]}
-        end
+        alias MyApp.TraceHook
 
-        def post_hooks do
-          {:pipe, [... your post hook functions ...]}
-        end
-      end
-  """
-
-  @typedoc "Defines a cache command"
-  @type command :: {Nebulex.Cache.t(), action :: atom, args :: [any]}
-
-  @typedoc "Defines the hook callback function"
-  @type hook_fun :: (result :: any, command -> any)
-
-  @typedoc "Hook execution mode"
-  @type mode :: :async | :sync | :pipe
-
-  @doc """
-  Returns a list of hook functions that will be executed before invoke the
-  cache action.
-
-  ## Examples
-
-      defmodule MyCache do
-        use Nebulex.Cache,
-          otp_app: :my_app,
-          adapter: Nebulex.Adapters.Local
-
-        def pre_hooks do
-          pre_hook =
-            fn
-              (result, {_, :get, _} = call) ->
-                # do your stuff ...
-              (result, _) ->
-                result
-            end
-
-          {:async, [pre_hook]}
+        @impl true
+        def init(opts) do
+          {:ok, pid} = TraceHook.start_link()
+          {:ok, Keyword.put(opts, :trace_hook_pid, pid)}
         end
       end
   """
-  @callback pre_hooks() :: {mode, [hook_fun]}
 
-  @doc """
-  Returns a list of hook functions that will be executed after invoke the
-  cache action.
+  @doc false
+  defmacro __using__(_opts) do
+    quote do
+      @behaviour Nebulex.Hook
 
-  ## Examples
+      @impl true
+      def handle_pre(event), do: event
 
-      defmodule MyCache do
-        use Nebulex.Cache,
-          otp_app: :my_app,
-          adapter: Nebulex.Adapters.Local
+      @impl true
+      def handle_post(event), do: event
 
-        def post_hooks do
-          {:pipe, [&post_hook/2]}
-        end
-
-        def post_hook(result, {_, :set, _} = call) do
-          send(:hooked_cache, call)
-        end
-
-        def post_hook(_, _) do
-          :noop
-        end
-      end
-  """
-  @callback post_hooks() :: {mode, [hook_fun]}
-
-  @doc """
-  Evaluates the `hooks` according to the given execution `mode`.
-  """
-  @spec eval({mode, hooks :: [hook_fun]}, command, result :: any) :: any
-  def eval({_mode, []}, _command, result), do: result
-
-  def eval({mode, hooks}, {_cache, _action, _args} = command, result) do
-    Enum.reduce(hooks, result, fn
-      hook, acc when is_function(hook, 2) and mode == :pipe ->
-        hook.(acc, command)
-
-      hook, ^result when is_function(hook, 2) and mode == :sync ->
-        _ = hook.(result, command)
-        result
-
-      hook, ^result when is_function(hook, 2) ->
-        _ = Task.start_link(:erlang, :apply, [hook, [result, command]])
-        result
-
-      _, acc when mode == :pipe ->
-        acc
-
-      _, _ ->
-        result
-    end)
+      defoverridable handle_pre: 1, handle_post: 1
+    end
   end
+
+  defmodule Event do
+    @moduledoc """
+    Defines a hook event.
+    """
+
+    @enforce_keys [:module, :name, :arity]
+    defstruct [:module, :name, :arity, :result, :acc]
+
+    @type t :: %__MODULE__{
+            module: Nebulex.Cache.t(),
+            name: atom,
+            arity: non_neg_integer,
+            result: term,
+            acc: term
+          }
+  end
+
+  @doc """
+  Invoked to handle synchronous pre-hooks.
+
+  `handle_pre/1` will block until the hook's logic is executed. Therefore,
+  the hook logic should be lightweight, for example, just sending or hand over
+  the event to another process running the hook's logic there without affect
+  cache performance.
+  """
+  @callback handle_pre(Nebulex.Hook.Event.t()) :: term
+
+  @doc """
+  Invoked to handle synchronous post-hooks.
+
+  `handle_post/1` will block until the hook's logic is executed. Therefore,
+  the hook logic should be lightweight, for example, just sending or hand over
+  the event to another process running the hook's logic there without affect
+  cache performance.
+  """
+  @callback handle_post(Nebulex.Hook.Event.t()) :: term
 end

@@ -26,51 +26,24 @@ defmodule Nebulex.Adapters.Partitioned do
 
   ## Features
 
-    * Support for partitioned topology (Sharding Distribution Model)
-    * Support for transactions via Erlang global name registration facility
-    * Configurable hash-slot module to compute the node
+    * Support for partitioned topology (Sharding Distribution Model).
+    * Support for transactions via Erlang global name registration facility.
+    * Configurable hash-slot module to compute the node.
 
-  ## Options
-
-  These options can be set through the config file:
-
-    * `:primary` - The module for the primary storage. The value must be a
-      valid local cache adapter so that the partitioned adapter can store
-      the data in there. For example, you can set the `Nebulex.Adapters.Local`
-      as value, unless you want to provide another one.
-
-    * `:hash_slot` - The module that implements `Nebulex.Adapter.HashSlot`
-      behaviour.
-
-  ## Runtime options
-
-  These options apply to all adapter's functions.
-
-    * `:timeout` - The time-out value in milliseconds for the command that
-      will be executed. If the timeout is exceeded, then the current process
-      will exit. This adapter uses `Task.await/2` internally, therefore,
-      check the function documentation to learn more about it. For commands
-      like `set_many` and `get_many`, if the timeout is exceeded, the task
-      is shutted down but the current process doesn't exit, only the result
-      associated to that task is just skipped in the reduce phase.
-
-    * `task_supervisor_opts` - Defines the options passed to
-      `Task.Supervisor.start_link/1` when the adapter is initialized.
-
-  ## Example
-
-  `Nebulex.Cache` is the wrapper around the cache. We can define the
-  partitioned cache as follows:
+  When used, aside from the `:otp_app` and `:adapter` the cache expects
+  `:primary` option as well. For example, the cache:
 
       defmodule MyApp.PartitionedCache do
         use Nebulex.Cache,
           otp_app: :my_app,
-          adapter: Nebulex.Adapters.Partitioned
+          adapter: Nebulex.Adapters.Partitioned,
+          primary: MyApp.PartitionedCache.Primary
 
         defmodule Primary do
           use Nebulex.Cache,
             otp_app: :my_app,
-            adapter: Nebulex.Adapters.Local
+            adapter: Nebulex.Adapters.Local,
+            backend: :shards
         end
       end
 
@@ -78,13 +51,42 @@ defmodule Nebulex.Adapters.Partitioned do
   usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.PartitionedCache.Primary,
-        n_shards: 2,
-        gc_interval: 3600
+        gc_interval: 3600,
+        partitions: System.schedulers_online()
 
-      config :my_app, MyApp.PartitionedCache,
-        primary: MyApp.PartitionedCache.Primary
+  For more information about the usage, see `Nebulex.Cache` documentation.
 
-  For more information about the usage, check out `Nebulex.Cache`.
+  ## Compile-Time Options
+
+  In addition to `:otp_app` and `:adapter`, this adapter supports the next
+  compile-time options:
+
+    * `:primary` - Defines the module for the primary storage. The value must
+      be a valid local cache adapter so that the partitioned adapter can store
+      the data in there. For example, you can set the `Nebulex.Adapters.Local`
+      as value, unless you want to provide another one.
+
+    * `:hash_slot` - Defines the module implementing
+      `Nebulex.Adapter.HashSlot` behaviour.
+
+  ## Config Options
+
+  These options can be set through the config file:
+
+    * `task_supervisor_opts` - Start-time options passed to
+      `Task.Supervisor.start_link/1` when the adapter is initialized.
+
+  ## Runtime options
+
+  These options apply to all adapter's functions.
+
+    * `:timeout` - The time-out value in milliseconds for the command that
+      will be executed. If the timeout is exceeded, then the current process
+      will exit. For executing a command on remote nodes, this adapter uses
+      `Task.await/2` internally for receiving the result, so this option tells
+      how much time the adapter should wait for it. If the timeout is exceeded,
+      the task is shut down but the current process doesn't exit, only the
+      result associated with that task is skipped in the reduce phase.
 
   ## Extended API
 
@@ -110,13 +112,16 @@ defmodule Nebulex.Adapters.Partitioned do
 
   ## Limitations
 
-  This adapter has a limitation for two functions: `get_and_update/4` and
-  `update/5`. They both have a parameter that is the anonymous function,
-  and the anonymous function is compiled into the module where it is created,
-  which means it necessarily doesn't exists on remote nodes. To ensure they
-  work as expected, you must provide functions from modules existing in all
-  nodes of the group.
+  For `c:Nebulex.Cache.get_and_update/3` and `c:Nebulex.Cache.update/4`,
+  they both have a parameter that is the anonymous function, and it is compiled
+  into the module where it is created, which means it necessarily doesn't exists
+  on remote nodes. To ensure they work as expected, you must provide functions
+  from modules existing in all nodes of the group.
   """
+
+  # Provide Cache Implementation
+  @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Queryable
 
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
@@ -127,31 +132,25 @@ defmodule Nebulex.Adapters.Partitioned do
   # Inherit default keyslot callback
   use Nebulex.Adapter.HashSlot
 
-  # Provide Cache Implementation
-  @behaviour Nebulex.Adapter
-  @behaviour Nebulex.Adapter.Queryable
+  import Nebulex.Helpers
 
-  alias Nebulex.{Object, RPC}
+  alias Nebulex.Cache.Cluster
+  alias Nebulex.RPC
 
   ## Adapter
 
   @impl true
   defmacro __before_compile__(env) do
-    otp_app = Module.get_attribute(env.module, :otp_app)
-    config = Module.get_attribute(env.module, :config)
-    hash_slot = Keyword.get(config, :hash_slot, __MODULE__)
-    task_supervisor = Module.concat([env.module, TaskSupervisor])
+    opts = Module.get_attribute(env.module, :opts)
+    task_supervisor = Module.concat(env.module, TaskSupervisor)
+    primary = opts[:primary] || raise ArgumentError, "expected primary: to be given as argument"
 
-    unless primary = Keyword.get(config, :primary) do
-      raise ArgumentError,
-            "missing :primary configuration in " <>
-              "config #{inspect(otp_app)}, #{inspect(env.module)}"
-    end
+    hash_slot =
+      opts
+      |> Keyword.get(:hash_slot, __MODULE__)
+      |> assert_behaviour(Nebulex.Adapter.HashSlot, "hash_slot")
 
     quote do
-      alias Nebulex.Adapters.Local.Generation
-      alias Nebulex.Cache.Cluster
-
       def __primary__, do: unquote(primary)
 
       def __task_sup__, do: unquote(task_supervisor)
@@ -162,6 +161,7 @@ defmodule Nebulex.Adapters.Partitioned do
         Cluster.get_node(__MODULE__, key, unquote(hash_slot))
       end
 
+      @impl true
       def init(config) do
         :ok = Cluster.join(__MODULE__)
         {:ok, config}
@@ -174,7 +174,17 @@ defmodule Nebulex.Adapters.Partitioned do
     cache = Keyword.fetch!(opts, :cache)
     task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
 
-    {:ok, [{Task.Supervisor, [name: cache.__task_sup__] ++ task_sup_opts}]}
+    child_spec =
+      Nebulex.Adapters.Supervisor.child_spec(
+        name: Module.concat(cache, Supervisor),
+        strategy: :rest_for_one,
+        children: [
+          {cache.__primary__, Keyword.put(opts, :cache, cache.__primary__)},
+          {Task.Supervisor, [name: cache.__task_sup__] ++ task_sup_opts}
+        ]
+      )
+
+    {:ok, child_spec}
   end
 
   @impl true
@@ -183,12 +193,14 @@ defmodule Nebulex.Adapters.Partitioned do
   end
 
   @impl true
-  def get_many(cache, keys, opts) do
+  def get_all(cache, keys, opts) do
     map_reduce(
       keys,
       cache,
-      :get_many,
-      Keyword.put(opts, :reducer, {
+      :get_all,
+      [opts],
+      Keyword.get(opts, :timeout),
+      {
         %{},
         fn
           {:ok, res}, _, acc when is_map(res) ->
@@ -197,36 +209,46 @@ defmodule Nebulex.Adapters.Partitioned do
           _, _, acc ->
             acc
         end
-      })
+      }
     )
   end
 
   @impl true
-  def set(cache, object, opts) do
-    call(cache, object.key, :set, [object, opts], opts)
+  def put(cache, key, value, ttl, on_write, opts) do
+    call(cache, key, :put, [key, value, ttl, on_write, opts], opts)
   end
 
   @impl true
-  def set_many(cache, objects, opts) do
+  def put_all(cache, entries, ttl, on_write, opts) do
     reducer = {
-      [],
+      {true, []},
       fn
-        {:ok, :ok}, _, acc ->
-          acc
+        {:ok, true}, {_, {_, _, [_, kv, _, _, _]}}, {bool, acc} ->
+          {bool, Enum.reduce(kv, acc, &[elem(&1, 0) | &2])}
 
-        {:ok, {:error, err_keys}}, _, acc ->
-          err_keys ++ acc
+        {:ok, false}, _, {_, acc} ->
+          {false, acc}
 
-        {:error, _}, {_, {_, _, [_, objs, _]}}, acc ->
-          for(obj <- objs, do: obj.key) ++ acc
+        {:error, _}, _, {_, acc} ->
+          {false, acc}
       end
     }
 
-    objects
-    |> map_reduce(cache, :set_many, Keyword.put(opts, :reducer, reducer))
+    entries
+    |> map_reduce(
+      cache,
+      :put_all,
+      [ttl, on_write, opts],
+      Keyword.get(opts, :timeout),
+      reducer
+    )
     |> case do
-      [] -> :ok
-      acc -> {:error, acc}
+      {true, _} ->
+        true
+
+      {false, keys} ->
+        :ok = Enum.each(keys, &delete(cache, &1, []))
+        on_write == :put
     end
   end
 
@@ -246,8 +268,13 @@ defmodule Nebulex.Adapters.Partitioned do
   end
 
   @impl true
-  def object_info(cache, key, attr) do
-    call(cache, key, :object_info, [key, attr])
+  def incr(cache, key, incr, ttl, opts) do
+    call(cache, key, :incr, [key, incr, ttl, opts], opts)
+  end
+
+  @impl true
+  def ttl(cache, key) do
+    call(cache, key, :ttl, [key])
   end
 
   @impl true
@@ -256,8 +283,8 @@ defmodule Nebulex.Adapters.Partitioned do
   end
 
   @impl true
-  def update_counter(cache, key, incr, opts) do
-    call(cache, key, :update_counter, [key, incr, opts], opts)
+  def touch(cache, key) do
+    call(cache, key, :touch, [key])
   end
 
   @impl true
@@ -274,16 +301,15 @@ defmodule Nebulex.Adapters.Partitioned do
 
   @impl true
   def flush(cache) do
-    _ =
-      RPC.multi_call(
-        cache.__task_sup__,
-        cache.__nodes__,
-        cache.__primary__.__adapter__,
-        :flush,
-        [cache.__primary__]
-      )
-
-    :ok
+    cache.__task_sup__
+    |> RPC.multi_call(
+      cache.__nodes__,
+      cache.__primary__.__adapter__,
+      :flush,
+      [cache.__primary__]
+    )
+    |> elem(0)
+    |> Enum.sum()
   end
 
   ## Queryable
@@ -374,9 +400,9 @@ defmodule Nebulex.Adapters.Partitioned do
 
   defp group_keys_by_node(enum, cache) do
     Enum.reduce(enum, %{}, fn
-      %Object{key: key} = object, acc ->
+      {key, _} = entry, acc ->
         node = cache.get_node(key)
-        Map.put(acc, node, [object | Map.get(acc, node, [])])
+        Map.put(acc, node, [entry | Map.get(acc, node, [])])
 
       key, acc ->
         node = cache.get_node(key)
@@ -384,15 +410,15 @@ defmodule Nebulex.Adapters.Partitioned do
     end)
   end
 
-  defp map_reduce(enum, cache, action, opts) do
+  defp map_reduce(enum, cache, action, args, timeout, reducer) do
     groups =
       enum
       |> group_keys_by_node(cache)
       |> Enum.map(fn {node, group} ->
-        {node, {cache.__primary__.__adapter__, action, [cache.__primary__, group, opts]}}
+        {node, {cache.__primary__.__adapter__, action, [cache.__primary__, group | args]}}
       end)
 
-    RPC.multi_call(cache.__task_sup__, groups, opts)
+    RPC.multi_call(cache.__task_sup__, groups, timeout: timeout, reducer: reducer)
   end
 
   defp handle_rpc_multi_call({res, []}, _action, fun) do

@@ -7,21 +7,26 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
   alias Nebulex.TestCache.Multilevel
 
   test "get for inclusive mode" do
-    1 = @l1.set(1, 1)
-    2 = @l2.set(2, 2)
-    3 = @l3.set(3, 3)
+    :ok = @l1.put(1, 1)
+    :ok = @l2.put(2, 2)
+    :ok = @l3.put(3, 3)
 
     assert 1 == Multilevel.get(1)
-    assert 2 == Multilevel.get(2, return: :key)
-    %Object{value: 2, key: 2, version: _} = Multilevel.get(2, return: :object)
-    assert 2 == 2 |> @l1.get(return: :key) |> @l2.get()
     refute @l2.get(1)
     refute @l3.get(1)
+
+    assert 2 == Multilevel.get(2)
+    assert 2 == @l1.get(2)
+    assert 2 == @l2.get(2)
     refute @l3.get(2)
+
     assert 3 == @l3.get(3)
     refute @l1.get(3)
     refute @l2.get(3)
+
     assert 3 == Multilevel.get(3)
-    assert 3 == 3 |> @l1.get(return: :key) |> @l2.get(return: :key) |> @l3.get()
+    assert 3 == @l1.get(3)
+    assert 3 == @l2.get(3)
+    assert 3 == @l3.get(3)
   end
 end

@@ -35,17 +35,17 @@ defmodule Nebulex.Adapter.Transaction do
 
   Locking only the involved key (recommended):
 
-      MyCache.transaction fn ->
+      MyCache.transaction [keys: [:counter]], fn ->
         counter = MyCache.get(:counter)
         MyCache.set(:counter, counter + 1)
-      end, keys: [:counter]
+      end
 
-      MyCache.transaction fn ->
+      MyCache.transaction [keys: [:alice, :bob]], fn ->
         alice = MyCache.get(:alice)
         bob = MyCache.get(:bob)
         MyCache.set(:alice, %{alice | balance: alice.balance + 100})
         MyCache.set(:bob, %{bob | balance: bob.balance + 100})
-      end, keys: [:alice, :bob]
+      end
   """
 
   @doc false
@@ -54,7 +54,7 @@ defmodule Nebulex.Adapter.Transaction do
       @behaviour Nebulex.Adapter.Transaction
 
       @impl true
-      def transaction(cache, fun, opts) do
+      def transaction(cache, opts, fun) do
         keys = Keyword.get(opts, :keys, [])
         nodes = Keyword.get(opts, :nodes, get_nodes(cache))
         retries = Keyword.get(opts, :retries, :infinity)
@@ -152,8 +152,8 @@ defmodule Nebulex.Adapter.Transaction do
   """
   @callback transaction(
               cache :: Nebulex.Cache.t(),
-              function :: fun,
-              opts :: Nebulex.Cache.opts()
+              opts :: Nebulex.Cache.opts(),
+              function :: fun
             ) :: any
 
   @doc """

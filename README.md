@@ -2,7 +2,7 @@
 > ### In-Process and Distributed Caching Framework for Elixir.
 > Easily craft and deploy different distributed caching topologies in Elixir.
 
-[![Build Status](https://travis-ci.org/cabol/nebulex.svg?branch=master)](https://travis-ci.org/cabol/nebulex)
+[![Build Status](https://github.com/cabol/nebulex/workflows/CI/badge.svg)](https://github.com/cabol/nebulex/actions)
 [![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
 [![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
 [![Hex Version](https://img.shields.io/hexpm/v/nebulex.svg)](https://hex.pm/packages/nebulex)
@@ -11,14 +11,14 @@
 Nebulex is an in-process and distributed caching framework with a set of
 useful and powerful features such as:
 
-  * Inspired by [Ecto][ecto]; simple and fluent API, flexible and
-    pluggable architecture (based on adapters).
+  * API Inspired by [Ecto][ecto]; flexible and pluggable architecture
+    (based on adapters).
 
   * Built-in adapters: local (generational cache), replicated, partitioned and
     multi-level.
 
-  * [Caching Decorators/Annotations](http://hexdocs.pm/nebulex/Nebulex.Caching.Decorators.html)
-    to implement different [cache usage patterns][EHCache].
+  * [Caching Annotations via Decorators](http://hexdocs.pm/nebulex/Nebulex.Decorators.html)
+    for implementing different [cache usage patterns][cache_patterns].
 
   * Support for different distributed caching topologies, such as:
     Replicated, Partitioned, Near, etc.
@@ -28,20 +28,12 @@ useful and powerful features such as:
     [multi-queue][multi_queue] or [generational caching][generational_caching]
     (built-in adapter), etc.
 
-  * Object versioning (via `:version` property); useful for
-    [Optimistic offline locks][offline_locks] implementation.
-
-  * [Pre/Post execution hooks](http://hexdocs.pm/nebulex/hooks.html). Ability
-    to hook any function call for a cache and add custom logic before and/or
-    after function execution.
-
   * Transactions and key-locking (`Nebulex.Adapter.Transaction`).
 
 [ecto]: https://github.com/elixir-ecto/ecto
 [multi_queue]: https://en.wikipedia.org/wiki/Cache_replacement_policies#Multi_queue_(MQ)
 [generational_caching]: http://fairwaytech.com/2012/09/write-through-and-generational-caching
-[offline_locks]: https://martinfowler.com/eaaCatalog/optimisticOfflineLock.html
-[EHCache]: https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc
+[cache_patterns]: https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc
 
 See the [getting started](http://hexdocs.pm/nebulex/getting-started.html) guide
 and the [online documentation](http://hexdocs.pm/nebulex/Nebulex.html).
@@ -74,7 +66,8 @@ For example, if you want to use a built-in cache, you just need to add
 ```elixir
 def deps do
   [
-    {:nebulex, "~> 1.2"}
+    {:nebulex, "~> 2.0.0"},
+    {:decorator, "~> 1.3"} #=> If you want to use Caching Annotations
   ]
 end
 ```
@@ -94,14 +87,14 @@ defmodule MyApp.Cache do
   ...
 ```
 
-> Check out the [getting started](http://hexdocs.pm/nebulex/getting-started.html)
+> See the [getting started](http://hexdocs.pm/nebulex/getting-started.html)
   guide to learn more about it.
 
 ## Important links
 
  * [Documentation](http://hexdocs.pm/nebulex/Nebulex.html)
  * [Getting Started](http://hexdocs.pm/nebulex/getting-started.html)
- * [Caching Decorators](http://hexdocs.pm/nebulex/caching-decorators.html)
+ * [Cache Usage Patterns via Nebulex.Decorators](http://hexdocs.pm/nebulex/cache-usage-patterns.html)
  * [Examples](https://github.com/cabol/nebulex_examples)
 
 ## Testing

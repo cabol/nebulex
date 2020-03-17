@@ -2,32 +2,38 @@ defmodule Nebulex.Cache.PersistenceTest do
   import Nebulex.SharedTestCase
 
   deftests do
-    import Nebulex.FileHelpers
+    @path "tmp_#{@cache}"
 
     test "dump and load" do
-      in_tmp(fn _ ->
-        :ok = File.mkdir_p!("caches")
-
+      try do
         assert 0 == @cache.size()
-        assert :ok == @cache.dump("caches/test_cache")
-        assert :ok == @cache.load("caches/test_cache")
-        assert 0 == @cache.size()
-
-        count = 33
-        map = for x <- 1..count, into: %{}, do: {x, x}
-
-        assert :ok == @cache.set_many(map)
-        assert count == @cache.size()
-
-        assert :ok == @cache.dump("caches/test_cache")
-        assert :ok == @cache.flush()
+        assert :ok == @cache.dump(@path)
+        assert File.exists?(@path)
+        assert :ok == @cache.load(@path)
         assert 0 == @cache.size()
 
-        assert {:error, :enoent} == @cache.load("caches/wrong_file")
-        assert :ok == @cache.load("caches/test_cache")
-        assert map == @cache.get_many(1..count)
-        assert count == @cache.size()
-      end)
+        count = 100
+        unexpired = for x <- 1..count, into: %{}, do: {x, x}
+
+        assert :ok == @cache.put_all(unexpired)
+        assert :ok == @cache.put_all(%{a: 1, b: 2}, ttl: 10)
+        assert :ok == @cache.put_all(%{c: 1, d: 2}, ttl: 3_600_000)
+        assert @cache.size() == count + 4
+
+        :ok = Process.sleep(1000)
+        assert :ok == @cache.dump(@path)
+        assert File.exists?(@path)
+        assert @cache.flush() == count + 4
+        assert @cache.size() == 0
+
+        assert {:error, :enoent} == @cache.load("wrong_file")
+        assert :ok == @cache.load(@path)
+        assert unexpired == @cache.get_all(1..count)
+        assert %{c: 1, d: 2} == @cache.get_all([:a, :b, :c, :d])
+        assert @cache.size() == count + 2
+      after
+        File.rm_rf!(@path)
+      end
     end
   end
 end

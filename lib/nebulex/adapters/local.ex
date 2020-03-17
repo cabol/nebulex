@@ -2,40 +2,46 @@ defmodule Nebulex.Adapters.Local do
   @moduledoc ~S"""
   Adapter module for Local Generational Cache.
 
-  It uses [Shards](https://github.com/cabol/shards) as in-memory backend
-  (ETS tables are used internally).
-
   ## Features
 
-    * Support for generational cache – inspired by
+    * Generational cache – inspired by
       [epocxy](https://github.com/duomark/epocxy).
+    * Configurable backend (`ets` or `:shards`).
+    * Support for Sharding – For intensive workloads, the Cache may also be
+      partitioned (by using `:shards` backend and specifying the `:partitions`
+      option).
+    * Support for garbage collection (see `Nebulex.Adapters.Local.Generation`).
+    * Time-based eviction through the `:ttl` option (Time-To-Live).
+    * Support for transactions via Erlang global name registration facility.
 
-    * Support for Sharding – handled by `:shards`.
+  ## Compile-Time Options
 
-    * Support for garbage collection via `Nebulex.Adapters.Local.Generation`
+  In addition to `:otp_app` and `:adapter`, this adapter supports the next
+  compile-time options:
 
-    * Support for transactions via Erlang global name registration facility
+    * `:backend` - Defines the backend or storage to be used for the adapter.
+      Supported backends are: `:ets` and `:shards`. Defaults to `:ets`.
 
-  ## Options
+  ## Config Options
 
   These options can be set through the config file:
 
     * `:n_generations` - Max number of Cache generations, defaults to `2`.
 
-    * `:n_shards` - The number of partitions for each Cache generation table.
-      Defaults to `System.schedulers_online()`. See `:shards.new/2`.
+    * `:read_concurrency` - Since this adapter uses ETS tables internally,
+      this option is used when a new table is created. See `:ets.new/2`.
+      Defaults to `true`.
 
-    * `:read_concurrency` - Indicates whether the tables that `:shards`
-      creates uses `:read_concurrency` or not (default: `true`).
-      See `:ets.new/2`.
+    * `:write_concurrency` - Since this adapter uses ETS tables internally,
+      this option is used when a new table is created. See `:ets.new/2`.
+      Defaults to `true`.
 
-    * `:write_concurrency` - Indicates whether the tables that `:shards`
-      creates uses `:write_concurrency` or not (default: `true`).
-      See `:ets.new/2`.
+     * `:compressed` - This option is used when a new ETS table is created and
+       it defines whether or not it includes X as an option. See `:ets.new/2`.
+       Defaults to `false`.
 
-    * `:compressed` - If this option is present, the table data is stored in a
-      more compact format to consume less memory. However, it will make table
-      operations slower (default: `false`). See `:ets.new/2`.
+    * `:partitions` - The number of partitions in the Cache. This option is only
+      available for `:shards` backend. Defaults to `System.schedulers_online()`.
 
     * `:gc_interval` - Interval time in seconds to garbage collection to run,
       delete the oldest generation and create a new one. If this option is
@@ -45,13 +51,16 @@ defmodule Nebulex.Adapters.Local do
     * `:allocated_memory` - Max size in bytes allocated for a cache generation.
       If this option is set and the configured value is reached, a new
       generation is created so the oldest is deleted and force releasing memory
-      space. If it is not set (`nil`), the cleanup check to release memory
-      is not performed (the default).
+      space. If it is not set (or set to `nil`), the cleanup check to release
+      memory is not performed (the default).
 
-    * `:gc_cleanup_interval` - The number of writes needed to run the cleanup
-      check. Once this value is reached and only if `allocated_memory` option
-      is set, the cleanup check is performed. Defaults to `10`, so after 10
-      write operations the cleanup check is performed.
+    * `:gc_cleanup_min_timeout` - The min timeout in seconds for triggering the
+      next cleanup and memory check. This will be the timeout to use when the
+      max allocated memory is reached. Defaults to `30`sec.
+
+    * `:gc_cleanup_max_timeout` - The max timeout in seconds for triggering the
+      next cleanup and memory check. This is the timeout used when the cache
+      starts or the consumed memory is `0`. Defaults to `300`sec.
 
   ## Example
 
@@ -61,16 +70,30 @@ defmodule Nebulex.Adapters.Local do
       defmodule MyApp.LocalCache do
         use Nebulex.Cache,
           otp_app: :my_app,
-          adapter: Nebulex.Adapters.Local
+          adapter: Nebulex.Adapters.Local,
+          backend: :shards
       end
 
   Where the configuration for the cache must be in your application
   environment, usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.LocalCache,
-        n_shards: 2,
         gc_interval: 3600,
-        write_concurrency: true
+        allocated_memory: 2_000_000_000,
+        gc_cleanup_min_timeout: 10,
+        gc_cleanup_max_timeout: 900
+
+  For intensive workloads, the Cache may also be partitioned (by using `:shards`
+  backend and specifying the `:partitions` option). If partitioning is required
+  then a good default is to set the number of partitions to the number of
+  schedulers available (the default):
+
+      config :my_app, MyApp.LocalCache,
+        gc_interval: 3600,
+        allocated_memory: 2_000_000_000,
+        gc_cleanup_min_timeout: 10,
+        gc_cleanup_max_timeout: 900,
+        partitions: System.schedulers_online()
 
   For more information about the usage, check out `Nebulex.Cache`.
 
@@ -94,7 +117,7 @@ defmodule Nebulex.Adapters.Local do
 
   The adapter supports as query parameter the following values:
 
-    * `query` - `nil | :all_unexpired | :all_expired | :ets.match_spec()`
+    * `query` - `nil | :unexpired | :expired | :ets.match_spec()`
 
   Internally, an entry is represented by the tuple `{key, val, vsn, exp}`,
   which means the match pattern within the `:ets.match_spec()` must be
@@ -105,8 +128,8 @@ defmodule Nebulex.Adapters.Local do
 
       # built-in queries
       MyCache.all()
-      MyCache.all(:all_unexpired)
-      MyCache.all(:all_expired)
+      MyCache.all(:unexpired)
+      MyCache.all(:expired)
 
       # using a custom match spec (all values > 10)
       spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
@@ -123,11 +146,15 @@ defmodule Nebulex.Adapters.Local do
       MyCache.all(spec)
 
   The `:return` option applies only for built-in queries, such as:
-  `nil | :all_unexpired | :all_expired`, if you are using a
+  `nil | :unexpired | :expired`, if you are using a
   custom `:ets.match_spec()`, the return value depends on it.
 
   The same applies to `stream` function.
   """
+
+  # Provide Cache Implementation
+  @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Queryable
 
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
@@ -135,61 +162,43 @@ defmodule Nebulex.Adapters.Local do
   # Inherit default persistence implementation
   use Nebulex.Adapter.Persistence
 
-  # Provide Cache Implementation
-  @behaviour Nebulex.Adapter
-  @behaviour Nebulex.Adapter.Queryable
+  import Record
 
-  alias Nebulex.Adapters.Local.Generation
-  alias Nebulex.Object
-  alias :shards_local, as: Local
+  alias Nebulex.Adapters.Local.{Backend, Generation}
+  alias Nebulex.{Entry, Time}
+
+  # Cache Entry
+  defrecord(:entry,
+    key: nil,
+    value: nil,
+    touched: nil,
+    ttl: nil
+  )
+
+  # Suported Backends
+  @backends ~w(ets shards)a
 
   ## Adapter
 
   @impl true
   defmacro __before_compile__(env) do
-    cache = env.module
-    config = Module.get_attribute(cache, :config)
-    allocated_memory = Keyword.get(config, :allocated_memory)
-    n_shards = Keyword.get(config, :n_shards, System.schedulers_online())
-    shards_sup_name = Module.concat([cache, ShardsSupervisor])
+    opts = Module.get_attribute(env.module, :opts)
+    backend = Keyword.get(opts, :backend, :ets)
 
-    shards_state =
-      n_shards
-      |> :shards_state.new(:shards_local, shards_sup_name)
-      |> Macro.escape()
-
-    tab_opts = [
-      :set,
-      {:sup_name, shards_sup_name},
-      {:n_shards, n_shards},
-      {:read_concurrency, Keyword.get(config, :read_concurrency, true)},
-      {:write_concurrency, Keyword.get(config, :write_concurrency, true)}
-      | if(Keyword.get(config, :compressed), do: [:compressed], else: [])
-    ]
+    unless backend in @backends do
+      raise ArgumentError, "supported backends: #{inspect(@backends)}, got: #{inspect(backend)}"
+    end
 
     quote do
       alias Nebulex.Adapters.Local.Generation
       alias Nebulex.Adapters.Local.Metadata
 
+      def __backend__, do: unquote(backend)
+
       def __metadata__, do: Metadata.get(__MODULE__)
-
-      def __state__, do: unquote(shards_state)
-
-      def __shards_sup_name__, do: unquote(shards_sup_name)
-
-      def __tab_opts__, do: unquote(tab_opts)
 
       def new_generation(opts \\ []) do
         Generation.new(__MODULE__, opts)
-      end
-
-      if unquote(allocated_memory) do
-        def cleanup(bypass_arg) do
-          :ok = Generation.cleanup(__MODULE__)
-          bypass_arg
-        end
-      else
-        def cleanup(bypass_arg), do: bypass_arg
       end
     end
   end
@@ -197,65 +206,45 @@ defmodule Nebulex.Adapters.Local do
   @impl true
   def init(opts) do
     cache = Keyword.fetch!(opts, :cache)
-
-    children = [
-      %{
-        id: cache.__shards_sup_name__,
-        start: {:shards_sup, :start_link, [cache.__shards_sup_name__]},
-        type: :supervisor
-      },
-      %{
-        id: Generation,
-        start: {Generation, :start_link, [cache, opts]}
-      }
-    ]
-
-    {:ok, children}
+    {:ok, Backend.child_spec(cache, opts)}
   end
 
   @impl true
   def get(cache, key, _opts) do
     cache.__metadata__.generations
-    |> do_get(cache, key)
-    |> entry_to_object()
+    |> do_get(key, cache)
+    |> return(:value)
   end
 
-  defp do_get([newest | _] = generations, cache, key) do
-    case fetch(cache, newest, key) do
-      nil ->
-        generations
-        |> retrieve(cache, key)
-        |> elem(1)
-
-      ret ->
-        ret
+  defp do_get([newest | _] = generations, key, cache) do
+    with nil <- fetch_from_gen(newest, key, cache) do
+      generations
+      |> retrieve_from_gens(key, cache)
+      |> elem(1)
     end
   end
 
-  defp fetch(cache, gen, key, fun \\ &local_get/4) do
+  defp fetch_from_gen(gen, key, cache, fun \\ &get_entry/4) do
     fun
-    |> apply([gen, key, nil, cache.__state__])
+    |> apply([gen, key, nil, cache])
     |> validate_ttl(gen, cache)
   end
 
-  defp retrieve([newest | olders], cache, key) do
+  defp retrieve_from_gens([newest | olders], key, cache) do
     Enum.reduce_while(olders, {newest, nil}, fn gen, {newer, _} ->
-      case fetch(cache, gen, key, &local_pop/4) do
+      case fetch_from_gen(gen, key, cache, &pop_entry/4) do
         nil ->
           {:cont, {gen, nil}}
 
-        {k, v, vsn, exp} ->
-          # make sure we take the old timestamp since it will get set to
-          # the default :infinity otherwise.
-          entry = {k, v, vsn, diff_epoch(exp)}
-          true = Local.insert(newer, entry, cache.__state__)
-          {:halt, {gen, entry}}
+        entry() = cached ->
+          true = cache.__backend__.insert(newer, cached)
+          {:halt, {gen, cached}}
       end
     end)
   end
 
   @impl true
-  def get_many(cache, keys, _opts) do
+  def get_all(cache, keys, _opts) do
     Enum.reduce(keys, %{}, fn key, acc ->
       if obj = get(cache, key, []),
         do: Map.put(acc, key, obj),
@@ -264,122 +253,120 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def set(cache, object, opts) do
-    opts
-    |> Keyword.get(:action, :set)
-    |> do_set(cache, object)
+  def put(cache, key, value, ttl, on_write, _opts) do
+    do_put(
+      on_write,
+      cache,
+      entry(
+        key: key,
+        value: value,
+        touched: Time.now(),
+        ttl: ttl
+      )
+    )
   end
 
-  defp do_set(:set, cache, %Object{key: key, value: val, version: vsn, expire_at: exp}) do
-    local_set(cache, {key, val, vsn, exp})
+  defp do_put(:put, cache, entry) do
+    put_entries(cache, entry)
   end
 
-  defp do_set(:add, cache, %Object{key: key, value: val, version: vsn, expire_at: exp}) do
-    cache.__metadata__.generations
-    |> hd()
-    |> Local.insert_new({key, val, vsn, exp}, cache.__state__)
-    |> cache.cleanup()
+  defp do_put(:put_new, cache, entry) do
+    put_new_entries(cache, entry)
   end
 
-  defp do_set(:replace, cache, %Object{key: key, value: val, version: vsn, expire_at: exp}) do
-    local_update(cache, key, [{2, val}, {3, vsn}, {4, exp}])
+  defp do_put(:replace, cache, entry(key: key, value: value, ttl: ttl)) do
+    update_entry(cache, key, [{3, value}, {4, nil}, {5, ttl}])
   end
 
   @impl true
-  def set_many(cache, objects, _opts) do
+  def put_all(cache, entries, ttl, on_write, _opts) do
+    touched = Time.now()
+
     entries =
-      for %Object{key: key, value: value, version: version, expire_at: expire_at} <- objects,
-          value != nil do
-        {key, value, version, expire_at}
+      for {key, value} <- entries, value != nil do
+        entry(key: key, value: value, touched: touched, ttl: ttl)
       end
 
-    true = local_set(cache, entries)
-    :ok
-  rescue
-    _ -> {:error, for(o <- objects, do: o.key)}
+    do_put_all(cache, entries, on_write)
+  end
+
+  defp do_put_all(cache, entries, :put) do
+    put_entries(cache, entries)
+  end
+
+  defp do_put_all(cache, entries, :put_new) do
+    put_new_entries(cache, entries)
   end
 
   @impl true
   def delete(cache, key, _opts) do
-    Enum.each(cache.__metadata__.generations, &Local.delete(&1, key, cache.__state__))
+    Enum.each(cache.__metadata__.generations, &cache.__backend__.delete(&1, key))
   end
 
   @impl true
   def take(cache, key, _opts) do
     Enum.reduce_while(cache.__metadata__.generations, nil, fn gen, acc ->
-      case Local.take(gen, key, cache.__state__) do
-        [entry] -> {:halt, entry_to_object(entry)}
-        [] -> {:cont, acc}
-      end
-    end)
-  end
+      case cache.__backend__.take(gen, key) do
+        [entry] ->
+          value =
+            entry
+            |> validate_ttl(gen, cache)
+            |> return(:value)
 
-  @impl true
-  def has_key?(cache, key) do
-    Enum.reduce_while(cache.__metadata__.generations, false, fn gen, acc ->
-      if has_key?(gen, key, Object.ts(), cache.__state__),
-        do: {:halt, true},
-        else: {:cont, acc}
-    end)
-  end
+          {:halt, value}
 
-  defp has_key?(gen, key, now, state) do
-    case Local.lookup_element(gen, key, 4, state) do
-      exp when not is_nil(exp) and exp <= now ->
-        true = Local.delete(gen, key, state)
-        false
-
-      _ ->
-        true
-    end
-  rescue
-    ArgumentError -> false
-  end
-
-  @impl true
-  def object_info(cache, key, attr) do
-    Enum.reduce_while(cache.__metadata__.generations, nil, fn gen, acc ->
-      case {fetch(cache, gen, key), attr} do
-        {{_, _, _, exp}, :ttl} ->
-          {:halt, Object.remaining_ttl(exp)}
-
-        {{_, _, vsn, _}, :version} ->
-          {:halt, vsn}
-
-        {nil, _} ->
+        [] ->
           {:cont, acc}
       end
     end)
   end
 
   @impl true
-  def expire(cache, key, ttl) do
-    expire_at = Object.expire_at(ttl)
+  def incr(cache, key, incr, ttl, _opts) do
+    cache.__metadata__.generations
+    |> hd()
+    |> cache.__backend__.update_counter(
+      key,
+      {3, incr},
+      entry(key: key, value: 0, touched: Time.now(), ttl: ttl)
+    )
+  end
 
-    case local_update(cache, key, {4, expire_at}) do
-      true -> expire_at || :infinity
-      false -> nil
+  @impl true
+  def has_key?(cache, key) do
+    case get(cache, key, []) do
+      nil -> false
+      _ -> true
     end
   end
 
   @impl true
-  def update_counter(cache, key, incr, opts) do
-    exp =
-      opts
-      |> Keyword.get(:ttl)
-      |> Object.expire_at()
-
+  def ttl(cache, key) do
     cache.__metadata__.generations
-    |> hd()
-    |> Local.update_counter(key, {2, incr}, {key, 0, nil, exp}, cache.__state__)
-    |> cache.cleanup()
+    |> do_get(key, cache)
+    |> return()
+    |> case do
+      nil -> nil
+      entry(ttl: :infinity) -> :infinity
+      entry(ttl: ttl, touched: touched) -> ttl - (Time.now() - touched)
+    end
+  end
+
+  @impl true
+  def expire(cache, key, ttl) do
+    update_entry(cache, key, [{4, Time.now()}, {5, ttl}])
+  end
+
+  @impl true
+  def touch(cache, key) do
+    update_entry(cache, key, [{4, Time.now()}])
   end
 
   @impl true
   def size(cache) do
     Enum.reduce(cache.__metadata__.generations, 0, fn gen, acc ->
       gen
-      |> Local.info(:size, cache.__state__)
+      |> cache.__backend__.info(:size)
       |> Kernel.+(acc)
     end)
   end
@@ -396,7 +383,7 @@ defmodule Nebulex.Adapters.Local do
     query = validate_match_spec(query, opts)
 
     for gen <- cache.__metadata__.generations,
-        elems <- Local.select(gen, query, cache.__state__),
+        elems <- cache.__backend__.select(gen, query),
         do: elems
   end
 
@@ -411,7 +398,7 @@ defmodule Nebulex.Adapters.Local do
     Stream.resource(
       fn ->
         [newer | _] = generations = cache.__metadata__.generations
-        result = Local.select(newer, match_spec, page_size, cache.__state__)
+        result = cache.__backend__.select(newer, match_spec, page_size)
         {result, generations}
       end,
       fn
@@ -422,12 +409,12 @@ defmodule Nebulex.Adapters.Local do
           result =
             generations
             |> hd()
-            |> Local.select(match_spec, page_size, cache.__state__)
+            |> cache.__backend__.select(match_spec, page_size)
 
           {[], {result, generations}}
 
         {{elements, cont}, [_ | _] = generations} ->
-          {elements, {Local.select(cont), generations}}
+          {elements, {cache.__backend__.select(cont), generations}}
       end,
       & &1
     )
@@ -436,7 +423,7 @@ defmodule Nebulex.Adapters.Local do
   ## Transaction
 
   @impl true
-  def transaction(cache, fun, opts) do
+  def transaction(cache, opts, fun) do
     keys = Keyword.get(opts, :keys, [])
     nodes = Keyword.get(opts, :nodes, [node()])
     retries = Keyword.get(opts, :retries, :infinity)
@@ -445,62 +432,59 @@ defmodule Nebulex.Adapters.Local do
 
   ## Helpers
 
-  defp local_get(tab, key, default, state) do
-    case Local.lookup(tab, key, state) do
+  defp get_entry(tab, key, default, cache) do
+    case cache.__backend__.lookup(tab, key) do
       [] -> default
       [entry] -> entry
     end
   end
 
-  defp local_pop(tab, key, default, state) do
-    case Local.take(tab, key, state) do
+  defp pop_entry(tab, key, default, cache) do
+    case cache.__backend__.take(tab, key) do
       [] -> default
       [entry] -> entry
     end
   end
 
-  defp local_set(cache, entries) do
+  defp put_entries(cache, entry_or_entries) do
     cache.__metadata__.generations
     |> hd()
-    |> Local.insert(entries, cache.__state__)
-    |> cache.cleanup()
+    |> cache.__backend__.insert(entry_or_entries)
   end
 
-  defp local_update(cache, key, updates) do
+  defp put_new_entries(cache, entry_or_entries) do
     cache.__metadata__.generations
     |> hd()
-    |> Local.update_element(key, updates, cache.__state__)
+    |> cache.__backend__.insert_new(entry_or_entries)
   end
 
-  defp entry_to_object(nil), do: nil
-
-  defp entry_to_object({key, val, vsn, :infinity}) do
-    %Object{key: key, value: val, version: vsn}
+  defp update_entry(cache, key, updates) do
+    cache.__metadata__.generations
+    |> hd()
+    |> cache.__backend__.update_element(key, updates)
   end
 
-  defp entry_to_object({key, val, vsn, expire_at}) do
-    %Object{key: key, value: val, version: vsn, expire_at: expire_at}
-  end
+  defp return(entry, field \\ nil)
+  defp return(nil, _field), do: nil
+  defp return(entry(value: value), :value), do: value
+  defp return(entry, _field), do: entry
 
   defp validate_ttl(nil, _, _), do: nil
-  defp validate_ttl({_, _, _, nil} = entry, _, _), do: entry
+  defp validate_ttl(entry(ttl: :infinity) = entry, _, _), do: entry
 
-  defp validate_ttl({key, _, _, expire_at} = entry, gen, cache) do
-    if expire_at > Object.ts() do
-      entry
-    else
-      true = Local.delete(gen, key, cache.__state__)
+  defp validate_ttl(entry(key: key, touched: touched, ttl: ttl) = entry, gen, cache) do
+    if Time.now() - touched >= ttl do
+      true = cache.__backend__.delete(gen, key)
       nil
+    else
+      entry
     end
   end
 
-  defp diff_epoch(ttl) when is_integer(ttl), do: ttl - Object.ts()
-  defp diff_epoch(_), do: :infinity
-
-  defp validate_match_spec(spec, opts) when spec in [nil, :all_unexpired, :all_expired] do
+  defp validate_match_spec(spec, opts) when spec in [nil, :unexpired, :expired] do
     [
       {
-        {:"$1", :"$2", :"$3", :"$4"},
+        entry(key: :"$1", value: :"$2", touched: :"$3", ttl: :"$4"),
         if(spec = comp_match_spec(spec), do: [spec], else: []),
         ret_match_spec(opts)
       }
@@ -508,7 +492,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp validate_match_spec(spec, _opts) do
-    case Local.test_ms({nil, nil, nil, :infinity}, spec) do
+    case :ets.test_ms({nil, nil, nil, :infinity}, spec) do
       {:ok, _result} ->
         spec
 
@@ -520,17 +504,17 @@ defmodule Nebulex.Adapters.Local do
   defp comp_match_spec(nil),
     do: nil
 
-  defp comp_match_spec(:all_unexpired),
-    do: {:orelse, {:==, :"$4", nil}, {:>, :"$4", Object.ts()}}
+  defp comp_match_spec(:unexpired),
+    do: {:orelse, {:==, :"$4", :infinity}, {:<, {:-, Time.now(), :"$3"}, :"$4"}}
 
-  defp comp_match_spec(:all_expired),
-    do: {:not, comp_match_spec(:all_unexpired)}
+  defp comp_match_spec(:expired),
+    do: {:not, comp_match_spec(:unexpired)}
 
   defp ret_match_spec(opts) do
     case Keyword.get(opts, :return, :key) do
       :key -> [:"$1"]
       :value -> [:"$2"]
-      :object -> [%Object{key: :"$1", value: :"$2", version: :"$3", expire_at: :"$4"}]
+      :entry -> [%Entry{key: :"$1", value: :"$2", touched: :"$3", ttl: :"$4"}]
     end
   end
 end

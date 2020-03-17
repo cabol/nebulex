@@ -29,7 +29,7 @@ erl_crash.dump
 erl_crash.dump
 .DS_Store
 ._*
-/tmp
+/tmp*
 .elixir*
 .vs*
 /priv

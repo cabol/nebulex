@@ -35,44 +35,20 @@ defmodule Nebulex.Adapters.Replicated do
 
   > Based on **"Distributed Caching Essential Lessons"** by **Cameron Purdy**.
 
-  ## Options
-
-  These options can be set through the config file:
-
-    * `:primary` - The module for the primary storage. The value must be a
-      valid local cache adapter so that the partitioned adapter can store
-      the data in there. For example, you can set the `Nebulex.Adapters.Local`
-      as value, unless you want to provide another one.
-
-  ## Runtime options
-
-  These options apply to all adapter's functions.
-
-    * `:timeout` - The time-out value in milliseconds for the command that
-      will be executed. If the timeout is exceeded, then the current process
-      will exit. This adapter uses `Task.await/2` internally, therefore,
-      check the function documentation to learn more about it. For commands
-      like `set_many` and `get_many`, if the timeout is exceeded, the task
-      is shutted down but the current process doesn't exit, only the result
-      associated to that task is just skipped in the reduce phase.
-
-    * `task_supervisor_opts` - Defines the options passed to
-      `Task.Supervisor.start_link/1` when the adapter is initialized.
-
-  ## Example
-
-  `Nebulex.Cache` is the wrapper around the cache. We can define the local
-  and replicated cache as follows:
+  When used, aside from the `:otp_app` and `:adapter` the cache expects
+  `:primary` option as well. For example, the cache:
 
       defmodule MyApp.ReplicatedCache do
         use Nebulex.Cache,
           otp_app: :my_app,
-          adapter: Nebulex.Adapters.Replicated
+          adapter: Nebulex.Adapters.Replicated,
+          primary: MyApp.ReplicatedCache.Primary
 
         defmodule Primary do
           use Nebulex.Cache,
             otp_app: :my_app,
-            adapter: Nebulex.Adapters.Local
+            adapter: Nebulex.Adapters.Local,
+            backend: :shards
         end
       end
 
@@ -80,13 +56,40 @@ defmodule Nebulex.Adapters.Replicated do
   usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.ReplicatedCache.Primary,
-        n_shards: 2,
-        gc_interval: 3600
+        gc_interval: 3600,
+        partitions: System.schedulers_online()
 
-      config :my_app, MyApp.ReplicatedCache,
-        primary: MyApp.ReplicatedCache.Primary
+  For more information about the usage, see `Nebulex.Cache` documentation.
 
-  For more information about the usage, check out `Nebulex.Cache`.
+  ## Compile-Time Options
+
+  In addition to `:otp_app` and `:adapter`, this adapter supports the next
+  compile-time options:
+
+    * `:primary` - Compile-time option which defines the module for the
+      primary storage. The value must be a valid local cache adapter so that
+      the replicated adapter can store the data in there. For example, you can
+      set the `Nebulex.Adapters.Local` as value, unless you want to provide
+      another one.
+
+  ## Config Options
+
+  These options can be set through the config file:
+
+    * `task_supervisor_opts` - Start-time options passed to
+      `Task.Supervisor.start_link/1` when the adapter is initialized.
+
+  ## Runtime options
+
+  These options apply to all adapter's functions.
+
+    * `:timeout` - The time-out value in milliseconds for the command that
+      will be executed. If the timeout is exceeded, then the current process
+      will exit. For executing a command on remote nodes, this adapter uses
+      `Task.await/2` internally for receiving the result, so this option tells
+      how much time the adapter should wait for it. If the timeout is exceeded,
+      the task is shut down but the current process doesn't exit, only the
+      result associated with that task is skipped in the reduce phase.
 
   ## Extended API
 
@@ -105,15 +108,15 @@ defmodule Nebulex.Adapters.Replicated do
   Returns the nodes that belongs to the caller Cache.
   """
 
+  # Provide Cache Implementation
+  @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Queryable
+
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
 
   # Inherit default persistence implementation
   use Nebulex.Adapter.Persistence
-
-  # Provide Cache Implementation
-  @behaviour Nebulex.Adapter
-  @behaviour Nebulex.Adapter.Queryable
 
   alias Nebulex.RPC
 
@@ -121,20 +124,12 @@ defmodule Nebulex.Adapters.Replicated do
 
   @impl true
   defmacro __before_compile__(env) do
-    otp_app = Module.get_attribute(env.module, :otp_app)
-    config = Module.get_attribute(env.module, :config)
+    opts = Module.get_attribute(env.module, :opts)
     task_supervisor = Module.concat([env.module, TaskSupervisor])
-
-    unless primary = Keyword.get(config, :primary) do
-      raise ArgumentError,
-            "missing :primary configuration in " <>
-              "config #{inspect(otp_app)}, #{inspect(env.module)}"
-    end
+    primary = opts[:primary] || raise ArgumentError, "expected primary: to be given as argument"
 
     quote do
-      alias Nebulex.Adapters.Local.Generation
       alias Nebulex.Cache.Cluster
-      alias Nebulex.Object
 
       def __primary__, do: unquote(primary)
 
@@ -146,39 +141,6 @@ defmodule Nebulex.Adapters.Replicated do
         :ok = Cluster.join(__MODULE__)
         {:ok, config}
       end
-
-      def import do
-        cluster_nodes = Cluster.get_nodes(__MODULE__)
-
-        case cluster_nodes -- [node()] do
-          [] ->
-            :ok
-
-          nodes ->
-            transaction(
-              fn ->
-                nodes
-                |> Enum.reduce_while([], &stream_entries/2)
-                |> unquote(primary).set_many()
-              end,
-              keys: [:"$global_lock"],
-              nodes: cluster_nodes
-            )
-        end
-      end
-
-      defp stream_entries(node, acc) do
-        stream_fun = fn ->
-          nil
-          |> __MODULE__.stream(return: :object, page_size: 10)
-          |> Enum.filter(&(not Object.expired?(&1)))
-        end
-
-        case :rpc.call(node, Kernel, :apply, [stream_fun, []]) do
-          {:badrpc, _} -> {:cont, acc}
-          entries -> {:halt, entries}
-        end
-      end
     end
   end
 
@@ -187,10 +149,18 @@ defmodule Nebulex.Adapters.Replicated do
     cache = Keyword.fetch!(opts, :cache)
     task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
 
-    # import all cached entries from another node
-    :ok = cache.import()
+    child_spec =
+      Nebulex.Adapters.Supervisor.child_spec(
+        name: Module.concat(cache, Supervisor),
+        strategy: :rest_for_one,
+        children: [
+          {cache.__primary__, Keyword.put(opts, :cache, cache.__primary__)},
+          {Nebulex.Adapters.Replicated.Bootstrap, cache},
+          {Task.Supervisor, [name: cache.__task_sup__] ++ task_sup_opts}
+        ]
+      )
 
-    {:ok, [{Task.Supervisor, [name: cache.__task_sup__] ++ task_sup_opts}]}
+    {:ok, child_spec}
   end
 
   @impl true
@@ -199,19 +169,19 @@ defmodule Nebulex.Adapters.Replicated do
   end
 
   @impl true
-  def get_many(cache, keys, opts) do
-    cache.__primary__.__adapter__.get_many(cache.__primary__, keys, opts)
+  def get_all(cache, keys, opts) do
+    cache.__primary__.__adapter__.get_all(cache.__primary__, keys, opts)
   end
 
   @impl true
-  def set(cache, object, opts) do
-    with_transaction(cache, :set, [object.key], [object, opts], opts)
+  def put(cache, key, value, ttl, on_write, opts) do
+    with_transaction(cache, :put, [key], [key, value, ttl, on_write, opts], opts)
   end
 
   @impl true
-  def set_many(cache, objects, opts) do
-    keys = for obj <- objects, do: obj.key
-    with_transaction(cache, :set_many, keys, [objects, opts], opts)
+  def put_all(cache, entries, ttl, on_write, opts) do
+    keys = for {k, _} <- entries, do: k
+    with_transaction(cache, :put_all, keys, [entries, ttl, on_write, opts], opts)
   end
 
   @impl true
@@ -225,23 +195,28 @@ defmodule Nebulex.Adapters.Replicated do
   end
 
   @impl true
+  def incr(cache, key, incr, ttl, opts) do
+    with_transaction(cache, :incr, [key], [key, incr, ttl, opts], opts)
+  end
+
+  @impl true
   def has_key?(cache, key) do
     cache.__primary__.__adapter__.has_key?(cache.__primary__, key)
   end
 
   @impl true
-  def object_info(cache, key, attr) do
-    cache.__primary__.__adapter__.object_info(cache.__primary__, key, attr)
+  def ttl(cache, key) do
+    cache.__primary__.__adapter__.ttl(cache.__primary__, key)
   end
 
   @impl true
   def expire(cache, key, ttl) do
-    cache.__primary__.__adapter__.expire(cache.__primary__, key, ttl)
+    with_transaction(cache, :expire, [key], [key, ttl])
   end
 
   @impl true
-  def update_counter(cache, key, incr, opts) do
-    with_transaction(cache, :update_counter, [key], [key, incr, opts], opts)
+  def touch(cache, key) do
+    with_transaction(cache, :touch, [key], [key])
   end
 
   @impl true
@@ -276,8 +251,8 @@ defmodule Nebulex.Adapters.Replicated do
     # table `:global_locks` managed by `:global`, but thus far, it was the
     # simplest and fastest way to block all write-like operations when the
     # `flush` action is performed or a new node is joined and the entries are
-    # being imported to it from another node. Perhaps find a better way to
-    # address these scenarios.
+    # being imported to it from another node. Perhaps find a better way for
+    # addressing these scenarios.
     case :ets.lookup(:global_locks, {cache, :"$global_lock"}) do
       [_] ->
         :ok = Process.sleep(1)
@@ -286,11 +261,10 @@ defmodule Nebulex.Adapters.Replicated do
       [] ->
         transaction(
           cache,
+          [keys: keys, nodes: cache.__nodes__],
           fn ->
             multi_call(cache, action, args, opts)
-          end,
-          keys: keys,
-          nodes: cache.__nodes__
+          end
         )
     end
   end
@@ -312,4 +286,62 @@ defmodule Nebulex.Adapters.Replicated do
   defp handle_rpc_multi_call({_, errors}, action) do
     raise Nebulex.RPCMultiCallError, action: action, errors: errors
   end
+end
+
+defmodule Nebulex.Adapters.Replicated.Bootstrap do
+  @moduledoc false
+  use GenServer
+
+  alias Nebulex.Cache.Cluster
+
+  @doc false
+  def start_link(cache) do
+    name = Module.concat(cache, Bootstrap)
+    GenServer.start_link(__MODULE__, cache, name: name)
+  end
+
+  @impl true
+  def init(cache) do
+    :ok = import_from_nodes(cache)
+    {:ok, nil}
+  end
+
+  # coveralls-ignore-start
+  defp import_from_nodes(cache) do
+    cluster_nodes = Cluster.get_nodes(cache)
+
+    case cluster_nodes -- [node()] do
+      [] ->
+        :ok
+
+      nodes ->
+        cache.transaction(
+          [
+            keys: [:"$global_lock"],
+            nodes: cluster_nodes
+          ],
+          fn ->
+            nodes
+            |> Enum.reduce_while([], &stream_entries(cache, &1, &2))
+            |> cache.__primary__.put_all()
+          end
+        )
+    end
+  end
+
+  defp stream_entries(cache, node, acc) do
+    stream_fun = fn ->
+      :unexpired
+      |> cache.stream(return: :entry, page_size: 10)
+      |> Stream.map(&{&1.key, &1.value})
+      |> Enum.to_list()
+    end
+
+    case :rpc.call(node, Kernel, :apply, [stream_fun, []]) do
+      {:badrpc, _} -> {:cont, acc}
+      entries -> {:halt, entries}
+    end
+  end
+
+  # coveralls-ignore-stop
 end

@@ -1,54 +1,63 @@
-defmodule Nebulex.Version.Timestamp do
-  @moduledoc false
-  @behaviour Nebulex.Object.Version
-
-  alias Nebulex.Object
-
-  @impl true
-  def generate(nil), do: now()
-  def generate(%Object{}), do: now()
-
-  defp now, do: DateTime.to_unix(DateTime.utc_now(), :nanosecond)
-end
-
 defmodule Nebulex.TestCache do
   @moduledoc false
+
   defmodule Hooks do
     @moduledoc false
-    defmacro __using__(opts) do
-      quote bind_quoted: [opts: opts] do
-        @opts opts
 
-        def pre_hooks do
-          pre_hook = fn
-            result, {_, :get, _} = call ->
-              send(:hooked_cache, call)
+    defmodule TestHook do
+      @moduledoc false
+      use Nebulex.Hook
 
-            _, _ ->
-              :noop
-          end
+      use GenServer
 
-          {@opts[:pre_hooks_mode] || :async, [pre_hook]}
-        end
+      alias Nebulex.Hook.Event
 
-        def post_hooks do
-          wrong_hook = fn var -> var end
-          {@opts[:post_hooks_mode] || :async, [wrong_hook, &post_hook/2]}
-        end
+      @hookable_actions [:get, :put]
 
-        def post_hook(result, {_, :set, _} = call) do
-          _ = send(:hooked_cache, call)
-          result
-        end
-
-        def post_hook(nil, {_, :get, _}) do
-          "hello"
-        end
-
-        def post_hook(result, _) do
-          result
-        end
+      @doc false
+      def start_link(opts \\ []) do
+        GenServer.start_link(__MODULE__, opts, name: __MODULE__)
       end
+
+      ## Nebulex.Hook
+
+      @impl Nebulex.Hook
+      def handle_pre(%Event{name: name}) when name in @hookable_actions do
+        System.system_time(:microsecond)
+      end
+
+      def handle_pre(event), do: event
+
+      @impl Nebulex.Hook
+      def handle_post(%Event{name: name} = event) when name in @hookable_actions do
+        GenServer.cast(__MODULE__, {:trace, event})
+      end
+
+      def handle_post(event), do: event
+
+      ## GenServer
+
+      @impl GenServer
+      def init(_opts) do
+        {:ok, %{}}
+      end
+
+      @impl GenServer
+      def handle_cast({:trace, %Event{acc: start} = event}, state) do
+        _ = send(:hooked_cache, %{event | acc: System.system_time(:microsecond) - start})
+        {:noreply, state}
+      end
+    end
+
+    defmodule HookError do
+      @moduledoc false
+      use Nebulex.Hook
+
+      alias Nebulex.Hook.Event
+
+      def handle_post(%Event{name: :get}), do: raise(ArgumentError, "error")
+
+      def handle_post(event), do: event
     end
   end
 
@@ -56,47 +65,42 @@ defmodule Nebulex.TestCache do
     @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local,
-      version_generator: Nebulex.Version.Timestamp
+      adapter: Nebulex.Adapters.Local
   end
 
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.Versionless, compressed: true)
-
-  defmodule Versionless do
+  defmodule LocalWithShards do
     @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
+      adapter: Nebulex.Adapters.Local,
+      backend: :shards
   end
 
   defmodule HookableCache do
     @moduledoc false
-    defmodule C1 do
-      @moduledoc false
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Local
+    use Nebulex.Decorators
+    @decorate_all hook(Nebulex.TestCache.Hooks.TestHook)
 
-      use Hooks
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
+
+    alias Nebulex.TestCache.Hooks.TestHook
+
+    def init(opts) do
+      {:ok, pid} = TestHook.start_link()
+      {:ok, Keyword.put(opts, :hook_pid, pid)}
     end
+  end
 
-    defmodule C2 do
-      @moduledoc false
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Local
+  defmodule ErrorHookableCache do
+    @moduledoc false
+    use Nebulex.Decorators
+    @decorate_all hook(Nebulex.TestCache.Hooks.HookError)
 
-      use Hooks, post_hooks_mode: :pipe
-    end
-
-    defmodule C3 do
-      @moduledoc false
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Local
-
-      use Hooks, post_hooks_mode: :sync
-    end
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
   end
 
   defmodule CacheStats do
@@ -115,25 +119,14 @@ defmodule Nebulex.TestCache do
     @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local,
-      version_generator: Nebulex.Version.Timestamp
+      adapter: Nebulex.Adapters.Local
   end
-
-  :ok =
-    Application.put_env(
-      :nebulex,
-      Nebulex.TestCache.LocalWithSizeLimit,
-      allocated_memory: 100_000,
-      gc_cleanup_interval: 2
-    )
 
   defmodule LocalWithSizeLimit do
     @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local,
-      version_generator: Nebulex.Version.Timestamp,
-      n_shards: 2,
       gc_interval: 3600,
       n_generations: 3
   end
@@ -143,8 +136,7 @@ defmodule Nebulex.TestCache do
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Partitioned,
-      primary: Nebulex.TestCache.Partitioned.Primary,
-      version_generator: Nebulex.Version.Timestamp
+      primary: Nebulex.TestCache.Partitioned.Primary
 
     defmodule Primary do
       @moduledoc false
@@ -189,29 +181,22 @@ defmodule Nebulex.TestCache do
   end
 
   for mod <- [Nebulex.TestCache.Multilevel, Nebulex.TestCache.MultilevelExclusive] do
-    levels =
-      for l <- 1..3 do
-        level = String.to_atom("#{mod}.L#{l}")
-        :ok = Application.put_env(:nebulex, level, gc_interval: 3600)
-        level
-      end
+    levels = for l <- 1..3, do: String.to_atom("#{mod}.L#{l}")
 
-    config =
+    cache_model =
       case mod do
-        Nebulex.TestCache.Multilevel ->
-          [levels: levels, fallback: &mod.fallback/1]
-
-        _ ->
-          [cache_model: :exclusive, levels: levels, fallback: &mod.fallback/1]
+        Nebulex.TestCache.Multilevel -> :inclusive
+        _ -> :exclusive
       end
-
-    :ok = Application.put_env(:nebulex, mod, config)
 
     defmodule mod do
       @moduledoc false
       use Nebulex.Cache,
         otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Multilevel
+        adapter: Nebulex.Adapters.Multilevel,
+        levels: levels,
+        fallback: &mod.fallback/1,
+        cache_model: cache_model
 
       defmodule L1 do
         @moduledoc false
@@ -232,7 +217,7 @@ defmodule Nebulex.TestCache do
         use Nebulex.Cache,
           otp_app: :nebulex,
           adapter: Nebulex.Adapters.Local,
-          n_shards: 2
+          backend: :shards
       end
 
       def fallback(_key) do
@@ -247,7 +232,6 @@ defmodule Nebulex.TestCache do
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Replicated,
-      version_generator: Nebulex.Version.Timestamp,
       primary: Nebulex.TestCache.Replicated.Primary
 
     defmodule Primary do
@@ -268,13 +252,18 @@ defmodule Nebulex.TestCache do
     defmacro __before_compile__(_), do: :ok
 
     @impl true
-    def init(_), do: {:ok, []}
+    def init(_) do
+      {:ok, nil}
+    end
 
     @impl true
     def get(_, _, _), do: raise(ArgumentError, "Error")
 
     @impl true
-    def set(_, _, _), do: Process.sleep(1000)
+    def put(_, _, _, _, _, _) do
+      :ok = Process.sleep(1000)
+      true
+    end
 
     @impl true
     def delete(_, _, _), do: :ok
@@ -286,39 +275,39 @@ defmodule Nebulex.TestCache do
     def has_key?(_, _), do: nil
 
     @impl true
-    def object_info(_, _, _), do: nil
+    def ttl(_, _), do: nil
 
     @impl true
     def expire(_, _, _), do: nil
 
     @impl true
-    def update_counter(_, _, _, _), do: 1
+    def touch(_, _), do: true
+
+    @impl true
+    def incr(_, _, _, _, _), do: 1
 
     @impl true
     def size(_), do: Process.exit(self(), :normal)
 
     @impl true
-    def flush(_), do: Process.sleep(2000)
+    def flush(_) do
+      Process.sleep(2000)
+      0
+    end
 
     @impl true
-    def get_many(_, _, _), do: Process.sleep(1000)
+    def get_all(_, _, _), do: Process.sleep(1000)
 
     @impl true
-    def set_many(_, _, _), do: Process.exit(self(), :normal)
+    def put_all(_, _, _, _, _), do: Process.exit(self(), :normal)
   end
-
-  :ok =
-    Application.put_env(
-      :nebulex,
-      Nebulex.TestCache.PartitionedMock,
-      primary: Nebulex.TestCache.PartitionedMock.Primary
-    )
 
   defmodule PartitionedMock do
     @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Partitioned
+      adapter: Nebulex.Adapters.Partitioned,
+      primary: Nebulex.TestCache.PartitionedMock.Primary
 
     defmodule Primary do
       @moduledoc false
@@ -328,18 +317,12 @@ defmodule Nebulex.TestCache do
     end
   end
 
-  :ok =
-    Application.put_env(
-      :nebulex,
-      Nebulex.TestCache.ReplicatedMock,
-      primary: Nebulex.TestCache.ReplicatedMock.Primary
-    )
-
   defmodule ReplicatedMock do
     @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Replicated
+      adapter: Nebulex.Adapters.Replicated,
+      primary: Nebulex.TestCache.ReplicatedMock.Primary
 
     defmodule Primary do
       @moduledoc false

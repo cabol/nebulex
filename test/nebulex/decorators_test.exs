@@ -1,6 +1,13 @@
-defmodule Nebulex.Caching.DecoratorsTest do
+defmodule Nebulex.DecoratorsTest do
   use ExUnit.Case, async: true
-  use Nebulex.Caching.Decorators
+  use Nebulex.Decorators
+
+  defmodule Hook do
+    use Nebulex.Hook
+
+    @impl true
+    def handle_post(event), do: send(self(), event)
+  end
 
   defmodule Cache do
     use Nebulex.Cache,
@@ -12,7 +19,8 @@ defmodule Nebulex.Caching.DecoratorsTest do
     defstruct [:id, :count]
   end
 
-  alias Nebulex.Caching.DecoratorsTest.{Cache, Meta}
+  alias Nebulex.DecoratorsTest.{Cache, Hook, Meta}
+  alias Nebulex.Hook.Event
 
   setup do
     {:ok, pid} = Cache.start_link(n_generations: 2)
@@ -27,7 +35,7 @@ defmodule Nebulex.Caching.DecoratorsTest do
   test "fail on cacheable because missing cache" do
     assert_raise ArgumentError, "expected cache: to be given as argument", fn ->
       defmodule Test do
-        use Nebulex.Caching.Decorators
+        use Nebulex.Decorators
 
         @decorate cache(a: 1)
         def t(a, b) do
@@ -130,8 +138,8 @@ defmodule Nebulex.Caching.DecoratorsTest do
 
   test "update" do
     assert :ok == set_keys(x: 1, y: 2, z: 3)
-    assert :x == cache_put(:x)
-    assert :y == cache_put(:y)
+    assert :x == cache_update(:x)
+    assert :y == cache_update(:y)
     assert :x == Cache.get(:x)
     assert :y == Cache.get(:y)
     assert 3 == Cache.get(:z)
@@ -144,8 +152,8 @@ defmodule Nebulex.Caching.DecoratorsTest do
 
   test "update with opts" do
     assert :ok == set_keys(x: 1, y: 2, z: 3)
-    assert :x == cache_put_with_opts(:x)
-    assert :y == cache_put_with_opts(:y)
+    assert :x == cache_update_with_opts(:x)
+    assert :y == cache_update_with_opts(:y)
 
     :ok = Process.sleep(1100)
     refute Cache.get(:x)
@@ -154,10 +162,19 @@ defmodule Nebulex.Caching.DecoratorsTest do
 
   test "update with match" do
     assert :ok == set_keys(x: 0, y: 0, z: 0)
-    assert :x == cache_put_with_match(:x)
-    assert :y == cache_put_with_match(:y)
+    assert :x == cache_update_with_match(:x)
+    assert :y == cache_update_with_match(:y)
     assert 0 == Cache.get(:x)
     assert :y == Cache.get(:y)
+  end
+
+  test "hook" do
+    assert 1 = hookable_fun(1)
+    assert_receive %Event{module: __MODULE__, name: :hookable_fun, arity: 1} = event, 200
+
+    assert_raise(Nebulex.HookError, ~r"hook execution failed with error", fn ->
+      wrong_hookable_fun(1)
+    end)
   end
 
   ## Caching Functions
@@ -167,7 +184,7 @@ defmodule Nebulex.Caching.DecoratorsTest do
     {x, y}
   end
 
-  @decorate cache(cache: Cache, key: x, opts: [ttl: 1])
+  @decorate cache(cache: Cache, key: x, opts: [ttl: 1000])
   def get_with_opts(x) do
     x
   end
@@ -222,24 +239,34 @@ defmodule Nebulex.Caching.DecoratorsTest do
   end
 
   @decorate update(cache: Cache, key: x)
-  def cache_put(x) do
+  def cache_update(x) do
     x
   end
 
-  @decorate update(cache: Cache, key: x, opts: [ttl: 1])
-  def cache_put_with_opts(x) do
+  @decorate update(cache: Cache, key: x, opts: [ttl: 1000])
+  def cache_update_with_opts(x) do
     x
   end
 
   @decorate update(cache: Cache, key: x, match: fn x -> x != :x end)
-  def cache_put_with_match(x) do
+  def cache_update_with_match(x) do
+    x
+  end
+
+  @decorate hook(Hook)
+  def hookable_fun(x) do
+    x
+  end
+
+  @decorate hook(WrongHook)
+  def wrong_hookable_fun(x) do
     x
   end
 
   ## Private Functions
 
   defp set_keys(entries) do
-    assert :ok == Cache.set_many(entries)
+    assert :ok == Cache.put_all(entries)
 
     Enum.each(entries, fn {k, v} ->
       assert v == Cache.get(k)

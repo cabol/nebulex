@@ -4,56 +4,56 @@ defmodule Nebulex.Cache.TransactionTest do
   deftests do
     test "transaction" do
       refute @cache.transaction(fn ->
-               1
-               |> @cache.set(11, return: :key)
-               |> @cache.get!(return: :key)
-               |> @cache.delete(return: :key)
-               |> @cache.get()
+               with :ok <- @cache.put(1, 11),
+                    11 <- @cache.get!(1),
+                    :ok <- @cache.delete(1),
+                    value <- @cache.get(1) do
+                 value
+               end
              end)
 
       assert_raise MatchError, fn ->
         @cache.transaction(fn ->
-          :ok =
-            1
-            |> @cache.set(11, return: :key)
-            |> @cache.get!(return: :key)
-            |> @cache.delete(return: :key)
-            |> @cache.get()
+          with :ok <- @cache.put(1, 11),
+               11 <- @cache.get!(1),
+               :ok <- @cache.delete(1) do
+            :ok = @cache.get(1)
+          end
         end)
       end
     end
 
     test "nested transaction" do
       refute @cache.transaction(
+               [keys: [1]],
                fn ->
                  @cache.transaction(
+                   [keys: [2]],
                    fn ->
-                     1
-                     |> @cache.set(11, return: :key)
-                     |> @cache.get!(return: :key)
-                     |> @cache.delete(return: :key)
-                     |> @cache.get
-                   end,
-                   keys: [2]
+                     with :ok <- @cache.put(1, 11),
+                          11 <- @cache.get!(1),
+                          :ok <- @cache.delete(1),
+                          value <- @cache.get(1) do
+                       value
+                     end
+                   end
                  )
-               end,
-               keys: [1]
+               end
              )
     end
 
     test "set and get within a transaction" do
-      assert ["old value"] == @cache.set(:test, ["old value"])
+      assert :ok == @cache.put(:test, ["old value"])
+      assert ["old value"] == @cache.get(:test)
 
       assert ["new value", "old value"] ==
                @cache.transaction(
+                 [keys: [:test]],
                  fn ->
-                   value = @cache.get(:test)
-
-                   assert ["old value"] == value
-
-                   @cache.set(:test, ["new value" | value])
-                 end,
-                 keys: [:test]
+                   ["old value"] = value = @cache.get(:test)
+                   :ok = @cache.put(:test, ["new value" | value])
+                   @cache.get(:test)
+                 end
                )
 
       assert ["new value", "old value"] == @cache.get(:test)
@@ -62,11 +62,10 @@ defmodule Nebulex.Cache.TransactionTest do
     test "transaction aborted" do
       spawn_link(fn ->
         @cache.transaction(
+          [keys: [1], retries: 1],
           fn ->
             Process.sleep(1100)
-          end,
-          keys: [1],
-          retries: 1
+          end
         )
       end)
 
@@ -74,11 +73,10 @@ defmodule Nebulex.Cache.TransactionTest do
 
       assert_raise RuntimeError, "transaction aborted", fn ->
         @cache.transaction(
+          [keys: [1], retries: 1],
           fn ->
             @cache.get(1)
-          end,
-          keys: [1],
-          retries: 1
+          end
         )
       end
     end
@@ -87,7 +85,7 @@ defmodule Nebulex.Cache.TransactionTest do
       refute @cache.in_transaction?()
 
       @cache.transaction(fn ->
-        _ = @cache.set(1, 11, return: :key)
+        :ok = @cache.put(1, 11, return: :key)
         true = @cache.in_transaction?()
       end)
     end
