@@ -1,5 +1,5 @@
 defmodule Nebulex.Adapters.Local do
-  @moduledoc """
+  @moduledoc ~S"""
   Adapter module for Local Generational Cache.
 
   It uses [Shards](https://github.com/cabol/shards) as in-memory backend

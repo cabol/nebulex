@@ -1,5 +1,5 @@
 defmodule Nebulex.Object.Version do
-  @moduledoc """
+  @moduledoc ~S"""
   Version handler for cached objects.
 
   The purpose of this module is to allow users implement custom

@@ -1,5 +1,6 @@
-defmodule Nebulex.CachingTest do
+defmodule Nebulex.Caching.DecoratorsTest do
   use ExUnit.Case, async: true
+  use Nebulex.Caching.Decorators
 
   defmodule Cache do
     use Nebulex.Cache,
@@ -11,8 +12,7 @@ defmodule Nebulex.CachingTest do
     defstruct [:id, :count]
   end
 
-  import Nebulex.Caching
-  alias Nebulex.CachingTest.{Cache, Meta}
+  alias Nebulex.Caching.DecoratorsTest.{Cache, Meta}
 
   setup do
     {:ok, pid} = Cache.start_link(n_generations: 2)
@@ -27,28 +27,17 @@ defmodule Nebulex.CachingTest do
   test "fail on cacheable because missing cache" do
     assert_raise ArgumentError, "expected cache: to be given as argument", fn ->
       defmodule Test do
-        import Nebulex.Caching
+        use Nebulex.Caching.Decorators
 
-        defcacheable t(a, b) do
+        @decorate cache(a: 1)
+        def t(a, b) do
           {a, b}
         end
       end
     end
   end
 
-  test "fail on cacheable because invalid syntax" do
-    assert_raise ArgumentError, "invalid syntax in defcacheable t.t(a)", fn ->
-      defmodule Test do
-        import Nebulex.Caching
-
-        defcacheable t.t(a), cache: Cache do
-          a
-        end
-      end
-    end
-  end
-
-  test "cacheable" do
+  test "cache" do
     refute Cache.get("x")
     assert {"x", "y"} == get_by_x("x")
     assert {"x", "y"} == Cache.get("x")
@@ -62,7 +51,7 @@ defmodule Nebulex.CachingTest do
     assert {"x", "y"} == Cache.get({"x", "y"})
   end
 
-  test "cacheable with opts" do
+  test "cache with opts" do
     refute Cache.get("x")
     assert 1 == get_with_opts(1)
     assert 1 == Cache.get(1)
@@ -71,7 +60,7 @@ defmodule Nebulex.CachingTest do
     refute Cache.get(1)
   end
 
-  test "cacheable with match" do
+  test "cache with match" do
     refute Cache.get(:x)
     assert :x == get_with_match(:x)
     refute Cache.get(:x)
@@ -79,14 +68,24 @@ defmodule Nebulex.CachingTest do
     refute Cache.get(:y)
     assert :y == get_with_match(:y)
     assert Cache.get(:y)
+
+    refute Cache.get(:ok)
+    assert :ok == get_with_match2(:ok)
+    assert Cache.get(:ok)
+
+    refute Cache.get(:error)
+    assert :error == get_with_match2(:error)
+    refute Cache.get(:error)
   end
 
-  test "cacheable with default key" do
-    key = :erlang.phash2({:get_with_default_key, [123, {:foo, "bar"}]})
+  test "cache with default key" do
+    key = :erlang.phash2({__MODULE__, :get_with_default_key})
 
     refute Cache.get(key)
-    assert {123, {:foo, "bar"}} == get_with_default_key(123, {:foo, "bar"})
-    assert {123, {:foo, "bar"}} == Cache.get(key)
+    assert :ok == get_with_default_key(123, {:foo, "bar"})
+    assert :ok == Cache.get(key)
+    assert :ok == get_with_default_key(:foo, "bar")
+    assert :ok == Cache.get(key)
   end
 
   test "defining keys using structs and maps" do
@@ -115,7 +114,7 @@ defmodule Nebulex.CachingTest do
 
   test "evict with multiple keys" do
     assert :ok == set_keys(x: 1, y: 2, z: 3)
-    assert :ok == cache_evict_keys(:x, :y)
+    assert {:x, :y} == cache_evict_keys(:x, :y)
     refute Cache.get(:x)
     refute Cache.get(:y)
     assert 3 == Cache.get(:z)
@@ -129,7 +128,7 @@ defmodule Nebulex.CachingTest do
     refute Cache.get(:z)
   end
 
-  test "updatable" do
+  test "update" do
     assert :ok == set_keys(x: 1, y: 2, z: 3)
     assert :x == cache_put(:x)
     assert :y == cache_put(:y)
@@ -143,7 +142,7 @@ defmodule Nebulex.CachingTest do
     assert 3 == Cache.get(:z)
   end
 
-  test "updatable with opts" do
+  test "update with opts" do
     assert :ok == set_keys(x: 1, y: 2, z: 3)
     assert :x == cache_put_with_opts(:x)
     assert :y == cache_put_with_opts(:y)
@@ -153,7 +152,7 @@ defmodule Nebulex.CachingTest do
     refute Cache.get(:y)
   end
 
-  test "updatable with match" do
+  test "update with match" do
     assert :ok == set_keys(x: 0, y: 0, z: 0)
     assert :x == cache_put_with_match(:x)
     assert :y == cache_put_with_match(:y)
@@ -163,55 +162,77 @@ defmodule Nebulex.CachingTest do
 
   ## Caching Functions
 
-  defcacheable get_by_x(x, y \\ "y"), cache: Cache, key: x do
+  @decorate cache(cache: Cache, key: x)
+  def get_by_x(x, y \\ "y") do
     {x, y}
   end
 
-  defcacheable get_with_opts(x), cache: Cache, key: x, opts: [ttl: 1] do
+  @decorate cache(cache: Cache, key: x, opts: [ttl: 1])
+  def get_with_opts(x) do
     x
   end
 
-  defcacheable get_with_match(x), cache: Cache, key: x, match: fn x -> x != :x end do
+  @decorate cache(cache: Cache, key: x, match: fn x -> x != :x end)
+  def get_with_match(x) do
     x
   end
 
-  defcacheable get_by_xy(x, y), cache: Cache, key: {x, y} do
+  @decorate cache(cache: Cache, key: x, match: &match/1)
+  def get_with_match2(x) do
+    x
+  end
+
+  defp match(:ok), do: true
+  defp match(_), do: false
+
+  @decorate cache(cache: Cache, key: {x, y})
+  def get_by_xy(x, y) do
     {x, y}
   end
 
-  defcacheable get_with_default_key(x, y), cache: Cache do
-    {x, y}
-  end
-
-  defcacheable get_meta(%Meta{} = meta), cache: Cache, key: {Meta, meta.id} do
-    meta
-  end
-
-  defcacheable get_map(map), cache: Cache, key: map[:id] do
-    map
-  end
-
-  defevict cache_evict(x), cache: Cache, key: x do
-    x
-  end
-
-  defevict cache_evict_keys(x, y), cache: Cache, keys: [x, y] do
+  @decorate cache(cache: Cache)
+  def get_with_default_key(x, y) do
+    _ = {x, y}
     :ok
   end
 
-  defevict cache_evict_all(x), cache: Cache, all_entries: true do
+  @decorate cache(cache: Cache, key: {Meta, meta.id})
+  def get_meta(%Meta{} = meta) do
+    meta
+  end
+
+  @decorate cache(cache: Cache, key: map[:id])
+  def get_map(map) do
+    map
+  end
+
+  @decorate evict(cache: Cache, key: x)
+  def cache_evict(x) do
     x
   end
 
-  defupdatable cache_put(x), cache: Cache, key: x do
+  @decorate evict(cache: Cache, keys: [x, y])
+  def cache_evict_keys(x, y) do
+    {x, y}
+  end
+
+  @decorate evict(cache: Cache, all_entries: true)
+  def cache_evict_all(x) do
     x
   end
 
-  defupdatable cache_put_with_opts(x), cache: Cache, key: x, opts: [ttl: 1] do
+  @decorate update(cache: Cache, key: x)
+  def cache_put(x) do
     x
   end
 
-  defupdatable cache_put_with_match(x), cache: Cache, key: x, match: fn x -> x != :x end do
+  @decorate update(cache: Cache, key: x, opts: [ttl: 1])
+  def cache_put_with_opts(x) do
+    x
+  end
+
+  @decorate update(cache: Cache, key: x, match: fn x -> x != :x end)
+  def cache_put_with_match(x) do
     x
   end
 

@@ -13,21 +13,21 @@ defmodule Nebulex.Adapters.Local.Generation do
   These options are configured via the built-in local adapter
   (`Nebulex.Adapters.Local`):
 
-  * `:gc_interval` - Interval time in seconds to garbage collection to run,
-    delete the oldest generation and create a new one. If this option is
-    not set, garbage collection is never executed, so new generations
-    must be created explicitly, e.g.: `new(cache, [])`.
+    * `:gc_interval` - Interval time in seconds to garbage collection to run,
+      delete the oldest generation and create a new one. If this option is
+      not set, garbage collection is never executed, so new generations
+      must be created explicitly, e.g.: `new(cache, [])`.
 
-  * `:allocated_memory` - Max size in bytes allocated for a cache generation.
-    If this option is set and the configured value is reached, a new generation
-    is created so the oldest is deleted and force releasing memory space.
-    If it is not set (`nil`), the cleanup check to release memory is not
-    performed (the default).
+    * `:allocated_memory` - Max size in bytes allocated for a cache generation.
+      If this option is set and the configured value is reached, a new generation
+      is created so the oldest is deleted and force releasing memory space.
+      If it is not set (`nil`), the cleanup check to release memory is not
+      performed (the default).
 
-  * `:gc_cleanup_interval` - The number of writes needed to run the cleanup
-    check. Once this value is reached and only if `allocated_memory` option
-    is set, the cleanup check is performed. Defaults to `10`, so after 10
-    write operations the cleanup check is performed.
+    * `:gc_cleanup_interval` - The number of writes needed to run the cleanup
+      check. Once this value is reached and only if `allocated_memory` option
+      is set, the cleanup check is performed. Defaults to `10`, so after 10
+      write operations the cleanup check is performed.
   """
 
   defmodule State do

@@ -1,9 +1,9 @@
-# Cache Usage Patterns via Nebulex.Caching DSL
+# Cache Usage Patterns via Nebulex.Caching.Decorators
 
 There are several common access patterns when using a cache. **Nebulex**
-supports most of these patterns by means of [Nebulex.Caching DSL][DSL].
+supports most of these patterns by means of [Nebulex.Caching.Decorators][Decorators].
 
-[DSL]: https://github.com/cabol/nebulex/blob/master/lib/nebulex/caching.ex
+[Decorators]: http://hexdocs.pm/nebulex/Nebulex.Caching.Decorators.html
 
 > Most of the following documentation about caching patterns it has been taken
   from [EHCache Doc][EHCache]
@@ -70,11 +70,11 @@ A disadvantage of using the cache-as-SoR pattern is:
 
  * Less directly visible code-path
 
-But how to get all this out-of-box? This is where [Nebulex.Caching DSL][DSL]
+But how to get all this out-of-box? This is where the [Decorators][Decorators]
 comes in. It provides a set of macros to abstract most of the logic behind
 **Read-through** and **Write-through** patterns and make the implementation
 extremely easy. But let's go over these patterns more in detail and how to
-implement them using [Nebulex.Caching DSL][DSL].
+implement them using [Nebulex Decorators][Decorators].
 
 ## Read-through
 
@@ -89,23 +89,26 @@ The next time the cache is asked for the value for the same key it can be
 returned from the cache without using the loader (unless the entry has been
 evicted or expired).
 
-This pattern can be easily implemented using `defcacheable` macro from
-[Nebulex.Caching DSL][DSL] as follows:
+This pattern can be easily implemented using `cache` decorator as follows:
 
 ```elixir
 defmodule MyApp.Example do
-  import Nebulex.Caching
+  use Nebulex.Caching.Decorators
+
   alias MyApp.Cache
 
-  defcacheable get_by_name(name, age), cache: Cache, key: name do
+  @decorate cache(cache: Cache, key: name)
+  def get_by_name(name, age) do
     # your logic (the loader to retrieve the value from the SoR)
   end
 
-  defcacheable get_by_age(age), cache: Cache, key: age, opts: [ttl: 3600] do
+  @decorate cache(cache: Cache, key: age, opts: [ttl: 3600])
+  def get_by_age(age) do
     # your logic (the loader to retrieve the value from the SoR)
   end
 
-  defcacheable all(query), cache: Cache do
+  @decorate cache(cache: Cache)
+  def all(query) do
     # your logic (the loader to retrieve the value from the SoR)
   end
 end
@@ -129,16 +132,19 @@ associated with the given key using `defupdatable`, or just delete it using
 
 ```elixir
 defmodule MyApp.Example do
-  import Nebulex.Caching
+  use Nebulex.Caching.Decorators
+
   alias MyApp.Cache
 
   # When the data is written to the SoR, it is updated in the cache
-  defupdatable update(something), cache: Cache, key: something do
+  @decorate update(cache: Cache, key: something)
+  def update(something) do
     # Write data to the SoR (most likely the Database)
   end
 
   # When the data is written to the SoR, it is deleted (evicted) from the cache
-  defevict update_something(something), cache: Cache, key: something do
+  @decorate evict(cache: Cache, key: something)
+  def update_something(something) do
     # Write data to the SoR (most likely the Database)
   end
 end

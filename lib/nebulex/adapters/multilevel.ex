@@ -1,5 +1,5 @@
 defmodule Nebulex.Adapters.Multilevel do
-  @moduledoc """
+  @moduledoc ~S"""
   Adapter module for Multi-level Cache.
 
   This is just a simple layer on top of local or distributed cache

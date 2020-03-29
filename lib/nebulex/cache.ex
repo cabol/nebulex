@@ -1,5 +1,5 @@
 defmodule Nebulex.Cache do
-  @moduledoc """
+  @moduledoc ~S"""
   Cache Main Interface.
 
   A Cache maps to an underlying implementation, controlled by the
