@@ -1,5 +1,29 @@
 # Changelog
 
+## [v1.2.0](https://github.com/cabol/nebulex/tree/v1.2.0) (2020-03-30)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v1.1.1...v1.2.0)
+
+**Implemented enhancements:**
+
+- Refactor Nebulex.Caching in order to use annotated functions via decorators [\#66](https://github.com/cabol/nebulex/issues/66)
+
+**Fixed bugs:**
+
+- Sporadic :badarg error [\#52](https://github.com/cabol/nebulex/issues/52)
+
+**Closed issues:**
+
+- Question: disabling cache conditionally in defcacheable [\#63](https://github.com/cabol/nebulex/issues/63)
+- Support for persistence operations [\#61](https://github.com/cabol/nebulex/issues/61)
+- Implement adapter for replicated topology [\#60](https://github.com/cabol/nebulex/issues/60)
+
+**Merged pull requests:**
+
+- \[\#66\] Refactor Nebulex.Caching to use annotated functions via decorators [\#67](https://github.com/cabol/nebulex/pull/67) ([cabol](https://github.com/cabol))
+- Fixes and enhancements for v1.2.0 [\#64](https://github.com/cabol/nebulex/pull/64) ([cabol](https://github.com/cabol))
+- Features for next release \(v1.2.0\) [\#59](https://github.com/cabol/nebulex/pull/59) ([cabol](https://github.com/cabol))
+
 ## [v1.1.1](https://github.com/cabol/nebulex/tree/v1.1.1) (2019-11-11)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v1.1.0...v1.1.1)
@@ -9,10 +33,6 @@
 - Add capability to limit cache size  [\#53](https://github.com/cabol/nebulex/issues/53)
 - Ability to "get or set" a key [\#49](https://github.com/cabol/nebulex/issues/49)
 - Multilevel Cache: transaction/3 is attempting to change all levels multiple times. [\#35](https://github.com/cabol/nebulex/issues/35)
-
-**Fixed bugs:**
-
-- Sporadic :badarg error [\#52](https://github.com/cabol/nebulex/issues/52)
 
 **Closed issues:**
 
@@ -72,7 +92,6 @@
 
 **Merged pull requests:**
 
-- typo in transaction docs [\#38](https://github.com/cabol/nebulex/pull/38) ([fredr](https://github.com/fredr))
 - Handle an :infinity expiration in multilevel replication. [\#36](https://github.com/cabol/nebulex/pull/36) ([sdost](https://github.com/sdost))
 - add missing coma in conf section of readme file [\#32](https://github.com/cabol/nebulex/pull/32) ([Kociamber](https://github.com/Kociamber))
 
