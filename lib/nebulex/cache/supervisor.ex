@@ -34,7 +34,7 @@ defmodule Nebulex.Cache.Supervisor do
     otp_app = opts[:otp_app] || raise ArgumentError, "expected otp_app: to be given as argument"
     adapter = opts[:adapter] || raise ArgumentError, "expected adapter: to be given as argument"
 
-    unless Code.ensure_loaded?(adapter) do
+    if Code.ensure_compiled(adapter) != {:module, adapter} do
       raise ArgumentError,
             "adapter #{inspect(adapter)} was not compiled, " <>
               "ensure it is correct and it is included as a project dependency"
@@ -54,7 +54,6 @@ defmodule Nebulex.Cache.Supervisor do
       otp_app
       |> Application.get_env(cache, [])
       |> Keyword.merge(opts)
-      |> Keyword.put(:otp_app, otp_app)
 
     {otp_app, adapter, behaviours, config}
   end

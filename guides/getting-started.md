@@ -28,7 +28,7 @@ changing the `deps` definition in that file to this:
 ```elixir
 defp deps do
   [
-    {:nebulex, "~> 1.1"}
+    {:nebulex, "~> 1.2.0"}
   ]
 end
 ```

@@ -7,9 +7,10 @@ defmodule Nebulex.Mixfile do
     [
       app: :nebulex,
       version: @version,
-      elixir: "~> 1.8",
-      deps: deps(),
+      elixir: "~> 1.9",
+      elixirc_paths: elixirc_paths(Mix.env()),
       elixirc_options: [warnings_as_errors: System.get_env("CI") == "true"],
+      deps: deps(),
 
       # Docs
       name: "Nebulex",
@@ -32,6 +33,9 @@ defmodule Nebulex.Mixfile do
       description: "A fast, flexible and powerful distributed caching framework for Elixir."
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   def application do
     []

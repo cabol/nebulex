@@ -1,4 +1,5 @@
 defmodule Nebulex.Version.Timestamp do
+  @moduledoc false
   @behaviour Nebulex.Object.Version
 
   alias Nebulex.Object
@@ -11,7 +12,9 @@ defmodule Nebulex.Version.Timestamp do
 end
 
 defmodule Nebulex.TestCache do
+  @moduledoc false
   defmodule Hooks do
+    @moduledoc false
     defmacro __using__(opts) do
       quote bind_quoted: [opts: opts] do
         @opts opts
@@ -50,6 +53,7 @@ defmodule Nebulex.TestCache do
   end
 
   defmodule Local do
+    @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local,
@@ -59,13 +63,16 @@ defmodule Nebulex.TestCache do
   :ok = Application.put_env(:nebulex, Nebulex.TestCache.Versionless, compressed: true)
 
   defmodule Versionless do
+    @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local
   end
 
   defmodule HookableCache do
+    @moduledoc false
     defmodule C1 do
+      @moduledoc false
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.Adapters.Local
@@ -74,6 +81,7 @@ defmodule Nebulex.TestCache do
     end
 
     defmodule C2 do
+      @moduledoc false
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.Adapters.Local
@@ -82,6 +90,7 @@ defmodule Nebulex.TestCache do
     end
 
     defmodule C3 do
+      @moduledoc false
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.Adapters.Local
@@ -90,12 +99,12 @@ defmodule Nebulex.TestCache do
     end
   end
 
-  :ok = Application.put_env(:nebulex, Nebulex.TestCache.CacheStats, stats: true)
-
   defmodule CacheStats do
+    @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
+      adapter: Nebulex.Adapters.Local,
+      stats: true
 
     def post_hooks do
       {:pipe, []}
@@ -103,6 +112,7 @@ defmodule Nebulex.TestCache do
   end
 
   defmodule LocalWithGC do
+    @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local,
@@ -118,6 +128,7 @@ defmodule Nebulex.TestCache do
     )
 
   defmodule LocalWithSizeLimit do
+    @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local,
@@ -127,6 +138,7 @@ defmodule Nebulex.TestCache do
   end
 
   defmodule Partitioned do
+    @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Partitioned,
@@ -134,33 +146,21 @@ defmodule Nebulex.TestCache do
       version_generator: Nebulex.Version.Timestamp
 
     defmodule Primary do
+      @moduledoc false
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.Adapters.Local,
         gc_interval: 3600
     end
 
-    def reducer_fun(object, {acc1, acc2}) do
-      if Map.has_key?(acc1, object.key),
-        do: {acc1, acc2},
-        else: {Map.put(acc1, object.key, object.value), object.value + acc2}
-    end
-
     def get_and_update_fun(nil), do: {nil, 1}
     def get_and_update_fun(current) when is_integer(current), do: {current, current * 2}
 
     def get_and_update_bad_fun(_), do: :other
-
-    def get_and_update_timeout_fun(value) do
-      :ok = Process.sleep(5000)
-      {value, value}
-    end
-
-    def update_fun(nil), do: 1
-    def update_fun(current) when is_integer(current), do: current * 2
   end
 
   defmodule PartitionedWithCustomHashSlot do
+    @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Partitioned,
@@ -168,12 +168,14 @@ defmodule Nebulex.TestCache do
       hash_slot: Nebulex.TestCache.PartitionedWithCustomHashSlot.HashSlot
 
     defmodule Primary do
+      @moduledoc false
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.Adapters.Local
     end
 
     defmodule HashSlot do
+      @moduledoc false
       @behaviour Nebulex.Adapter.HashSlot
 
       @impl true
@@ -205,23 +207,27 @@ defmodule Nebulex.TestCache do
     :ok = Application.put_env(:nebulex, mod, config)
 
     defmodule mod do
+      @moduledoc false
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.Adapters.Multilevel
 
       defmodule L1 do
+        @moduledoc false
         use Nebulex.Cache,
           otp_app: :nebulex,
           adapter: Nebulex.Adapters.Local
       end
 
       defmodule L2 do
+        @moduledoc false
         use Nebulex.Cache,
           otp_app: :nebulex,
           adapter: Nebulex.Adapters.Local
       end
 
       defmodule L3 do
+        @moduledoc false
         use Nebulex.Cache,
           otp_app: :nebulex,
           adapter: Nebulex.Adapters.Local,
@@ -236,6 +242,7 @@ defmodule Nebulex.TestCache do
   end
 
   defmodule Replicated do
+    @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Replicated,
@@ -243,6 +250,7 @@ defmodule Nebulex.TestCache do
       primary: Nebulex.TestCache.Replicated.Primary
 
     defmodule Primary do
+      @moduledoc false
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.Adapters.Local
@@ -252,6 +260,7 @@ defmodule Nebulex.TestCache do
   ## Mocks
 
   defmodule AdapterMock do
+    @moduledoc false
     @behaviour Nebulex.Adapter
 
     @impl true
@@ -305,11 +314,13 @@ defmodule Nebulex.TestCache do
     )
 
   defmodule PartitionedMock do
+    @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Partitioned
 
     defmodule Primary do
+      @moduledoc false
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.TestCache.AdapterMock
@@ -324,11 +335,13 @@ defmodule Nebulex.TestCache do
     )
 
   defmodule ReplicatedMock do
+    @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Replicated
 
     defmodule Primary do
+      @moduledoc false
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.TestCache.AdapterMock

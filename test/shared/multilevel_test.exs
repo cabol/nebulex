@@ -4,7 +4,7 @@ defmodule Nebulex.MultilevelTest do
   deftests do
     alias Nebulex.Object
 
-    @levels Keyword.fetch!(Application.fetch_env!(:nebulex, @cache), :levels)
+    @levels @cache.__levels__
     @l1 :lists.nth(1, @levels)
     @l2 :lists.nth(2, @levels)
     @l3 :lists.nth(3, @levels)

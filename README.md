@@ -74,7 +74,7 @@ For example, if you want to use a built-in cache, you just need to add
 ```elixir
 def deps do
   [
-    {:nebulex, "~> 1.1"}
+    {:nebulex, "~> 1.2.0"}
   ]
 end
 ```

@@ -5,7 +5,7 @@ defmodule Nebulex.Cache.StatsTest do
   alias Nebulex.TestCache.CacheStats
 
   setup do
-    {:ok, pid} = CacheStats.start_link(n_generations: 2)
+    {:ok, pid} = CacheStats.start_link(n_generations: 2, stats: true)
     :ok
 
     on_exit(fn ->
@@ -15,7 +15,7 @@ defmodule Nebulex.Cache.StatsTest do
   end
 
   test "test counters" do
-    CacheStats.new_generation()
+    _ = CacheStats.new_generation()
 
     for x <- 1..5, do: CacheStats.set(x, x)
     assert 5 == Stats.get_counter(CacheStats, :set)

@@ -4,7 +4,7 @@ defmodule Nebulex.Cluster do
   Copyright (c) 2014 Chris McCord
   """
 
-  def spawn do
+  def spawn(nodes) do
     # Turn node into a distributed node with the given long name
     :net_kernel.start([:"primary@127.0.0.1"])
 
@@ -12,8 +12,7 @@ defmodule Nebulex.Cluster do
     :erl_boot_server.start([])
     allow_boot(to_charlist("127.0.0.1"))
 
-    :nebulex
-    |> Application.get_env(:nodes, [])
+    nodes
     |> Enum.map(&Task.async(fn -> spawn_node(&1) end))
     |> Enum.map(&Task.await(&1, 30_000))
   end
@@ -62,7 +61,7 @@ defmodule Nebulex.Cluster do
 
   defp node_name(node_host) do
     node_host
-    |> to_string
+    |> to_string()
     |> String.split("@")
     |> Enum.at(0)
     |> String.to_atom()

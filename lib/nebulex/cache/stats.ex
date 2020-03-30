@@ -22,28 +22,28 @@ defmodule Nebulex.Cache.Stats do
   @spec get_counter(Nebulex.Cache.t(), atom) :: integer
   def get_counter(cache, action) when is_atom(action) do
     cache
-    |> server_name
+    |> server_name()
     |> :ets.lookup_element(action, 2)
   end
 
   @spec get_counters(Nebulex.Cache.t()) :: Keyword.t()
   def get_counters(cache) do
     cache
-    |> server_name
+    |> server_name()
     |> :ets.select([{{:"$1", :"$2"}, [], [{{:"$1", :"$2"}}]}])
   end
 
   @spec incr_counter(Nebulex.Cache.t(), atom) :: integer
   def incr_counter(cache, action) when is_atom(action) do
     cache
-    |> server_name
+    |> server_name()
     |> :ets.update_counter(action, 1, {action, 0})
   end
 
   @spec reset_counter(Nebulex.Cache.t(), atom) :: boolean
   def reset_counter(cache, action) when is_atom(action) do
     cache
-    |> server_name
+    |> server_name()
     |> :ets.update_element(action, {2, 0})
   end
 
@@ -89,5 +89,5 @@ defmodule Nebulex.Cache.Stats do
 
   ## Private Functions
 
-  defp server_name(cache), do: Module.concat([cache, Stats])
+  defp server_name(cache), do: Module.concat(cache, Stats)
 end

@@ -1,4 +1,6 @@
 defmodule Nebulex.SharedTestCase do
+  @moduledoc false
+
   defmacro deftests(do: block) do
     quote do
       defmacro __using__(opts) do
