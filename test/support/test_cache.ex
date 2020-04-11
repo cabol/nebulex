@@ -133,6 +133,7 @@ defmodule Nebulex.TestCache do
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local,
       version_generator: Nebulex.Version.Timestamp,
+      n_shards: 2,
       gc_interval: 3600,
       n_generations: 3
   end

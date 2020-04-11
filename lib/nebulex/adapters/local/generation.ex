@@ -200,8 +200,8 @@ defmodule Nebulex.Adapters.Local.Generation do
     {:reply, :ok, %{state | allocated_memory: mem_size}}
   end
 
-  def handle_call(:get_state, _from, %State{gen_name: name} = state) do
-    {:reply, %{state | memory: memory_info(name)}, state}
+  def handle_call(:get_state, _from, %State{gen_name: name, cache: cache} = state) do
+    {:reply, %{state | memory: memory_info(name, cache.__state__)}, state}
   end
 
   @impl true
@@ -217,7 +217,7 @@ defmodule Nebulex.Adapters.Local.Generation do
         } = state
       )
       when cleanup_counts >= cleanup_interval do
-    if memory_info(name) >= max_size do
+    if memory_info(name, cache.__state__) >= max_size do
       {_, name, index} = new_gen(cache, index)
       {:noreply, %{reset_timeout(state) | gc_cleanup_counts: 1, gen_name: name, gen_index: index}}
     else
@@ -300,7 +300,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     %{state | time_ref: start_timer(time)}
   end
 
-  defp memory_info(name) do
-    Local.info(name, :memory) * :erlang.system_info(:wordsize)
+  defp memory_info(name, state) do
+    Local.info(name, :memory, state) * :erlang.system_info(:wordsize)
   end
 end
