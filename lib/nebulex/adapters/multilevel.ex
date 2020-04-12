@@ -177,10 +177,19 @@ defmodule Nebulex.Adapters.Multilevel do
         raise ArgumentError, "expected levels: to be a list and have at least one level"
 
     quote do
+      @doc """
+      A convenience function for getting the cache levels.
+      """
       def __levels__, do: unquote(levels)
 
+      @doc """
+      A convenience function for getting the cache model.
+      """
       def __model__, do: unquote(cache_model)
 
+      @doc """
+      A convenience function for getting the default fallback.
+      """
       def __fallback__, do: unquote(fallback)
     end
   end

@@ -63,17 +63,22 @@ defmodule Nebulex.TestCache do
 
   defmodule Local do
     @moduledoc false
-    use Nebulex.Cache,
-      otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
-  end
 
-  defmodule LocalWithShards do
-    @moduledoc false
-    use Nebulex.Cache,
-      otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local,
-      backend: :shards
+    defmodule ETS do
+      @moduledoc false
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local,
+        backend: :ets
+    end
+
+    defmodule Shards do
+      @moduledoc false
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local,
+        backend: :shards
+    end
   end
 
   defmodule HookableCache do

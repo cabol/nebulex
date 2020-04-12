@@ -42,9 +42,5 @@ jobs:
         run: mix dialyzer --plt
       - name: Run Dialyzer
         run: mix dialyzer --halt-exit-status
-      - name: Run Xref
-        run: |
-          mix xref unreachable --abort-if-any
-          mix xref deprecated --abort-if-any
       - name: Report Doc Coverage
         run: MIX_ENV=docs mix inch.report

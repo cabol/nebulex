@@ -131,10 +131,19 @@ defmodule Nebulex.Adapters.Replicated do
     quote do
       alias Nebulex.Cache.Cluster
 
+      @doc """
+      A convenience function for getting the primary cache.
+      """
       def __primary__, do: unquote(primary)
 
+      @doc """
+      A convenience function for getting the task supervisor.
+      """
       def __task_sup__, do: unquote(task_supervisor)
 
+      @doc """
+      A convenience function for getting the cluster nodes.
+      """
       def __nodes__, do: Cluster.get_nodes(__MODULE__)
 
       def init(config) do

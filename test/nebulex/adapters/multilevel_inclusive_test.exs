@@ -6,27 +6,39 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
 
   alias Nebulex.TestCache.Multilevel
 
-  test "get for inclusive mode" do
-    :ok = @l1.put(1, 1)
-    :ok = @l2.put(2, 2)
-    :ok = @l3.put(3, 3)
+  setup do
+    {:ok, ml_cache} = @cache.start_link()
+    :ok
 
-    assert 1 == Multilevel.get(1)
-    refute @l2.get(1)
-    refute @l3.get(1)
+    on_exit(fn ->
+      :ok = Process.sleep(100)
+      if Process.alive?(ml_cache), do: @cache.stop(ml_cache)
+    end)
+  end
 
-    assert 2 == Multilevel.get(2)
-    assert 2 == @l1.get(2)
-    assert 2 == @l2.get(2)
-    refute @l3.get(2)
+  describe "inclusive" do
+    test "get" do
+      :ok = @l1.put(1, 1)
+      :ok = @l2.put(2, 2)
+      :ok = @l3.put(3, 3)
 
-    assert 3 == @l3.get(3)
-    refute @l1.get(3)
-    refute @l2.get(3)
+      assert 1 == Multilevel.get(1)
+      refute @l2.get(1)
+      refute @l3.get(1)
 
-    assert 3 == Multilevel.get(3)
-    assert 3 == @l1.get(3)
-    assert 3 == @l2.get(3)
-    assert 3 == @l3.get(3)
+      assert 2 == Multilevel.get(2)
+      assert 2 == @l1.get(2)
+      assert 2 == @l2.get(2)
+      refute @l3.get(2)
+
+      assert 3 == @l3.get(3)
+      refute @l1.get(3)
+      refute @l2.get(3)
+
+      assert 3 == Multilevel.get(3)
+      assert 3 == @l1.get(3)
+      assert 3 == @l2.get(3)
+      assert 3 == @l3.get(3)
+    end
   end
 end

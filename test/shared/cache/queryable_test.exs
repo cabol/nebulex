@@ -1,7 +1,7 @@
 defmodule Nebulex.Cache.QueryableTest do
   import Nebulex.SharedTestCase
 
-  deftests do
+  deftests "queryable" do
     import Nebulex.CacheHelpers
 
     test "all" do

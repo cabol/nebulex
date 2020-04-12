@@ -151,12 +151,25 @@ defmodule Nebulex.Adapters.Partitioned do
       |> assert_behaviour(Nebulex.Adapter.HashSlot, "hash_slot")
 
     quote do
+      @doc """
+      A convenience function for getting the primary cache.
+      """
       def __primary__, do: unquote(primary)
 
+      @doc """
+      A convenience function for getting the task supervisor.
+      """
       def __task_sup__, do: unquote(task_supervisor)
 
+      @doc """
+      A convenience function for getting the cluster nodes.
+      """
       def __nodes__, do: Cluster.get_nodes(__MODULE__)
 
+      @doc """
+      A convenience function for picking a node from the cluster based on the
+      given `key`.
+      """
       def get_node(key) do
         Cluster.get_node(__MODULE__, key, unquote(hash_slot))
       end

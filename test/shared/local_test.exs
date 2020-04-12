@@ -1,19 +1,9 @@
 defmodule Nebulex.LocalTest do
   import Nebulex.SharedTestCase
 
-  deftests do
+  deftests "local" do
     import Ex2ms
     import Nebulex.CacheHelpers
-
-    setup do
-      {:ok, pid} = @cache.start_link(n_generations: 2)
-      :ok
-
-      on_exit(fn ->
-        :ok = Process.sleep(10)
-        if Process.alive?(pid), do: @cache.stop(pid)
-      end)
-    end
 
     test "fail on before_compile because invalid backend" do
       msg = "supported backends: [:ets, :shards], got: :xyz"

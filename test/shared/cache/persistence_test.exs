@@ -1,7 +1,7 @@
 defmodule Nebulex.Cache.PersistenceTest do
   import Nebulex.SharedTestCase
 
-  deftests do
+  deftests "persistence" do
     @path "tmp_#{@cache}"
 
     test "dump and load" do

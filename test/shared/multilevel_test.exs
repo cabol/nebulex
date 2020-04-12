@@ -1,7 +1,7 @@
 defmodule Nebulex.MultilevelTest do
   import Nebulex.SharedTestCase
 
-  deftests do
+  deftests "multilevel" do
     @levels @cache.__levels__()
     @l1 :lists.nth(1, @levels)
     @l2 :lists.nth(2, @levels)
@@ -9,16 +9,6 @@ defmodule Nebulex.MultilevelTest do
 
     for level <- @levels do
       :ok = Application.put_env(:nebulex, level, gc_interval: 3600, partitions: 2)
-    end
-
-    setup do
-      {:ok, ml_cache} = @cache.start_link()
-      :ok
-
-      on_exit(fn ->
-        :ok = Process.sleep(100)
-        if Process.alive?(ml_cache), do: @cache.stop(ml_cache)
-      end)
     end
 
     test "partitions for L3 with shards backend" do

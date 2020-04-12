@@ -53,6 +53,8 @@ defmodule Nebulex.Adapters.Local.Backend do
   end
 
   defp parse_opts(opts, extra \\ []) do
+    type = get_option(opts, :backend_type, &is_atom/1, :set)
+
     compressed =
       case get_option(opts, :compressed, &is_boolean/1, false) do
         true -> [:compressed]
@@ -63,7 +65,7 @@ defmodule Nebulex.Adapters.Local.Backend do
       opts,
       :backend_opts,
       List.flatten([
-        :set,
+        type,
         :named_table,
         :public,
         {:keypos, 2},

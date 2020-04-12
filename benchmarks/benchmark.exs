@@ -4,10 +4,12 @@ nodes = [:"node1@127.0.0.1", :"node2@127.0.0.1"]
 Nebulex.Cluster.spawn(nodes)
 
 alias Nebulex.NodeCase
-alias Nebulex.TestCache.{Local, Partitioned}
+alias Nebulex.TestCache.Local.{ETS, Shards}
+alias Nebulex.TestCache.Partitioned
 
 # start caches
-{:ok, local} = Local.start_link()
+{:ok, local_ets} = ETS.start_link()
+{:ok, local_shards} = Shards.start_link()
 {:ok, dist} = Partitioned.start_link()
 node_pid_list = NodeCase.start_caches(Node.list(), [Partitioned])
 
@@ -16,12 +18,14 @@ keys = Enum.to_list(1..10_000)
 
 # init caches
 Enum.each(1..5000, fn x ->
-  Local.put(x, x)
+  ETS.put(x, x)
+  Shards.put(x, x)
   Partitioned.put(x, x)
 end)
 
 inputs = %{
-  "Generational Local Cache" => Local,
+  "Generational Local Cache with ETS" => ETS,
+  "Generational Local Cache with Shards" => Shards,
   "Partitioned Cache" => Partitioned
 }
 
@@ -97,6 +101,7 @@ Benchee.run(
 )
 
 # stop caches s
-if Process.alive?(local), do: Local.stop(local)
+if Process.alive?(local_ets), do: ETS.stop(local_ets)
+if Process.alive?(local_shards), do: Shards.stop(local_shards)
 if Process.alive?(dist), do: Partitioned.stop(dist)
 NodeCase.stop_caches(node_pid_list)

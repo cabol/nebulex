@@ -40,6 +40,13 @@ defmodule Nebulex.Adapters.Local do
        it defines whether or not it includes X as an option. See `:ets.new/2`.
        Defaults to `false`.
 
+    * `:backend_type` - This option defines the type of ETS to be used
+      (Defaults to `:set`). However, it is highly recommended to keep the
+      default value, since there are commands not supported (unexpected
+      exception may be raised) for types like `:bag` or `: duplicate_bag`.
+      Please see the [ETS](https://erlang.org/doc/man/ets.html) docs
+      for more information.
+
     * `:partitions` - The number of partitions in the Cache. This option is only
       available for `:shards` backend. Defaults to `System.schedulers_online()`.
 
@@ -193,10 +200,19 @@ defmodule Nebulex.Adapters.Local do
       alias Nebulex.Adapters.Local.Generation
       alias Nebulex.Adapters.Local.Metadata
 
+      @doc """
+      A convenience function for getting the current backend.
+      """
       def __backend__, do: unquote(backend)
 
+      @doc """
+      A convenience function for getting the Cache metadata.
+      """
       def __metadata__, do: Metadata.get(__MODULE__)
 
+      @doc """
+      A convenience function for creating new generations.
+      """
       def new_generation(opts \\ []) do
         Generation.new(__MODULE__, opts)
       end
@@ -236,7 +252,7 @@ defmodule Nebulex.Adapters.Local do
         nil ->
           {:cont, {gen, nil}}
 
-        entry() = cached ->
+        cached ->
           true = cache.__backend__.insert(newer, cached)
           {:halt, {gen, cached}}
       end
@@ -306,17 +322,17 @@ defmodule Nebulex.Adapters.Local do
   @impl true
   def take(cache, key, _opts) do
     Enum.reduce_while(cache.__metadata__.generations, nil, fn gen, acc ->
-      case cache.__backend__.take(gen, key) do
-        [entry] ->
+      case pop_entry(gen, key, nil, cache) do
+        nil ->
+          {:cont, acc}
+
+        res ->
           value =
-            entry
+            res
             |> validate_ttl(gen, cache)
             |> return(:value)
 
           {:halt, value}
-
-        [] ->
-          {:cont, acc}
       end
     end)
   end
@@ -345,11 +361,18 @@ defmodule Nebulex.Adapters.Local do
     cache.__metadata__.generations
     |> do_get(key, cache)
     |> return()
-    |> case do
-      nil -> nil
-      entry(ttl: :infinity) -> :infinity
-      entry(ttl: ttl, touched: touched) -> ttl - (Time.now() - touched)
-    end
+    |> entry_ttl()
+  end
+
+  defp entry_ttl(nil), do: nil
+  defp entry_ttl(entry(ttl: :infinity)), do: :infinity
+
+  defp entry_ttl(entry(ttl: ttl, touched: touched)) do
+    ttl - (Time.now() - touched)
+  end
+
+  defp entry_ttl(entries) when is_list(entries) do
+    for entry <- entries, do: entry_ttl(entry)
   end
 
   @impl true
@@ -436,6 +459,7 @@ defmodule Nebulex.Adapters.Local do
     case cache.__backend__.lookup(tab, key) do
       [] -> default
       [entry] -> entry
+      entries -> entries
     end
   end
 
@@ -443,6 +467,7 @@ defmodule Nebulex.Adapters.Local do
     case cache.__backend__.take(tab, key) do
       [] -> default
       [entry] -> entry
+      entries -> entries
     end
   end
 
@@ -464,10 +489,14 @@ defmodule Nebulex.Adapters.Local do
     |> cache.__backend__.update_element(key, updates)
   end
 
-  defp return(entry, field \\ nil)
+  defp return(entry_or_entries, field \\ nil)
   defp return(nil, _field), do: nil
   defp return(entry(value: value), :value), do: value
-  defp return(entry, _field), do: entry
+  defp return(entry(key: _) = entry, _field), do: entry
+
+  defp return(entries, field) when is_list(entries) do
+    for entry <- entries, do: return(entry, field)
+  end
 
   defp validate_ttl(nil, _, _), do: nil
   defp validate_ttl(entry(ttl: :infinity) = entry, _, _), do: entry
@@ -479,6 +508,12 @@ defmodule Nebulex.Adapters.Local do
     else
       entry
     end
+  end
+
+  defp validate_ttl(entries, gen, cache) when is_list(entries) do
+    Enum.filter(entries, fn entry ->
+      not is_nil(validate_ttl(entry, gen, cache))
+    end)
   end
 
   defp validate_match_spec(spec, opts) when spec in [nil, :unexpired, :expired] do

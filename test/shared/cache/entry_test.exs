@@ -1,7 +1,7 @@
 defmodule Nebulex.Cache.EntryTest do
   import Nebulex.SharedTestCase
 
-  deftests do
+  deftests "cache" do
     alias Nebulex.TestCache.Partitioned
 
     ## Entries
