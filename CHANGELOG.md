@@ -1,5 +1,13 @@
 # Changelog
 
+## [v1.2.1](https://github.com/cabol/nebulex/tree/v1.2.1) (2020-04-12)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v1.2.0...v1.2.1)
+
+**Fixed bugs:**
+
+- Fix issue when memory check is ran for the generation manager [\#69](https://github.com/cabol/nebulex/issues/69)
+
 ## [v1.2.0](https://github.com/cabol/nebulex/tree/v1.2.0) (2020-03-30)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v1.1.1...v1.2.0)
@@ -92,6 +100,7 @@
 
 **Merged pull requests:**
 
+- typo in transaction docs [\#38](https://github.com/cabol/nebulex/pull/38) ([fredr](https://github.com/fredr))
 - Handle an :infinity expiration in multilevel replication. [\#36](https://github.com/cabol/nebulex/pull/36) ([sdost](https://github.com/sdost))
 - add missing coma in conf section of readme file [\#32](https://github.com/cabol/nebulex/pull/32) ([Kociamber](https://github.com/Kociamber))
 
