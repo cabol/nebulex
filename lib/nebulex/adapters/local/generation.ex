@@ -1,17 +1,27 @@
 defmodule Nebulex.Adapters.Local.Generation do
   @moduledoc """
-  Generations Handler. This GenServer acts as garbage collector, everytime
-  it runs, a new cache generation is created a the oldest one is deleted.
+  Generational garbage collection process.
 
-  The only way to create new generations is through this module (this
-  server is the metadata owner) calling `new/2` function. When a Cache
-  is created, a generations handler associated to that Cache is started
-  at the same time, therefore, this server MUST NOT be started directly.
+  The generational garbage collector manage the heap as several sub-heaps,
+  known as generations, based on age of the objects. An object is allocated
+  in the youngest generation, sometimes called the nursery, and is promoted
+  to an older generation if its lifetime exceeds the threshold of its current
+  generation (defined by option `:gc_interval`). Everytime the GC runs
+  (triggered by `:gc_interval` timeout), a new cache generation is created
+  and the oldest one is deleted.
+
+  The only way to create new generations is through this module (this server
+  is the metadata owner) calling `new/2` function. When a Cache is created,
+  a generational garbage collector is attached to it automatically,
+  therefore, this server MUST NOT be started directly.
 
   ## Options
 
   These options are configured via the built-in local adapter
   (`Nebulex.Adapters.Local`):
+
+    * `:generations` - Max number of Cache generations. Defaults to `2`
+      (normally two generations is enough).
 
     * `:gc_interval` - Interval time in seconds to garbage collection to run,
       delete the oldest generation and create a new one. If this option is
@@ -152,7 +162,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     gc_cleanup_ref = if allocated_memory, do: start_timer(cleanup_max, nil, :cleanup)
 
     # GC options
-    {{_, gen_name, gen_index}, ref} =
+    {{gen_name, gen_index, _}, ref} =
       if gc_interval = get_option(opts, :gc_interval, &(is_integer(&1) and &1 > 0)),
         do: {new_gen(cache, 0, backend_opts), start_timer(gc_interval)},
         else: {new_gen(cache, 0, backend_opts), nil}
@@ -179,7 +189,7 @@ defmodule Nebulex.Adapters.Local.Generation do
         _from,
         %State{cache: cache, gen_index: gen_index, backend_opts: backend_opts} = state
       ) do
-    {generations, gen_name, gen_index} = new_gen(cache, gen_index, backend_opts)
+    {gen_name, gen_index, metadata} = new_gen(cache, gen_index, backend_opts)
 
     ref =
       opts
@@ -187,7 +197,7 @@ defmodule Nebulex.Adapters.Local.Generation do
       |> maybe_reset_timer(state)
 
     state = %{state | gen_name: gen_name, gen_index: gen_index, gc_heartbeat_ref: ref}
-    {:reply, generations, state}
+    {:reply, metadata.generations, state}
   end
 
   def handle_call(:flush, _from, %State{cache: cache} = state) do
@@ -221,7 +231,7 @@ defmodule Nebulex.Adapters.Local.Generation do
           backend_opts: backend_opts
         } = state
       ) do
-    {_, gen_name, gen_index} = new_gen(cache, gen_index, backend_opts)
+    {gen_name, gen_index, _} = new_gen(cache, gen_index, backend_opts)
 
     state = %{
       state
@@ -253,7 +263,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     size = memory_info(cache, name)
 
     if size >= max_size do
-      {_, name, index} = new_gen(cache, index, backend_opts)
+      {name, index, _} = new_gen(cache, index, backend_opts)
 
       state = %{
         state
@@ -287,33 +297,24 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   defp init_metadata(cache, opts) do
-    n_gens = get_option(opts, :n_generations, &is_integer/1, 2)
-    Metadata.create(cache, %Metadata{n_generations: n_gens})
+    max_generations = get_option(opts, :generations, &is_integer/1, 2)
+    Metadata.create(cache, %Metadata{max_generations: max_generations})
   end
 
   defp new_gen(cache, gen_index, backend_opts) do
     gen_name = Module.concat(cache, "." <> Integer.to_string(gen_index))
 
-    gens =
+    metadata =
       gen_name
       |> cache.__backend__.new(backend_opts)
-      |> Metadata.new_generation(cache)
-      |> maybe_delete_gen(cache)
+      |> Metadata.push_generation(cache)
 
-    {gens, gen_name, incr_gen_index(cache, gen_index)}
-  end
+    gen_index =
+      if gen_index < metadata.max_generations,
+        do: gen_index + 1,
+        else: 0
 
-  defp maybe_delete_gen({generations, nil}, _cache), do: generations
-
-  defp maybe_delete_gen({generations, dropped_gen}, cache) do
-    _ = cache.__backend__.delete(dropped_gen)
-    generations
-  end
-
-  defp incr_gen_index(cache, gen_index) do
-    if gen_index < cache.__metadata__.n_generations,
-      do: gen_index + 1,
-      else: 0
+    {gen_name, gen_index, metadata}
   end
 
   defp start_timer(time, ref \\ nil, event \\ :heartbeat) do

@@ -68,24 +68,24 @@ defmodule Nebulex do
         alias MyApp.Cache
         alias MyApp.Repo
 
-        @decorate cache(cache: Cache, key: {User, id}, opts: [ttl: 3600])
+        @decorate cacheable(cache: Cache, key: {User, id}, opts: [ttl: 3600])
         def get_user!(id) do
           Repo.get!(User, id)
         end
 
-        @decorate cache(cache: Cache, key: {User, [email: email]})
+        @decorate cacheable(cache: Cache, key: {User, [email: email]})
         def get_user_by_email!(email) do
           Repo.get_by!(User, email: email)
         end
 
-        @decorate update(cache: Cache, key: {User, user.id})
+        @decorate cache_put(cache: Cache, key: {User, user.id})
         def update_user!(%User{} = user, attrs) do
           user
           |> User.changeset(attrs)
           |> Repo.update!()
         end
 
-        @decorate evict(cache: Cache, keys: [{User, user.id}, {User, [email: user.email]}])
+        @decorate cache_evict(cache: Cache, keys: [{User, user.id}, {User, [email: user.email]}])
         def delete_user(%User{} = user) do
           Repo.delete(user)
         end

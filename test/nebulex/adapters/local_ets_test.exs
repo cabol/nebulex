@@ -6,7 +6,7 @@ defmodule Nebulex.Adapters.LocalEtsTest do
   alias Nebulex.TestCache.Local.ETS, as: Cache
 
   setup do
-    {:ok, pid} = @cache.start_link(n_generations: 2)
+    {:ok, pid} = @cache.start_link(generations: 2)
     :ok
 
     on_exit(fn ->

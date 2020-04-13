@@ -1,17 +1,25 @@
 defmodule Nebulex.Adapters.Local do
   @moduledoc ~S"""
-  Adapter module for Local Generational Cache.
+  Adapter module for Local Generational Cache; inspired by
+  [epocxy](https://github.com/duomark/epocxy).
+
+  Generational caching using an ets table (or multiple ones when used with
+  `:shards`) for each generation of cached data. Accesses hit the newer
+  generation first, and migrate from the older generation to the newer
+  generation when retrieved from the stale table. When a new generation
+  is started, the oldest one is deleted. This is a form of mass garbage
+  collection which avoids using timers and expiration of individual
+  cached elements.
 
   ## Features
 
-    * Generational cache – inspired by
-      [epocxy](https://github.com/duomark/epocxy).
     * Configurable backend (`ets` or `:shards`).
-    * Support for Sharding – For intensive workloads, the Cache may also be
-      partitioned (by using `:shards` backend and specifying the `:partitions`
-      option).
-    * Support for garbage collection (see `Nebulex.Adapters.Local.Generation`).
-    * Time-based eviction through the `:ttl` option (Time-To-Live).
+    * Expiration – A status based on TTL (Time To Live) option. To maintain
+      cache performance, expired entries may not be immediately flushed or
+      evicted, they are expired or evicted on-demand, when the key is read.
+    * Eviction – [Generational Garbage Collection](http://hexdocs.pm/nebulex/Nebulex.Adapters.Local.Generation.html).
+    * Sharding – For intensive workloads, the Cache may also be partitioned
+      (by using `:shards` backend and specifying the `:partitions` option).
     * Support for transactions via Erlang global name registration facility.
 
   ## Compile-Time Options
@@ -26,7 +34,8 @@ defmodule Nebulex.Adapters.Local do
 
   These options can be set through the config file:
 
-    * `:n_generations` - Max number of Cache generations, defaults to `2`.
+    * `:generations` - Max number of Cache generations. Defaults to `2`
+      (normally two generations is enough).
 
     * `:read_concurrency` - Since this adapter uses ETS tables internally,
       this option is used when a new table is created. See `:ets.new/2`.

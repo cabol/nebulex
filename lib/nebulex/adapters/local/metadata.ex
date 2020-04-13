@@ -1,9 +1,9 @@
 defmodule Nebulex.Adapters.Local.Metadata do
   @moduledoc false
 
-  defstruct generations: [], n_generations: 2
+  defstruct generations: [], max_generations: 2
 
-  @type t :: %__MODULE__{generations: [atom], n_generations: integer}
+  @type t :: %__MODULE__{generations: [atom], max_generations: pos_integer}
 
   alias Nebulex.Adapters.Local.Metadata
 
@@ -25,25 +25,31 @@ defmodule Nebulex.Adapters.Local.Metadata do
     metadata
   end
 
-  @spec new_generation(gen :: atom, cache :: Nebulex.Cache.t()) ::
-          {generations :: [atom], dropped_generation :: atom | nil}
-  def new_generation(gen, cache) do
-    metadata = get(cache)
+  @spec push_generation(gen :: atom, cache :: Nebulex.Cache.t()) :: Metadata.t()
+  def push_generation(gen, cache) do
+    cache
+    |> get()
+    |> push_generation(gen, cache)
+  end
 
-    if length(metadata.generations) >= metadata.n_generations do
-      new_metadata =
-        metadata
-        |> Map.update!(:generations, &[gen | Enum.drop(&1, -1)])
-        |> update(cache)
+  ## Private Functions
 
-      {new_metadata.generations, List.last(metadata.generations)}
-    else
-      new_metadata =
-        metadata
-        |> Map.update!(:generations, &[gen | &1])
-        |> update(cache)
+  defp push_generation(%Metadata{generations: gens, max_generations: max} = metadata, gen, cache)
+       when length(gens) >= max do
+    metadata
+    |> Map.update!(:generations, &[gen | Enum.drop(&1, -1)])
+    |> update(cache)
+    |> delete_generation(cache, List.last(gens))
+  end
 
-      {new_metadata.generations, nil}
-    end
+  defp push_generation(%Metadata{} = metadata, gen, cache) do
+    metadata
+    |> Map.update!(:generations, &[gen | &1])
+    |> update(cache)
+  end
+
+  defp delete_generation(metadata, cache, dropped) do
+    _ = cache.__backend__.delete(dropped)
+    metadata
   end
 end

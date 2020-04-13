@@ -56,8 +56,8 @@ defmodule Nebulex.Cache.Supervisor do
         |> init_adapter(adapter, opts)
         |> Supervisor.init(strategy: :one_for_one, max_restarts: 0)
 
-      :ignore ->
-        :ignore
+      other ->
+        other
     end
   end
 

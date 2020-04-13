@@ -133,7 +133,7 @@ defmodule Nebulex.TestCache do
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local,
       gc_interval: 3600,
-      n_generations: 3
+      generations: 3
   end
 
   defmodule Partitioned do

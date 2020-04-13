@@ -98,17 +98,17 @@ defmodule MyApp.Example do
 
   alias MyApp.Cache
 
-  @decorate cache(cache: Cache, key: name)
-  def get_by_name(name, age) do
+  @decorate cacheable(cache: Cache, key: name)
+  def get_by_name(name) do
     # your logic (the loader to retrieve the value from the SoR)
   end
 
-  @decorate cache(cache: Cache, key: age, opts: [ttl: 3600])
+  @decorate cacheable(cache: Cache, key: age, opts: [ttl: 3600])
   def get_by_age(age) do
     # your logic (the loader to retrieve the value from the SoR)
   end
 
-  @decorate cache(cache: Cache)
+  @decorate cacheable(cache: Cache)
   def all(query) do
     # your logic (the loader to retrieve the value from the SoR)
   end
@@ -138,13 +138,13 @@ defmodule MyApp.Example do
   alias MyApp.Cache
 
   # When the data is written to the SoR, it is updated in the cache
-  @decorate update(cache: Cache, key: something)
+  @decorate cache_put(cache: Cache, key: something)
   def update(something) do
     # Write data to the SoR (most likely the Database)
   end
 
   # When the data is written to the SoR, it is deleted (evicted) from the cache
-  @decorate evict(cache: Cache, key: something)
+  @decorate cache_evict(cache: Cache, key: something)
   def update_something(something) do
     # Write data to the SoR (most likely the Database)
   end

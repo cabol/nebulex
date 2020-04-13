@@ -10,7 +10,7 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
   setup do
     cache_pids =
       for cache <- @caches do
-        {:ok, pid} = cache.start_link(n_generations: 2, backend_type: :duplicate_bag)
+        {:ok, pid} = cache.start_link(generations: 2, backend_type: :duplicate_bag)
         {cache, pid}
       end
 

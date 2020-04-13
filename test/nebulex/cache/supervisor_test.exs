@@ -5,16 +5,17 @@ defmodule Nebulex.Cache.SupervisorTest do
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local
+
+    def init(opts) do
+      case Keyword.get(opts, :ignore) do
+        true -> :ignore
+        false -> opts
+      end
+    end
   end
 
-  setup do
-    {:ok, pid} = MyCache.start_link()
-    :ok
-
-    on_exit(fn ->
-      :ok = Process.sleep(10)
-      if Process.alive?(pid), do: MyCache.stop(pid)
-    end)
+  test "fail on init because :ignore is returned" do
+    assert MyCache.start_link(ignore: true) == :ignore
   end
 
   test "fail on compile_config because missing otp_app" do
