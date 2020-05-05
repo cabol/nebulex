@@ -59,10 +59,10 @@ defmodule Nebulex.Adapters.Local do
     * `:partitions` - The number of partitions in the Cache. This option is only
       available for `:shards` backend. Defaults to `System.schedulers_online()`.
 
-    * `:gc_interval` - Interval time in seconds to garbage collection to run,
-      delete the oldest generation and create a new one. If this option is
-      not set, garbage collection is never executed, so new generations
-      must be created explicitly, e.g.: `MyCache.new_generation([])`.
+    * `:gc_interval` - Interval time in milliseconds to garbage collection to
+      run, delete the oldest generation and create a new one. If this option is
+      not set, garbage collection is never executed, so new generations must be
+      created explicitly, e.g.: `MyCache.new_generation([])`.
 
     * `:allocated_memory` - Max size in bytes allocated for a cache generation.
       If this option is set and the configured value is reached, a new
@@ -70,13 +70,13 @@ defmodule Nebulex.Adapters.Local do
       space. If it is not set (or set to `nil`), the cleanup check to release
       memory is not performed (the default).
 
-    * `:gc_cleanup_min_timeout` - The min timeout in seconds for triggering the
-      next cleanup and memory check. This will be the timeout to use when the
-      max allocated memory is reached. Defaults to `30`sec.
+    * `:gc_cleanup_min_timeout` - The min timeout in milliseconds for triggering
+      the next cleanup and memory check. This will be the timeout to use when
+      the max allocated memory is reached. Defaults to `30_000`.
 
-    * `:gc_cleanup_max_timeout` - The max timeout in seconds for triggering the
-      next cleanup and memory check. This is the timeout used when the cache
-      starts or the consumed memory is `0`. Defaults to `300`sec.
+    * `:gc_cleanup_max_timeout` - The max timeout in milliseconds for triggering
+      the next cleanup and memory check. This is the timeout used when the cache
+      starts or the consumed memory is `0`. Defaults to `300_000`.
 
   ## Example
 
@@ -94,10 +94,10 @@ defmodule Nebulex.Adapters.Local do
   environment, usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.LocalCache,
-        gc_interval: 3600,
+        gc_interval: 3_600_000,
         allocated_memory: 2_000_000_000,
-        gc_cleanup_min_timeout: 10,
-        gc_cleanup_max_timeout: 900
+        gc_cleanup_min_timeout: 10_000,
+        gc_cleanup_max_timeout: 900_000
 
   For intensive workloads, the Cache may also be partitioned (by using `:shards`
   backend and specifying the `:partitions` option). If partitioning is required
@@ -105,10 +105,10 @@ defmodule Nebulex.Adapters.Local do
   schedulers available (the default):
 
       config :my_app, MyApp.LocalCache,
-        gc_interval: 3600,
+        gc_interval: 3_600_000,
         allocated_memory: 2_000_000_000,
-        gc_cleanup_min_timeout: 10,
-        gc_cleanup_max_timeout: 900,
+        gc_cleanup_min_timeout: 10_000,
+        gc_cleanup_max_timeout: 900_000,
         partitions: System.schedulers_online()
 
   For more information about the usage, check out `Nebulex.Cache`.

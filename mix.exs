@@ -91,7 +91,7 @@ defmodule Nebulex.Mixfile do
   defp dialyzer do
     [
       plt_add_apps: [:shards, :mix, :eex],
-      plt_file: {:no_warn, "priv/plts/dialyzer_#{Mix.env()}.plt"},
+      plt_file: {:no_warn, "priv/plts/#{Mix.env()}/dialyzer.plt"},
       flags: [
         :unmatched_returns,
         :error_handling,

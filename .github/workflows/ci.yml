@@ -7,8 +7,8 @@ on:
     branches: [ master ]
 
 jobs:
-  mix_test:
-    name: 'mix test (Elixir ${{ matrix.elixir }} OTP ${{ matrix.otp }})'
+  nebulex_test:
+    name: 'Nebulex Test (Elixir ${{ matrix.elixir }} OTP ${{ matrix.otp }})'
 
     strategy:
       matrix:
@@ -59,19 +59,19 @@ jobs:
       - name: Check Style
         run: mix credo --strict
 
-      - name: Run Tests and Coverage
+      - name: Tests and Coverage
         run: |
           epmd -daemon
           mix coveralls.github
 
       - uses: actions/cache@v1
         with:
-          path: priv/plts
-          key: ${{ runner.os }}-plt-v1-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+          path: priv/plts/${{ env.MIX_ENV }}
+          key: ${{ runner.os }}-plt-${{ env.MIX_ENV }}-v1-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
           restore-keys: |
-            ${{ runner.os }}-plt-v1-
+            ${{ runner.os }}-plt-${{ env.MIX_ENV }}-v1-
 
-      - name: Run Dialyzer
+      - name: Dialyzer
         run: mix dialyzer --format short
 
       - name: Report Doc Coverage
