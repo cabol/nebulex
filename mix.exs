@@ -1,11 +1,7 @@
 defmodule Nebulex.Mixfile do
   use Mix.Project
 
-<<<<<<< HEAD
-  @version "1.2.2"
-=======
   @version "2.0.0-dev"
->>>>>>> Cache API v2 (Refactoring)
 
   def project do
     [
@@ -61,7 +57,7 @@ defmodule Nebulex.Mixfile do
       {:benchee_html, "~> 1.0", optional: true, only: :test},
 
       # Code Analysis
-      {:dialyxir, "~> 0.5", optional: true, only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.0", optional: true, only: [:dev, :test], runtime: false},
       {:credo, "~> 1.1", optional: true, only: [:dev, :test]},
 
       # Docs
@@ -95,7 +91,7 @@ defmodule Nebulex.Mixfile do
   defp dialyzer do
     [
       plt_add_apps: [:shards, :mix, :eex],
-      plt_file: {:no_warn, "priv/plts/dialyzer-#{Mix.env()}.plt"},
+      plt_file: {:no_warn, "priv/plts/dialyzer_#{Mix.env()}.plt"},
       flags: [
         :unmatched_returns,
         :error_handling,

@@ -9,6 +9,7 @@ on:
 jobs:
   mix_test:
     name: 'mix test (Elixir ${{ matrix.elixir }} OTP ${{ matrix.otp }})'
+
     strategy:
       matrix:
         elixir:
@@ -17,30 +18,61 @@ jobs:
         otp:
           - 22.3
           - 21.3
+
     runs-on: ubuntu-latest
+
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MIX_ENV: test
+
     steps:
       - uses: actions/checkout@v2
+
       - uses: actions/setup-elixir@v1
         with:
           otp-version: '${{ matrix.otp }}'
           elixir-version: '${{ matrix.elixir }}'
+
+      - uses: actions/cache@v1
+        with:
+          path: deps
+          key: ${{ runner.os }}-mix-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+
+      - uses: actions/cache@v1
+        with:
+          path: _build
+          key: ${{ runner.os }}-build-${{ hashFiles(format('{0}', github.workspace)) }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+
       - name: Install Dependencies
         run: mix deps.get
+
       - name: Compile Code
         run: mix compile --warnings-as-errors
+
       - name: Check Format
         run: mix format --check-formatted
+
       - name: Check Style
         run: mix credo --strict
+
       - name: Run Tests and Coverage
         run: |
           epmd -daemon
-          MIX_ENV=test mix coveralls.github
-      - name: Generate PLT
-        run: mix dialyzer --plt
+          mix coveralls.github
+
+      - uses: actions/cache@v1
+        with:
+          path: priv/plts
+          key: ${{ runner.os }}-plt-v1-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+          restore-keys: |
+            ${{ runner.os }}-plt-v1-
+
       - name: Run Dialyzer
-        run: mix dialyzer --halt-exit-status
+        run: mix dialyzer --format short
+
       - name: Report Doc Coverage
         run: MIX_ENV=docs mix inch.report

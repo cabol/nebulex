@@ -262,7 +262,10 @@ defmodule Nebulex.TestCache do
     end
 
     @impl true
-    def get(_, _, _), do: raise(ArgumentError, "Error")
+    def get(_, key, _) do
+      if is_integer(key), do: raise(ArgumentError, "Error")
+      :ok
+    end
 
     @impl true
     def put(_, _, _, _, _, _) do
@@ -277,13 +280,13 @@ defmodule Nebulex.TestCache do
     def take(_, _, _), do: nil
 
     @impl true
-    def has_key?(_, _), do: nil
+    def has_key?(_, _), do: true
 
     @impl true
     def ttl(_, _), do: nil
 
     @impl true
-    def expire(_, _, _), do: nil
+    def expire(_, _, _), do: true
 
     @impl true
     def touch(_, _), do: true
@@ -292,7 +295,10 @@ defmodule Nebulex.TestCache do
     def incr(_, _, _, _, _), do: 1
 
     @impl true
-    def size(_), do: Process.exit(self(), :normal)
+    def size(_) do
+      _ = Process.exit(self(), :normal)
+      0
+    end
 
     @impl true
     def flush(_) do
@@ -301,7 +307,10 @@ defmodule Nebulex.TestCache do
     end
 
     @impl true
-    def get_all(_, _, _), do: Process.sleep(1000)
+    def get_all(_, _, _) do
+      :ok = Process.sleep(1000)
+      %{}
+    end
 
     @impl true
     def put_all(_, _, _, _, _), do: Process.exit(self(), :normal)
