@@ -127,59 +127,6 @@ if Code.ensure_loaded?(Decorator.Define) do
     long time since it is inefficient), all the entries are removed in one
     operation as shown above.
 
-    ## Putting all together
-
-    Supposing we are using `Ecto` and we want to define some cacheable functions
-    within the context `MyApp.Accounts`:
-
-        defmodule MyApp.Accounts do
-          use Nebulex.Decorators
-
-          import Ecto.Query
-
-          alias MyApp.Accounts.Account
-          alias MyApp.{Cache, Repo}
-
-          @ttl 3_600_000 #=> 1 hr
-
-          @decorate cacheable(cache: Cache, key: {Account, id}, opts: [ttl: @ttl])
-          def get_account!(id) do
-            Repo.get!(Account, id)
-          end
-
-          @decorate cacheable(cache: Cache, key: {Account, clauses})
-          def get_account_by!(clauses) do
-            Repo.get_by!(Account, clauses)
-          end
-
-          @decorate cacheable(cache: Cache, match: &match_fun/1)
-          def accounts_by_type(type) do
-            query = from(q in Account, where: q.type == ^type)
-            Repo.all(query)
-          end
-
-          defp match_fun([]), do: false
-          defp match_fun(_), do: true
-
-          @decorate cache_put(cache: Cache, key: {Account, acct.id})
-          def update_account!(%Account{} = acct, attrs) do
-            acct
-            |> Account.changeset(attrs)
-            |> Repo.update!()
-          end
-
-          @decorate cache_evict(
-                      cache: Cache,
-                      keys: [
-                        {Account, acct.id},
-                        {Account, [email: acct.email]}
-                      ]
-                    )
-          def delete_account(%Account{} = acct) do
-            Repo.delete(acct)
-          end
-        end
-
     ## Shared Options
 
     All three cache annotations explained previously accept the following
@@ -196,11 +143,87 @@ if Code.ensure_loaded?(Decorator.Define) do
       * `:opts` - Defines the cache options that will be passed as argument
         to the invoked cache function (optional).
 
-      * `:match` - Defines a function `(element() -> as_boolean(term()))` that
-        receives the evaluated code block and decides if the cache should be
-        updated or not (optional). Caches only those elements for which `fun`
-        returns a truthy value. It does not have any effect on `cache_evict`
-        since values are always evicted before executing the function logic.
+      * `:match` - Match function `(term -> boolean | {true, term})` (optional).
+        This function is for matching and decide whether or not the code-block
+        evaluation result is cached or not. If `true` the code-block evaluation
+        result is cached as it is (the default). If `{true, value}` is returned,
+        then the `value` is what is cached (useful to control what to cache).
+        Otherwise, none result is stored in the cache.
+
+    ## Putting all together
+
+    Supposing we are using `Ecto` and we want to define some cacheable functions
+    within the context `MyApp.Accounts`:
+
+        # The Cache
+        defmodule MyApp.Cache do
+          use Nebulex.Cache,
+            otp_app: :my_app,
+            adapter: Nebulex.Adapters.Local,
+            backend: :shards
+        end
+
+        # Some Ecto schema
+        defmodule MyApp.Accounts.User do
+          use Ecto.Schema
+
+          schema "users" do
+            field(:username, :string)
+            field(:password, :string)
+            field(:role, :string)
+          end
+
+          def changeset(user, attrs) do
+            user
+            |> cast(attrs, [:username, :password, :role])
+            |> validate_required([:username, :password, :role])
+          end
+        end
+
+        # Accounts context
+        defmodule MyApp.Accounts do
+          use Nebulex.Decorators
+
+          alias MyApp.Accounts.User
+          alias MyApp.{Cache, Repo}
+
+          @ttl Nebulex.Time.expiry_time(1, :hour)
+
+          @decorate cacheable(cache: Cache, key: {User, id}, opts: [ttl: @ttl])
+          def get_user!(id) do
+            Repo.get!(User, id)
+          end
+
+          @decorate cacheable(cache: Cache, key: {User, username}, opts: [ttl: @ttl])
+          def get_user_by_username(username) do
+            Repo.get_by(User, [username: username])
+          end
+
+          @decorate cache_put(
+                      cache: Cache,
+                      keys: [{User, usr.id}, {User, usr.username}],
+                      match: &match_update/1
+                    )
+          def update_user(%User{} = usr, attrs) do
+            usr
+            |> User.changeset(attrs)
+            |> Repo.update()
+          end
+
+          defp match_update({:ok, usr}), do: {true, usr}
+          defp match_update({:error, _}), do: false
+
+          @decorate cache_evict(cache: Cache, keys: [{User, usr.id}, {User, usr.username}])
+          def delete_user(%User{} = usr) do
+            Repo.delete(usr)
+          end
+
+          def create_user(attrs \\ %{}) do
+            %User{}
+            |> User.changeset(attrs)
+            |> Repo.insert()
+          end
+        end
 
     See [Cache Usage Patters Guide](http://hexdocs.pm/nebulex/cache-usage-patterns.html).
 
@@ -286,12 +309,14 @@ if Code.ensure_loaded?(Decorator.Define) do
 
           alias MyApp.Cache
 
+          @ttl Nebulex.Time.expiry_time(1, :hour)
+
           @decorate cacheable(cache: Cache, key: name)
           def get_by_name(name, age) do
             # your logic (maybe the loader to retrieve the value from the SoR)
           end
 
-          @decorate cacheable(cache: Cache, key: age, opts: [ttl: 3600])
+          @decorate cacheable(cache: Cache, key: age, opts: [ttl: @ttl])
           def get_by_age(age) do
             # your logic (maybe the loader to retrieve the value from the SoR)
           end
@@ -337,12 +362,14 @@ if Code.ensure_loaded?(Decorator.Define) do
 
           alias MyApp.Cache
 
+          @ttl Nebulex.Time.expiry_time(1, :hour)
+
           @decorate cache_put(cache: Cache, key: name)
           def update(name) do
             # your logic (maybe write data to the SoR)
           end
 
-          @decorate cache_put(cache: Cache, opts: [ttl: 3600])
+          @decorate cache_put(cache: Cache, opts: [ttl: @ttl])
           def update_with_ttl(name) do
             # your logic (maybe write data to the SoR)
           end
@@ -514,27 +541,30 @@ if Code.ensure_loaded?(Decorator.Define) do
         if value = cache.get(key, opts) do
           value
         else
-          value = unquote(block)
-
-          if match.(value) do
-            :ok = cache.put(key, value, opts)
-            value
-          else
-            value
-          end
+          unquote(match_logic(block))
         end
       end
     end
 
     defp action_logic(:cache_put, block, _attrs) do
-      quote do
-        value = unquote(block)
+      match_logic(block)
+    end
 
-        if match.(value) do
-          :ok = cache.put(key, value, opts)
-          value
-        else
-          value
+    defp match_logic(block) do
+      quote do
+        result = unquote(block)
+
+        case match.(result) do
+          {true, value} ->
+            :ok = cache.put(key, value, opts)
+            result
+
+          true ->
+            :ok = cache.put(key, result, opts)
+            result
+
+          false ->
+            result
         end
       end
     end

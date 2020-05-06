@@ -34,7 +34,7 @@ defmodule Nebulex do
   environment, usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.MyCache,
-        gc_interval: 3600,
+        gc_interval: 3_600_000,
         partitions: 2
 
   Each cache in Nebulex defines a `start_link/1` function that needs to be
@@ -58,40 +58,6 @@ defmodule Nebulex do
 
   ## Decorators
 
-  Decorators are a set of caching annotations to make easier the implementation
-  of different [cache patterns](https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc).
-
-      defmodule MyApp.Accounts do
-        use Nebulex.Decorators
-
-        alias MyApp.Accounts.User
-        alias MyApp.Cache
-        alias MyApp.Repo
-
-        @decorate cacheable(cache: Cache, key: {User, id}, opts: [ttl: 3600])
-        def get_user!(id) do
-          Repo.get!(User, id)
-        end
-
-        @decorate cacheable(cache: Cache, key: {User, [email: email]})
-        def get_user_by_email!(email) do
-          Repo.get_by!(User, email: email)
-        end
-
-        @decorate cache_put(cache: Cache, key: {User, user.id})
-        def update_user!(%User{} = user, attrs) do
-          user
-          |> User.changeset(attrs)
-          |> Repo.update!()
-        end
-
-        @decorate cache_evict(cache: Cache, keys: [{User, user.id}, {User, [email: user.email]}])
-        def delete_user(%User{} = user) do
-          Repo.delete(user)
-        end
-      end
-
-  It also provides a decorator to define hooked functions, a way to support
-  pre/post hooks. See `Nebulex.Decorators` for more information.
+  See [Nebulex.Decorators](http://hexdocs.pm/nebulex/Nebulex.Decorators.html).
   """
 end

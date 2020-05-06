@@ -98,12 +98,14 @@ defmodule MyApp.Example do
 
   alias MyApp.Cache
 
+  @ttl Nebulex.Time.expiry_time(1, :hour)
+
   @decorate cacheable(cache: Cache, key: name)
   def get_by_name(name) do
     # your logic (the loader to retrieve the value from the SoR)
   end
 
-  @decorate cacheable(cache: Cache, key: age, opts: [ttl: 3600])
+  @decorate cacheable(cache: Cache, key: age, opts: [ttl: @ttl])
   def get_by_age(age) do
     # your logic (the loader to retrieve the value from the SoR)
   end

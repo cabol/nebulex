@@ -17,7 +17,6 @@ jobs:
           - 1.9.4
         otp:
           - 22.3
-          - 21.3
 
     runs-on: ubuntu-latest
 
@@ -43,7 +42,7 @@ jobs:
       - uses: actions/cache@v1
         with:
           path: _build
-          key: ${{ runner.os }}-build-${{ hashFiles(format('{0}', github.workspace)) }}
+          key: ${{ runner.os }}-build-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
           restore-keys: |
             ${{ runner.os }}-build-
 
@@ -67,9 +66,9 @@ jobs:
       - uses: actions/cache@v1
         with:
           path: priv/plts/${{ env.MIX_ENV }}
-          key: ${{ runner.os }}-plt-${{ env.MIX_ENV }}-v1-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+          key: ${{ runner.os }}-plt-${{ env.MIX_ENV }}-v1
           restore-keys: |
-            ${{ runner.os }}-plt-${{ env.MIX_ENV }}-v1-
+            ${{ runner.os }}-plt-${{ env.MIX_ENV }}-v1
 
       - name: Dialyzer
         run: mix dialyzer --format short

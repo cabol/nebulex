@@ -8,7 +8,7 @@ defmodule Nebulex.MultilevelTest do
     @l3 :lists.nth(3, @levels)
 
     for level <- @levels do
-      :ok = Application.put_env(:nebulex, level, gc_interval: 3600, partitions: 2)
+      :ok = Application.put_env(:nebulex, level, gc_interval: 3_600_000, partitions: 2)
     end
 
     test "partitions for L3 with shards backend" do

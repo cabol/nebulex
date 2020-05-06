@@ -132,7 +132,7 @@ defmodule Nebulex.TestCache do
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local,
-      gc_interval: 3600,
+      gc_interval: Nebulex.Time.expiry_time(1, :hour),
       generations: 3
   end
 
@@ -148,7 +148,7 @@ defmodule Nebulex.TestCache do
       use Nebulex.Cache,
         otp_app: :nebulex,
         adapter: Nebulex.Adapters.Local,
-        gc_interval: 3600
+        gc_interval: Nebulex.Time.expiry_time(1, :hour)
     end
 
     def get_and_update_fun(nil), do: {nil, 1}

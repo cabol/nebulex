@@ -28,11 +28,14 @@ defmodule Nebulex.Adapters.Local.Generation do
       option is not set, garbage collection is never executed, so new
       generations must be created explicitly, e.g.: `new(cache, [])`.
 
+    * `:max_size` - Max number of cached entries (cache limit). If it is not
+      set (`nil`), the check to release memory is not performed (the default).
+
     * `:allocated_memory` - Max size in bytes allocated for a cache generation.
-      If this option is set and the configured value is reached, a new generation
-      is created so the oldest is deleted and force releasing memory space.
-      If it is not set (`nil`), the cleanup check to release memory is not
-      performed (the default).
+      If this option is set and the configured value is reached, a new cache
+      generation is created so the oldest is deleted and force releasing memory
+      space. If it is not set (`nil`), the cleanup check to release memory is
+      not performed (the default).
 
     * `:gc_cleanup_min_timeout` - The min timeout in milliseconds for triggering
       the next cleanup and memory check. This will be the timeout to use when

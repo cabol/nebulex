@@ -132,7 +132,7 @@ We can insert a new entries into our blog cache with this code:
 
 ```elixir
 iex> user = %{id: 1, first_name: "Galileo", last_name: "Galilei"}
-iex> Blog.Cache.put(user[:id], user, ttl: 3600)
+iex> Blog.Cache.put(user[:id], user, ttl: Nebulex.Time.expiry_time(1, :hour))
 :ok
 ```
 

@@ -96,11 +96,11 @@ defmodule Nebulex.Adapters.Multilevel do
   environment, usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.MultilevelCache.L1,
-        gc_interval: 3600,
+        gc_interval: Nebulex.Time.expiry_time(1, :hour),
         partitions: 2
 
       config :my_app, MyApp.MultilevelCache.L2.Primary,
-        gc_interval: 3600,
+        gc_interval: Nebulex.Time.expiry_time(1, :hour),
         partitions: 2
 
   Using the multilevel cache cache:

@@ -56,7 +56,7 @@ defmodule Nebulex.Adapters.Replicated do
   usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.ReplicatedCache.Primary,
-        gc_interval: 3600,
+        gc_interval: Nebulex.Time.expiry_time(1, :hour),
         partitions: System.schedulers_online()
 
   For more information about the usage, see `Nebulex.Cache` documentation.

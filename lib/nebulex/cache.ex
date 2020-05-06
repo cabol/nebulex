@@ -20,8 +20,8 @@ defmodule Nebulex.Cache do
   Could be configured with:
 
       config :my_app, MyCache,
-        gc_interval: 3600,
-        allocated_memory: 2_000_000_000,
+        gc_interval: Nebulex.Time.expiry_time(1, :hour),
+        max_size: 200_000,
         gc_cleanup_min_timeout: 10,
         gc_cleanup_max_timeout: 900,
         partitions: System.schedulers_online()
