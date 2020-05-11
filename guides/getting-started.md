@@ -565,5 +565,5 @@ To learn more about how multilevel-cache works, please check
 
 ## Next
 
- * [Cache Usage Patterns via Nebulex.Decorators](http://hexdocs.pm/nebulex/cache-usage-patterns.html) -
+ * [Cache Usage Patterns via Nebulex.Caching](http://hexdocs.pm/nebulex/cache-usage-patterns.html) -
    Annotations-based DSL to implement different cache usage patterns.

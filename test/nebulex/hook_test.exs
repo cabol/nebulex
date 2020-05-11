@@ -1,54 +1,170 @@
 defmodule Nebulex.HookTest do
   use ExUnit.Case, async: true
 
-  alias Nebulex.Hook.Event
-  alias Nebulex.TestCache.{ErrorHookableCache, HookableCache}
+  import ExUnit.CaptureLog
+
+  alias Nebulex.Hook
+
+  require Logger
 
   setup do
-    {:ok, pid} = HookableCache.start_link()
-    :ok
+    Application.start(:logger)
 
     on_exit(fn ->
-      :ok = Process.sleep(10)
-      if Process.alive?(pid), do: HookableCache.stop(pid)
+      Application.stop(:logger)
     end)
   end
 
-  test "hooks" do
-    true = Process.register(self(), :hooked_cache)
-    HookableCache.new_generation()
+  describe "before" do
+    defmodule BeforeHookCache do
+      @moduledoc false
+      use Nebulex.Hook
+      @decorate_all before(&Nebulex.HookTest.hook_fun/1)
 
-    refute HookableCache.get("foo")
-    assert_receive %Event{module: HookableCache, name: :get, arity: 2} = event, 200
-    refute event.result
-    assert event.acc >= 0
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+    end
 
-    assert :ok == HookableCache.put("foo", "bar")
-    assert_receive %Event{module: HookableCache, name: :put, arity: 3} = event, 200
-    assert event.acc >= 0
+    test "hook" do
+      {:ok, pid} = BeforeHookCache.start_link()
+      true = Process.register(self(), :hooked_cache)
+      _ = BeforeHookCache.new_generation()
 
-    assert :ok == HookableCache.put("hello", "world")
-    assert_receive %Event{module: HookableCache, name: :put, arity: 3} = event, 200
-    assert event.acc >= 0
+      refute BeforeHookCache.get("foo")
+      assert_receive %Hook{} = hook, 200
+      assert hook.step == :before
+      assert hook.module == BeforeHookCache
+      assert hook.name == :get
+      assert hook.arity == 2
+      refute hook.return
 
-    assert "bar" == HookableCache.get("foo")
-    assert_receive %Event{module: HookableCache, name: :get, arity: 2} = event, 200
-    assert event.result == "bar"
-    assert event.acc >= 0
+      assert :ok == BeforeHookCache.put("foo", "bar")
+      assert_receive %Hook{} = hook, 200
+      assert hook.step == :before
+      assert hook.module == BeforeHookCache
+      assert hook.name == :put
+      assert hook.arity == 3
+      refute hook.return
 
-    assert "world" == HookableCache.get("hello")
-    assert_receive %Event{module: HookableCache, name: :get, arity: 2} = event, 200
-    assert event.result == "world"
-    assert event.acc >= 0
+      :ok = BeforeHookCache.stop(pid)
+    end
   end
 
-  test "hooks error" do
-    {:ok, pid} = ErrorHookableCache.start_link()
+  describe "after_return" do
+    defmodule AfterReturnHookCache do
+      @moduledoc false
+      use Nebulex.Hook
+      @decorate_all after_return(&Nebulex.HookTest.hook_fun/1)
 
-    assert_raise(Nebulex.HookError, ~r"hook execution failed with error", fn ->
-      ErrorHookableCache.get("foo")
-    end)
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+    end
 
-    :ok = ErrorHookableCache.stop(pid)
+    test "hook" do
+      {:ok, pid} = AfterReturnHookCache.start_link()
+      true = Process.register(self(), :hooked_cache)
+      _ = AfterReturnHookCache.new_generation()
+
+      refute AfterReturnHookCache.get("foo")
+      assert_receive %Hook{} = hook, 200
+      assert hook.module == AfterReturnHookCache
+      assert hook.name == :get
+      assert hook.arity == 2
+      assert hook.step == :after_return
+      refute hook.return
+
+      assert :ok == AfterReturnHookCache.put("foo", "bar")
+      assert_receive %Hook{} = hook, 200
+      assert hook.module == AfterReturnHookCache
+      assert hook.name == :put
+      assert hook.arity == 3
+      assert hook.step == :after_return
+      assert hook.return == :ok
+
+      :ok = AfterReturnHookCache.stop(pid)
+    end
   end
+
+  describe "around" do
+    defmodule AroundHookCache do
+      @moduledoc false
+      use Nebulex.Hook
+      @decorate_all around(&Nebulex.TestCache.TestHook.track/1)
+
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+
+      alias Nebulex.TestCache.TestHook
+
+      def init(opts) do
+        {:ok, pid} = TestHook.start_link()
+        {:ok, Keyword.put(opts, :hook_pid, pid)}
+      end
+    end
+
+    test "hook" do
+      {:ok, pid} = AroundHookCache.start_link()
+      true = Process.register(self(), :hooked_cache)
+      _ = AroundHookCache.new_generation()
+
+      refute AroundHookCache.get("foo")
+      assert_receive %Hook{module: AroundHookCache, name: :get, arity: 2} = hook, 200
+      refute hook.return
+      assert hook.acc >= 0
+
+      assert :ok == AroundHookCache.put("foo", "bar")
+      assert_receive %Hook{module: AroundHookCache, name: :put, arity: 3} = hook, 200
+      assert hook.acc >= 0
+      assert hook.return == :ok
+
+      assert :ok == AroundHookCache.put("hello", "world")
+      assert_receive %Hook{module: AroundHookCache, name: :put, arity: 3} = hook, 200
+      assert hook.acc >= 0
+      assert hook.return == :ok
+
+      assert "bar" == AroundHookCache.get("foo")
+      assert_receive %Hook{module: AroundHookCache, name: :get, arity: 2} = hook, 200
+      assert hook.return == "bar"
+      assert hook.acc >= 0
+
+      assert "world" == AroundHookCache.get("hello")
+      assert_receive %Hook{module: AroundHookCache, name: :get, arity: 2} = hook, 200
+      assert hook.return == "world"
+      assert hook.acc >= 0
+
+      :ok = AroundHookCache.stop(pid)
+    end
+  end
+
+  describe "exception" do
+    defmodule ErrorCache do
+      @moduledoc false
+      use Nebulex.Hook
+      @decorate_all around(&Nebulex.TestCache.TestHook.hook_error/1)
+
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+    end
+
+    test "hook" do
+      {:ok, pid} = ErrorCache.start_link()
+
+      msg = "hook execution failed on step before with error"
+      assert capture_log(fn -> ErrorCache.get("foo") end) =~ msg
+
+      :ok = ErrorCache.stop(pid)
+    end
+  end
+
+  ## Helpers
+
+  def hook_fun(%Hook{name: name} = hook) when name in [:get, :put] do
+    send(self(), hook)
+  end
+
+  def hook_fun(hook), do: hook
 end

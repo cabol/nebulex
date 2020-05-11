@@ -10,22 +10,6 @@ defmodule Nebulex.KeyAlreadyExistsError do
   end
 end
 
-defmodule Nebulex.HookError do
-  @moduledoc """
-  Raised when a hook execution fails.
-  """
-  defexception [:exception]
-
-  @impl true
-  def message(%{exception: exception}) do
-    """
-    hook execution failed with error:
-
-    #{inspect(exception, pretty: true)}
-    """
-  end
-end
-
 defmodule Nebulex.QueryError do
   @moduledoc """
   Raised at runtime when the query is invalid.

@@ -1,7 +1,8 @@
 if Code.ensure_loaded?(Decorator.Define) do
-  defmodule Nebulex.Decorators do
+  defmodule Nebulex.Caching do
     @moduledoc ~S"""
-    Declarative annotation-based caching via function decorators.
+    Declarative annotation-based caching via function
+    [decorators](https://github.com/arjan/decorator).
 
     For caching declaration, the abstraction provides three Elixir function
     decorators: `cacheable `, `cache_evict`, and `cache_put`, which allow
@@ -49,11 +50,11 @@ if Code.ensure_loaded?(Decorator.Define) do
           # the logic for retrieving the account ...
         end
 
-    At first glance, while the boolean argument influences the way the book is
-    found, it is no use for the cache.
+    At first glance, while the boolean argument influences the way the account
+    is found, it is no use for the cache.
 
-    For such cases, the `cacheable` decorator allows the user to specify how
-    the key is generated based on the function attributes.
+    For such cases, the `cacheable` decorator allows the user to specify the
+    key explicitly based on the function attributes.
 
         @decorate cacheable(cache: Cache, key: {Account, email})
         def get_account(email, include_users?) do
@@ -61,7 +62,7 @@ if Code.ensure_loaded?(Decorator.Define) do
         end
 
         @decorate cacheable(cache: Cache, key: {Account, user.account_id})
-        def get_account_by_user(%User{} = user) do
+        def get_user_account(%User{} = user) do
           # the logic for retrieving the account ...
         end
 
@@ -74,6 +75,23 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     See the **"Shared Options"** section below.
 
+    ### Functions with multiple clauses
+
+    Since [decorator lib](https://github.com/arjan/decorator#functions-with-multiple-clauses)
+    is used, it is important to be aware of the recommendations, warns,
+    limitations, and so on. In this case, for functions with multiple clauses
+    the general advice is to create an empty function head, and call the
+    decorator on that head, like so:
+
+        @decorate cacheable(cache: Cache, key: email)
+        def get_account(email \\ nil)
+
+        def get_account(nil), do: nil
+
+        def get_account(email) do
+          # the logic for retrieving the account ...
+        end
+
     ## `cache_put` decorator
 
     For cases where the cache needs to be updated without interfering with the
@@ -82,7 +100,7 @@ if Code.ensure_loaded?(Decorator.Define) do
     (according to the `cache_put` options). It supports the same options as
     `cacheable`.
 
-        @decorate cache_put(cache: Cache, key: {Account, email})
+        @decorate cache_put(cache: Cache, key: {Account, acct.email})
         def update_account(%Account{} = acct, attrs) do
           # the logic for updating the account ...
         end
@@ -182,7 +200,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
         # Accounts context
         defmodule MyApp.Accounts do
-          use Nebulex.Decorators
+          use Nebulex.Caching
 
           alias MyApp.Accounts.User
           alias MyApp.{Cache, Repo}
@@ -226,70 +244,9 @@ if Code.ensure_loaded?(Decorator.Define) do
         end
 
     See [Cache Usage Patters Guide](http://hexdocs.pm/nebulex/cache-usage-patterns.html).
-
-    ## Pre/Post Hooks
-
-    Since `v2.0.0`, pre/post hooks are not supported and/or handled by `Nebulex`
-    itself. Hooks feature is not a common use-case and also it is something that
-    can be be easily implemented on top of the Cache at the application level.
-
-    Nevertheless, to keep backward compatibility somehow, `Nebulex` provides a
-    decorator for implementing pre/post hooks very easily.
-
-    Suppose we want to trace all cache calls (before and after they are called)
-    by logging them. In this case, we need to provide a pre/post hook to log
-    these calls.
-
-    First of all, we have to create a module implementing `Nebulex.Hook`
-    behaviour:
-
-        defmodule MyApp.LoggingHook do
-          use Nebulex.Hook
-
-          alias Nebulex.Hook.Event
-
-          require Logger
-
-          ## Nebulex.Hook
-
-          @impl Nebulex.Hook
-          def handle_pre(%Event{} = event) do
-            Logger.debug("PRE: #{event.module}.#{event.name}/#{event.arity}")
-          end
-
-          @impl Nebulex.Hook
-          def handle_post(%Event{} = event) do
-            Logger.debug(
-              "POST: #{event.module}.#{event.name}/#{event.arity} => #{inspect(event.result)}")
-          end
-        end
-
-    And then, in the Cache:
-
-        defmodule MyApp.Cache do
-          use Nebulex.Decorators
-          @decorate_all hook(MyApp.LoggingHook)
-
-          use Nebulex.Cache,
-            otp_app: :my_app,
-            adapter: Nebulex.Adapters.Local
-        end
-
-    Try it out:
-
-        iex(1)> MyApp.Cache.put 1, 1
-        10:19:47.736 [debug] PRE: Elixir.MyApp.Cache.put/3
-        :ok
-        10:19:47.736 [debug] POST: Elixir.MyApp.Cache.put/3 => :ok
-        iex(2)> MyApp.Cache.get 1
-        10:20:14.941 [debug] PRE: Elixir.MyApp.Cache.get/2
-        1
-        10:20:14.941 [debug] POST: Elixir.MyApp.Cache.get/2 => 1
-
-    See also [Nebulex.Hook](http://hexdocs.pm/nebulex/Nebulex.Hook.html).
     """
 
-    use Decorator.Define, cacheable: 1, cache_evict: 1, cache_put: 1, hook: 1
+    use Decorator.Define, cacheable: 1, cache_evict: 1, cache_put: 1
 
     @doc """
     Provides a way of annotating functions to be cached (cacheable aspect).
@@ -305,7 +262,7 @@ if Code.ensure_loaded?(Decorator.Define) do
     ## Examples
 
         defmodule MyApp.Example do
-          use Nebulex.Decorators
+          use Nebulex.Caching
 
           alias MyApp.Cache
 
@@ -358,29 +315,24 @@ if Code.ensure_loaded?(Decorator.Define) do
     ## Examples
 
         defmodule MyApp.Example do
-          use Nebulex.Decorators
+          use Nebulex.Caching
 
           alias MyApp.Cache
 
           @ttl Nebulex.Time.expiry_time(1, :hour)
 
-          @decorate cache_put(cache: Cache, key: name)
-          def update(name) do
+          @decorate cache_put(cache: Cache, key: id, opts: [ttl: @ttl])
+          def update!(id, attrs \\ %{}) do
             # your logic (maybe write data to the SoR)
           end
 
-          @decorate cache_put(cache: Cache, opts: [ttl: @ttl])
-          def update_with_ttl(name) do
+          @decorate cache_put(cache: Cache, key: id, match: &match_fun/1, opts: [ttl: @ttl])
+          def update(id, attrs \\ %{}) do
             # your logic (maybe write data to the SoR)
           end
 
-          @decorate cache_put(cache: Cache, key: clauses, match: &match_fun/1)
-          def update_all(clauses) do
-            # your logic (maybe write data to the SoR)
-          end
-
-          defp match_fun([]), do: false
-          defp match_fun(_), do: true
+          defp match_fun({:ok, updated}), do: {true, updated}
+          defp match_fun({:error, _}), do: false
         end
 
     The **Write-through** pattern is supported by this decorator. Your function
@@ -410,22 +362,22 @@ if Code.ensure_loaded?(Decorator.Define) do
     ## Examples
 
         defmodule MyApp.Example do
-          use Nebulex.Decorators
+          use Nebulex.Caching
 
           alias MyApp.Cache
 
-          @decorate cache_evict(cache: Cache, key: name)
-          def evict(name) do
+          @decorate cache_evict(cache: Cache, key: id)
+          def delete(id) do
             # your logic (maybe write/delete data to the SoR)
           end
 
-          @decorate cache_evict(cache: Cache, keys: [attrs.name, attrs.id])
-          def evict_many(attrs) do
+          @decorate cache_evict(cache: Cache, keys: [object.name, object.id])
+          def delete_object(object) do
             # your logic (maybe write/delete data to the SoR)
           end
 
           @decorate cache_evict(cache: Cache, all_entries: true)
-          def evict_all do
+          def delete_all do
             # your logic (maybe write/delete data to the SoR)
           end
         end
@@ -438,79 +390,6 @@ if Code.ensure_loaded?(Decorator.Define) do
     """
     def cache_evict(attrs, block, context) do
       caching_action(:cache_evict, attrs, block, context)
-    end
-
-    @doc ~S"""
-    Provides a way of annotating functions to be hooked (pre/post hooks).
-
-    The first argument `hook` must be a module implementing the `Nebulex.Hook`
-    behaviour.
-
-    Raises `Nebulex.HookError` is any error does occurs.
-
-    This decorator runs the following steps:
-
-      1. The callback `c:Nebulex.Hook.handle_pre/1` is invoked; in case there is
-         a pre-hook. The returned value is passed to the post- hook within the
-         event's accumulator.
-      2. The code block is executed, and the result is passed to the post- hook
-         within the event's result.
-      3. The callback `c:Nebulex.Hook.handle_post/1` is invoked. The return is
-         ignored here.
-      4. The evaluated code block result is returned.
-
-    This is a very flexible way of implementing or adding pre and post hooks to
-    the cache. However, tt should be used very carefully since it may affect the
-    performance and/or behavior of the function.
-
-    ## Example
-
-        defmodule MyApp.DebugHook do
-          use Nebulex.Hook
-
-          alias Nebulex.Hook.Event
-
-          require Logger
-
-          ## Nebulex.Hook
-
-          @impl true
-          def handle_post(%Event{} = e) do
-            Logger.debug(
-              "#{e.module}.#{e.name}/#{e.arity} => #{inspect(e.result)}")
-          end
-        end
-
-        defmodule MyApp.MyCache do
-          use Nebulex.Decorators
-          @decorate_all hook(MyApp.DebugHook)
-
-          use Nebulex.Cache,
-            otp_app: :my_app,
-            adapter: Nebulex.Adapters.Local
-        end
-
-    See also `Nebulex.Hook`.
-    """
-    def hook(hook, block, context) do
-      quote do
-        hook = unquote(hook)
-
-        event = %Nebulex.Hook.Event{
-          module: unquote(context.module),
-          name: unquote(context.name),
-          arity: unquote(context.arity)
-        }
-
-        try do
-          acc = hook.handle_pre(event)
-          result = unquote(block)
-          _ = hook.handle_post(%{event | result: result, acc: acc})
-          result
-        rescue
-          e -> reraise Nebulex.HookError, [exception: e], __STACKTRACE__
-        end
-      end
     end
 
     ## Private Functions

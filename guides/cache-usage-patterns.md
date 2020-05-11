@@ -1,12 +1,12 @@
-# Cache Usage Patterns via Nebulex.Decorators
+# Cache Usage Patterns via Nebulex.Caching
 
 There are several common access patterns when using a cache. **Nebulex**
-supports most of these patterns by means of [Nebulex.Decorators][Decorators].
+supports most of these patterns by means of [Nebulex.Caching][nbx_caching].
 
-[Decorators]: http://hexdocs.pm/nebulex/Nebulex.Decorators.html
+[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
 
-> Most of the following documentation about caching patterns it has been taken
-  from [EHCache Doc][EHCache]
+> Most of the following documentation about caching patterns it based on
+  [EHCache Docs][EHCache]
 
 [EHCache]: https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc
 
@@ -94,7 +94,7 @@ This pattern can be easily implemented using `cache` decorator as follows:
 
 ```elixir
 defmodule MyApp.Example do
-  use Nebulex.Decorators
+  use Nebulex.Caching
 
   alias MyApp.Cache
 
@@ -135,7 +135,7 @@ associated with the given key using `defupdatable`, or just delete it using
 
 ```elixir
 defmodule MyApp.Example do
-  use Nebulex.Decorators
+  use Nebulex.Caching
 
   alias MyApp.Cache
 
@@ -155,5 +155,3 @@ end
 
 As you can see, the logic to write data to the system-of-record (SoR) is the
 function logic itself.
-
-See [Nebulex.Decorators](http://hexdocs.pm/nebulex/Nebulex.Decorators.html).

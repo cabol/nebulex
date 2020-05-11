@@ -1,63 +1,47 @@
 defmodule Nebulex.TestCache do
   @moduledoc false
 
-  defmodule Hooks do
+  defmodule TestHook do
     @moduledoc false
+    use GenServer
 
-    defmodule TestHook do
-      @moduledoc false
-      use Nebulex.Hook
+    alias Nebulex.Hook
 
-      use GenServer
+    @actions [:get, :put]
 
-      alias Nebulex.Hook.Event
-
-      @hookable_actions [:get, :put]
-
-      @doc false
-      def start_link(opts \\ []) do
-        GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-      end
-
-      ## Nebulex.Hook
-
-      @impl Nebulex.Hook
-      def handle_pre(%Event{name: name}) when name in @hookable_actions do
-        System.system_time(:microsecond)
-      end
-
-      def handle_pre(event), do: event
-
-      @impl Nebulex.Hook
-      def handle_post(%Event{name: name} = event) when name in @hookable_actions do
-        GenServer.cast(__MODULE__, {:trace, event})
-      end
-
-      def handle_post(event), do: event
-
-      ## GenServer
-
-      @impl GenServer
-      def init(_opts) do
-        {:ok, %{}}
-      end
-
-      @impl GenServer
-      def handle_cast({:trace, %Event{acc: start} = event}, state) do
-        _ = send(:hooked_cache, %{event | acc: System.system_time(:microsecond) - start})
-        {:noreply, state}
-      end
+    def start_link(opts \\ []) do
+      GenServer.start_link(__MODULE__, opts, name: __MODULE__)
     end
 
-    defmodule HookError do
-      @moduledoc false
-      use Nebulex.Hook
+    ## Hook Function
 
-      alias Nebulex.Hook.Event
+    def track(%Hook{step: :before, name: name}) when name in @actions do
+      System.system_time(:microsecond)
+    end
 
-      def handle_post(%Event{name: :get}), do: raise(ArgumentError, "error")
+    def track(%Hook{step: :after_return, name: name} = event) when name in @actions do
+      GenServer.cast(__MODULE__, {:track, event})
+    end
 
-      def handle_post(event), do: event
+    def track(hook), do: hook
+
+    ## Error Hook Function
+
+    def hook_error(%Hook{name: :get}), do: raise(ArgumentError, "error")
+
+    def hook_error(hook), do: hook
+
+    ## GenServer
+
+    @impl GenServer
+    def init(_opts) do
+      {:ok, %{}}
+    end
+
+    @impl GenServer
+    def handle_cast({:track, %Hook{acc: start} = hook}, state) do
+      _ = send(:hooked_cache, %{hook | acc: System.system_time(:microsecond) - start})
+      {:noreply, state}
     end
   end
 
@@ -79,33 +63,6 @@ defmodule Nebulex.TestCache do
         adapter: Nebulex.Adapters.Local,
         backend: :shards
     end
-  end
-
-  defmodule HookableCache do
-    @moduledoc false
-    use Nebulex.Decorators
-    @decorate_all hook(Nebulex.TestCache.Hooks.TestHook)
-
-    use Nebulex.Cache,
-      otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
-
-    alias Nebulex.TestCache.Hooks.TestHook
-
-    def init(opts) do
-      {:ok, pid} = TestHook.start_link()
-      {:ok, Keyword.put(opts, :hook_pid, pid)}
-    end
-  end
-
-  defmodule ErrorHookableCache do
-    @moduledoc false
-    use Nebulex.Decorators
-    @decorate_all hook(Nebulex.TestCache.Hooks.HookError)
-
-    use Nebulex.Cache,
-      otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
   end
 
   defmodule CacheStats do

@@ -1,13 +1,6 @@
-defmodule Nebulex.DecoratorsTest do
+defmodule Nebulex.CachingTest do
   use ExUnit.Case, async: true
-  use Nebulex.Decorators
-
-  defmodule Hook do
-    use Nebulex.Hook
-
-    @impl true
-    def handle_post(event), do: send(self(), event)
-  end
+  use Nebulex.Caching
 
   defmodule Cache do
     use Nebulex.Cache,
@@ -19,8 +12,7 @@ defmodule Nebulex.DecoratorsTest do
     defstruct [:id, :count]
   end
 
-  alias Nebulex.DecoratorsTest.{Cache, Hook, Meta}
-  alias Nebulex.Hook.Event
+  alias Nebulex.CachingTest.{Cache, Meta}
 
   setup do
     {:ok, pid} = Cache.start_link(generations: 2)
@@ -36,7 +28,7 @@ defmodule Nebulex.DecoratorsTest do
     test "fail on cacheable because missing cache" do
       assert_raise ArgumentError, "expected cache: to be given as argument", fn ->
         defmodule Test do
-          use Nebulex.Decorators
+          use Nebulex.Caching
 
           @decorate cacheable(a: 1)
           def t(a, b) do
@@ -183,19 +175,6 @@ defmodule Nebulex.DecoratorsTest do
     end
   end
 
-  describe "hook" do
-    test "executed" do
-      assert 1 = hookable_fun(1)
-      assert_receive %Event{module: __MODULE__, name: :hookable_fun, arity: 1} = event, 200
-    end
-
-    test "failed because of exception" do
-      assert_raise(Nebulex.HookError, ~r"hook execution failed with error", fn ->
-        wrong_hookable_fun(1)
-      end)
-    end
-  end
-
   ## Caching Functions
 
   @decorate cacheable(cache: Cache, key: x)
@@ -274,16 +253,6 @@ defmodule Nebulex.DecoratorsTest do
     {:ok, to_string(x)}
   rescue
     _ -> :error
-  end
-
-  @decorate hook(Hook)
-  def hookable_fun(x) do
-    x
-  end
-
-  @decorate hook(WrongHook)
-  def wrong_hookable_fun(x) do
-    x
   end
 
   ## Private Functions

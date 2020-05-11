@@ -65,10 +65,10 @@ jobs:
 
       - uses: actions/cache@v1
         with:
-          path: priv/plts/${{ env.MIX_ENV }}
-          key: ${{ runner.os }}-plt-${{ env.MIX_ENV }}-v1
+          path: priv/plts
+          key: ${{ runner.os }}-plt-v1-${{ env.MIX_ENV }}
           restore-keys: |
-            ${{ runner.os }}-plt-${{ env.MIX_ENV }}-v1
+            ${{ runner.os }}-plt-v1
 
       - name: Dialyzer
         run: mix dialyzer --format short

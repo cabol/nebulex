@@ -2,8 +2,6 @@
 > ### In-Process and Distributed Cache Toolkit for Elixir.
 > Easily craft and deploy distributed cache topologies and cache usage patterns.
 
----
-
 ![CI](https://github.com/cabol/nebulex/workflows/CI/badge.svg)
 [![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
 [![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
@@ -65,7 +63,7 @@ end
 
 # The Accounts context
 defmodule MyApp.Accounts do
-  use Nebulex.Decorators
+  use Nebulex.Caching
 
   alias MyApp.Accounts.User
   alias MyApp.PartitionedCache, as: Cache
@@ -155,8 +153,10 @@ def deps do
 end
 ```
 
-> The `:decorator` dependency is for enabling the
-  [cache decorators](http://hexdocs.pm/nebulex/Nebulex.Decorators.html).
+> The `:decorator` dependency is for enabling
+  [declarative annotation-based caching via decorators][nbx_caching].
+
+[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
 
 Then run `mix deps.get` in your shell to fetch the dependencies. If you want to
 use another cache adapter, just choose the proper dependency from the table
@@ -178,7 +178,7 @@ defmodule MyApp.Cache do
 
  * [Getting Started](http://hexdocs.pm/nebulex/getting-started.html)
  * [Documentation](http://hexdocs.pm/nebulex/Nebulex.html)
- * [Cache Usage Patterns via Nebulex.Decorators](http://hexdocs.pm/nebulex/cache-usage-patterns.html)
+ * [Cache Usage Patterns via Nebulex.Caching](http://hexdocs.pm/nebulex/cache-usage-patterns.html)
  * [Examples](https://github.com/cabol/nebulex_examples)
 
 ## Testing
