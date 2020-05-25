@@ -1,33 +1,38 @@
 defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
   use ExUnit.Case, async: true
 
+  defmodule ETS do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
+  end
+
+  defmodule Shards do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
+  end
+
   import Ex2ms
 
-  alias Nebulex.TestCache.Local.{ETS, Shards}
-
-  @caches [ETS, Shards]
+  alias Nebulex.Adapters.LocalDuplicateKeysTest.{ETS, Shards}
 
   setup do
-    cache_pids =
-      for cache <- @caches do
-        {:ok, pid} = cache.start_link(generations: 2, backend_type: :duplicate_bag)
-        {cache, pid}
-      end
-
-    :ok
+    {:ok, ets} = ETS.start_link(backend_type: :duplicate_bag)
+    {:ok, shards} = Shards.start_link(backend: :shards, backend_type: :duplicate_bag)
 
     on_exit(fn ->
-      :ok = Process.sleep(10)
-
-      for {cache, pid} <- cache_pids do
-        if Process.alive?(pid), do: cache.stop(pid)
-      end
+      :ok = Process.sleep(100)
+      if Process.alive?(ets), do: ETS.stop()
+      if Process.alive?(shards), do: Shards.stop()
     end)
+
+    {:ok, caches: [ETS, Shards]}
   end
 
   describe "duplicate keys" do
-    test "get and get_all" do
-      for_all_caches(fn cache ->
+    test "get and get_all", %{caches: caches} do
+      for_all_caches(caches, fn cache ->
         :ok = cache.put_all(a: 1, a: 2, a: 2, b: 1, b: 2, c: 1)
 
         assert cache.get(:a) == [1, 2, 2]
@@ -38,8 +43,8 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
       end)
     end
 
-    test "take" do
-      for_all_caches(fn cache ->
+    test "take", %{caches: caches} do
+      for_all_caches(caches, fn cache ->
         :ok = cache.put_all(a: 1, a: 2, a: 2, b: 1, b: 2, c: 1)
 
         assert cache.take(:a) == [1, 2, 2]
@@ -50,8 +55,8 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
       end)
     end
 
-    test "delete" do
-      for_all_caches(fn cache ->
+    test "delete", %{caches: caches} do
+      for_all_caches(caches, fn cache ->
         :ok = cache.put(:a, 1)
         :ok = cache.put(:a, 2)
         :ok = cache.put(:a, 2)
@@ -62,8 +67,8 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
       end)
     end
 
-    test "put_new" do
-      for_all_caches(fn cache ->
+    test "put_new", %{caches: caches} do
+      for_all_caches(caches, fn cache ->
         assert cache.put_new(:a, 1)
         :ok = cache.put(:a, 2)
         refute cache.put_new(:a, 3)
@@ -72,8 +77,8 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
       end)
     end
 
-    test "has_key?" do
-      for_all_caches(fn cache ->
+    test "has_key?", %{caches: caches} do
+      for_all_caches(caches, fn cache ->
         :ok = cache.put(:a, 1)
         :ok = cache.put(:a, 2)
 
@@ -82,8 +87,8 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
       end)
     end
 
-    test "ttl" do
-      for_all_caches(fn cache ->
+    test "ttl", %{caches: caches} do
+      for_all_caches(caches, fn cache ->
         :ok = cache.put(:a, 1, ttl: 5000)
         :ok = cache.put(:a, 2, ttl: 10_000)
         :ok = cache.put(:a, 3)
@@ -97,8 +102,8 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
       end)
     end
 
-    test "size and flush" do
-      for_all_caches(fn cache ->
+    test "size and flush", %{caches: caches} do
+      for_all_caches(caches, fn cache ->
         :ok = cache.put_all(a: 1, a: 2, a: 2, b: 1, b: 2, c: 1)
 
         assert cache.size() == 6
@@ -107,8 +112,8 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
       end)
     end
 
-    test "all and stream using match_spec queries" do
-      for_all_caches(fn cache ->
+    test "all and stream using match_spec queries", %{caches: caches} do
+      for_all_caches(caches, fn cache ->
         :ok = cache.put_all(a: 1, a: 2, a: 2, b: 1, b: 2, c: 1)
 
         test_ms =
@@ -126,24 +131,24 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
   end
 
   describe "unsupported commands" do
-    test "replace" do
-      for_all_caches(fn cache ->
+    test "replace", %{caches: caches} do
+      for_all_caches(caches, fn cache ->
         assert_raise ArgumentError, fn ->
           cache.replace(:a, 1)
         end
       end)
     end
 
-    test "incr" do
-      for_all_caches(fn cache ->
+    test "incr", %{caches: caches} do
+      for_all_caches(caches, fn cache ->
         assert_raise ArgumentError, fn ->
           cache.incr(:a)
         end
       end)
     end
 
-    test "expire" do
-      for_all_caches(fn cache ->
+    test "expire", %{caches: caches} do
+      for_all_caches(caches, fn cache ->
         :ok = cache.put(:a, 1)
         :ok = cache.put(:a, 2)
 
@@ -153,8 +158,8 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
       end)
     end
 
-    test "touch" do
-      for_all_caches(fn cache ->
+    test "touch", %{caches: caches} do
+      for_all_caches(caches, fn cache ->
         :ok = cache.put(:a, 1)
         :ok = cache.put(:a, 2)
 
@@ -167,8 +172,8 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
 
   ## Helpers
 
-  defp for_all_caches(fun) do
-    Enum.each(@caches, fn cache ->
+  defp for_all_caches(caches, fun) do
+    Enum.each(caches, fn cache ->
       fun.(cache)
     end)
   end

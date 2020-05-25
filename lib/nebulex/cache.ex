@@ -1,6 +1,7 @@
 defmodule Nebulex.Cache do
   @moduledoc ~S"""
-  Cache Main Interface.
+  Cache's main interface; defines the cache abstraction layer which is
+  highly inspired by [Ecto](https://github.com/elixir-ecto/ecto).
 
   A Cache maps to an underlying implementation, controlled by the
   adapter. For example, Nebulex ships with a default adapter that
@@ -13,13 +14,13 @@ defmodule Nebulex.Cache do
       defmodule MyCache do
         use Nebulex.Cache,
           otp_app: :my_app,
-          adapter: Nebulex.Adapters.Local,
-          backend: :shards
+          adapter: Nebulex.Adapters.Local
       end
 
   Could be configured with:
 
       config :my_app, MyCache,
+        backend: :shards,
         gc_interval: Nebulex.Time.expiry_time(1, :hour),
         max_size: 200_000,
         gc_cleanup_min_timeout: 10,
@@ -29,12 +30,14 @@ defmodule Nebulex.Cache do
   Most of the configuration that goes into the `config` is specific
   to the adapter. For this particular example, you can check
   [`Nebulex.Adapters.Local`](https://hexdocs.pm/nebulex/Nebulex.Adapters.Local.html)
-  for more information.
+  for more information. In spite of this, the following configuration values
+  are shared across all adapters:
 
-  ## Adapter Extensions
+    * `:name`- The name of the Cache supervisor process (Optional). If it is
+      not passed within the options, the name of the cache module will be used
+      as the name by default.
 
-  Some adapters might extend the API with additional functions, therefore,
-  it is important to review adapters' documentation.
+  **NOTE:** It is highly recommendable to check the adapters' documentation.
   """
 
   @type t :: module
@@ -95,8 +98,8 @@ defmodule Nebulex.Cache do
       end
 
       @impl true
-      def stop(pid, timeout \\ 5000) do
-        Supervisor.stop(pid, :normal, timeout)
+      def stop(timeout \\ 5000) do
+        Supervisor.stop(get_dynamic_cache(), :normal, timeout)
       end
 
       @compile {:inline, get_dynamic_cache: 0}
@@ -308,39 +311,44 @@ defmodule Nebulex.Cache do
               | {:error, term}
 
   @doc """
-  Shuts down the cache represented by the given pid.
+  Shuts down the cache.
   """
-  @callback stop(pid, timeout) :: :ok
+  @callback stop(timeout) :: :ok
 
   @doc """
-  Returns the atom name or pid of the current cache.
+  Returns the atom name or pid of the current cache
+  (based on Ecto dynamic repo).
 
   See also `c:put_dynamic_cache/1`.
   """
   @callback get_dynamic_cache() :: atom() | pid()
 
   @doc """
-  Sets the dynamic repository to be used in further interactions.
-  Sometimes you may want a single Ecto repository to talk to
-  many different database instances. By default, when you call
-  `MyApp.Repo.start_link/1`, it will start a repository with
-  name `MyApp.Repo`. But if you want to start multiple repositories,
-  you can give each of them a different name:
-      MyApp.Repo.start_link(name: :tenant_foo, hostname: "foo.example.com")
-      MyApp.Repo.start_link(name: :tenant_bar, hostname: "bar.example.com")
-  You can also start repositories without names by explicitly
-  setting the name to nil:
-      MyApp.Repo.start_link(name: nil, hostname: "temp.example.com")
-  However, once the repository is started, you can't directly interact with
-  it, since all operations in `MyApp.Repo` are sent by default to the repository
-  named `MyApp.Repo`. You can change the default repo at compile time with:
-      use Ecto.Repo, default_dynamic_repo: :name_of_repo
-  Or you can change it anytime at runtime by calling `put_dynamic_repo/1`:
-      MyApp.Repo.put_dynamic_repo(:tenant_foo)
-  From this moment on, all future queries done by the current process will
-  run on `:tenant_foo`.
-  **Note this feature is experimental and may be changed or removed in future
-  releases.**
+  Sets the dynamic cache to be used in further commands
+  (based on Ecto dynamic repo).
+
+  There might be cases where we want to have different cache instances but
+  accessing them through the same cache module. By default, when you call
+  `MyApp.Cache.start_link/1`, it will start a cache with the name
+  `MyApp.Cache`. But it is also possible to start multiple caches by using
+  a different name for each of them:
+
+      MyApp.Cache.start_link(name: :cache1)
+      MyApp.Cache.start_link(name: :cache2, backend: :shards)
+
+  However, once the cache is started, it is not possible to interact directly
+  with it, since all operations through `MyApp.Cache` are sent by default to
+  the cache named `MyApp.Cache`. But you can change the default cache at
+  compile-time:
+
+      use Nebulex.Cache, default_dynamic_cache: :cache_name
+
+  Or anytime at runtime by calling `put_dynamic_cache/1`:
+
+      MyApp.Cache.put_dynamic_cache(:another_cache_name)
+
+  From this moment on, all future commands performed by the current process
+  will run on `:another_cache_name`.
   """
   @callback put_dynamic_cache(atom() | pid()) :: atom() | pid()
 

@@ -1,42 +1,39 @@
 defmodule Nebulex.Adapters.LocalWithShardsTest do
   use ExUnit.Case, async: true
-  use Nebulex.LocalTest, cache: Nebulex.TestCache.Local.Shards
-  use Nebulex.CacheTest, cache: Nebulex.TestCache.Local.Shards
+  use Nebulex.LocalTest
+  use Nebulex.CacheTest
 
-  alias Nebulex.TestCache.Local.Shards, as: Cache
+  import Nebulex.Helpers
+  import Nebulex.TestCase
 
-  setup do
-    {:ok, pid} = @cache.start_link(generations: 2)
-    :ok
+  alias Nebulex.Adapter
+  alias Nebulex.TestCache.Cache
 
-    on_exit(fn ->
-      :ok = Process.sleep(10)
-      if Process.alive?(pid), do: @cache.stop(pid)
-    end)
-  end
+  setup_with_dynamic_cache(Cache, :local_with_shards, backend: :shards)
 
   describe "shards" do
-    test "backend" do
-      assert Cache.__backend__() == :shards
+    test "backend", %{name: name} do
+      Adapter.with_meta(name, fn _, meta ->
+        assert meta.backend == :shards
+      end)
     end
 
     test "custom partitions" do
       defmodule CustomPartitions do
         use Nebulex.Cache,
           otp_app: :nebulex,
-          adapter: Nebulex.Adapters.Local,
-          backend: :shards
+          adapter: Nebulex.Adapters.Local
       end
 
-      :ok = Application.put_env(:nebulex, CustomPartitions, partitions: 2)
-      {:ok, pid} = CustomPartitions.start_link()
+      :ok = Application.put_env(:nebulex, CustomPartitions, backend: :shards, partitions: 2)
+      {:ok, _pid} = CustomPartitions.start_link()
 
-      assert CustomPartitions
-             |> Module.concat("0")
+      assert [CustomPartitions, Generation, 0]
+             |> normalize_module_name()
              |> :shards_state.get()
              |> :shards_state.n_shards() == 2
 
-      :ok = CustomPartitions.stop(pid)
+      :ok = CustomPartitions.stop()
     end
   end
 end

@@ -35,10 +35,11 @@ defmodule Nebulex.Helpers do
         do: behaviour
   end
 
-  @spec with_meta(atom, (module, Nebulex.Adapter.adapter_meta() -> term)) :: term
-  def with_meta(name, fun) do
-    {adapter, adapter_meta} = Nebulex.Cache.Registry.lookup(name)
-    fun.(adapter, adapter_meta)
+  @spec normalize_module_name([atom | binary | number]) :: module
+  def normalize_module_name(list) when is_list(list) do
+    list
+    |> Enum.map(&Macro.camelize("#{&1}"))
+    |> Module.concat()
   end
 
   ## Private Functions

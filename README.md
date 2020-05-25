@@ -25,23 +25,17 @@ some functions:
 
 ```elixir
 # In the config/config.exs file
-config :my_app, MyApp.PartitionedCache.Primary,
-  gc_interval: Nebulex.Time.expiry_time(1, :hour),
-  partitions: 2
+config :my_app, MyApp.PartitionedCache,
+  primary: [
+    gc_interval: Nebulex.Time.expiry_time(1, :hour),
+    partitions: 2
+  ]
 
 # Defining a Cache with a partitioned topology
 defmodule MyApp.PartitionedCache do
   use Nebulex.Cache,
     otp_app: :my_app,
-    adapter: Nebulex.Adapters.Partitioned,
-    primary: MyApp.PartitionedCache.Primary
-
-  defmodule Primary do
-    use Nebulex.Cache,
-      otp_app: :my_app,
-      adapter: Nebulex.Adapters.Local,
-      backend: :shards
-  end
+    adapter: Nebulex.Adapters.Partitioned
 end
 
 # Some Ecto schema
@@ -148,13 +142,24 @@ For example, if you want to use a built-in cache, add to your `mix.exs` file:
 def deps do
   [
     {:nebulex, "~> 2.0"},
-    {:decorator, "~> 1.3"}
+    {:shards, "~> 0.6"},   #=> For using :shards as backend
+    {:decorator, "~> 1.3"} #=> For using Caching Annotations
   ]
 end
 ```
 
-> The `:decorator` dependency is for enabling
-  [declarative annotation-based caching via decorators][nbx_caching].
+In order to give more flexibility and loading only needed dependencies, Nebulex
+makes all its dependencies as optional. For example:
+
+ * For intensive workloads, we may want to use `:shards` as the backend for the
+   local adapter and having partitioned tables. In such a case, you have to add
+   `:shards` to the dependency list.
+
+ * For enabling the usage of
+   [declarative annotation-based caching via decorators][nbx_caching],
+   you have to add `:decorator` to the dependency list.
+
+ * Also, all the external adapters have to be added as a dependency as well.
 
 [nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
 
@@ -169,9 +174,8 @@ respective to the chosen dependency. For the local built-in cache it is:
 defmodule MyApp.Cache do
   use Nebulex.Cache,
     otp_app: :my_app,
-    adapter: Nebulex.Adapters.Local,
-    backend: :shards
-  ...
+    adapter: Nebulex.Adapters.Local
+end
 ```
 
 ## Important links

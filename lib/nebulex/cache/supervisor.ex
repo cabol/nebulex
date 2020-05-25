@@ -9,7 +9,7 @@ defmodule Nebulex.Cache.Supervisor do
   """
   def start_link(cache, otp_app, adapter, opts) do
     sup_opts = if name = Keyword.get(opts, :name, cache), do: [name: name], else: []
-    Supervisor.start_link(__MODULE__, {name, cache, otp_app, adapter, opts}, sup_opts)
+    Supervisor.start_link(__MODULE__, {cache, otp_app, adapter, opts}, sup_opts)
   end
 
   @doc """
@@ -49,17 +49,13 @@ defmodule Nebulex.Cache.Supervisor do
   ## Supervisor Callbacks
 
   @impl true
-  def init({name, cache, otp_app, adapter, opts}) do
+  def init({cache, otp_app, adapter, opts}) do
     case runtime_config(cache, otp_app, opts) do
       {:ok, opts} ->
-        {:ok, child, meta} = adapter.init([name: name, cache: cache] ++ opts)
-        meta = Map.merge(meta, %{cache: cache, name: name})
+        {:ok, child, meta} = adapter.init([cache: cache] ++ opts)
+        meta = Map.put(meta, :cache, cache)
         child_spec = wrap_child_spec(child, [adapter, meta])
         Supervisor.init([child_spec], strategy: :one_for_one, max_restarts: 0)
-
-      # cache
-      # |> init_adapter(adapter, opts)
-      # |> Supervisor.init(strategy: :one_for_one, max_restarts: 0)
 
       other ->
         other

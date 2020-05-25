@@ -29,17 +29,27 @@ changing the `deps` definition in that file to this:
 ```elixir
 defp deps do
   [
-    {:nebulex, "~> 2.0.0"},
+    {:nebulex, "~> 2.0"},
+    {:shards, "~> 0.6"},   #=> Since we will use :shards as backend
     {:decorator, "~> 1.3"} #=> If you want to use Caching Annotations
   ]
 end
 ```
 
-> Because the [decorator](https://github.com/arjan/decorator) library can cause
-  conflicts when it interacts with other dependencies in the same project, it
-  supports it as an optional dependency. This allows you to disable it if it
-  causes problems for you, but it also means that you need to explicitly include
-  some version of decorator in your application's dependency list
+In order to give more flexibility and loading only needed dependencies, Nebulex
+makes all its dependencies as optional. For example:
+
+ * For intensive workloads, we may want to use `:shards` as the backend for the
+   local adapter and having partitioned tables. In such a case, you have to add
+   `:shards` to the dependency list.
+
+ * For enabling the usage of
+   [declarative annotation-based caching via decorators][nbx_caching],
+   you have to add `:decorator` to the dependency list.
+
+ * Also, all the external adapters have to be added as a dependency as well.
+
+[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
 
 To install these dependencies, we will run this command:
 
@@ -59,16 +69,11 @@ end
 ```
 
 This module is what we'll be using to interact with the cache. It uses the
-`Nebulex.Cache` module and it expects the `:otp_app` and `:adapter` as options.
-The `otp_app` tells Nebulex which Elixir application it can look for cache
-configuration in. In this case, we've specified that it is the `:blog`
-application where Nebulex can find that configuration and so Nebulex will use
-the configuration that was set up in `config/config.exs`.
-
-Depending on the adapter we are using, it may provide more compile-time options,
-for example, in this case, we use `Nebulex.Adapters.Local` which provides the
-option `:backend` to define whether the adapter should use `:ets` or `:shards`.
-In this example, we will use `:shards` as backend:
+`Nebulex.Cache` module and it expects the `:otp_app` as option. The `otp_app`
+tells Nebulex which Elixir application it can look for cache configuration in.
+In this case, we've specified that it is the `:blog` application where Nebulex
+can find that configuration and so Nebulex will use the configuration that was
+set up in `config/config.exs`.
 
 ```elixir
 defmodule Blog.Cache do
@@ -83,7 +88,8 @@ Could be configured in `config/config.exs` like so:
 
 ```elixir
 config :blog, Blog.Cache,
-  gc_interval: 86_400, #=> 24 hrs
+  gc_interval: Nebulex.Time.expiry_time(1, :day),
+  backend: :shards,
   partitions: System.schedulers_online() #=> The default
 ```
 
@@ -102,7 +108,7 @@ def start(_type, _args) do
   import Supervisor.Spec, warn: false
 
   children = [
-    supervisor(Blog.Cache, []),
+    supervisor(Blog.Cache, [])
   ]
 
   ...
@@ -410,25 +416,19 @@ like so:
 defmodule Blog.PartitionedCache do
   use Nebulex.Cache,
     otp_app: :blog,
-    adapter: Nebulex.Adapters.Partitioned,
-    primary: Blog.PartitionedCache.Primary
-
-  defmodule Primary do
-    use Nebulex.Cache,
-      otp_app: :blog,
-      adapter: Nebulex.Adapters.Local,
-      backend: :shards
-  end
+    adapter: Nebulex.Adapters.Partitioned
 end
 ```
 
 Could be configured with (`config/config.exs`):
 
 ```elixir
-# Primary backend for the partitioned cache
-config :blog, Blog.PartitionedCache.Primary,
-  gc_interval: 86_400, #=> 24 hrs
-  partitions: 2
+config :blog, Blog.PartitionedCache,
+  primary: [
+    gc_interval: Nebulex.Time.expiry_time(1, :day),
+    backend: :shards,
+    partitions: 2
+  ]
 ```
 
 And remember to setup the `Blog.PartitionedCache` as supervisor within the
@@ -441,8 +441,7 @@ def start(_type, _args) do
   import Supervisor.Spec, warn: false
 
   children = [
-    supervisor(Blog.Cache, []),            #=> Previous created local cache
-    supervisor(Blog.PartitionedCache, []), #=> Partitioned cache
+    supervisor(Blog.PartitionedCache, [])
   ]
 
   ...
@@ -455,8 +454,7 @@ def start(_type, _args) do
   import Supervisor.Spec, warn: false
 
   children = [
-    Blog.Cache,            #=> Previous created local cache
-    Blog.PartitionedCache, #=> Partitioned cache
+    Blog.PartitionedCache
   ]
 
   ...
@@ -493,13 +491,28 @@ First, let's define out multi-level cache `Blog.MultilevelCache`:
 defmodule Blog.MultilevelCache do
   use Nebulex.Cache,
     otp_app: :blog,
-    adapter: Nebulex.Adapters.Multilevel,
-    cache_model: :inclusive,
-    levels: [
-      Blog.Cache,
-      Blog.PartitionedCache
-    ]
+    adapter: Nebulex.Adapters.Multilevel
 end
+```
+
+Could be configured with (`config/config.exs`):
+
+```elixir
+config :blog, Blog.MultilevelCache,
+  model: :inclusive,
+  levels: [
+    l1: [
+      gc_interval: Nebulex.Time.expiry_time(1, :day),
+      backend: :shards
+    ],
+    l2: [
+      adapter: Nebulex.Adapters.Partitioned,
+      primary: [
+        gc_interval: Nebulex.Time.expiry_time(1, :day),
+        backend: :shards
+      ]
+    ]
+  ]
 ```
 
 And remember to setup the `Blog.Multilevel` as a supervisor within the
@@ -512,7 +525,7 @@ def start(_type, _args) do
   import Supervisor.Spec, warn: false
 
   children = [
-    supervisor(Blog.MultilevelCache, []) #=> Multilevel cache
+    supervisor(Blog.MultilevelCache, [])
   ]
 
   ...
@@ -525,7 +538,7 @@ def start(_type, _args) do
   import Supervisor.Spec, warn: false
 
   children = [
-    Blog.Multilevel #=> Multilevel cache
+    Blog.Multilevel
   ]
 
   ...
@@ -533,29 +546,11 @@ def start(_type, _args) do
 
 Let's try it out!
 
-Insert some date into the partitioned cache:
-
 ```elixir
-iex> Blog.PartitionedCache.put("foo", "bar")
-:ok
-
-iex> Blog.Cache.get("foo")
-nil
-
-iex> Blog.PartitionedCache.get("foo")
+iex> Blog.Multilevel.put("foo", "bar", ttl: Nebulex.Time.expiry_time(1, :hour))
 "bar"
-```
 
-Now let's retrieve the data but using the multi-level cache:
-
-```elixir
 iex> Blog.Multilevel.get("foo")
-"bar"
-
-iex> Blog.Cache.get("foo")
-"bar"
-
-iex> Blog.PartitionedCache.get("foo")
 "bar"
 ```
 

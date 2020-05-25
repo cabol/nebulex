@@ -15,12 +15,12 @@ defmodule Nebulex.CachingTest do
   alias Nebulex.CachingTest.{Cache, Meta}
 
   setup do
-    {:ok, pid} = Cache.start_link(generations: 2)
+    {:ok, pid} = Cache.start_link()
     :ok
 
     on_exit(fn ->
-      :ok = Process.sleep(10)
-      if Process.alive?(pid), do: Cache.stop(pid)
+      :ok = Process.sleep(20)
+      if Process.alive?(pid), do: Cache.stop()
     end)
   end
 

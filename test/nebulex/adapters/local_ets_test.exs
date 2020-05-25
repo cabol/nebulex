@@ -1,23 +1,20 @@
 defmodule Nebulex.Adapters.LocalEtsTest do
   use ExUnit.Case, async: true
-  use Nebulex.LocalTest, cache: Nebulex.TestCache.Local.ETS
-  use Nebulex.CacheTest, cache: Nebulex.TestCache.Local.ETS
+  use Nebulex.LocalTest
+  use Nebulex.CacheTest
 
-  alias Nebulex.TestCache.Local.ETS, as: Cache
+  import Nebulex.TestCase
 
-  setup do
-    {:ok, pid} = @cache.start_link(generations: 2)
-    :ok
+  alias Nebulex.Adapter
+  alias Nebulex.TestCache.Cache
 
-    on_exit(fn ->
-      :ok = Process.sleep(10)
-      if Process.alive?(pid), do: @cache.stop(pid)
-    end)
-  end
+  setup_with_dynamic_cache(Cache, :local_with_ets)
 
   describe "ets" do
-    test "backend" do
-      assert Cache.__backend__() == :ets
+    test "backend", %{name: name} do
+      Adapter.with_meta(name, fn _, meta ->
+        assert meta.backend == :ets
+      end)
     end
   end
 end

@@ -57,10 +57,25 @@ defmodule Nebulex.Entry do
       iex> Nebulex.Entry.expired?(%Nebulex.Entry{})
       false
   """
-  @spec expired?(Nebulex.Entry.t()) :: boolean
-  def expired?(%Nebulex.Entry{ttl: :infinity}), do: false
+  @spec expired?(t) :: boolean
+  def expired?(%__MODULE__{ttl: :infinity}), do: false
 
-  def expired?(%Nebulex.Entry{touched: touched, ttl: ttl, time_unit: unit}) do
+  def expired?(%__MODULE__{touched: touched, ttl: ttl, time_unit: unit}) do
     Time.now(unit) - touched >= ttl
+  end
+
+  @doc """
+  Returns the remaining time-to-live.
+
+  ## Example
+
+      iex> Nebulex.Entry.ttl(%Nebulex.Entry{})
+      :infinity
+  """
+  @spec ttl(t) :: timeout
+  def ttl(%__MODULE__{ttl: :infinity}), do: :infinity
+
+  def ttl(%__MODULE__{ttl: ttl, touched: touched, time_unit: unit}) do
+    ttl - (Time.now(unit) - touched)
   end
 end

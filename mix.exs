@@ -47,9 +47,8 @@ defmodule Nebulex.Mixfile do
 
   defp deps do
     [
-      {:shards, "~> 0.6"},
+      {:shards, "~> 0.6", optional: true},
       {:decorator, "~> 1.3", optional: true},
-      {:telemetry, "~> 0.4", optional: true},
 
       # Test
       {:excoveralls, "~> 0.13", only: :test},
@@ -60,7 +59,7 @@ defmodule Nebulex.Mixfile do
 
       # Code Analysis
       {:dialyxir, "~> 1.0", optional: true, only: [:dev, :test], runtime: false},
-      {:credo, "~> 1.1", optional: true, only: [:dev, :test]},
+      {:credo, "~> 1.4", optional: true, only: [:dev, :test]},
 
       # Docs
       {:ex_doc, "~> 0.22", only: :dev, runtime: false},

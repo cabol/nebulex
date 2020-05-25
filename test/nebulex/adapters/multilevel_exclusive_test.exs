@@ -1,36 +1,54 @@
 defmodule Nebulex.Adapters.MultilevelExclusiveTest do
   use ExUnit.Case, async: true
-  use Nebulex.MultilevelTest, cache: Nebulex.TestCache.MultilevelExclusive
-  use Nebulex.Cache.QueryableTest, cache: Nebulex.TestCache.MultilevelExclusive
-  use Nebulex.Cache.TransactionTest, cache: Nebulex.TestCache.MultilevelExclusive
+  use Nebulex.MultilevelTest
+  use Nebulex.Cache.QueryableTest
+  use Nebulex.Cache.TransactionTest
 
-  alias Nebulex.TestCache.MultilevelExclusive, as: Multilevel
+  import Nebulex.Helpers
+  import Nebulex.TestCase
 
-  setup do
-    {:ok, ml_cache} = @cache.start_link()
-    :ok
+  alias Nebulex.Cache.Cluster
+  alias Nebulex.TestCache.Multilevel
+  alias Nebulex.Time
 
-    on_exit(fn ->
-      :ok = Process.sleep(100)
-      if Process.alive?(ml_cache), do: @cache.stop(ml_cache)
-    end)
-  end
+  @gc_interval Time.expiry_time(1, :hour)
+
+  @levels [
+    l1: [gc_interval: @gc_interval, backend: :shards, partitions: 2],
+    l2: [gc_interval: @gc_interval],
+    l3: [
+      adapter: Nebulex.Adapters.Partitioned,
+      primary: [gc_interval: @gc_interval]
+    ]
+  ]
+
+  setup_with_dynamic_cache(Multilevel, :multilevel_exclusive,
+    model: :exclusive,
+    levels: @levels,
+    fallback: fn _ -> nil end
+  )
 
   describe "exclusive" do
     test "get" do
-      :ok = @l1.put(1, 1)
-      :ok = @l2.put(2, 2)
-      :ok = @l3.put(3, 3)
+      :ok = Multilevel.put(1, 1, level: 1)
+      :ok = Multilevel.put(2, 2, level: 2)
+      :ok = Multilevel.put(3, 3, level: 3)
 
       assert Multilevel.get(1) == 1
       assert Multilevel.get(2, return: :key) == 2
       assert Multilevel.get(3) == 3
-      refute @l1.get(2)
-      refute @l1.get(3)
-      refute @l2.get(1)
-      refute @l2.get(3)
-      refute @l3.get(1)
-      refute @l3.get(2)
+      refute Multilevel.get(2, level: 1)
+      refute Multilevel.get(3, level: 1)
+      refute Multilevel.get(1, level: 2)
+      refute Multilevel.get(3, level: 2)
+      refute Multilevel.get(1, level: 3)
+      refute Multilevel.get(2, level: 3)
+    end
+  end
+
+  describe "partitioned levels" do
+    test "return cluster nodes" do
+      assert Cluster.get_nodes(normalize_module_name([:multilevel_exclusive, "L3"])) == [node()]
     end
   end
 end

@@ -16,18 +16,52 @@ defmodule Nebulex.Adapters.Multilevel do
   operation in a specific level (although it is not recommended) via
   `level` option, where the value is a positive integer greater than 0.
 
-  ## Compile-Time Options
+  We can define a multi-level cache as follows:
 
-  In addition to `:otp_app` and `:adapter`, this adapter supports the next
-  compile-time options:
+      defmodule MyApp.Multilevel do
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: Nebulex.Adapters.Multilevel
+      end
 
-    * `:levels` - The list of caches where each cache corresponds to a level.
-      The order of the caches in the list defines the the order of the levels
-      as well, for example, the first cache in the list will be the L1 cache
-      (level 1) and so on; the Nth elemnt will be the LN cache. This option
-      is mandatory, if it is not set or empty, an exception will be raised.
+  Where the configuration for the Cache must be in your application
+  environment, usually defined in your `config/config.exs`:
 
-    * `:cache_model` - Specifies the cache model: `:inclusive` or `:exclusive`;
+      config :my_app, MyApp.Multilevel,
+        model: :inclusive,
+        levels: [
+          l1: [
+            gc_interval: Nebulex.Time.expiry_time(1, :hour),
+            backend: :shards,
+            partitions: 2
+          ],
+          l2: [
+            adapter: Nebulex.Adapters.Partitioned,
+            primary: [
+              gc_interval: Nebulex.Time.expiry_time(1, :hour),
+              backend: :shards,
+              partitions: 2
+            ]
+          ]
+        ]
+
+  For more information about the usage, see `Nebulex.Cache` documentation.
+
+  ## Options
+
+  This adapter supports the following options and all of them can be given via
+  the cache configuration:
+
+    * `:levels` - A keyword list that defines each cache level configuration.
+      The key is used as the name for that cache level, and the value is the
+      level config, which depends on the adapter to use. The order in which
+      the levels are defined is the same the multi-level cache will use. For
+      example, the first cache in the list will be the L1 cache (level 1) and
+      so on; the Nth elemnt will be the LN cache. This option is mandatory,
+      if it is not set or empty, an exception will be raised.
+      See "Shared Level Options" below.
+
+    * `:model` - Specifies the cache model: `:inclusive` or `:exclusive`;
       defaults to `:inclusive`. In an inclusive cache, the same data can be
       present in all caches/levels. In an exclusive cache, data can be present
       in only one cache/level and a key cannot be found in the rest of caches
@@ -35,121 +69,34 @@ defmodule Nebulex.Adapters.Multilevel do
       `:cache_model` is `:inclusive`, when the key is found in a level N,
       that entry is duplicated backwards (to all previous levels: 1..N-1).
 
-    * `:fallback` - Defines a global fallback function when a key is not present
-      in any cache level. Function is defined as: `(key -> value)`.
+  ## Shared Level Options
+
+    * `:adapter` - The adapter to be used for the configured level.
+      Defaults to `Nebulex.Adapters.Local`.
+
+  **The rest of the options depend on the adapter to use.**
 
   ## Run-Time Options
 
-  Some functions below accept the following options:
+  Some of the cache functions accept the following runtime options:
 
     * `:level` - It may be an integer greater than 0 that specifies the cache
       level where the operation will take place. By default, the evaluation
       is performed throughout the whole cache hierarchy (all levels).
 
-    * `:fallback` - Defines a fallback function when a key is not present
-      in any cache level. Function is defined as: `(key -> value)`. For example:
-      `MultilevelCache.get("foo", fallback: fn(key) -> key * 2 end)`.
-
-  ## Example
-
-  `Nebulex.Cache` is the wrapper around the Cache. We can define the
-  multi-level cache as follows:
-
-      defmodule MyApp.MultilevelCache do
-        use Nebulex.Cache,
-          otp_app: :nebulex,
-          adapter: Nebulex.Adapters.Multilevel,
-          fallback: &__MODULE__.fallback/1,
-          levels: [
-            MyApp.MultilevelCache.L1,
-            MyApp.MultilevelCache.L2
-          ]
-
-        defmodule L1 do
-          use Nebulex.Cache,
-            otp_app: :nebulex,
-            adapter: Nebulex.Adapters.Local,
-            backend: :shards
-        end
-
-        defmodule L2 do
-          use Nebulex.Cache,
-            otp_app: :nebulex,
-            adapter: Nebulex.Adapters.Partitioned,
-            primary: MyApp.MultilevelCache.L2.Primary
-
-          defmodule Primary do
-            use Nebulex.Cache,
-              otp_app: :my_app,
-              adapter: Nebulex.Adapters.Local,
-              backend: :shards
-          end
-        end
-
-        def fallback(_key) do
-          # maybe fetch the data from Database
-          nil
-        end
-      end
-
-  Where the configuration for the Cache must be in your application
-  environment, usually defined in your `config/config.exs`:
-
-      config :my_app, MyApp.MultilevelCache.L1,
-        gc_interval: Nebulex.Time.expiry_time(1, :hour),
-        partitions: 2
-
-      config :my_app, MyApp.MultilevelCache.L2.Primary,
-        gc_interval: Nebulex.Time.expiry_time(1, :hour),
-        partitions: 2
-
-  Using the multilevel cache cache:
-
-      # Retrieving data from cache
-      MyCache.get("foo", fallback: fn(_key) ->
-        # Maybe fetch the key from database
-        "initial value"
-      end)
-
-      # Entry is set in all cache levels
-      MyCache.put("foo", "bar")
-
-      # Entry is set at second cache level
-      MyCache.put("foo", "bar", level: 2)
-
-      # Entry is deleted from all cache levels
-      MyCache.delete("foo")
-
-      # Entry is deleted from second cache level
-      MyCache.delete("foo", level: 2)
-
   ## Extended API
 
-  This adapter provides some additional functions to the `Nebulex.Cache` API.
+  This adapter provides one additional convenience function for retrieving
+  the cache model for the given cache `name`:
 
-  ### `__levels__`
-
-  This function returns the configured level list.
-
-      MyCache.__levels__
-
-  ### `__model__`
-
-  This function returns the multi-level cache model.
-
-      MyCache.__model__
-
-  ### `__fallback__`
-
-  This function returns the default fallback function.
-
-      MyCache.__fallback__
+      MyCache.model()
+      MyCache.model(:cache_name)
 
   ## Limitations
 
   Because this adapter reuses other existing/configured adapters, it inherits
   all their limitations too. Therefore, it is highly recommended to check the
-  documentation of the used adapters.
+  documentation of the adapters to use.
   """
 
   # Provide Cache Implementation
@@ -161,120 +108,131 @@ defmodule Nebulex.Adapters.Multilevel do
 
   import Nebulex.Helpers
 
+  alias Nebulex.Adapter
+
   # Multi-level Cache Models
   @models [:inclusive, :exclusive]
 
   ## Adapter
 
   @impl true
-  defmacro __before_compile__(env) do
-    opts = Module.get_attribute(env.module, :opts)
-    cache_model = get_option(opts, :cache_model, &(&1 in @models), :inclusive)
-    fallback = get_option(opts, :fallback, &is_function(&1, 1))
-
-    levels =
-      get_option(opts, :levels, &(is_list(&1) && length(&1) > 0)) ||
-        raise ArgumentError, "expected levels: to be a list and have at least one level"
-
+  defmacro __before_compile__(_env) do
     quote do
       @doc """
-      A convenience function for getting the cache levels.
+      A convenience function to get the cache model.
       """
-      def __levels__, do: unquote(levels)
-
-      @doc """
-      A convenience function for getting the cache model.
-      """
-      def __model__, do: unquote(cache_model)
-
-      @doc """
-      A convenience function for getting the default fallback.
-      """
-      def __fallback__, do: unquote(fallback)
+      def model(name \\ __MODULE__) do
+        Adapter.with_meta(name, fn _adapter, %{model: model} ->
+          model
+        end)
+      end
     end
   end
 
   @impl true
   def init(opts) do
-    cache = Keyword.fetch!(opts, :cache)
+    # required cache name
+    name = opts[:name] || Keyword.fetch!(opts, :cache)
 
-    children =
-      for level <- cache.__levels__ do
-        {level, Keyword.put(opts, :cache, level)}
-      end
+    # get cache levels
+    levels =
+      get_option(opts, :levels, &(Keyword.keyword?(&1) && length(&1) > 0)) ||
+        raise "expected levels: to be a keyword with at least one entry"
+
+    # get rest of the multilevel options
+    model = get_option(opts, :model, &(&1 in @models), :inclusive)
+    fallback = get_option(opts, :fallback, &is_function(&1, 1))
+
+    {children, meta_list} =
+      levels
+      |> Enum.reverse()
+      |> Enum.reduce({[], []}, fn {l_name, l_opts}, {child_acc, meta_acc} ->
+        {adapter, l_opts} = Keyword.pop(l_opts, :adapter, Nebulex.Adapters.Local)
+        adapter = assert_behaviour(adapter, Nebulex.Adapter, "adapter")
+        l_opts = [name: normalize_module_name([name, l_name])] ++ l_opts
+        {:ok, child, meta} = adapter.init(l_opts)
+        {[child | child_acc], [{adapter, meta} | meta_acc]}
+      end)
 
     child_spec =
       Nebulex.Adapters.Supervisor.child_spec(
-        name: Module.concat(cache, Supervisor),
+        name: normalize_module_name([name, Supervisor]),
         strategy: :one_for_one,
         children: children
       )
 
-    {:ok, child_spec}
+    meta = %{
+      name: name,
+      levels: meta_list,
+      model: model,
+      fallback: fallback
+    }
+
+    {:ok, child_spec, meta}
   end
 
   @impl true
-  def get(cache, key, opts) do
-    fun = fn current, {_, prev} ->
-      if value = current.__adapter__.get(current, key, opts) do
-        {:halt, {value, prev}}
+  def get(%{levels: levels, model: model}, key, opts) do
+    fun = fn {adapter, meta} = level, {default, prev} ->
+      if value = adapter.get(meta, key, opts) do
+        {:halt, {value, [level | prev]}}
       else
-        {:cont, {nil, [current | prev]}}
+        {:cont, {default, [level | prev]}}
       end
     end
 
-    cache.__levels__
+    opts
+    |> levels(levels)
     |> Enum.reduce_while({nil, []}, fun)
-    |> maybe_fallback(cache, key, opts)
-    |> maybe_replicate(cache)
+    |> maybe_replicate(key, model)
   end
 
   @impl true
-  def get_all(cache, keys, _opts) do
+  def get_all(adapter_meta, keys, _opts) do
     Enum.reduce(keys, %{}, fn key, acc ->
-      if obj = get(cache, key, []),
+      if obj = get(adapter_meta, key, []),
         do: Map.put(acc, key, obj),
         else: acc
     end)
   end
 
   @impl true
-  def put(cache, key, value, ttl, on_write, opts) do
-    eval(cache, :put, [key, value, ttl, on_write, opts], opts)
+  def put(adapter_meta, key, value, ttl, on_write, opts) do
+    eval(adapter_meta, :put, [key, value, ttl, on_write, opts], opts)
   end
 
   @impl true
-  def put_all(cache, entries, ttl, on_write, opts) do
+  def put_all(%{levels: levels}, entries, ttl, on_write, opts) do
     opts
-    |> levels(cache)
-    |> Enum.reduce_while(true, fn level, acc ->
-      case level.__adapter__.put_all(level, entries, ttl, on_write, opts) do
+    |> levels(levels)
+    |> Enum.reduce_while(true, fn {adapter, meta}, acc ->
+      case adapter.put_all(meta, entries, ttl, on_write, opts) do
         true ->
           {:cont, acc}
 
         false ->
-          :ok = Enum.each(entries, &level.__adapter__.delete(level, elem(&1, 0), []))
+          :ok = Enum.each(entries, &adapter.delete(meta, elem(&1, 0), []))
           {:halt, on_write == :put}
       end
     end)
   end
 
   @impl true
-  def delete(cache, key, opts) do
-    eval(cache, :delete, [key, opts], opts)
+  def delete(adapter_meta, key, opts) do
+    eval(adapter_meta, :delete, [key, opts], opts)
   end
 
   @impl true
-  def take(cache, key, opts) do
+  def take(%{levels: levels}, key, opts) do
     opts
-    |> levels(cache)
+    |> levels(levels)
     |> do_take(nil, key, opts)
   end
 
   defp do_take([], result, _key, _opts), do: result
 
-  defp do_take([level | rest], nil, key, opts) do
-    result = level.__adapter__.take(level, key, opts)
+  defp do_take([{adapter, meta} | rest], nil, key, opts) do
+    result = adapter.take(meta, key, opts)
     do_take(rest, result, key, opts)
   end
 
@@ -284,71 +242,71 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
-  def has_key?(cache, key) do
-    eval_while(cache, :has_key?, [key], false)
+  def has_key?(adapter_meta, key) do
+    eval_while(adapter_meta, :has_key?, [key], false)
   end
 
   @impl true
-  def incr(cache, key, incr, ttl, opts) do
-    eval(cache, :incr, [key, incr, ttl, opts], opts)
+  def incr(adapter_meta, key, incr, ttl, opts) do
+    eval(adapter_meta, :incr, [key, incr, ttl, opts], opts)
   end
 
   @impl true
-  def ttl(cache, key) do
-    eval_while(cache, :ttl, [key], nil)
+  def ttl(adapter_meta, key) do
+    eval_while(adapter_meta, :ttl, [key], nil)
   end
 
   @impl true
-  def expire(cache, key, ttl) do
-    Enum.reduce(cache.__levels__, false, fn level_cache, acc ->
-      level_cache.__adapter__.expire(level_cache, key, ttl) or acc
+  def expire(%{levels: levels}, key, ttl) do
+    Enum.reduce(levels, false, fn {adapter, meta}, acc ->
+      adapter.expire(meta, key, ttl) or acc
     end)
   end
 
   @impl true
-  def touch(cache, key) do
-    Enum.reduce(cache.__levels__, false, fn level_cache, acc ->
-      level_cache.__adapter__.touch(level_cache, key) or acc
+  def touch(%{levels: levels}, key) do
+    Enum.reduce(levels, false, fn {adapter, meta}, acc ->
+      adapter.touch(meta, key) or acc
     end)
   end
 
   @impl true
-  def size(cache) do
-    Enum.reduce(cache.__levels__, 0, fn level_cache, acc ->
-      level_cache.__adapter__.size(level_cache) + acc
+  def size(%{levels: levels}) do
+    Enum.reduce(levels, 0, fn {adapter, meta}, acc ->
+      adapter.size(meta) + acc
     end)
   end
 
   @impl true
-  def flush(cache) do
-    Enum.reduce(cache.__levels__, 0, fn level_cache, acc ->
-      level_cache.__adapter__.flush(level_cache) + acc
+  def flush(%{levels: levels}) do
+    Enum.reduce(levels, 0, fn {adapter, meta}, acc ->
+      adapter.flush(meta) + acc
     end)
   end
 
   ## Queryable
 
   @impl true
-  def all(cache, query, opts) do
-    for level_cache <- cache.__levels__,
-        elems <- level_cache.__adapter__.all(level_cache, query, opts),
+  def all(%{levels: levels}, query, opts) do
+    for {adapter, meta} <- levels,
+        elems <- adapter.all(meta, query, opts),
         do: elems
   end
 
   @impl true
-  def stream(cache, query, opts) do
+  def stream(%{levels: levels}, query, opts) do
     Stream.resource(
       fn ->
-        cache.__levels__
+        levels
       end,
       fn
         [] ->
           {:halt, []}
 
-        [level | levels] ->
+        [{adapter, meta} | levels] ->
           elements =
-            level
-            |> level.__adapter__.stream(query, opts)
+            meta
+            |> adapter.stream(query, opts)
             |> Enum.to_list()
 
           {elements, levels}
@@ -359,59 +317,51 @@ defmodule Nebulex.Adapters.Multilevel do
 
   ## Helpers
 
-  defp eval(ml_cache, fun, args, opts) do
+  defp eval(%{levels: levels}, fun, args, opts) do
+    eval(levels, fun, args, opts)
+  end
+
+  defp eval(levels, fun, args, opts) when is_list(levels) do
     opts
-    |> levels(ml_cache)
+    |> levels(levels)
     |> eval(fun, args)
   end
 
-  defp eval([l1 | next], fun, args) do
-    Enum.reduce(next, apply(l1.__adapter__, fun, [l1 | args]), fn cache, acc ->
-      ^acc = apply(cache.__adapter__, fun, [cache | args])
+  defp eval([{level, meta} | next], fun, args) do
+    Enum.reduce(next, apply(level, fun, [meta | args]), fn {level, meta}, acc ->
+      ^acc = apply(level, fun, [meta | args])
     end)
   end
 
-  defp levels(opts, cache) do
+  defp levels(opts, levels) do
     case Keyword.get(opts, :level) do
-      nil -> cache.__levels__
-      level -> [:lists.nth(level, cache.__levels__)]
+      nil -> levels
+      level -> [Enum.at(levels, level - 1)]
     end
   end
 
-  defp eval_while(ml_cache, fun, args, init) do
-    Enum.reduce_while(ml_cache.__levels__, init, fn cache, acc ->
-      if return = apply(cache.__adapter__, fun, [cache | args]),
+  defp eval_while(%{levels: levels}, fun, args, init) do
+    Enum.reduce_while(levels, init, fn {adapter, meta}, acc ->
+      if return = apply(adapter, fun, [meta | args]),
         do: {:halt, return},
         else: {:cont, acc}
     end)
   end
 
-  defp maybe_fallback({nil, levels}, cache, key, opts) do
-    value =
-      if fallback = opts[:fallback] || cache.__fallback__,
-        do: eval_fallback(fallback, key),
-        else: nil
+  defp maybe_replicate({nil, _}, _, _), do: nil
 
-    {key, value, levels}
+  defp maybe_replicate({value, [{adapter, meta} | levels]}, key, :inclusive) do
+    ttl = adapter.ttl(meta, key) || :infinity
+
+    :ok =
+      Enum.each(levels, fn {l_adapter, l_meta} ->
+        _ = l_adapter.put(l_meta, key, value, ttl, :put, [])
+      end)
+
+    value
   end
 
-  defp maybe_fallback({value, levels}, _, key, _opts) do
-    {key, value, levels}
-  end
-
-  defp eval_fallback(fallback, key) when is_function(fallback, 1),
-    do: fallback.(key)
-
-  defp eval_fallback({m, f}, key) when is_atom(m) and is_atom(f),
-    do: apply(m, f, [key])
-
-  defp maybe_replicate({_, nil, _}, _), do: nil
-
-  defp maybe_replicate({key, value, levels}, cache) do
-    if cache.__model__ == :inclusive do
-      :ok = Enum.each(levels, & &1.put(key, value, ttl: cache.ttl(key)))
-    end
-
+  defp maybe_replicate({value, _levels}, _key, :exclusive) do
     value
   end
 end

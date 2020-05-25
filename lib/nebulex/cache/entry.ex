@@ -3,13 +3,13 @@ defmodule Nebulex.Cache.Entry do
 
   import Nebulex.Helpers
 
-  alias Nebulex.Time
+  alias Nebulex.{Adapter, Time}
 
   @doc """
   Implementation for `c:Nebulex.Cache.get/2`.
   """
   def get(name, key, opts) do
-    with_meta(name, & &1.get(&2, key, opts))
+    Adapter.with_meta(name, & &1.get(&2, key, opts))
   end
 
   @doc """
@@ -29,7 +29,7 @@ defmodule Nebulex.Cache.Entry do
   def get_all(_name, [], _opts), do: %{}
 
   def get_all(name, keys, opts) do
-    with_meta(name, & &1.get_all(&2, keys, opts))
+    Adapter.with_meta(name, & &1.get_all(&2, keys, opts))
   end
 
   @doc """
@@ -75,7 +75,7 @@ defmodule Nebulex.Cache.Entry do
   defp do_put(_name, _key, nil, _on_write, _opts), do: true
 
   defp do_put(name, key, value, on_write, opts) do
-    with_meta(name, & &1.put(&2, key, value, get_ttl(opts), on_write, opts))
+    Adapter.with_meta(name, & &1.put(&2, key, value, get_ttl(opts), on_write, opts))
   end
 
   @doc """
@@ -97,14 +97,14 @@ defmodule Nebulex.Cache.Entry do
   def do_put_all(_name, entries, _on_write, _opts) when map_size(entries) == 0, do: true
 
   def do_put_all(name, entries, on_write, opts) do
-    with_meta(name, & &1.put_all(&2, entries, get_ttl(opts), on_write, opts))
+    Adapter.with_meta(name, & &1.put_all(&2, entries, get_ttl(opts), on_write, opts))
   end
 
   @doc """
   Implementation for `c:Nebulex.Cache.delete/2`.
   """
   def delete(name, key, opts) do
-    with_meta(name, & &1.delete(&2, key, opts))
+    Adapter.with_meta(name, & &1.delete(&2, key, opts))
   end
 
   @doc """
@@ -113,7 +113,7 @@ defmodule Nebulex.Cache.Entry do
   def take(_name, nil, _opts), do: nil
 
   def take(name, key, opts) do
-    with_meta(name, & &1.take(&2, key, opts))
+    Adapter.with_meta(name, & &1.take(&2, key, opts))
   end
 
   @doc """
@@ -131,14 +131,14 @@ defmodule Nebulex.Cache.Entry do
   Implementation for `c:Nebulex.Cache.has_key?/1`.
   """
   def has_key?(name, key) do
-    with_meta(name, & &1.has_key?(&2, key))
+    Adapter.with_meta(name, & &1.has_key?(&2, key))
   end
 
   @doc """
   Implementation for `c:Nebulex.Cache.get_and_update/3`.
   """
   def get_and_update(name, key, fun, opts) when is_function(fun, 1) do
-    with_meta(name, fn adapter, adapter_meta ->
+    Adapter.with_meta(name, fn adapter, adapter_meta ->
       current = adapter.get(adapter_meta, key, opts)
 
       case fun.(current) do
@@ -168,7 +168,7 @@ defmodule Nebulex.Cache.Entry do
   Implementation for `c:Nebulex.Cache.update/4`.
   """
   def update(name, key, initial, fun, opts) do
-    with_meta(name, fn adapter, adapter_meta ->
+    Adapter.with_meta(name, fn adapter, adapter_meta ->
       adapter_meta
       |> adapter.get(key, opts)
       |> case do
@@ -191,7 +191,7 @@ defmodule Nebulex.Cache.Entry do
   Implementation for `c:Nebulex.Cache.incr/3`.
   """
   def incr(name, key, incr, opts) when is_integer(incr) do
-    with_meta(name, & &1.incr(&2, key, incr, get_ttl(opts), opts))
+    Adapter.with_meta(name, & &1.incr(&2, key, incr, get_ttl(opts), opts))
   end
 
   def incr(_cache, _key, incr, _opts) do
@@ -202,7 +202,7 @@ defmodule Nebulex.Cache.Entry do
   Implementation for `c:Nebulex.Cache.ttl/1`.
   """
   def ttl(name, key) do
-    with_meta(name, & &1.ttl(&2, key))
+    Adapter.with_meta(name, & &1.ttl(&2, key))
   end
 
   @doc """
@@ -213,28 +213,28 @@ defmodule Nebulex.Cache.Entry do
       (Time.timeout?(ttl) && ttl) ||
         raise ArgumentError, "expected ttl to be a valid timeout, got: #{inspect(ttl)}"
 
-    with_meta(name, & &1.expire(&2, key, ttl))
+    Adapter.with_meta(name, & &1.expire(&2, key, ttl))
   end
 
   @doc """
   Implementation for `c:Nebulex.Cache.touch/1`.
   """
   def touch(name, key) do
-    with_meta(name, & &1.touch(&2, key))
+    Adapter.with_meta(name, & &1.touch(&2, key))
   end
 
   @doc """
   Implementation for `c:Nebulex.Cache.size/0`.
   """
   def size(name) do
-    with_meta(name, & &1.size(&2))
+    Adapter.with_meta(name, & &1.size(&2))
   end
 
   @doc """
   Implementation for `c:Nebulex.Cache.flush/0`.
   """
   def flush(name) do
-    with_meta(name, & &1.flush(&2))
+    Adapter.with_meta(name, & &1.flush(&2))
   end
 
   ## Helpers

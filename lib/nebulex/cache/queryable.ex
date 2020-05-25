@@ -1,7 +1,7 @@
 defmodule Nebulex.Cache.Queryable do
   @moduledoc false
 
-  import Nebulex.Helpers
+  alias Nebulex.Adapter
 
   @default_page_size 10
 
@@ -9,7 +9,7 @@ defmodule Nebulex.Cache.Queryable do
   Implementation for `c:Nebulex.Cache.all/2`.
   """
   def all(name, query, opts) do
-    with_meta(name, & &1.all(&2, query, opts))
+    Adapter.with_meta(name, & &1.all(&2, query, opts))
   end
 
   @doc """
@@ -17,6 +17,6 @@ defmodule Nebulex.Cache.Queryable do
   """
   def stream(name, query, opts) do
     opts = Keyword.put_new(opts, :page_size, @default_page_size)
-    with_meta(name, & &1.stream(&2, query, opts))
+    Adapter.with_meta(name, & &1.stream(&2, query, opts))
   end
 end

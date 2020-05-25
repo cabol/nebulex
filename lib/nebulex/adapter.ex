@@ -13,7 +13,7 @@ defmodule Nebulex.Adapter do
 
     * `:cache` - The cache module.
     * `:name` - The nase of the cache.
-    * :pid` - The PID returned by the child spec returned in `c:init/1`
+    * `:pid` - The PID returned by the child spec returned in `c:init/1`
   """
   @type adapter_meta :: map
 
@@ -178,4 +178,16 @@ defmodule Nebulex.Adapter do
   See `c:Nebulex.Cache.flush/0`.
   """
   @callback flush(adapter_meta) :: integer
+
+  @doc """
+  RExecutes the function `fun` passing as parameters the adapter and metadata
+  (from the `c:init/1` callback) associated with the given cache `name_or_pid`.
+
+  It expects a name or a PID representing the cache.
+  """
+  @spec with_meta(atom | pid, (module, adapter_meta -> term)) :: term
+  def with_meta(name_or_pid, fun) do
+    {adapter, adapter_meta} = Nebulex.Cache.Registry.lookup(name_or_pid)
+    fun.(adapter, adapter_meta)
+  end
 end

@@ -26,8 +26,7 @@ defmodule Nebulex do
       defmodule MyApp.MyCache do
         use Nebulex.Cache,
           otp_app: :my_app,
-          adapter: Nebulex.Adapters.Local,
-          backend: :shards
+          adapter: Nebulex.Adapters.Local
       end
 
   Where the configuration for the Cache must be in your application
@@ -35,6 +34,7 @@ defmodule Nebulex do
 
       config :my_app, MyApp.MyCache,
         gc_interval: 3_600_000,
+        backend: :shards,
         partitions: 2
 
   Each cache in Nebulex defines a `start_link/1` function that needs to be

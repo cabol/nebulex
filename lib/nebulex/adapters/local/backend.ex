@@ -8,12 +8,8 @@ defmodule Nebulex.Adapters.Local.Backend do
   ## API
 
   @doc false
-  def child_spec(cache, opts) do
-    child_spec(cache.__backend__, cache, opts)
-  end
-
-  defp child_spec(:shards, cache, opts) do
-    sup_name = Module.concat(cache, ShardsSupervisor)
+  def child_spec(:shards, name, opts) do
+    sup_name = normalize_module_name([name, ShardsSupervisor])
 
     partitions =
       get_option(
@@ -23,30 +19,30 @@ defmodule Nebulex.Adapters.Local.Backend do
         System.schedulers_online()
       )
 
-    sup_spec(cache, [
+    sup_spec(name, [
       %{
         id: sup_name,
         start: {:shards_sup, :start_link, [sup_name]},
         type: :supervisor
       },
-      generation_spec(cache, parse_opts(opts, sup_name: sup_name, n_shards: partitions))
+      generation_spec(name, parse_opts(opts, sup_name: sup_name, n_shards: partitions))
     ])
   end
 
-  defp child_spec(:ets, cache, opts) do
-    sup_spec(cache, [generation_spec(cache, parse_opts(opts))])
+  def child_spec(:ets, name, opts) do
+    sup_spec(name, [generation_spec(name, parse_opts(opts))])
   end
 
-  defp generation_spec(cache, opts) do
+  defp generation_spec(name, opts) do
     %{
-      id: {cache, Generation},
-      start: {Generation, :start_link, [cache, opts]}
+      id: {name, Generation},
+      start: {Generation, :start_link, [opts]}
     }
   end
 
-  def sup_spec(cache, children) do
+  def sup_spec(name, children) do
     Nebulex.Adapters.Supervisor.child_spec(
-      name: Module.concat(cache, Supervisor),
+      name: normalize_module_name([name, Supervisor]),
       strategy: :one_for_all,
       children: children
     )

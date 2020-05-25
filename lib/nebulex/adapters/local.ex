@@ -11,6 +11,10 @@ defmodule Nebulex.Adapters.Local do
   collection which avoids using timers and expiration of individual
   cached elements.
 
+  This implementation of generation cache uses only two generations
+  (which is more than enough) also referred like the `newer` and
+  the `older`.
+
   ## Features
 
     * Configurable backend (`ets` or `:shards`).
@@ -22,20 +26,13 @@ defmodule Nebulex.Adapters.Local do
       (by using `:shards` backend and specifying the `:partitions` option).
     * Support for transactions via Erlang global name registration facility.
 
-  ## Compile-Time Options
+  ## Options
 
-  In addition to `:otp_app` and `:adapter`, this adapter supports the next
-  compile-time options:
+  This adapter supports the following options and all of them can be given via
+  the cache configuration:
 
     * `:backend` - Defines the backend or storage to be used for the adapter.
       Supported backends are: `:ets` and `:shards`. Defaults to `:ets`.
-
-  ## Config Options
-
-  These options can be set through the config file:
-
-    * `:generations` - Max number of Cache generations. Defaults to `2`
-      (normally two generations is enough).
 
     * `:read_concurrency` - Since this adapter uses ETS tables internally,
       this option is used when a new table is created. See `:ets.new/2`.
@@ -62,7 +59,7 @@ defmodule Nebulex.Adapters.Local do
     * `:gc_interval` - Interval time in milliseconds to garbage collection to
       run, delete the oldest generation and create a new one. If this option is
       not set, garbage collection is never executed, so new generations must be
-      created explicitly, e.g.: `MyCache.new_generation([])`.
+      created explicitly, e.g.: `Generation.new_generation(cache_name, [])`.
 
     * `:max_size` - Max number of cached entries (cache limit). If it is not
       set (`nil`), the check to release memory is not performed (the default).
@@ -89,15 +86,15 @@ defmodule Nebulex.Adapters.Local do
       defmodule MyApp.LocalCache do
         use Nebulex.Cache,
           otp_app: :my_app,
-          adapter: Nebulex.Adapters.Local,
-          backend: :shards
+          adapter: Nebulex.Adapters.Local
       end
 
   Where the configuration for the cache must be in your application
   environment, usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.LocalCache,
-        gc_interval: Nebulex.Time.expiry_time(1, :hour),,
+        backend: :shards,
+        gc_interval: Nebulex.Time.expiry_time(1, :hour),
         max_size: 200_000,
         allocated_memory: 2_000_000_000,
         gc_cleanup_min_timeout: Nebulex.Time.expiry_time(10),
@@ -109,7 +106,8 @@ defmodule Nebulex.Adapters.Local do
   schedulers available (the default):
 
       config :my_app, MyApp.LocalCache,
-        gc_interval: Nebulex.Time.expiry_time(1, :hour),,
+        backend: :shards,
+        gc_interval: Nebulex.Time.expiry_time(1, :hour),
         max_size: 200_000,
         allocated_memory: 2_000_000_000,
         gc_cleanup_min_timeout: Nebulex.Time.expiry_time(10),
@@ -117,22 +115,6 @@ defmodule Nebulex.Adapters.Local do
         partitions: System.schedulers_online()
 
   For more information about the usage, check out `Nebulex.Cache`.
-
-  ## Extended API
-
-  This adapter provides some additional functions to the `Nebulex.Cache` API.
-  Most of these functions are used internally by the adapter, but there is one
-  function which is indeed provided to be used from the Cache API, and it is
-  the function to create new generations: `new_generation/1`.
-
-      MyApp.LocalCache.new_generation
-
-  Other additional function that might be useful is: `__metadata__`,
-  which is used to retrieve the Cache Metadata.
-
-      MyApp.LocalCache.__metadata__
-
-  The rest of the functions as we mentioned before, are for internal use.
 
   ## Queryable API
 
@@ -167,10 +149,10 @@ defmodule Nebulex.Adapters.Local do
       MyCache.all(spec)
 
   The `:return` option applies only for built-in queries, such as:
-  `nil | :unexpired | :expired`, if you are using a
-  custom `:ets.match_spec()`, the return value depends on it.
+  `nil | :unexpired | :expired`, if you are using a custom `:ets.match_spec()`,
+  the return value depends on it.
 
-  The same applies to `stream` function.
+  The same applies to the `stream` function.
   """
 
   # Provide Cache Implementation
@@ -202,75 +184,63 @@ defmodule Nebulex.Adapters.Local do
   ## Adapter
 
   @impl true
-  defmacro __before_compile__(env) do
-    opts = Module.get_attribute(env.module, :opts)
-    backend = Keyword.get(opts, :backend, :ets)
-
-    unless backend in @backends do
-      raise ArgumentError, "supported backends: #{inspect(@backends)}, got: #{inspect(backend)}"
-    end
-
+  defmacro __before_compile__(_env) do
     quote do
-      alias Nebulex.Adapters.Local.Generation
-      alias Nebulex.Adapters.Local.Metadata
-
-      @doc """
-      A convenience function for getting the current backend.
-      """
-      def __backend__, do: unquote(backend)
-
-      @doc """
-      A convenience function for getting the Cache metadata.
-      """
-      def __metadata__, do: Metadata.get(__MODULE__)
-
       @doc """
       A convenience function for creating new generations.
       """
       def new_generation(opts \\ []) do
-        Generation.new(__MODULE__, opts)
+        opts
+        |> Keyword.get(:name, __MODULE__)
+        |> Generation.new(opts)
       end
     end
   end
 
   @impl true
   def init(opts) do
-    cache = Keyword.fetch!(opts, :cache)
-    {:ok, Backend.child_spec(cache, opts), %{}}
+    name = opts[:name] || Keyword.fetch!(opts, :cache)
+    backend = Keyword.get(opts, :backend, :ets)
+
+    unless backend in @backends do
+      raise "expected backend: to be within the supported backends " <>
+              "#{inspect(@backends)}, got: #{inspect(backend)}"
+    end
+
+    child =
+      Backend.child_spec(
+        backend,
+        name,
+        [name: name, backend: backend] ++ opts
+      )
+
+    {:ok, child, %{name: name, backend: backend}}
   end
 
   @impl true
-  def get(%{cache: cache}, key, _opts) do
-    cache.__metadata__.generations
-    |> do_get(key, cache)
+  def get(%{name: name, backend: backend}, key, _opts) do
+    name
+    |> Generation.list()
+    |> do_get(key, backend)
     |> return(:value)
   end
 
-  defp do_get([newest | _] = generations, key, cache) do
-    with nil <- fetch_from_gen(newest, key, cache) do
-      generations
-      |> retrieve_from_gens(key, cache)
-      |> elem(1)
+  defp do_get([newer], key, backend) do
+    gen_fetch(newer, key, backend)
+  end
+
+  defp do_get([newer, older], key, backend) do
+    with nil <- gen_fetch(newer, key, backend),
+         entry(key: ^key) = cached <- gen_fetch(older, key, backend, &pop_entry/4) do
+      true = backend.insert(newer, cached)
+      cached
     end
   end
 
-  defp fetch_from_gen(gen, key, cache, fun \\ &get_entry/4) do
+  defp gen_fetch(gen, key, backend, fun \\ &get_entry/4) do
     fun
-    |> apply([gen, key, nil, cache])
-    |> validate_ttl(gen, cache)
-  end
-
-  defp retrieve_from_gens([newest | olders], key, cache) do
-    Enum.reduce_while(olders, {newest, nil}, fn gen, {newer, _} ->
-      case fetch_from_gen(gen, key, cache, &pop_entry/4) do
-        nil ->
-          {:cont, {gen, nil}}
-
-        cached ->
-          true = cache.__backend__.insert(newer, cached)
-          {:halt, {gen, cached}}
-      end
-    end)
+    |> apply([gen, key, nil, backend])
+    |> validate_ttl(gen, backend)
   end
 
   @impl true
@@ -283,10 +253,11 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def put(%{cache: cache}, key, value, ttl, on_write, _opts) do
+  def put(%{name: name, backend: backend}, key, value, ttl, on_write, _opts) do
     do_put(
       on_write,
-      cache,
+      name,
+      backend,
       entry(
         key: key,
         value: value,
@@ -296,20 +267,20 @@ defmodule Nebulex.Adapters.Local do
     )
   end
 
-  defp do_put(:put, cache, entry) do
-    put_entries(cache, entry)
+  defp do_put(:put, name, backend, entry) do
+    put_entries(name, backend, entry)
   end
 
-  defp do_put(:put_new, cache, entry) do
-    put_new_entries(cache, entry)
+  defp do_put(:put_new, name, backend, entry) do
+    put_new_entries(name, backend, entry)
   end
 
-  defp do_put(:replace, cache, entry(key: key, value: value, ttl: ttl)) do
-    update_entry(cache, key, [{3, value}, {4, nil}, {5, ttl}])
+  defp do_put(:replace, name, backend, entry(key: key, value: value, ttl: ttl)) do
+    update_entry(name, backend, key, [{3, value}, {4, nil}, {5, ttl}])
   end
 
   @impl true
-  def put_all(%{cache: cache}, entries, ttl, on_write, _opts) do
+  def put_all(%{name: name, backend: backend}, entries, ttl, on_write, _opts) do
     touched = Time.now()
 
     entries =
@@ -317,33 +288,37 @@ defmodule Nebulex.Adapters.Local do
         entry(key: key, value: value, touched: touched, ttl: ttl)
       end
 
-    do_put_all(cache, entries, on_write)
+    do_put_all(name, backend, entries, on_write)
   end
 
-  defp do_put_all(cache, entries, :put) do
-    put_entries(cache, entries)
+  defp do_put_all(name, backend, entries, :put) do
+    put_entries(name, backend, entries)
   end
 
-  defp do_put_all(cache, entries, :put_new) do
-    put_new_entries(cache, entries)
-  end
-
-  @impl true
-  def delete(%{cache: cache}, key, _opts) do
-    Enum.each(cache.__metadata__.generations, &cache.__backend__.delete(&1, key))
+  defp do_put_all(name, backend, entries, :put_new) do
+    put_new_entries(name, backend, entries)
   end
 
   @impl true
-  def take(%{cache: cache}, key, _opts) do
-    Enum.reduce_while(cache.__metadata__.generations, nil, fn gen, acc ->
-      case pop_entry(gen, key, nil, cache) do
+  def delete(%{name: name, backend: backend}, key, _opts) do
+    name
+    |> Generation.list()
+    |> Enum.each(&backend.delete(&1, key))
+  end
+
+  @impl true
+  def take(%{name: name, backend: backend}, key, _opts) do
+    name
+    |> Generation.list()
+    |> Enum.reduce_while(nil, fn gen, acc ->
+      case pop_entry(gen, key, nil, backend) do
         nil ->
           {:cont, acc}
 
         res ->
           value =
             res
-            |> validate_ttl(gen, cache)
+            |> validate_ttl(gen, backend)
             |> return(:value)
 
           {:halt, value}
@@ -352,10 +327,10 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def incr(%{cache: cache}, key, incr, ttl, _opts) do
-    cache.__metadata__.generations
-    |> hd()
-    |> cache.__backend__.update_counter(
+  def incr(%{name: name, backend: backend}, key, incr, ttl, _opts) do
+    name
+    |> Generation.newer()
+    |> backend.update_counter(
       key,
       {3, incr},
       entry(key: key, value: 0, touched: Time.now(), ttl: ttl)
@@ -371,9 +346,10 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def ttl(%{cache: cache}, key) do
-    cache.__metadata__.generations
-    |> do_get(key, cache)
+  def ttl(%{name: name, backend: backend}, key) do
+    name
+    |> Generation.list()
+    |> do_get(key, backend)
     |> return()
     |> entry_ttl()
   end
@@ -390,52 +366,54 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def expire(%{cache: cache}, key, ttl) do
-    update_entry(cache, key, [{4, Time.now()}, {5, ttl}])
+  def expire(%{name: name, backend: backend}, key, ttl) do
+    update_entry(name, backend, key, [{4, Time.now()}, {5, ttl}])
   end
 
   @impl true
-  def touch(%{cache: cache}, key) do
-    update_entry(cache, key, [{4, Time.now()}])
+  def touch(%{name: name, backend: backend}, key) do
+    update_entry(name, backend, key, [{4, Time.now()}])
   end
 
   @impl true
-  def size(%{cache: cache}) do
-    Enum.reduce(cache.__metadata__.generations, 0, fn gen, acc ->
+  def size(%{name: name, backend: backend}) do
+    name
+    |> Generation.list()
+    |> Enum.reduce(0, fn gen, acc ->
       gen
-      |> cache.__backend__.info(:size)
+      |> backend.info(:size)
       |> Kernel.+(acc)
     end)
   end
 
   @impl true
-  def flush(%{cache: cache}) do
-    Generation.flush(cache)
+  def flush(%{name: name}) do
+    Generation.flush(name)
   end
 
   ## Queryable
 
   @impl true
-  def all(%{cache: cache}, query, opts) do
+  def all(%{name: name, backend: backend}, query, opts) do
     query = validate_match_spec(query, opts)
 
-    for gen <- cache.__metadata__.generations,
-        elems <- cache.__backend__.select(gen, query),
+    for gen <- Generation.list(name),
+        elems <- backend.select(gen, query),
         do: elems
   end
 
   @impl true
-  def stream(%{cache: cache}, query, opts) do
+  def stream(adapter_meta, query, opts) do
     query
     |> validate_match_spec(opts)
-    |> do_stream(cache, Keyword.get(opts, :page_size, 10))
+    |> do_stream(adapter_meta, Keyword.get(opts, :page_size, 10))
   end
 
-  defp do_stream(match_spec, cache, page_size) do
+  defp do_stream(match_spec, %{name: name, backend: backend}, page_size) do
     Stream.resource(
       fn ->
-        [newer | _] = generations = cache.__metadata__.generations
-        result = cache.__backend__.select(newer, match_spec, page_size)
+        [newer | _] = generations = Generation.list(name)
+        result = backend.select(newer, match_spec, page_size)
         {result, generations}
       end,
       fn
@@ -446,12 +424,12 @@ defmodule Nebulex.Adapters.Local do
           result =
             generations
             |> hd()
-            |> cache.__backend__.select(match_spec, page_size)
+            |> backend.select(match_spec, page_size)
 
           {[], {result, generations}}
 
         {{elements, cont}, [_ | _] = generations} ->
-          {elements, {cache.__backend__.select(cont), generations}}
+          {elements, {backend.select(cont), generations}}
       end,
       & &1
     )
@@ -466,38 +444,38 @@ defmodule Nebulex.Adapters.Local do
 
   ## Helpers
 
-  defp get_entry(tab, key, default, cache) do
-    case cache.__backend__.lookup(tab, key) do
+  defp get_entry(tab, key, default, backend) do
+    case backend.lookup(tab, key) do
       [] -> default
       [entry] -> entry
       entries -> entries
     end
   end
 
-  defp pop_entry(tab, key, default, cache) do
-    case cache.__backend__.take(tab, key) do
+  defp pop_entry(tab, key, default, backend) do
+    case backend.take(tab, key) do
       [] -> default
       [entry] -> entry
       entries -> entries
     end
   end
 
-  defp put_entries(cache, entry_or_entries) do
-    cache.__metadata__.generations
-    |> hd()
-    |> cache.__backend__.insert(entry_or_entries)
+  defp put_entries(name, backend, entry_or_entries) do
+    name
+    |> Generation.newer()
+    |> backend.insert(entry_or_entries)
   end
 
-  defp put_new_entries(cache, entry_or_entries) do
-    cache.__metadata__.generations
-    |> hd()
-    |> cache.__backend__.insert_new(entry_or_entries)
+  defp put_new_entries(name, backend, entry_or_entries) do
+    name
+    |> Generation.newer()
+    |> backend.insert_new(entry_or_entries)
   end
 
-  defp update_entry(cache, key, updates) do
-    cache.__metadata__.generations
-    |> hd()
-    |> cache.__backend__.update_element(key, updates)
+  defp update_entry(name, backend, key, updates) do
+    name
+    |> Generation.newer()
+    |> backend.update_element(key, updates)
   end
 
   defp return(entry_or_entries, field \\ nil)
@@ -512,18 +490,18 @@ defmodule Nebulex.Adapters.Local do
   defp validate_ttl(nil, _, _), do: nil
   defp validate_ttl(entry(ttl: :infinity) = entry, _, _), do: entry
 
-  defp validate_ttl(entry(key: key, touched: touched, ttl: ttl) = entry, gen, cache) do
+  defp validate_ttl(entry(key: key, touched: touched, ttl: ttl) = entry, gen, backend) do
     if Time.now() - touched >= ttl do
-      true = cache.__backend__.delete(gen, key)
+      true = backend.delete(gen, key)
       nil
     else
       entry
     end
   end
 
-  defp validate_ttl(entries, gen, cache) when is_list(entries) do
+  defp validate_ttl(entries, gen, backend) when is_list(entries) do
     Enum.filter(entries, fn entry ->
-      not is_nil(validate_ttl(entry, gen, cache))
+      not is_nil(validate_ttl(entry, gen, backend))
     end)
   end
 

@@ -27,7 +27,7 @@ defmodule Nebulex.HookTest do
     end
 
     test "hook" do
-      {:ok, pid} = BeforeHookCache.start_link()
+      {:ok, _pid} = BeforeHookCache.start_link()
       true = Process.register(self(), :hooked_cache)
       _ = BeforeHookCache.new_generation()
 
@@ -47,7 +47,7 @@ defmodule Nebulex.HookTest do
       assert hook.arity == 3
       refute hook.return
 
-      :ok = BeforeHookCache.stop(pid)
+      :ok = BeforeHookCache.stop()
     end
   end
 
@@ -63,7 +63,7 @@ defmodule Nebulex.HookTest do
     end
 
     test "hook" do
-      {:ok, pid} = AfterReturnHookCache.start_link()
+      {:ok, _pid} = AfterReturnHookCache.start_link()
       true = Process.register(self(), :hooked_cache)
       _ = AfterReturnHookCache.new_generation()
 
@@ -83,7 +83,7 @@ defmodule Nebulex.HookTest do
       assert hook.step == :after_return
       assert hook.return == :ok
 
-      :ok = AfterReturnHookCache.stop(pid)
+      :ok = AfterReturnHookCache.stop()
     end
   end
 
@@ -106,7 +106,7 @@ defmodule Nebulex.HookTest do
     end
 
     test "hook" do
-      {:ok, pid} = AroundHookCache.start_link()
+      {:ok, _pid} = AroundHookCache.start_link()
       true = Process.register(self(), :hooked_cache)
       _ = AroundHookCache.new_generation()
 
@@ -135,7 +135,7 @@ defmodule Nebulex.HookTest do
       assert hook.return == "world"
       assert hook.acc >= 0
 
-      :ok = AroundHookCache.stop(pid)
+      :ok = AroundHookCache.stop()
     end
   end
 
@@ -151,12 +151,12 @@ defmodule Nebulex.HookTest do
     end
 
     test "hook" do
-      {:ok, pid} = ErrorCache.start_link()
+      {:ok, _pid} = ErrorCache.start_link()
 
       msg = "hook execution failed on step before with error"
       assert capture_log(fn -> ErrorCache.get("foo") end) =~ msg
 
-      :ok = ErrorCache.stop(pid)
+      :ok = ErrorCache.stop()
     end
   end
 

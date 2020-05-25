@@ -19,38 +19,26 @@ defmodule Nebulex.Cache.SupervisorTest do
   end
 
   test "fail on compile_config because missing otp_app" do
-    opts = [adapter: TestAdapter]
-    :ok = Application.put_env(:nebulex, MyCache, opts)
-
     assert_raise ArgumentError, "expected otp_app: to be given as argument", fn ->
-      Nebulex.Cache.Supervisor.compile_config(opts)
+      Nebulex.Cache.Supervisor.compile_config(adapter: TestAdapter)
     end
   end
 
   test "fail on compile_config because missing adapter" do
-    opts = [otp_app: :nebulex]
-    :ok = Application.put_env(:nebulex, MyCache, opts)
-
     assert_raise ArgumentError, "expected adapter: to be given as argument", fn ->
-      Nebulex.Cache.Supervisor.compile_config(opts)
+      Nebulex.Cache.Supervisor.compile_config(otp_app: :nebulex)
     end
   end
 
   test "fail on compile_config because adapter was not compiled" do
-    opts = [otp_app: :nebulex, adapter: TestAdapter]
-    :ok = Application.put_env(:nebulex, MyCache, opts)
-
     msg = ~r"adapter TestAdapter was not compiled, ensure"
 
     assert_raise ArgumentError, msg, fn ->
-      Nebulex.Cache.Supervisor.compile_config(opts)
+      Nebulex.Cache.Supervisor.compile_config(otp_app: :nebulex, adapter: TestAdapter)
     end
   end
 
   test "fail on compile_config because adapter error" do
-    opts = [otp_app: :nebulex]
-    :ok = Application.put_env(:nebulex, MyCache2, opts)
-
     msg = "expected :adapter option given to Nebulex.Cache to list Nebulex.Adapter as a behaviour"
 
     assert_raise ArgumentError, msg, fn ->
@@ -63,7 +51,24 @@ defmodule Nebulex.Cache.SupervisorTest do
           adapter: MyAdapter
       end
 
-      Nebulex.Cache.Supervisor.compile_config(opts)
+      Nebulex.Cache.Supervisor.compile_config(otp_app: :nebulex)
     end
+  end
+
+  test "start cache with custom adapter" do
+    defmodule CustomCache do
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.TestCache.AdapterMock
+    end
+
+    assert {:ok, pid} = CustomCache.start_link(child_name: :custom_cache)
+    _ = Process.flag(:trap_exit, true)
+
+    assert {:error, error} =
+             CustomCache.start_link(name: :another_custom_cache, child_name: :custom_cache)
+
+    assert_receive {:EXIT, _pid, ^error}
+    assert CustomCache.stop() == :ok
   end
 end

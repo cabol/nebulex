@@ -3,14 +3,12 @@ defmodule Nebulex.CacheTest do
   Shared Tests
   """
 
-  defmacro __using__(opts) do
-    quote bind_quoted: [opts: opts] do
-      @cache Keyword.fetch!(opts, :cache)
-
-      use Nebulex.Cache.EntryTest, cache: @cache
-      use Nebulex.Cache.QueryableTest, cache: @cache
-      use Nebulex.Cache.TransactionTest, cache: @cache
-      use Nebulex.Cache.PersistenceTest, cache: @cache
+  defmacro __using__(_opts) do
+    quote do
+      use Nebulex.Cache.EntryTest
+      use Nebulex.Cache.QueryableTest
+      use Nebulex.Cache.TransactionTest
+      use Nebulex.Cache.PersistenceTest
     end
   end
 end
