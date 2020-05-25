@@ -64,6 +64,7 @@ defmodule Nebulex.Cache do
       @otp_app otp_app
       @adapter adapter
       @opts opts
+      @default_dynamic_cache opts[:default_dynamic_cache] || __MODULE__
       @before_compile adapter
 
       ## Config and metadata
@@ -98,116 +99,128 @@ defmodule Nebulex.Cache do
         Supervisor.stop(pid, :normal, timeout)
       end
 
+      @compile {:inline, get_dynamic_cache: 0}
+
+      @impl true
+      def get_dynamic_cache do
+        Process.get({__MODULE__, :dynamic_cache}, @default_dynamic_cache)
+      end
+
+      @impl true
+      def put_dynamic_cache(dynamic) when is_atom(dynamic) or is_pid(dynamic) do
+        Process.put({__MODULE__, :dynamic_cache}, dynamic) || @default_dynamic_cache
+      end
+
       ## Entries
 
       @impl true
       def get(key, opts \\ []) do
-        Entry.get(__MODULE__, key, opts)
+        Entry.get(get_dynamic_cache(), key, opts)
       end
 
       @impl true
       def get!(key, opts \\ []) do
-        Entry.get!(__MODULE__, key, opts)
+        Entry.get!(get_dynamic_cache(), key, opts)
       end
 
       @impl true
       def get_all(keys, opts \\ []) do
-        Entry.get_all(__MODULE__, keys, opts)
+        Entry.get_all(get_dynamic_cache(), keys, opts)
       end
 
       @impl true
       def put(key, value, opts \\ []) do
-        Entry.put(__MODULE__, key, value, opts)
+        Entry.put(get_dynamic_cache(), key, value, opts)
       end
 
       @impl true
       def put_all(entries, opts \\ []) do
-        Entry.put_all(__MODULE__, entries, opts)
+        Entry.put_all(get_dynamic_cache(), entries, opts)
       end
 
       @impl true
       def put_new(key, value, opts \\ []) do
-        Entry.put_new(__MODULE__, key, value, opts)
+        Entry.put_new(get_dynamic_cache(), key, value, opts)
       end
 
       @impl true
       def put_new!(key, value, opts \\ []) do
-        Entry.put_new!(__MODULE__, key, value, opts)
+        Entry.put_new!(get_dynamic_cache(), key, value, opts)
       end
 
       @impl true
       def put_new_all(entries, opts \\ []) do
-        Entry.put_new_all(__MODULE__, entries, opts)
+        Entry.put_new_all(get_dynamic_cache(), entries, opts)
       end
 
       @impl true
       def replace(key, value, opts \\ []) do
-        Entry.replace(__MODULE__, key, value, opts)
+        Entry.replace(get_dynamic_cache(), key, value, opts)
       end
 
       @impl true
       def replace!(key, value, opts \\ []) do
-        Entry.replace!(__MODULE__, key, value, opts)
+        Entry.replace!(get_dynamic_cache(), key, value, opts)
       end
 
       @impl true
       def delete(key, opts \\ []) do
-        Entry.delete(__MODULE__, key, opts)
+        Entry.delete(get_dynamic_cache(), key, opts)
       end
 
       @impl true
       def take(key, opts \\ []) do
-        Entry.take(__MODULE__, key, opts)
+        Entry.take(get_dynamic_cache(), key, opts)
       end
 
       @impl true
       def take!(key, opts \\ []) do
-        Entry.take!(__MODULE__, key, opts)
+        Entry.take!(get_dynamic_cache(), key, opts)
       end
 
       @impl true
       def has_key?(key) do
-        Entry.has_key?(__MODULE__, key)
+        Entry.has_key?(get_dynamic_cache(), key)
       end
 
       @impl true
       def get_and_update(key, fun, opts \\ []) do
-        Entry.get_and_update(__MODULE__, key, fun, opts)
+        Entry.get_and_update(get_dynamic_cache(), key, fun, opts)
       end
 
       @impl true
       def update(key, initial, fun, opts \\ []) do
-        Entry.update(__MODULE__, key, initial, fun, opts)
+        Entry.update(get_dynamic_cache(), key, initial, fun, opts)
       end
 
       @impl true
       def incr(key, incr \\ 1, opts \\ []) do
-        Entry.incr(__MODULE__, key, incr, opts)
+        Entry.incr(get_dynamic_cache(), key, incr, opts)
       end
 
       @impl true
       def ttl(key) do
-        Entry.ttl(__MODULE__, key)
+        Entry.ttl(get_dynamic_cache(), key)
       end
 
       @impl true
       def expire(key, ttl) do
-        Entry.expire(__MODULE__, key, ttl)
+        Entry.expire(get_dynamic_cache(), key, ttl)
       end
 
       @impl true
       def touch(key) do
-        Entry.touch(__MODULE__, key)
+        Entry.touch(get_dynamic_cache(), key)
       end
 
       @impl true
       def size do
-        Entry.size(__MODULE__)
+        Entry.size(get_dynamic_cache())
       end
 
       @impl true
       def flush do
-        Entry.flush(__MODULE__)
+        Entry.flush(get_dynamic_cache())
       end
 
       ## Queryable
@@ -215,12 +228,12 @@ defmodule Nebulex.Cache do
       if Nebulex.Adapter.Queryable in behaviours do
         @impl true
         def all(query \\ nil, opts \\ []) do
-          Queryable.all(__MODULE__, query, opts)
+          Queryable.all(get_dynamic_cache(), query, opts)
         end
 
         @impl true
         def stream(query \\ nil, opts \\ []) do
-          Queryable.stream(__MODULE__, query, opts)
+          Queryable.stream(get_dynamic_cache(), query, opts)
         end
       end
 
@@ -229,12 +242,12 @@ defmodule Nebulex.Cache do
       if Nebulex.Adapter.Persistence in behaviours do
         @impl true
         def dump(path, opts \\ []) do
-          Persistence.dump(__MODULE__, path, opts)
+          Persistence.dump(get_dynamic_cache(), path, opts)
         end
 
         @impl true
         def load(path, opts \\ []) do
-          Persistence.load(__MODULE__, path, opts)
+          Persistence.load(get_dynamic_cache(), path, opts)
         end
       end
 
@@ -243,12 +256,12 @@ defmodule Nebulex.Cache do
       if Nebulex.Adapter.Transaction in behaviours do
         @impl true
         def transaction(opts \\ [], fun) do
-          Transaction.transaction(__MODULE__, opts, fun)
+          Transaction.transaction(get_dynamic_cache(), opts, fun)
         end
 
         @impl true
         def in_transaction? do
-          Transaction.in_transaction?(__MODULE__)
+          Transaction.in_transaction?(get_dynamic_cache())
         end
       end
     end
@@ -298,6 +311,38 @@ defmodule Nebulex.Cache do
   Shuts down the cache represented by the given pid.
   """
   @callback stop(pid, timeout) :: :ok
+
+  @doc """
+  Returns the atom name or pid of the current cache.
+
+  See also `c:put_dynamic_cache/1`.
+  """
+  @callback get_dynamic_cache() :: atom() | pid()
+
+  @doc """
+  Sets the dynamic repository to be used in further interactions.
+  Sometimes you may want a single Ecto repository to talk to
+  many different database instances. By default, when you call
+  `MyApp.Repo.start_link/1`, it will start a repository with
+  name `MyApp.Repo`. But if you want to start multiple repositories,
+  you can give each of them a different name:
+      MyApp.Repo.start_link(name: :tenant_foo, hostname: "foo.example.com")
+      MyApp.Repo.start_link(name: :tenant_bar, hostname: "bar.example.com")
+  You can also start repositories without names by explicitly
+  setting the name to nil:
+      MyApp.Repo.start_link(name: nil, hostname: "temp.example.com")
+  However, once the repository is started, you can't directly interact with
+  it, since all operations in `MyApp.Repo` are sent by default to the repository
+  named `MyApp.Repo`. You can change the default repo at compile time with:
+      use Ecto.Repo, default_dynamic_repo: :name_of_repo
+  Or you can change it anytime at runtime by calling `put_dynamic_repo/1`:
+      MyApp.Repo.put_dynamic_repo(:tenant_foo)
+  From this moment on, all future queries done by the current process will
+  run on `:tenant_foo`.
+  **Note this feature is experimental and may be changed or removed in future
+  releases.**
+  """
+  @callback put_dynamic_cache(atom() | pid()) :: atom() | pid()
 
   @doc """
   Gets a value from Cache where the key matches the given `key`.

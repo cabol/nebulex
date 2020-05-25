@@ -197,7 +197,7 @@ defmodule Nebulex.Adapters.Partitioned do
         ]
       )
 
-    {:ok, child_spec}
+    {:ok, child_spec, %{}}
   end
 
   @impl true

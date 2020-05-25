@@ -25,54 +25,54 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   end
 
   test "replicated set" do
-    assert :ok == Replicated.put(1, 1)
-    assert 1 == Replicated.get(1)
+    assert Replicated.put(1, 1) == :ok
+    assert Replicated.get(1) == 1
 
     assert_for_all_replicas(Replicated, :get, [1], 1)
 
-    assert :ok == Replicated.put_all(a: 1, b: 2, c: 3)
+    assert Replicated.put_all(a: 1, b: 2, c: 3) == :ok
 
     assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})
   end
 
   test "replicated delete" do
-    assert :ok == Replicated.put("foo", "bar")
-    assert "bar" == Replicated.get("foo")
+    assert Replicated.put("foo", "bar") == :ok
+    assert Replicated.get("foo") == "bar"
 
     assert_for_all_replicas(Replicated, :get, ["foo"], "bar")
 
-    assert :ok == Replicated.delete("foo")
+    assert Replicated.delete("foo") == :ok
     refute Replicated.get("foo")
 
     assert_for_all_replicas(Replicated, :get, ["foo"], nil)
   end
 
   test "replicated take" do
-    assert :ok == Replicated.put("foo", "bar")
-    assert "bar" == Replicated.get("foo")
+    assert Replicated.put("foo", "bar") == :ok
+    assert Replicated.get("foo") == "bar"
 
     assert_for_all_replicas(Replicated, :get, ["foo"], "bar")
 
-    assert "bar" == Replicated.take("foo")
+    assert Replicated.take("foo") == "bar"
     refute Replicated.get("foo")
 
     assert_for_all_replicas(Replicated, :take, ["foo"], nil)
   end
 
   test "replicated incr" do
-    assert 3 == Replicated.incr(:counter, 3)
-    assert 4 == Replicated.incr(:counter)
+    assert Replicated.incr(:counter, 3) == 3
+    assert Replicated.incr(:counter) == 4
 
     assert_for_all_replicas(Replicated, :get, [:counter], 4)
   end
 
   test "replicated flush" do
-    assert :ok == Replicated.put_all(a: 1, b: 2, c: 3)
+    assert Replicated.put_all(a: 1, b: 2, c: 3) == :ok
 
     assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})
 
-    assert 3 == Replicated.flush()
-    assert 0 == Replicated.size()
+    assert Replicated.flush() == 3
+    assert Replicated.size() == 0
 
     assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{})
   end
@@ -116,16 +116,16 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   end
 
   test "join new cache node" do
-    assert :ok == Replicated.put_all(a: 1, b: 2, c: 3)
-    assert :lists.usort(cluster_nodes()) == :lists.usort(Replicated.__nodes__())
+    assert Replicated.put_all(a: 1, b: 2, c: 3) == :ok
+    assert :lists.usort(Replicated.__nodes__()) == :lists.usort(cluster_nodes())
 
     assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})
 
     # join new cache node
     node_pid_list = start_caches([:"node3@127.0.0.1"], [Replicated])
 
-    assert :lists.usort([:"node3@127.0.0.1" | cluster_nodes()]) ==
-             :lists.usort(Replicated.__nodes__())
+    assert :lists.usort(Replicated.__nodes__()) ==
+             :lists.usort([:"node3@127.0.0.1" | cluster_nodes()])
 
     :ok = Process.sleep(2000)
     assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})

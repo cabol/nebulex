@@ -9,30 +9,30 @@ defmodule Nebulex.Cache.EntryTest do
     test "delete" do
       for x <- 1..3, do: @cache.put(x, x * 2)
 
-      assert 2 == @cache.get(1)
-      assert :ok == @cache.delete(1)
+      assert @cache.get(1) == 2
+      assert @cache.delete(1) == :ok
       refute @cache.get(1)
 
-      assert 4 == @cache.get(2)
-      assert 6 == @cache.get(3)
+      assert @cache.get(2) == 4
+      assert @cache.get(3) == 6
 
-      assert :ok == @cache.delete(:non_existent)
+      assert @cache.delete(:non_existent) == :ok
       refute @cache.get(:non_existent)
     end
 
     test "get" do
       for x <- 1..2, do: @cache.put(x, x)
 
-      assert 1 == @cache.get(1)
-      assert 2 == @cache.get(2)
+      assert @cache.get(1) == 1
+      assert @cache.get(2) == 2
       refute @cache.get(3)
     end
 
     test "get!" do
       for x <- 1..2, do: @cache.put(x, x)
 
-      assert 1 == @cache.get!(1)
-      assert 2 == @cache.get!(2)
+      assert @cache.get!(1) == 1
+      assert @cache.get!(2) == 2
 
       assert_raise KeyError, fn ->
         @cache.get!(3)
@@ -41,35 +41,31 @@ defmodule Nebulex.Cache.EntryTest do
 
     test "get_all" do
       assert @cache.put_all(a: 1, c: 3)
-
-      map = @cache.get_all([:a, :b, :c], version: -1)
-      assert %{a: 1, c: 3} == map
-      refute map[:b]
-
-      assert 0 == map_size(@cache.get_all([]))
-      assert 2 == @cache.flush()
+      assert @cache.get_all([:a, :b, :c], version: -1) == %{a: 1, c: 3}
+      assert map_size(@cache.get_all([])) == 0
+      assert @cache.flush() == 2
     end
 
     test "put" do
       for x <- 1..4, do: assert(:ok == @cache.put(x, x))
 
-      assert 1 == @cache.get(1)
-      assert 2 == @cache.get(2)
+      assert @cache.get(1) == 1
+      assert @cache.get(2) == 2
 
       for x <- 3..4, do: assert(:ok = @cache.put(x, x * x))
-      assert 9 == @cache.get(3)
-      assert 16 == @cache.get(4)
+      assert @cache.get(3) == 9
+      assert @cache.get(4) == 16
 
-      assert :ok == @cache.put("foo", nil)
+      assert @cache.put("foo", nil) == :ok
       refute @cache.get("foo")
     end
 
     test "put_new" do
       assert @cache.put_new("foo", "bar")
-      assert "bar" == @cache.get("foo")
+      assert @cache.get("foo") == "bar"
 
       refute @cache.put_new("foo", "bar bar")
-      assert "bar" == @cache.get("foo")
+      assert @cache.get("foo") == "bar"
 
       assert @cache.put_new(:mykey, nil)
       refute @cache.get(:mykey)
@@ -88,11 +84,11 @@ defmodule Nebulex.Cache.EntryTest do
     test "replace" do
       refute @cache.replace("foo", "bar")
 
-      assert :ok == @cache.put("foo", "bar")
-      assert "bar" == @cache.get("foo")
+      assert @cache.put("foo", "bar") == :ok
+      assert @cache.get("foo") == "bar"
 
       assert @cache.replace("foo", "bar bar")
-      assert "bar bar" == @cache.get("foo")
+      assert @cache.get("foo") == "bar bar"
 
       assert @cache.replace(:mykey, nil)
       refute @cache.get(:mykey)
@@ -103,19 +99,19 @@ defmodule Nebulex.Cache.EntryTest do
         @cache.replace!("foo", "bar")
       end
 
-      assert :ok == @cache.put("foo", "bar")
+      assert @cache.put("foo", "bar") == :ok
       assert @cache.replace!("foo", "bar bar")
-      assert "bar bar" == @cache.get("foo")
+      assert @cache.get("foo") == "bar bar"
     end
 
     test "put key terms" do
       refute @cache.get({:mykey, 1, "hello"})
-      assert :ok == @cache.put({:mykey, 1, "hello"}, "world")
-      assert "world" == @cache.get({:mykey, 1, "hello"})
+      assert @cache.put({:mykey, 1, "hello"}, "world") == :ok
+      assert @cache.get({:mykey, 1, "hello"}) == "world"
 
       refute @cache.get(%{a: 1, b: 2})
-      assert :ok == @cache.put(%{a: 1, b: 2}, "value")
-      assert "value" == @cache.get(%{a: 1, b: 2})
+      assert @cache.put(%{a: 1, b: 2}, "value") == :ok
+      assert @cache.get(%{a: 1, b: 2}) == "value"
     end
 
     test "put with invalid options" do
@@ -137,25 +133,25 @@ defmodule Nebulex.Cache.EntryTest do
 
       assert @cache.put_all(%{"apples" => 1, "bananas" => 3})
       assert @cache.put_all(blueberries: 2, strawberries: 5)
-      assert 1 == @cache.get("apples")
-      assert 3 == @cache.get("bananas")
-      assert 2 == @cache.get(:blueberries)
-      assert 5 == @cache.get(:strawberries)
+      assert @cache.get("apples") == 1
+      assert @cache.get("bananas") == 3
+      assert @cache.get(:blueberries) == 2
+      assert @cache.get(:strawberries) == 5
 
       assert @cache.put_all([])
       assert @cache.put_all(%{})
       assert count = @cache.size()
-      assert count == @cache.flush()
+      assert @cache.flush() == count
     end
 
     test "put_new_all" do
       assert @cache.put_new_all(%{"apples" => 1, "bananas" => 3}, ttl: 1000)
-      assert 1 == @cache.get("apples")
-      assert 3 == @cache.get("bananas")
+      assert @cache.get("apples") == 1
+      assert @cache.get("bananas") == 3
 
       refute @cache.put_new_all(%{"apples" => 3, "oranges" => 1})
-      assert 1 == @cache.get("apples")
-      assert 3 == @cache.get("bananas")
+      assert @cache.get("apples") == 1
+      assert @cache.get("bananas") == 3
       refute @cache.get("oranges")
 
       :ok = Process.sleep(1200)
@@ -172,21 +168,21 @@ defmodule Nebulex.Cache.EntryTest do
     test "take" do
       for x <- 1..2, do: @cache.put(x, x)
 
-      assert 1 == @cache.take(1)
-      assert 2 == @cache.take(2)
+      assert @cache.take(1) == 1
+      assert @cache.take(2) == 2
       refute @cache.take(3)
       refute @cache.take(nil)
 
       for x <- 1..3, do: refute(@cache.get(x))
 
-      assert :ok == @cache.put("foo", "bar", ttl: 500)
+      assert @cache.put("foo", "bar", ttl: 500) == :ok
       :ok = Process.sleep(600)
       refute @cache.take(1)
     end
 
     test "take!" do
-      assert :ok == @cache.put(1, 1, ttl: 100)
-      assert 1 == @cache.take!(1)
+      assert @cache.put(1, 1, ttl: 100) == :ok
+      assert @cache.take!(1) == 1
 
       assert_raise KeyError, fn ->
         @cache.take!(1)
@@ -206,7 +202,7 @@ defmodule Nebulex.Cache.EntryTest do
     end
 
     test "has_key? expired key" do
-      assert :ok == @cache.put("foo", "bar", ttl: 500)
+      assert @cache.put("foo", "bar", ttl: 500) == :ok
       assert @cache.has_key?("foo")
 
       Process.sleep(600)
@@ -214,9 +210,9 @@ defmodule Nebulex.Cache.EntryTest do
     end
 
     test "ttl" do
-      assert :ok == @cache.put(:a, 1, ttl: 500)
+      assert @cache.put(:a, 1, ttl: 500) == :ok
       assert @cache.ttl(:a) > 0
-      assert :ok == @cache.put(:b, 2)
+      assert @cache.put(:b, 2) == :ok
 
       :ok = Process.sleep(10)
       assert @cache.ttl(:a) > 0
@@ -228,7 +224,7 @@ defmodule Nebulex.Cache.EntryTest do
     end
 
     test "expire" do
-      assert :ok == @cache.put(:a, 1, ttl: 500)
+      assert @cache.put(:a, 1, ttl: 500) == :ok
       assert @cache.ttl(:a) > 0
 
       assert @cache.expire(:a, 1000)
@@ -245,14 +241,14 @@ defmodule Nebulex.Cache.EntryTest do
     end
 
     test "touch" do
-      assert :ok == @cache.put(:touch, 1, ttl: 1000)
+      assert @cache.put(:touch, 1, ttl: 1000) == :ok
 
       :ok = Process.sleep(100)
       assert @cache.touch(:touch)
 
       :ok = Process.sleep(200)
       assert @cache.touch(:touch)
-      assert 1 == @cache.get(:touch)
+      assert @cache.get(:touch) == 1
 
       :ok = Process.sleep(1100)
       refute @cache.get(:touch)
@@ -262,13 +258,13 @@ defmodule Nebulex.Cache.EntryTest do
 
     test "size" do
       for x <- 1..100, do: @cache.put(x, x)
-      assert 100 == @cache.size
+      assert @cache.size() == 100
 
       for x <- 1..50, do: @cache.delete(x)
-      assert 50 == @cache.size
+      assert @cache.size() == 50
 
       for x <- 51..60, do: assert(@cache.get(x) == x)
-      assert 50 == @cache.size()
+      assert @cache.size() == 50
     end
 
     test "flush" do
@@ -287,26 +283,26 @@ defmodule Nebulex.Cache.EntryTest do
 
       fun = &Integer.to_string/1
 
-      assert "1" == @cache.update(1, 1, fun)
-      assert "2" == @cache.update(2, 1, fun)
-      assert 1 == @cache.update(3, 1, fun)
+      assert @cache.update(1, 1, fun) == "1"
+      assert @cache.update(2, 1, fun) == "2"
+      assert @cache.update(3, 1, fun) == 1
       refute @cache.update(4, nil, fun)
       refute @cache.get(4)
     end
 
     test "incr" do
-      assert 1 == @cache.incr(:counter)
-      assert 2 == @cache.incr(:counter)
-      assert 4 == @cache.incr(:counter, 2)
-      assert 7 == @cache.incr(:counter, 3)
-      assert 7 == @cache.incr(:counter, 0)
+      assert @cache.incr(:counter) == 1
+      assert @cache.incr(:counter) == 2
+      assert @cache.incr(:counter, 2) == 4
+      assert @cache.incr(:counter, 3) == 7
+      assert @cache.incr(:counter, 0) == 7
 
-      assert 7 == :counter |> @cache.get() |> to_int()
+      assert :counter |> @cache.get() |> to_int() == 7
 
-      assert 6 == @cache.incr(:counter, -1)
-      assert 5 == @cache.incr(:counter, -1)
-      assert 3 == @cache.incr(:counter, -2)
-      assert 0 == @cache.incr(:counter, -3)
+      assert @cache.incr(:counter, -1) == 6
+      assert @cache.incr(:counter, -1) == 5
+      assert @cache.incr(:counter, -2) == 3
+      assert @cache.incr(:counter, -3) == 0
 
       assert_raise ArgumentError, fn ->
         @cache.incr(:counter, "foo")
@@ -314,8 +310,8 @@ defmodule Nebulex.Cache.EntryTest do
     end
 
     test "incr and then set ttl" do
-      assert 1 == @cache.incr(:counter, 1)
-      assert :infinity == @cache.ttl(:counter)
+      assert @cache.incr(:counter, 1) == 1
+      assert @cache.ttl(:counter) == :infinity
 
       assert @cache.expire(:counter, 500)
       :ok = Process.sleep(600)
@@ -323,11 +319,11 @@ defmodule Nebulex.Cache.EntryTest do
     end
 
     test "key expiration with ttl" do
-      assert :ok == @cache.put(1, 11, ttl: 1000)
-      assert 11 == @cache.get!(1)
+      assert @cache.put(1, 11, ttl: 1000) == :ok
+      assert @cache.get!(1) == 11
 
       :ok = Process.sleep(10)
-      assert 11 == @cache.get(1)
+      assert @cache.get(1) == 11
       :ok = Process.sleep(1100)
       refute @cache.get(1)
 
@@ -337,23 +333,23 @@ defmodule Nebulex.Cache.EntryTest do
       ]
 
       for {action, args} <- ops do
-        assert :ok == apply(@cache, action, args)
+        assert apply(@cache, action, args) == :ok
         :ok = Process.sleep(10)
-        assert "bar" == @cache.get("foo")
+        assert @cache.get("foo") == "bar"
         :ok = Process.sleep(1200)
         refute @cache.get("foo")
 
-        assert :ok == apply(@cache, action, args)
+        assert apply(@cache, action, args) == :ok
         :ok = Process.sleep(10)
-        assert "bar" == @cache.get("foo")
+        assert @cache.get("foo") == "bar"
         :ok = Process.sleep(1200)
         refute @cache.get("foo")
       end
     end
 
     test "entry ttl" do
-      assert :ok == @cache.put(1, 11, ttl: 1000)
-      assert 11 == @cache.get!(1)
+      assert @cache.put(1, 11, ttl: 1000) == :ok
+      assert @cache.get!(1) == 11
 
       for _ <- 3..1 do
         assert @cache.ttl(1) > 0
@@ -362,34 +358,34 @@ defmodule Nebulex.Cache.EntryTest do
 
       :ok = Process.sleep(500)
       refute @cache.ttl(1)
-      assert :ok == @cache.put(1, 11, ttl: 1000)
+      assert @cache.put(1, 11, ttl: 1000) == :ok
       assert @cache.ttl(1) > 0
     end
 
     test "get_and_update existing entry with ttl" do
-      assert :ok == @cache.put(1, 1, ttl: 1000)
+      assert @cache.put(1, 1, ttl: 1000) == :ok
       assert @cache.ttl(1) > 0
 
       :ok = Process.sleep(10)
 
-      assert {1, 2} == @cache.get_and_update(1, &Partitioned.get_and_update_fun/1)
-      assert :infinity == @cache.ttl(1)
-
-      :ok = Process.sleep(1200)
-      assert 2 == @cache.get(1)
-    end
-
-    test "update existing entry with ttl" do
-      assert :ok == @cache.put(1, 1, ttl: 1000)
-      assert @cache.ttl(1) > 0
-
-      :ok = Process.sleep(10)
-
-      assert "1" == @cache.update(1, 10, &Integer.to_string/1)
+      assert @cache.get_and_update(1, &Partitioned.get_and_update_fun/1) == {1, 2}
       assert @cache.ttl(1) == :infinity
 
       :ok = Process.sleep(1200)
-      assert "1" == @cache.get(1)
+      assert @cache.get(1) == 2
+    end
+
+    test "update existing entry with ttl" do
+      assert @cache.put(1, 1, ttl: 1000) == :ok
+      assert @cache.ttl(1) > 0
+
+      :ok = Process.sleep(10)
+
+      assert @cache.update(1, 10, &Integer.to_string/1) == "1"
+      assert @cache.ttl(1) == :infinity
+
+      :ok = Process.sleep(1200)
+      assert @cache.get(1) == "1"
     end
 
     ## Helpers

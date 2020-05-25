@@ -43,20 +43,19 @@ defmodule Nebulex.Cache.TransactionTest do
     end
 
     test "set and get within a transaction" do
-      assert :ok == @cache.put(:test, ["old value"])
-      assert ["old value"] == @cache.get(:test)
+      assert @cache.put(:test, ["old value"]) == :ok
+      assert @cache.get(:test) == ["old value"]
 
-      assert ["new value", "old value"] ==
-               @cache.transaction(
-                 [keys: [:test]],
-                 fn ->
-                   ["old value"] = value = @cache.get(:test)
-                   :ok = @cache.put(:test, ["new value" | value])
-                   @cache.get(:test)
-                 end
-               )
+      assert @cache.transaction(
+               [keys: [:test]],
+               fn ->
+                 ["old value"] = value = @cache.get(:test)
+                 :ok = @cache.put(:test, ["new value" | value])
+                 @cache.get(:test)
+               end
+             ) == ["new value", "old value"]
 
-      assert ["new value", "old value"] == @cache.get(:test)
+      assert @cache.get(:test) == ["new value", "old value"]
     end
 
     test "transaction aborted" do

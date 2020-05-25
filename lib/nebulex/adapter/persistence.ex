@@ -32,7 +32,7 @@ defmodule Nebulex.Adapter.Persistence do
       @behaviour Nebulex.Adapter.Persistence
 
       @impl true
-      def dump(cache, path, opts) do
+      def dump(%{cache: cache}, path, opts) do
         path
         |> File.open([:read, :write], fn io_dev ->
           :unexpired
@@ -49,7 +49,7 @@ defmodule Nebulex.Adapter.Persistence do
       end
 
       @impl true
-      def load(cache, path, opts) do
+      def load(%{cache: cache}, path, opts) do
         path
         |> File.open([:read], fn io_dev ->
           io_dev
@@ -87,11 +87,8 @@ defmodule Nebulex.Adapter.Persistence do
 
   See `c:Nebulex.Cache.dump/2`.
   """
-  @callback dump(
-              cache :: Nebulex.Cache.t(),
-              path :: Path.t(),
-              opts :: Nebulex.Cache.opts()
-            ) :: :ok | {:error, term}
+  @callback dump(Nebulex.Adapter.adapter_meta(), Path.t(), Nebulex.Cache.opts()) ::
+              :ok | {:error, term}
 
   @doc """
   Loads a dumped cache from the given `path`.
@@ -100,9 +97,6 @@ defmodule Nebulex.Adapter.Persistence do
 
   See `c:Nebulex.Cache.load/2`.
   """
-  @callback load(
-              cache :: Nebulex.Cache.t(),
-              path :: Path.t(),
-              opts :: Nebulex.Cache.opts()
-            ) :: :ok | {:error, term}
+  @callback load(Nebulex.Adapter.adapter_meta(), Path.t(), Nebulex.Cache.opts()) ::
+              :ok | {:error, term}
 end

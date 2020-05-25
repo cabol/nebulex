@@ -9,7 +9,7 @@ defmodule Nebulex.Cache.Supervisor do
   """
   def start_link(cache, otp_app, adapter, opts) do
     sup_opts = if name = Keyword.get(opts, :name, cache), do: [name: name], else: []
-    Supervisor.start_link(__MODULE__, {cache, otp_app, adapter, opts}, sup_opts)
+    Supervisor.start_link(__MODULE__, {name, cache, otp_app, adapter, opts}, sup_opts)
   end
 
   @doc """
@@ -46,25 +46,46 @@ defmodule Nebulex.Cache.Supervisor do
     {otp_app, adapter, behaviours}
   end
 
-  ## Callbacks
+  ## Supervisor Callbacks
 
-  @doc false
-  def init({cache, otp_app, adapter, opts}) do
+  @impl true
+  def init({name, cache, otp_app, adapter, opts}) do
     case runtime_config(cache, otp_app, opts) do
       {:ok, opts} ->
-        cache
-        |> init_adapter(adapter, opts)
-        |> Supervisor.init(strategy: :one_for_one, max_restarts: 0)
+        {:ok, child, meta} = adapter.init([name: name, cache: cache] ++ opts)
+        meta = Map.merge(meta, %{cache: cache, name: name})
+        child_spec = wrap_child_spec(child, [adapter, meta])
+        Supervisor.init([child_spec], strategy: :one_for_one, max_restarts: 0)
+
+      # cache
+      # |> init_adapter(adapter, opts)
+      # |> Supervisor.init(strategy: :one_for_one, max_restarts: 0)
 
       other ->
         other
     end
   end
 
-  defp init_adapter(cache, adapter, opts) do
-    case adapter.init([cache: cache] ++ opts) do
-      {:ok, nil} -> []
-      {:ok, child_spec} -> [child_spec]
+  ## Helpers
+
+  @doc false
+  def start_child({mod, fun, args}, adapter, meta) do
+    case apply(mod, fun, args) do
+      {:ok, pid} ->
+        meta = Map.put(meta, :pid, pid)
+        :ok = Nebulex.Cache.Registry.associate(self(), {adapter, meta})
+        {:ok, pid}
+
+      other ->
+        other
     end
+  end
+
+  defp wrap_child_spec({id, start, restart, shutdown, type, mods}, args) do
+    {id, {__MODULE__, :start_child, [start | args]}, restart, shutdown, type, mods}
+  end
+
+  defp wrap_child_spec(%{start: start} = spec, args) do
+    %{spec | start: {__MODULE__, :start_child, [start | args]}}
   end
 end

@@ -11,29 +11,28 @@ defmodule Nebulex.Cache.QueryableTest do
       for x <- 1..100, do: assert(@cache.get(x) == x)
       expected = set1 ++ set2
 
-      assert expected == :lists.usort(@cache.all())
+      assert :lists.usort(@cache.all()) == expected
 
       set3 = Enum.to_list(20..60)
       :ok = Enum.each(set3, &@cache.delete(&1))
       expected = :lists.usort(expected -- set3)
 
-      assert expected == :lists.usort(@cache.all())
+      assert :lists.usort(@cache.all()) == expected
     end
 
     test "stream" do
       entries = for x <- 1..10, do: {x, x * 2}
-      assert :ok == @cache.put_all(entries)
+      assert @cache.put_all(entries) == :ok
 
       expected = Keyword.keys(entries)
-      assert expected == nil |> @cache.stream() |> Enum.to_list() |> :lists.usort()
+      assert nil |> @cache.stream() |> Enum.to_list() |> :lists.usort() == expected
 
       expected = Keyword.values(entries)
 
-      assert expected ==
-               nil
-               |> @cache.stream(return: :value, page_size: 3)
-               |> Enum.to_list()
-               |> :lists.usort()
+      assert nil
+             |> @cache.stream(return: :value, page_size: 3)
+             |> Enum.to_list()
+             |> :lists.usort() == expected
 
       assert_raise Nebulex.QueryError, fn ->
         :invalid_query

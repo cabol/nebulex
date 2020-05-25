@@ -236,11 +236,11 @@ defmodule Nebulex.Adapters.Local do
   @impl true
   def init(opts) do
     cache = Keyword.fetch!(opts, :cache)
-    {:ok, Backend.child_spec(cache, opts)}
+    {:ok, Backend.child_spec(cache, opts), %{}}
   end
 
   @impl true
-  def get(cache, key, _opts) do
+  def get(%{cache: cache}, key, _opts) do
     cache.__metadata__.generations
     |> do_get(key, cache)
     |> return(:value)
@@ -274,16 +274,16 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def get_all(cache, keys, _opts) do
+  def get_all(adapter_meta, keys, _opts) do
     Enum.reduce(keys, %{}, fn key, acc ->
-      if obj = get(cache, key, []),
+      if obj = get(adapter_meta, key, []),
         do: Map.put(acc, key, obj),
         else: acc
     end)
   end
 
   @impl true
-  def put(cache, key, value, ttl, on_write, _opts) do
+  def put(%{cache: cache}, key, value, ttl, on_write, _opts) do
     do_put(
       on_write,
       cache,
@@ -309,7 +309,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def put_all(cache, entries, ttl, on_write, _opts) do
+  def put_all(%{cache: cache}, entries, ttl, on_write, _opts) do
     touched = Time.now()
 
     entries =
@@ -329,12 +329,12 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def delete(cache, key, _opts) do
+  def delete(%{cache: cache}, key, _opts) do
     Enum.each(cache.__metadata__.generations, &cache.__backend__.delete(&1, key))
   end
 
   @impl true
-  def take(cache, key, _opts) do
+  def take(%{cache: cache}, key, _opts) do
     Enum.reduce_while(cache.__metadata__.generations, nil, fn gen, acc ->
       case pop_entry(gen, key, nil, cache) do
         nil ->
@@ -352,7 +352,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def incr(cache, key, incr, ttl, _opts) do
+  def incr(%{cache: cache}, key, incr, ttl, _opts) do
     cache.__metadata__.generations
     |> hd()
     |> cache.__backend__.update_counter(
@@ -363,15 +363,15 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def has_key?(cache, key) do
-    case get(cache, key, []) do
+  def has_key?(adapter_meta, key) do
+    case get(adapter_meta, key, []) do
       nil -> false
       _ -> true
     end
   end
 
   @impl true
-  def ttl(cache, key) do
+  def ttl(%{cache: cache}, key) do
     cache.__metadata__.generations
     |> do_get(key, cache)
     |> return()
@@ -390,17 +390,17 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def expire(cache, key, ttl) do
+  def expire(%{cache: cache}, key, ttl) do
     update_entry(cache, key, [{4, Time.now()}, {5, ttl}])
   end
 
   @impl true
-  def touch(cache, key) do
+  def touch(%{cache: cache}, key) do
     update_entry(cache, key, [{4, Time.now()}])
   end
 
   @impl true
-  def size(cache) do
+  def size(%{cache: cache}) do
     Enum.reduce(cache.__metadata__.generations, 0, fn gen, acc ->
       gen
       |> cache.__backend__.info(:size)
@@ -409,14 +409,14 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def flush(cache) do
+  def flush(%{cache: cache}) do
     Generation.flush(cache)
   end
 
   ## Queryable
 
   @impl true
-  def all(cache, query, opts) do
+  def all(%{cache: cache}, query, opts) do
     query = validate_match_spec(query, opts)
 
     for gen <- cache.__metadata__.generations,
@@ -425,7 +425,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def stream(cache, query, opts) do
+  def stream(%{cache: cache}, query, opts) do
     query
     |> validate_match_spec(opts)
     |> do_stream(cache, Keyword.get(opts, :page_size, 10))
@@ -460,11 +460,8 @@ defmodule Nebulex.Adapters.Local do
   ## Transaction
 
   @impl true
-  def transaction(cache, opts, fun) do
-    keys = Keyword.get(opts, :keys, [])
-    nodes = Keyword.get(opts, :nodes, [node()])
-    retries = Keyword.get(opts, :retries, :infinity)
-    do_transaction(cache, keys, nodes, retries, fun)
+  def transaction(adapter_meta, opts, fun) do
+    super(adapter_meta, Keyword.put(opts, :nodes, [node()]), fun)
   end
 
   ## Helpers

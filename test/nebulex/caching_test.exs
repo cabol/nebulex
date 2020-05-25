@@ -42,24 +42,24 @@ defmodule Nebulex.CachingTest do
   describe "cacheable" do
     test "with default opts" do
       refute Cache.get("x")
-      assert {"x", "y"} == get_by_x("x")
-      assert {"x", "y"} == Cache.get("x")
+      assert get_by_x("x") == {"x", "y"}
+      assert Cache.get("x") == {"x", "y"}
       refute get_by_x("nil")
       refute Cache.get("nil")
 
       refute Cache.get({"x", "y"})
-      assert {"x", "y"} == get_by_xy("x", "y")
-      assert {"x", "y"} == Cache.get({"x", "y"})
+      assert get_by_xy("x", "y") == {"x", "y"}
+      assert Cache.get({"x", "y"}) == {"x", "y"}
 
       :ok = Process.sleep(1100)
-      assert {"x", "y"} == Cache.get("x")
-      assert {"x", "y"} == Cache.get({"x", "y"})
+      assert Cache.get("x") == {"x", "y"}
+      assert Cache.get({"x", "y"}) == {"x", "y"}
     end
 
     test "with opts" do
       refute Cache.get("x")
-      assert 1 == get_with_opts(1)
-      assert 1 == Cache.get(1)
+      assert get_with_opts(1) == 1
+      assert Cache.get(1) == 1
 
       :ok = Process.sleep(1100)
       refute Cache.get(1)
@@ -67,23 +67,23 @@ defmodule Nebulex.CachingTest do
 
     test "with match function" do
       refute Cache.get(:x)
-      assert :x == get_with_match(:x)
+      assert get_with_match(:x) == :x
       refute Cache.get(:x)
 
       refute Cache.get(:y)
-      assert :y == get_with_match(:y)
+      assert get_with_match(:y) == :y
       assert Cache.get(:y)
 
       refute Cache.get("true")
-      assert {:ok, "true"} == get_with_match_fun("true")
-      assert {:ok, "true"} == Cache.get("true")
+      assert get_with_match_fun("true") == {:ok, "true"}
+      assert Cache.get("true") == {:ok, "true"}
 
       refute Cache.get(1)
-      assert {:ok, "1"} == get_with_match_fun(1)
-      assert "1" == Cache.get(1)
+      assert get_with_match_fun(1) == {:ok, "1"}
+      assert Cache.get(1) == "1"
 
       refute Cache.get({:ok, "hello"})
-      assert :error == get_with_match_fun({:ok, "hello"})
+      assert get_with_match_fun({:ok, "hello"}) == :error
       refute Cache.get({:ok, "hello"})
     end
 
@@ -91,42 +91,42 @@ defmodule Nebulex.CachingTest do
       key = :erlang.phash2({__MODULE__, :get_with_default_key})
 
       refute Cache.get(key)
-      assert :ok == get_with_default_key(123, {:foo, "bar"})
-      assert :ok == Cache.get(key)
-      assert :ok == get_with_default_key(:foo, "bar")
-      assert :ok == Cache.get(key)
+      assert get_with_default_key(123, {:foo, "bar"}) == :ok
+      assert Cache.get(key) == :ok
+      assert get_with_default_key(:foo, "bar") == :ok
+      assert Cache.get(key) == :ok
     end
 
     test "defining keys using structs and maps" do
       refute Cache.get("x")
-      assert %Meta{id: 1, count: 1} == get_meta(%Meta{id: 1, count: 1})
-      assert %Meta{id: 1, count: 1} == Cache.get({Meta, 1})
+      assert get_meta(%Meta{id: 1, count: 1}) == %Meta{id: 1, count: 1}
+      assert Cache.get({Meta, 1}) == %Meta{id: 1, count: 1}
 
       refute Cache.get("y")
-      assert %{id: 1} == get_map(%{id: 1})
-      assert %{id: 1} == Cache.get(1)
+      assert get_map(%{id: 1}) == %{id: 1}
+      assert Cache.get(1) == %{id: 1}
     end
   end
 
   describe "cache_put" do
     test "with default opts" do
-      assert :ok == set_keys(x: 1, y: 2, z: 3)
-      assert :x == update_fun(:x)
-      assert :y == update_fun(:y)
-      assert :x == Cache.get(:x)
-      assert :y == Cache.get(:y)
-      assert 3 == Cache.get(:z)
+      assert set_keys(x: 1, y: 2, z: 3) == :ok
+      assert update_fun(:x) == :x
+      assert update_fun(:y) == :y
+      assert Cache.get(:x) == :x
+      assert Cache.get(:y) == :y
+      assert Cache.get(:z) == 3
 
       :ok = Process.sleep(1100)
-      assert :x == Cache.get(:x)
-      assert :y == Cache.get(:y)
-      assert 3 == Cache.get(:z)
+      assert Cache.get(:x) == :x
+      assert Cache.get(:y) == :y
+      assert Cache.get(:z) == 3
     end
 
     test "with opts" do
-      assert :ok == set_keys(x: 1, y: 2, z: 3)
-      assert :x == update_with_opts(:x)
-      assert :y == update_with_opts(:y)
+      assert set_keys(x: 1, y: 2, z: 3) == :ok
+      assert update_with_opts(:x) == :x
+      assert update_with_opts(:y) == :y
 
       :ok = Process.sleep(1100)
       refute Cache.get(:x)
@@ -134,41 +134,41 @@ defmodule Nebulex.CachingTest do
     end
 
     test "with match function" do
-      assert {:ok, "x"} == update_with_match(:x)
-      assert {:ok, "true"} == update_with_match(true)
-      assert :error == update_with_match({:z, 1})
-      assert "x" == Cache.get(:x)
-      assert {:ok, "true"} == Cache.get(true)
+      assert update_with_match(:x) == {:ok, "x"}
+      assert update_with_match(true) == {:ok, "true"}
+      assert update_with_match({:z, 1}) == :error
+      assert Cache.get(:x) == "x"
+      assert Cache.get(true) == {:ok, "true"}
       refute Cache.get({:z, 1})
     end
   end
 
   describe "cache_evict" do
     test "with single key" do
-      assert :ok == set_keys(x: 1, y: 2, z: 3)
+      assert set_keys(x: 1, y: 2, z: 3) == :ok
 
-      assert :x == evict_fun(:x)
+      assert evict_fun(:x) == :x
       refute Cache.get(:x)
-      assert 2 == Cache.get(:y)
-      assert 3 == Cache.get(:z)
+      assert Cache.get(:y) == 2
+      assert Cache.get(:z) == 3
 
-      assert :y == evict_fun(:y)
+      assert evict_fun(:y) == :y
       refute Cache.get(:x)
       refute Cache.get(:y)
-      assert 3 == Cache.get(:z)
+      assert Cache.get(:z) == 3
     end
 
     test "with multiple keys" do
-      assert :ok == set_keys(x: 1, y: 2, z: 3)
-      assert {:x, :y} == evict_keys_fun(:x, :y)
+      assert set_keys(x: 1, y: 2, z: 3) == :ok
+      assert evict_keys_fun(:x, :y) == {:x, :y}
       refute Cache.get(:x)
       refute Cache.get(:y)
-      assert 3 == Cache.get(:z)
+      assert Cache.get(:z) == 3
     end
 
     test "all entries" do
-      assert :ok == set_keys(x: 1, y: 2, z: 3)
-      assert "hello" == evict_all_fun("hello")
+      assert set_keys(x: 1, y: 2, z: 3) == :ok
+      assert evict_all_fun("hello") == "hello"
       refute Cache.get(:x)
       refute Cache.get(:y)
       refute Cache.get(:z)

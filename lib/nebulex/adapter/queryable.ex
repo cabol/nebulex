@@ -3,9 +3,6 @@ defmodule Nebulex.Adapter.Queryable do
   Specifies the query API required from adapters.
   """
 
-  @type cache :: Nebulex.Cache.t()
-  @type opts :: Nebulex.Cache.opts()
-
   @doc """
   Fetches all entries from cache matching the given `query`.
 
@@ -19,7 +16,7 @@ defmodule Nebulex.Adapter.Queryable do
 
   See `c:Nebulex.Cache.all/2`.
   """
-  @callback all(cache, query :: any, opts) :: [any]
+  @callback all(Nebulex.Adapter.adapter_meta(), query :: any, Nebulex.Cache.opts()) :: [any]
 
   @doc """
   Streams the given `query`.
@@ -30,5 +27,6 @@ defmodule Nebulex.Adapter.Queryable do
 
   See `c:Nebulex.Cache.stream/2`.
   """
-  @callback stream(cache, query :: any, opts) :: Enumerable.t()
+  @callback stream(Nebulex.Adapter.adapter_meta(), query :: any, Nebulex.Cache.opts()) ::
+              Enumerable.t()
 end

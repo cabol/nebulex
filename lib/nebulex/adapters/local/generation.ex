@@ -201,7 +201,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   def handle_call(:flush, _from, %__MODULE__{cache: cache} = state) do
-    size = cache.__adapter__.size(cache)
+    size = cache.size()
 
     :ok =
       Enum.each(

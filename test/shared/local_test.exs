@@ -24,24 +24,27 @@ defmodule Nebulex.LocalTest do
         |> Process.whereis()
         |> @cache.stop()
 
-      assert_raise ArgumentError, fn -> @cache.put(1, 13) end
-      assert_raise ArgumentError, fn -> @cache.get(1) end
-      assert_raise ArgumentError, fn -> @cache.delete(1) end
+      msg = ~r"could not lookup Nebulex cache"
+      assert_raise RuntimeError, msg, fn -> @cache.put(1, 13) end
+      assert_raise RuntimeError, msg, fn -> @cache.get(1) end
+      assert_raise RuntimeError, msg, fn -> @cache.delete(1) end
     end
 
     test "get_and_update" do
-      assert {nil, 1} ==
-               @cache.get_and_update(1, fn
-                 nil -> {nil, 1}
-                 val -> {val, val * 2}
-               end)
+      fun = fn
+        nil -> {nil, 1}
+        val -> {val, val * 2}
+      end
 
-      assert {1, 2} == @cache.get_and_update(1, &{&1, &1 * 2})
-      assert {2, 6} == @cache.get_and_update(1, &{&1, &1 * 3})
-      assert {6, nil} == @cache.get_and_update(1, &{&1, nil})
-      assert 6 == @cache.get(1)
-      assert {6, nil} == @cache.get_and_update(1, fn _ -> :pop end)
-      assert {nil, 3} == @cache.get_and_update(3, &{&1, 3})
+      assert @cache.get_and_update(1, fun) == {nil, 1}
+
+      assert @cache.get_and_update(1, &{&1, &1 * 2}) == {1, 2}
+      assert @cache.get_and_update(1, &{&1, &1 * 3}) == {2, 6}
+      assert @cache.get_and_update(1, &{&1, nil}) == {6, 6}
+      assert @cache.get(1) == 6
+      assert @cache.get_and_update(1, fn _ -> :pop end) == {6, nil}
+      assert @cache.get_and_update(1, fn _ -> :pop end) == {nil, nil}
+      assert @cache.get_and_update(3, &{&1, 3}) == {nil, 3}
 
       assert_raise ArgumentError, fn ->
         @cache.get_and_update(1, fn _ -> :other end)
@@ -49,16 +52,16 @@ defmodule Nebulex.LocalTest do
     end
 
     test "incr with update" do
-      assert 1 == @cache.incr(:counter)
-      assert 2 == @cache.incr(:counter)
+      assert @cache.incr(:counter) == 1
+      assert @cache.incr(:counter) == 2
 
-      assert {2, 4} == @cache.get_and_update(:counter, &{&1, &1 * 2})
-      assert 5 == @cache.incr(:counter)
+      assert @cache.get_and_update(:counter, &{&1, &1 * 2}) == {2, 4}
+      assert @cache.incr(:counter) == 5
 
-      assert 10 == @cache.update(:counter, 1, &(&1 * 2))
-      assert 0 == @cache.incr(:counter, -10)
+      assert @cache.update(:counter, 1, &(&1 * 2)) == 10
+      assert @cache.incr(:counter, -10) == 0
 
-      assert :ok == @cache.put("foo", "bar")
+      assert @cache.put("foo", "bar") == :ok
 
       assert_raise ArgumentError, fn ->
         @cache.incr("foo")
@@ -66,13 +69,14 @@ defmodule Nebulex.LocalTest do
     end
 
     test "incr with ttl" do
-      assert 1 == @cache.incr(:counter_with_ttl, 1, ttl: 1000)
-      assert 2 == @cache.incr(:counter_with_ttl)
-      assert 2 == @cache.get(:counter_with_ttl)
+      assert @cache.incr(:counter_with_ttl, 1, ttl: 1000) == 1
+      assert @cache.incr(:counter_with_ttl) == 2
+      assert @cache.get(:counter_with_ttl) == 2
+
       :ok = Process.sleep(1010)
       refute @cache.get(:counter_with_ttl)
 
-      assert 1 == @cache.incr(:counter_with_ttl, 1, ttl: 5000)
+      assert @cache.incr(:counter_with_ttl, 1, ttl: 5000) == 1
       assert @cache.ttl(:counter_with_ttl) > 1000
 
       assert @cache.expire(:counter_with_ttl, 500)
@@ -81,9 +85,9 @@ defmodule Nebulex.LocalTest do
     end
 
     test "incr over an existing entry" do
-      assert :ok == @cache.put(:counter, 0)
-      assert 1 == @cache.incr(:counter)
-      assert 3 == @cache.incr(:counter, 2)
+      assert @cache.put(:counter, 0) == :ok
+      assert @cache.incr(:counter) == 1
+      assert @cache.incr(:counter, 2) == 3
     end
 
     test "all and stream using match_spec queries" do
@@ -91,11 +95,10 @@ defmodule Nebulex.LocalTest do
       _ = @cache.new_generation()
       values = values ++ cache_put(@cache, 6..10, &(&1 * 2))
 
-      assert values ==
-               nil
-               |> @cache.stream(page_size: 3, return: :value)
-               |> Enum.to_list()
-               |> :lists.usort()
+      assert nil
+             |> @cache.stream(page_size: 3, return: :value)
+             |> Enum.to_list()
+             |> :lists.usort() == values
 
       {_, expected} = Enum.split(values, 5)
 
@@ -105,7 +108,7 @@ defmodule Nebulex.LocalTest do
         end
 
       for action <- [:all, :stream] do
-        assert expected == all_or_stream(action, test_ms, page_size: 3, return: :value)
+        assert all_or_stream(action, test_ms, page_size: 3, return: :value) == expected
 
         msg = ~r"invalid match spec"
 
@@ -124,24 +127,24 @@ defmodule Nebulex.LocalTest do
 
         opts = [page_size: 3, return: :value]
 
-        assert all == all_or_stream(action, nil, opts)
-        assert all == all_or_stream(action, :unexpired, opts)
-        assert [] == all_or_stream(action, :expired, opts)
+        assert all_or_stream(action, nil, opts) == all
+        assert all_or_stream(action, :unexpired, opts) == all
+        assert all_or_stream(action, :expired, opts) == []
 
         :ok = Process.sleep(1100)
 
-        assert unexpired == all_or_stream(action, :unexpired, opts)
-        assert expired == all_or_stream(action, :expired, opts)
+        assert all_or_stream(action, :unexpired, opts) == unexpired
+        assert all_or_stream(action, :expired, opts) == expired
       end
     end
 
     test "unexpired entries through generations" do
-      assert :ok == @cache.put("foo", "bar")
-      assert "bar" == @cache.get("foo")
-      assert :infinity == @cache.ttl("foo")
+      assert @cache.put("foo", "bar") == :ok
+      assert @cache.get("foo") == "bar"
+      assert @cache.ttl("foo") == :infinity
 
       _ = @cache.new_generation()
-      assert "bar" == @cache.get("foo")
+      assert @cache.get("foo") == "bar"
     end
 
     test "push generations" do
@@ -152,7 +155,7 @@ defmodule Nebulex.LocalTest do
       for x <- 1..2, do: @cache.put(x, x)
 
       # fetch one entry from new generation
-      assert 1 == @cache.get(1)
+      assert @cache.get(1) == 1
 
       # fetch non-existent entries
       refute @cache.get(3)
@@ -164,15 +167,15 @@ defmodule Nebulex.LocalTest do
       # both entries should be in the old generation
       refute get_from_new(1)
       refute get_from_new(2)
-      assert 1 == get_from_old(1)
-      assert 2 == get_from_old(2)
+      assert get_from_old(1) == 1
+      assert get_from_old(2) == 2
 
       # fetch entry 1 to set it into the new generation
-      assert 1 == @cache.get(1)
-      assert 1 == get_from_new(1)
+      assert @cache.get(1) == 1
+      assert get_from_new(1) == 1
       refute get_from_new(2)
       refute get_from_old(1)
-      assert 2 == get_from_old(2)
+      assert get_from_old(2) == 2
 
       # create a new generation, the old generation should be deleted
       _ = @cache.new_generation()
@@ -180,19 +183,19 @@ defmodule Nebulex.LocalTest do
       # entry 1 should be into the old generation and entry 2 deleted
       refute get_from_new(1)
       refute get_from_new(2)
-      assert 1 == get_from_old(1)
+      assert get_from_old(1) == 1
       refute get_from_old(2)
     end
 
     test "push generations with ttl" do
-      assert :ok == @cache.put(1, 1, ttl: 1000)
-      assert 1 == @cache.get(1)
+      assert @cache.put(1, 1, ttl: 1000) == :ok
+      assert @cache.get(1) == 1
 
       _ = @cache.new_generation()
 
       refute get_from_new(1)
-      assert 1 == get_from_old(1)
-      assert 1 == @cache.get(1)
+      assert get_from_old(1) == 1
+      assert @cache.get(1) == 1
 
       :ok = Process.sleep(1100)
 

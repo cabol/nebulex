@@ -31,11 +31,10 @@ defmodule Nebulex.Adapters.LocalWithShardsTest do
       :ok = Application.put_env(:nebulex, CustomPartitions, partitions: 2)
       {:ok, pid} = CustomPartitions.start_link()
 
-      assert 2 ==
-               CustomPartitions
-               |> Module.concat("0")
-               |> :shards_state.get()
-               |> :shards_state.n_shards()
+      assert CustomPartitions
+             |> Module.concat("0")
+             |> :shards_state.get()
+             |> :shards_state.n_shards() == 2
 
       :ok = CustomPartitions.stop(pid)
     end

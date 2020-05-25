@@ -40,7 +40,9 @@ defmodule Nebulex.Mixfile do
   defp elixirc_paths(_), do: ["lib"]
 
   def application do
-    []
+    [
+      mod: {Nebulex.Application, []}
+    ]
   end
 
   defp deps do

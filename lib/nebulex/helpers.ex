@@ -35,6 +35,12 @@ defmodule Nebulex.Helpers do
         do: behaviour
   end
 
+  @spec with_meta(atom, (module, Nebulex.Adapter.adapter_meta() -> term)) :: term
+  def with_meta(name, fun) do
+    {adapter, adapter_meta} = Nebulex.Cache.Registry.lookup(name)
+    fun.(adapter, adapter_meta)
+  end
+
   ## Private Functions
 
   defp on_false(fun, val, _) when is_function(fun, 1), do: fun.(val)
