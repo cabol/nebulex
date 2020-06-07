@@ -31,14 +31,14 @@ defmodule Nebulex.Adapters.Multilevel do
         model: :inclusive,
         levels: [
           l1: [
-            gc_interval: Nebulex.Time.expiry_time(1, :hour),
+            gc_interval: 86_400_000,
             backend: :shards,
             partitions: 2
           ],
           l2: [
             adapter: Nebulex.Adapters.Partitioned,
             primary: [
-              gc_interval: Nebulex.Time.expiry_time(1, :hour),
+              gc_interval: 86_400_000,
               backend: :shards,
               partitions: 2
             ]

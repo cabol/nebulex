@@ -27,7 +27,8 @@ some functions:
 # In the config/config.exs file
 config :my_app, MyApp.PartitionedCache,
   primary: [
-    gc_interval: Nebulex.Time.expiry_time(1, :hour),
+    gc_interval: 86_400_000, #=> 1 day
+    backend: :shards,
     partitions: 2
   ]
 

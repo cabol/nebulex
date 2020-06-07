@@ -33,7 +33,7 @@ defmodule Nebulex do
   environment, usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.MyCache,
-        gc_interval: 3_600_000,
+        gc_interval: 3_600_000, #=> 1 hr
         backend: :shards,
         partitions: 2
 

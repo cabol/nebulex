@@ -49,7 +49,7 @@ defmodule Nebulex.Adapters.Replicated do
       config :my_app, MyApp.ReplicatedCache,
         primary: [
           adapter: Nebulex.Adapters.Local,
-          gc_interval: Nebulex.Time.expiry_time(1, :hour),
+          gc_interval: 86_400_000,
           backend: :shards,
           partitions: System.schedulers_online()
         ]

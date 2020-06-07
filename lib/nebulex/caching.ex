@@ -173,12 +173,16 @@ if Code.ensure_loaded?(Decorator.Define) do
     Supposing we are using `Ecto` and we want to define some cacheable functions
     within the context `MyApp.Accounts`:
 
+        # The config
+        config :my_app, MyApp.Cache,
+          gc_interval: 86_400_000, #=> 1 day
+          backend: :shards
+
         # The Cache
         defmodule MyApp.Cache do
           use Nebulex.Cache,
             otp_app: :my_app,
-            adapter: Nebulex.Adapters.Local,
-            backend: :shards
+            adapter: Nebulex.Adapters.Local
         end
 
         # Some Ecto schema

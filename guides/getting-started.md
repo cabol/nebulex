@@ -75,20 +75,11 @@ In this case, we've specified that it is the `:blog` application where Nebulex
 can find that configuration and so Nebulex will use the configuration that was
 set up in `config/config.exs`.
 
-```elixir
-defmodule Blog.Cache do
-  use Nebulex.Cache,
-    otp_app: :my_app,
-    adapter: Nebulex.Adapters.Local,
-    backend: :shards
-end
-```
-
 Could be configured in `config/config.exs` like so:
 
 ```elixir
 config :blog, Blog.Cache,
-  gc_interval: Nebulex.Time.expiry_time(1, :day),
+  gc_interval: 86_400_000, #=> 1 day
   backend: :shards,
   partitions: System.schedulers_online() #=> The default
 ```
@@ -425,7 +416,7 @@ Could be configured with (`config/config.exs`):
 ```elixir
 config :blog, Blog.PartitionedCache,
   primary: [
-    gc_interval: Nebulex.Time.expiry_time(1, :day),
+    gc_interval: 86_400_000,
     backend: :shards,
     partitions: 2
   ]
@@ -502,13 +493,13 @@ config :blog, Blog.MultilevelCache,
   model: :inclusive,
   levels: [
     l1: [
-      gc_interval: Nebulex.Time.expiry_time(1, :day),
+      gc_interval: 86_400_000,
       backend: :shards
     ],
     l2: [
       adapter: Nebulex.Adapters.Partitioned,
       primary: [
-        gc_interval: Nebulex.Time.expiry_time(1, :day),
+        gc_interval: 86_400_000,
         backend: :shards
       ]
     ]

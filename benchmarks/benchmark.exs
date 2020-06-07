@@ -1,17 +1,19 @@
 ## Benchmarks
 
-# nodes = [:"node1@127.0.0.1", :"node2@127.0.0.1"]
-# Nebulex.Cluster.spawn(nodes)
+nodes = [:"node1@127.0.0.1", :"node2@127.0.0.1"]
+Nebulex.Cluster.spawn(nodes)
 
-# alias Nebulex.NodeCase
+alias Nebulex.NodeCase
 alias Nebulex.TestCache.Cache
 alias Nebulex.TestCache.Partitioned
 
-# start caches
-{:ok, local_ets} = Cache.start_link(name: :cache_ets)
-{:ok, local_shards} = Cache.start_link(name: :cache_shards, backend: :shards)
-# {:ok, dist} = Partitioned.start_link()
-# node_pid_list = NodeCase.start_caches(Node.list(), [Partitioned])
+# start local caches
+{:ok, local_ets} = Cache.start_link(name: :cache_ets_bench)
+{:ok, local_shards} = Cache.start_link(name: :cache_shards_bench, backend: :shards)
+
+# start distributed caches
+{:ok, dist} = Partitioned.start_link(primary: [backend: :shards])
+node_pid_list = NodeCase.start_caches(Node.list(), [{Partitioned, primary: [backend: :shards]}])
 
 # default cache
 default_dynamic_cache = Cache.get_dynamic_cache()
@@ -19,17 +21,10 @@ default_dynamic_cache = Cache.get_dynamic_cache()
 # samples
 keys = Enum.to_list(1..10_000)
 
-# init caches
-# Enum.each(1..5000, fn x ->
-#   ETS.put(x, x)
-#   Shards.put(x, x)
-#   # Partitioned.put(x, x)
-# end)
-
 inputs = %{
-  "Generational Local Cache with ETS" => {Cache, :cache_ets},
-  "Generational Local Cache with Shards" => {Cache, :cache_shards}
-  # "Partitioned Cache" => {Partitioned, nil}
+  "Generational Local Cache with ETS" => {Cache, :cache_ets_bench},
+  "Generational Local Cache with Shards" => {Cache, :cache_shards_bench},
+  "Partitioned Cache" => {Partitioned, Partitioned}
 }
 
 benchmarks = %{
@@ -108,7 +103,7 @@ Benchee.run(
 )
 
 # stop caches s
-if Process.alive?(local_ets), do: Cache.stop(local_ets)
-if Process.alive?(local_shards), do: Cache.stop(local_shards)
-# if Process.alive?(dist), do: Partitioned.stop(dist)
-# NodeCase.stop_caches(node_pid_list)
+if Process.alive?(local_ets), do: Supervisor.stop(local_ets)
+if Process.alive?(local_shards), do: Supervisor.stop(local_shards)
+if Process.alive?(dist), do: Supervisor.stop(dist)
+NodeCase.stop_caches(node_pid_list)

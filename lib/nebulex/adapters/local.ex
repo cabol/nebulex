@@ -94,11 +94,11 @@ defmodule Nebulex.Adapters.Local do
 
       config :my_app, MyApp.LocalCache,
         backend: :shards,
-        gc_interval: Nebulex.Time.expiry_time(1, :hour),
+        gc_interval: 86_400_000,
         max_size: 200_000,
         allocated_memory: 2_000_000_000,
-        gc_cleanup_min_timeout: Nebulex.Time.expiry_time(10),
-        gc_cleanup_max_timeout: Nebulex.Time.expiry_time(5, :minute)
+        gc_cleanup_min_timeout: 10_000,
+        gc_cleanup_max_timeout: 600_000
 
   For intensive workloads, the Cache may also be partitioned (by using `:shards`
   backend and specifying the `:partitions` option). If partitioning is required
@@ -107,11 +107,11 @@ defmodule Nebulex.Adapters.Local do
 
       config :my_app, MyApp.LocalCache,
         backend: :shards,
-        gc_interval: Nebulex.Time.expiry_time(1, :hour),
+        gc_interval: 86_400_000,
         max_size: 200_000,
         allocated_memory: 2_000_000_000,
-        gc_cleanup_min_timeout: Nebulex.Time.expiry_time(10),
-        gc_cleanup_max_timeout: Nebulex.Time.expiry_time(5, :minute),
+        gc_cleanup_min_timeout: 10_000,
+        gc_cleanup_max_timeout: 600_000,
         partitions: System.schedulers_online()
 
   For more information about the usage, check out `Nebulex.Cache`.

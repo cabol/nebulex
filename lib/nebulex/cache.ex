@@ -21,10 +21,10 @@ defmodule Nebulex.Cache do
 
       config :my_app, MyCache,
         backend: :shards,
-        gc_interval: Nebulex.Time.expiry_time(1, :hour),
+        gc_interval: 86_400_000, #=> 1 day
         max_size: 200_000,
-        gc_cleanup_min_timeout: 10,
-        gc_cleanup_max_timeout: 900,
+        gc_cleanup_min_timeout: 10_000,
+        gc_cleanup_max_timeout: 900_000,
         partitions: System.schedulers_online()
 
   Most of the configuration that goes into the `config` is specific
