@@ -228,9 +228,15 @@ defmodule Nebulex.Caching.Decorators do
   defp caching_action(action, attrs, block, context) do
     cache = attrs[:cache] || raise ArgumentError, "expected cache: to be given as argument"
 
-    key_var = Keyword.get(attrs, :key, quote do: :erlang.phash2({unquote(context.module), unquote(context.name)}))
+    key_var =
+      Keyword.get(
+        attrs,
+        :key,
+        quote(do: :erlang.phash2({unquote(context.module), unquote(context.name)}))
+      )
+
     keys_var = Keyword.get(attrs, :keys, [])
-    match_var = Keyword.get(attrs, :match)
+    match_var = Keyword.get(attrs, :match, quote(do: fn _ -> true end))
 
     opts_var =
       attrs
@@ -244,7 +250,7 @@ defmodule Nebulex.Caching.Decorators do
       key = unquote(key_var)
       keys = unquote(keys_var)
       opts = unquote(opts_var)
-      match = unquote(match_var) || fn _ -> true end
+      match = unquote(match_var)
 
       unquote(action_logic)
     end
@@ -257,10 +263,12 @@ defmodule Nebulex.Caching.Decorators do
       else
         value = unquote(block)
 
-        cond do
-          apply(match, [value]) -> cache.set(key, value, opts)
+        with true <- apply(match, [value]),
+             value <- cache.set(key, value, opts) do
+          value
+        else
+          false -> value
         end
-        value
       end
     end
   end
@@ -286,10 +294,12 @@ defmodule Nebulex.Caching.Decorators do
     quote do
       value = unquote(block)
 
-      cond do
-        apply(match, [value]) -> cache.set(key, value, opts)
+      with true <- apply(match, [value]),
+           value <- cache.set(key, value, opts) do
+        value
+      else
+        false -> value
       end
-      value
     end
   end
 end
