@@ -1,5 +1,18 @@
 # Changelog
 
+## [v1.2.2](https://github.com/cabol/nebulex/tree/v1.2.2) (2020-06-11)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v1.2.1...v1.2.2)
+
+**Closed issues:**
+
+- Fix: Dialyzer  [\#74](https://github.com/cabol/nebulex/issues/74)
+- Question: Use environment variables for config [\#70](https://github.com/cabol/nebulex/issues/70)
+
+**Merged pull requests:**
+
+- fix: Dialyzer useless control flow [\#73](https://github.com/cabol/nebulex/pull/73) ([filipeherculano](https://github.com/filipeherculano))
+
 ## [v1.2.1](https://github.com/cabol/nebulex/tree/v1.2.1) (2020-04-12)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v1.2.0...v1.2.1)
