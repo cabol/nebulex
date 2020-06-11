@@ -1,27 +1,7 @@
 ## Benchmarks
 
-:ok = Application.put_env(:nebulex, :nodes, [:"node1@127.0.0.1", :"node2@127.0.0.1"])
-
-required_files =
-  for file <- File.ls!("test/support") do
-    {file, Code.require_file("../test/support/" <> file, __DIR__)}
-  end
-
-nodes = Keyword.values(Nebulex.Cluster.spawn())
-
-Enum.each(required_files, fn {file, loaded} ->
-  Enum.each(loaded, fn {mod, bin} ->
-    expected = List.duplicate({:module, mod}, length(nodes))
-
-    {^expected, []} =
-      :rpc.multicall(
-        nodes,
-        :code,
-        :load_binary,
-        [mod, to_charlist(file), bin]
-      )
-  end)
-end)
+nodes = [:"node1@127.0.0.1", :"node2@127.0.0.1"]
+Nebulex.Cluster.spawn(nodes)
 
 alias Nebulex.NodeCase
 alias Nebulex.TestCache.{Local, Partitioned}

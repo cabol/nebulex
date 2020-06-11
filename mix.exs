@@ -50,8 +50,8 @@ defmodule Nebulex.Mixfile do
       {:excoveralls, "~> 0.12", only: :test},
       {:ex2ms, "~> 1.5", only: :test},
       {:mock, "~> 0.3", only: :test},
-      {:benchee, "~> 1.0", optional: true, only: :dev},
-      {:benchee_html, "~> 1.0", optional: true, only: :dev},
+      {:benchee, "~> 1.0", optional: true, only: :test},
+      {:benchee_html, "~> 1.0", optional: true, only: :test},
 
       # Code Analysis
       {:dialyxir, "~> 0.5", optional: true, only: [:dev, :test], runtime: false},
