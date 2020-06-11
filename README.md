@@ -129,7 +129,7 @@ to learn more, check out the [benchmarks](./benchmarks) directory.
 To run the benchmarks:
 
 ```
-$ mix run benchmarks/benchmark.exs
+$ MIX_ENV=test mix run benchmarks/benchmark.exs
 ```
 
 If you are interested to run more sophisticated load tests, perhaps you should

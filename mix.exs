@@ -9,7 +9,6 @@ defmodule Nebulex.Mixfile do
       version: @version,
       elixir: "~> 1.9",
       elixirc_paths: elixirc_paths(Mix.env()),
-      elixirc_options: [warnings_as_errors: System.get_env("CI") == "true"],
       deps: deps(),
 
       # Docs
@@ -47,18 +46,16 @@ defmodule Nebulex.Mixfile do
       {:decorator, "~> 1.3"},
 
       # Test
-      {:excoveralls, "~> 0.12", only: :test},
-      {:ex2ms, "~> 1.5", only: :test},
+      {:excoveralls, "~> 0.13", only: :test},
+      {:ex2ms, "~> 1.6", only: :test},
       {:mock, "~> 0.3", only: :test},
       {:benchee, "~> 1.0", optional: true, only: :test},
       {:benchee_html, "~> 1.0", optional: true, only: :test},
-
-      # Code Analysis
-      {:dialyxir, "~> 0.5", optional: true, only: [:dev, :test], runtime: false},
-      {:credo, "~> 1.1", optional: true, only: [:dev, :test]},
+      {:dialyxir, "~> 1.0", optional: true, only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.4", optional: true, only: [:dev, :test]},
 
       # Docs
-      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.22", only: :dev, runtime: false},
       {:inch_ex, "~> 2.0", only: :docs}
     ]
   end
@@ -89,6 +86,7 @@ defmodule Nebulex.Mixfile do
   defp dialyzer do
     [
       plt_add_apps: [:shards, :mix, :eex],
+      plt_file: {:no_warn, "priv/plts/dialyzer-#{Mix.env()}.plt"},
       flags: [
         :unmatched_returns,
         :error_handling,

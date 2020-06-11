@@ -3,7 +3,7 @@ elixir:
   - 1.10
   - 1.9
 otp_release:
-  - 22.2
+  - 22.3
   - 21.3
 sudo: false
 env:
@@ -13,10 +13,9 @@ before_script:
   - mix deps.get
 script:
   - mix compile --warnings-as-errors
-  - mix credo --strict
   - mix format --check-formatted
+  - mix credo --strict
   - MIX_ENV=test mix coveralls.travis
-  - mix dialyzer --plt
-  - mix dialyzer --halt-exit-status
+  - mix dialyzer --format short
 after_script:
   - MIX_ENV=docs mix inch.report

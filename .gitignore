@@ -32,3 +32,4 @@ erl_crash.dump
 /tmp
 .elixir*
 .vs*
+/priv
