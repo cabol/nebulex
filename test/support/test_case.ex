@@ -32,7 +32,7 @@ defmodule Nebulex.TestCase do
         on_exit(fn ->
           try do
             :ok = Process.sleep(20)
-            if Process.alive?(pid), do: Supervisor.stop(pid)
+            if Process.alive?(pid), do: Supervisor.stop(pid, :normal, 5000)
           catch
             :exit, _ -> :noop
           after

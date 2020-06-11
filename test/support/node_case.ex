@@ -34,7 +34,7 @@ defmodule Nebulex.NodeCase do
   end
 
   def stop_cache(node, pid) do
-    rpc(node, Supervisor, :stop, [pid, @timeout])
+    rpc(node, Supervisor, :stop, [pid, :normal, @timeout])
   end
 
   def rpc(node, module, function, args) do
