@@ -401,19 +401,25 @@ if Code.ensure_loaded?(Decorator.Define) do
     defp caching_action(action, attrs, block, context) do
       cache = attrs[:cache] || raise ArgumentError, "expected cache: to be given as argument"
 
-      key_var = Keyword.get(attrs, :key)
+      key_var =
+        Keyword.get(
+          attrs,
+          :key,
+          quote(do: :erlang.phash2({unquote(context.module), unquote(context.name)}))
+        )
+
       keys_var = Keyword.get(attrs, :keys, [])
-      match_var = Keyword.get(attrs, :match)
+      match_var = Keyword.get(attrs, :match, quote(do: fn _ -> true end))
       opts_var = Keyword.get(attrs, :opts, [])
 
       action_logic = action_logic(action, block, attrs)
 
       quote do
         cache = unquote(cache)
-        key = unquote(key_var) || :erlang.phash2({unquote(context.module), unquote(context.name)})
+        key = unquote(key_var)
         keys = unquote(keys_var)
         opts = unquote(opts_var)
-        match = unquote(match_var) || fn _ -> true end
+        match = unquote(match_var)
 
         unquote(action_logic)
       end
@@ -435,20 +441,33 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     defp match_logic(block) do
       quote do
-        result = unquote(block)
+        apply(
+          Nebulex.Caching,
+          :eval_match,
+          [unquote(block), match, cache, key, opts]
+        )
+      end
+    end
 
-        case match.(result) do
-          {true, value} ->
-            :ok = cache.put(key, value, opts)
-            result
+    @doc """
+    This function is for internal purposes.
 
-          true ->
-            :ok = cache.put(key, result, opts)
-            result
+    > **NOTE:** Workaround to avoid dialyzer warnings when using declarative
+      annotation-based caching via decorators.
+    """
+    @spec eval_match(term, (term -> boolean | {true, term}), module, term, Keyword.t()) :: term
+    def eval_match(result, match, cache, key, opts) do
+      case match.(result) do
+        {true, value} ->
+          :ok = cache.put(key, value, opts)
+          result
 
-          false ->
-            result
-        end
+        true ->
+          :ok = cache.put(key, result, opts)
+          result
+
+        false ->
+          result
       end
     end
 
