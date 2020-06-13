@@ -49,6 +49,7 @@ defmodule Nebulex.Mixfile do
     [
       {:shards, "~> 0.6", optional: true},
       {:decorator, "~> 1.3", optional: true},
+      {:telemetry, "~> 0.4.2", optional: true},
 
       # Test
       {:excoveralls, "~> 0.13", only: :test},
@@ -91,7 +92,7 @@ defmodule Nebulex.Mixfile do
 
   defp dialyzer do
     [
-      plt_add_apps: [:shards, :mix, :eex, :logger],
+      plt_add_apps: [:shards, :mix, :eex, :telemetry],
       plt_file: {:no_warn, "priv/plts/dialyzer-#{Mix.env()}.plt"},
       flags: [
         :unmatched_returns,

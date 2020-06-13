@@ -168,6 +168,7 @@ defmodule Nebulex.Adapters.Local do
   import Record
 
   alias Nebulex.Adapters.Local.{Backend, Generation}
+  alias Nebulex.Cache.Stats
   alias Nebulex.{Entry, Time}
 
   # Cache Entry
@@ -199,13 +200,21 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def init(opts) do
+    # required cache name
     name = opts[:name] || Keyword.fetch!(opts, :cache)
-    backend = Keyword.get(opts, :backend, :ets)
 
-    unless backend in @backends do
-      raise "expected backend: to be within the supported backends " <>
-              "#{inspect(@backends)}, got: #{inspect(backend)}"
-    end
+    # resolve the backend to be used
+    backend =
+      opts
+      |> Keyword.get(:backend, :ets)
+      |> case do
+        val when val in @backends ->
+          val
+
+        val ->
+          raise "expected backend: option to be one of the supported backends " <>
+                  "#{inspect(@backends)}, got: #{inspect(val)}"
+      end
 
     child =
       Backend.child_spec(
@@ -214,33 +223,40 @@ defmodule Nebulex.Adapters.Local do
         [name: name, backend: backend] ++ opts
       )
 
-    {:ok, child, %{name: name, backend: backend}}
+    meta = %{
+      name: name,
+      backend: backend,
+      stat_counter: opts[:stat_counter] || Stats.init(opts)
+    }
+
+    {:ok, child, meta}
   end
 
   @impl true
-  def get(%{name: name, backend: backend}, key, _opts) do
+  def get(%{name: name, backend: backend, stat_counter: ref}, key, _opts) do
     name
     |> Generation.list()
-    |> do_get(key, backend)
+    |> do_get(key, backend, ref)
     |> return(:value)
+    |> update_stats(:get, ref)
   end
 
-  defp do_get([newer], key, backend) do
-    gen_fetch(newer, key, backend)
+  defp do_get([newer], key, backend, ref) do
+    gen_fetch(newer, key, backend, ref)
   end
 
-  defp do_get([newer, older], key, backend) do
-    with nil <- gen_fetch(newer, key, backend),
-         entry(key: ^key) = cached <- gen_fetch(older, key, backend, &pop_entry/4) do
+  defp do_get([newer, older], key, backend, ref) do
+    with nil <- gen_fetch(newer, key, backend, ref),
+         entry(key: ^key) = cached <- gen_fetch(older, key, backend, ref, &pop_entry/4) do
       true = backend.insert(newer, cached)
       cached
     end
   end
 
-  defp gen_fetch(gen, key, backend, fun \\ &get_entry/4) do
-    fun
-    |> apply([gen, key, nil, backend])
-    |> validate_ttl(gen, backend)
+  defp gen_fetch(gen, key, backend, ref, fun \\ &get_entry/4) do
+    gen
+    |> fun.(key, nil, backend)
+    |> validate_ttl(gen, backend, ref)
   end
 
   @impl true
@@ -253,11 +269,12 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def put(%{name: name, backend: backend}, key, value, ttl, on_write, _opts) do
+  def put(%{name: name, backend: backend, stat_counter: ref}, key, value, ttl, on_write, _opts) do
     do_put(
       on_write,
       name,
       backend,
+      ref,
       entry(
         key: key,
         value: value,
@@ -267,20 +284,26 @@ defmodule Nebulex.Adapters.Local do
     )
   end
 
-  defp do_put(:put, name, backend, entry) do
-    put_entries(name, backend, entry)
+  defp do_put(:put, name, backend, ref, entry) do
+    name
+    |> put_entries(backend, entry)
+    |> update_stats(:put, ref)
   end
 
-  defp do_put(:put_new, name, backend, entry) do
-    put_new_entries(name, backend, entry)
+  defp do_put(:put_new, name, backend, ref, entry) do
+    name
+    |> put_new_entries(backend, entry)
+    |> update_stats(:put, ref)
   end
 
-  defp do_put(:replace, name, backend, entry(key: key, value: value, ttl: ttl)) do
-    update_entry(name, backend, key, [{3, value}, {4, nil}, {5, ttl}])
+  defp do_put(:replace, name, backend, ref, entry(key: key, value: value, ttl: ttl)) do
+    name
+    |> update_entry(backend, key, [{3, value}, {4, nil}, {5, ttl}])
+    |> update_stats(:put, ref)
   end
 
   @impl true
-  def put_all(%{name: name, backend: backend}, entries, ttl, on_write, _opts) do
+  def put_all(%{name: name, backend: backend, stat_counter: ref}, entries, ttl, on_write, _opts) do
     touched = Time.now()
 
     entries =
@@ -288,26 +311,31 @@ defmodule Nebulex.Adapters.Local do
         entry(key: key, value: value, touched: touched, ttl: ttl)
       end
 
-    do_put_all(name, backend, entries, on_write)
+    do_put_all(name, backend, ref, entries, on_write)
   end
 
-  defp do_put_all(name, backend, entries, :put) do
-    put_entries(name, backend, entries)
+  defp do_put_all(name, backend, ref, entries, :put) do
+    name
+    |> put_entries(backend, entries)
+    |> update_stats(:put_all, {ref, entries})
   end
 
-  defp do_put_all(name, backend, entries, :put_new) do
-    put_new_entries(name, backend, entries)
+  defp do_put_all(name, backend, ref, entries, :put_new) do
+    name
+    |> put_new_entries(backend, entries)
+    |> update_stats(:put_all, {ref, entries})
   end
 
   @impl true
-  def delete(%{name: name, backend: backend}, key, _opts) do
+  def delete(%{name: name, backend: backend, stat_counter: ref}, key, _opts) do
     name
     |> Generation.list()
     |> Enum.each(&backend.delete(&1, key))
+    |> update_stats(:delete, ref)
   end
 
   @impl true
-  def take(%{name: name, backend: backend}, key, _opts) do
+  def take(%{name: name, backend: backend, stat_counter: ref}, key, _opts) do
     name
     |> Generation.list()
     |> Enum.reduce_while(nil, fn gen, acc ->
@@ -318,16 +346,17 @@ defmodule Nebulex.Adapters.Local do
         res ->
           value =
             res
-            |> validate_ttl(gen, backend)
+            |> validate_ttl(gen, backend, ref)
             |> return(:value)
 
           {:halt, value}
       end
     end)
+    |> update_stats(:take, ref)
   end
 
   @impl true
-  def incr(%{name: name, backend: backend}, key, incr, ttl, _opts) do
+  def incr(%{name: name, backend: backend, stat_counter: ref}, key, incr, ttl, _opts) do
     name
     |> Generation.newer()
     |> backend.update_counter(
@@ -335,6 +364,7 @@ defmodule Nebulex.Adapters.Local do
       {3, incr},
       entry(key: key, value: 0, touched: Time.now(), ttl: ttl)
     )
+    |> update_stats(:write, ref)
   end
 
   @impl true
@@ -346,12 +376,13 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def ttl(%{name: name, backend: backend}, key) do
+  def ttl(%{name: name, backend: backend, stat_counter: ref}, key) do
     name
     |> Generation.list()
-    |> do_get(key, backend)
+    |> do_get(key, backend, ref)
     |> return()
     |> entry_ttl()
+    |> update_stats(:get, ref)
   end
 
   defp entry_ttl(nil), do: nil
@@ -366,13 +397,17 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def expire(%{name: name, backend: backend}, key, ttl) do
-    update_entry(name, backend, key, [{4, Time.now()}, {5, ttl}])
+  def expire(%{name: name, backend: backend, stat_counter: ref}, key, ttl) do
+    name
+    |> update_entry(backend, key, [{4, Time.now()}, {5, ttl}])
+    |> update_stats(:put, ref)
   end
 
   @impl true
-  def touch(%{name: name, backend: backend}, key) do
-    update_entry(name, backend, key, [{4, Time.now()}])
+  def touch(%{name: name, backend: backend, stat_counter: ref}, key) do
+    name
+    |> update_entry(backend, key, [{4, Time.now()}])
+    |> update_stats(:put, ref)
   end
 
   @impl true
@@ -387,8 +422,10 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def flush(%{name: name}) do
-    Generation.flush(name)
+  def flush(%{name: name, stat_counter: ref}) do
+    name
+    |> Generation.flush()
+    |> update_stats(:flush, ref)
   end
 
   ## Queryable
@@ -479,6 +516,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp return(entry_or_entries, field \\ nil)
+
   defp return(nil, _field), do: nil
   defp return(entry(value: value), :value), do: value
   defp return(entry(key: _) = entry, _field), do: entry
@@ -487,21 +525,21 @@ defmodule Nebulex.Adapters.Local do
     for entry <- entries, do: return(entry, field)
   end
 
-  defp validate_ttl(nil, _, _), do: nil
-  defp validate_ttl(entry(ttl: :infinity) = entry, _, _), do: entry
+  defp validate_ttl(nil, _, _, _), do: nil
+  defp validate_ttl(entry(ttl: :infinity) = entry, _, _, _), do: entry
 
-  defp validate_ttl(entry(key: key, touched: touched, ttl: ttl) = entry, gen, backend) do
+  defp validate_ttl(entry(key: key, touched: touched, ttl: ttl) = entry, gen, backend, ref) do
     if Time.now() - touched >= ttl do
       true = backend.delete(gen, key)
-      nil
+      update_stats(nil, :expired, ref)
     else
       entry
     end
   end
 
-  defp validate_ttl(entries, gen, backend) when is_list(entries) do
+  defp validate_ttl(entries, gen, backend, ref) when is_list(entries) do
     Enum.filter(entries, fn entry ->
-      not is_nil(validate_ttl(entry, gen, backend))
+      not is_nil(validate_ttl(entry, gen, backend, ref))
     end)
   end
 
@@ -540,5 +578,64 @@ defmodule Nebulex.Adapters.Local do
       :value -> [:"$2"]
       :entry -> [%Entry{key: :"$1", value: :"$2", touched: :"$3", ttl: :"$4"}]
     end
+  end
+
+  defp update_stats(value, _action, nil), do: value
+  defp update_stats(value, _action, {nil, _}), do: value
+
+  defp update_stats(nil, :get, counter_ref) do
+    :ok = Stats.incr(counter_ref, :misses)
+    nil
+  end
+
+  defp update_stats(value, :get, counter_ref) do
+    :ok = Stats.incr(counter_ref, :hits)
+    value
+  end
+
+  defp update_stats(value, :expired, counter_ref) do
+    :ok = Stats.incr(counter_ref, :evictions)
+    :ok = Stats.incr(counter_ref, :expirations)
+    value
+  end
+
+  defp update_stats(value, :write, counter_ref) do
+    :ok = Stats.incr(counter_ref, :writes)
+    value
+  end
+
+  defp update_stats(true, :put, counter_ref) do
+    :ok = Stats.incr(counter_ref, :writes)
+    true
+  end
+
+  defp update_stats(true, :put_all, {counter_ref, entries}) do
+    :ok = Stats.incr(counter_ref, :writes, length(entries))
+    true
+  end
+
+  defp update_stats(value, :delete, counter_ref) do
+    :ok = Stats.incr(counter_ref, :evictions)
+    value
+  end
+
+  defp update_stats(nil, :take, counter_ref) do
+    :ok = Stats.incr(counter_ref, :misses)
+    nil
+  end
+
+  defp update_stats(value, :take, counter_ref) do
+    :ok = Stats.incr(counter_ref, :hits)
+    :ok = Stats.incr(counter_ref, :evictions)
+    value
+  end
+
+  defp update_stats(value, :flush, counter_ref) do
+    :ok = Stats.incr(counter_ref, :evictions, value)
+    value
+  end
+
+  defp update_stats(value, _action, _counter_ref) do
+    value
   end
 end

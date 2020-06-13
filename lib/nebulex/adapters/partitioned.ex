@@ -147,7 +147,7 @@ defmodule Nebulex.Adapters.Partitioned do
   import Nebulex.Helpers
 
   alias Nebulex.Adapter
-  alias Nebulex.Cache.Cluster
+  alias Nebulex.Cache.{Cluster, Stats}
   alias Nebulex.RPC
 
   ## Adapter
@@ -176,11 +176,15 @@ defmodule Nebulex.Adapters.Partitioned do
     # required cache name
     name = opts[:name] || Keyword.fetch!(opts, :cache)
 
+    # maybe use stats
+    stat_counter = opts[:stat_counter] || Stats.init(opts)
+
     # set up the primary cache store
     primary = Keyword.get(opts, :primary, [])
     {primary_adapter, primary} = Keyword.pop(primary, :adapter, Nebulex.Adapters.Local)
     primary_adapter = assert_behaviour(primary_adapter, Nebulex.Adapter, "adapter")
-    primary = [name: normalize_module_name([name, Primary])] ++ primary
+    primary_name = normalize_module_name([name, Primary])
+    primary = [name: primary_name, stat_counter: stat_counter] ++ primary
     {:ok, primary_child_spec, primary_meta} = primary_adapter.init(primary)
 
     # task supervisor to execute parallel and/or remote commands
@@ -208,7 +212,8 @@ defmodule Nebulex.Adapters.Partitioned do
       primary: primary_adapter,
       primary_meta: primary_meta,
       task_sup: task_sup_name,
-      hash_slot: hash_slot
+      hash_slot: hash_slot,
+      stat_counter: stat_counter
     }
 
     # join the cache to the cluster

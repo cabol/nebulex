@@ -142,7 +142,7 @@ defmodule Nebulex.Adapter do
   @callback has_key?(adapter_meta, key) :: boolean
 
   @doc """
-  Returns the TTL (time-to-live) for the given `key`. If the `key` doen not
+  Returns the TTL (time-to-live) for the given `key`. If the `key` does not
   exist, then `nil` is returned.
 
   See `c:Nebulex.Cache.ttl/1`.

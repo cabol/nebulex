@@ -13,7 +13,8 @@ defmodule Nebulex.LocalTest do
                cache.start_link(name: :invalid_backend, backend: :xyz)
 
       assert msg ==
-               "expected backend: to be within the supported backends [:ets, :shards], got: :xyz"
+               "expected backend: option to be one of the supported " <>
+                 "backends [:ets, :shards], got: :xyz"
     end
 
     test "fail with ArgumentError because cache was stopped", %{cache: cache} do

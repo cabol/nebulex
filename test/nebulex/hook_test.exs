@@ -1,19 +1,7 @@
 defmodule Nebulex.HookTest do
   use ExUnit.Case, async: true
 
-  import ExUnit.CaptureLog
-
   alias Nebulex.Hook
-
-  require Logger
-
-  setup do
-    Application.start(:logger)
-
-    on_exit(fn ->
-      Application.stop(:logger)
-    end)
-  end
 
   describe "before" do
     defmodule BeforeHookCache do
@@ -153,8 +141,9 @@ defmodule Nebulex.HookTest do
     test "hook" do
       {:ok, _pid} = ErrorCache.start_link()
 
-      msg = "hook execution failed on step before with error"
-      assert capture_log(fn -> ErrorCache.get("foo") end) =~ msg
+      assert_raise RuntimeError, ~r"hook execution failed on step :before with error", fn ->
+        ErrorCache.get("foo")
+      end
 
       :ok = ErrorCache.stop()
     end

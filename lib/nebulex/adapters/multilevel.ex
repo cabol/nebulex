@@ -109,6 +109,7 @@ defmodule Nebulex.Adapters.Multilevel do
   import Nebulex.Helpers
 
   alias Nebulex.Adapter
+  alias Nebulex.Cache.Stats
 
   # Multi-level Cache Models
   @models [:inclusive, :exclusive]
@@ -142,6 +143,7 @@ defmodule Nebulex.Adapters.Multilevel do
     # get rest of the multilevel options
     model = get_option(opts, :model, &(&1 in @models), :inclusive)
     fallback = get_option(opts, :fallback, &is_function(&1, 1))
+    stat_counter = Stats.init(opts)
 
     {children, meta_list} =
       levels
@@ -149,7 +151,8 @@ defmodule Nebulex.Adapters.Multilevel do
       |> Enum.reduce({[], []}, fn {l_name, l_opts}, {child_acc, meta_acc} ->
         {adapter, l_opts} = Keyword.pop(l_opts, :adapter, Nebulex.Adapters.Local)
         adapter = assert_behaviour(adapter, Nebulex.Adapter, "adapter")
-        l_opts = [name: normalize_module_name([name, l_name])] ++ l_opts
+        l_name = normalize_module_name([name, l_name])
+        l_opts = [name: l_name, stat_counter: stat_counter] ++ l_opts
         {:ok, child, meta} = adapter.init(l_opts)
         {[child | child_acc], [{adapter, meta} | meta_acc]}
       end)
@@ -165,7 +168,8 @@ defmodule Nebulex.Adapters.Multilevel do
       name: name,
       levels: meta_list,
       model: model,
-      fallback: fallback
+      fallback: fallback,
+      stat_counter: stat_counter
     }
 
     {:ok, child_spec, meta}
@@ -205,16 +209,17 @@ defmodule Nebulex.Adapters.Multilevel do
   def put_all(%{levels: levels}, entries, ttl, on_write, opts) do
     opts
     |> levels(levels)
-    |> Enum.reduce_while(true, fn {adapter, meta}, acc ->
+    |> Enum.reduce_while({true, []}, fn {adapter, meta} = level, {_, level_acc} ->
       case adapter.put_all(meta, entries, ttl, on_write, opts) do
         true ->
-          {:cont, acc}
+          {:cont, {true, [level | level_acc]}}
 
         false ->
-          :ok = Enum.each(entries, &adapter.delete(meta, elem(&1, 0), []))
-          {:halt, on_write == :put}
+          _ = delete_fromm_levels(level_acc, entries)
+          {:halt, {on_write == :put, level_acc}}
       end
     end)
+    |> elem(0)
   end
 
   @impl true
@@ -348,9 +353,15 @@ defmodule Nebulex.Adapters.Multilevel do
     end)
   end
 
+  defp delete_fromm_levels(levels, entries) do
+    for {adapter, meta} <- levels, {key, _} <- entries do
+      adapter.delete(meta, key, [])
+    end
+  end
+
   defp maybe_replicate({nil, _}, _, _), do: nil
 
-  defp maybe_replicate({value, [{adapter, meta} | levels]}, key, :inclusive) do
+  defp maybe_replicate({value, [{adapter, meta} | [_ | _] = levels]}, key, :inclusive) do
     ttl = adapter.ttl(meta, key) || :infinity
 
     :ok =
@@ -361,7 +372,7 @@ defmodule Nebulex.Adapters.Multilevel do
     value
   end
 
-  defp maybe_replicate({value, _levels}, _key, :exclusive) do
+  defp maybe_replicate({value, _levels}, _key, _model) do
     value
   end
 end

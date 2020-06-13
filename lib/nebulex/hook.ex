@@ -129,8 +129,6 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     alias Nebulex.Hook
 
-    require Logger
-
     @doc """
     Before decorator.
 
@@ -260,10 +258,8 @@ if Code.ensure_loaded?(Decorator.Define) do
       fun.(hook)
     rescue
       e ->
-        Logger.error(
-          "hook execution failed on step #{step} with error #{inspect(e)}. " <>
-            "Stacktrace: #{inspect(__STACKTRACE__)}"
-        )
+        msg = "hook execution failed on step #{inspect(step)} with error #{inspect(e)}"
+        reraise RuntimeError, msg, __STACKTRACE__
     end
   end
 end
