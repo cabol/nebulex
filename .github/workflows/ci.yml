@@ -13,10 +13,10 @@ jobs:
     strategy:
       matrix:
         elixir:
-          - 1.10.2
-          - 1.9.4
+          - '1.10.x'
+          - '1.9.x'
         otp:
-          - 22.3
+          - '22.x'
 
     runs-on: ubuntu-latest
 
@@ -66,9 +66,9 @@ jobs:
       - uses: actions/cache@v1
         with:
           path: priv/plts
-          key: ${{ runner.os }}-plt-v1-${{ env.MIX_ENV }}
+          key: ${{ runner.os }}-plt-v2-${{ env.MIX_ENV }}
           restore-keys: |
-            ${{ runner.os }}-plt-v1
+            ${{ runner.os }}-plt-v2
 
       - name: Dialyzer
         run: mix dialyzer --format short

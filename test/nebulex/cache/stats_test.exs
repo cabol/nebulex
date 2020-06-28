@@ -11,6 +11,8 @@ defmodule Nebulex.Cache.StatsTest do
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Multilevel
+
+    use Nebulex.Cache.Stats
   end
 
   @config [
@@ -117,15 +119,7 @@ defmodule Nebulex.Cache.StatsTest do
   end
 
   describe "disabled stats" do
-    setup do
-      {:ok, pid} = Cache.start_link(@config)
-      :ok
-
-      on_exit(fn ->
-        :ok = Process.sleep(20)
-        if Process.alive?(pid), do: Cache.stop()
-      end)
-    end
+    setup_with_dynamic_cache(Cache, :disabled_stats, @config)
 
     test "stat_counter is nil" do
       refute Cache.stats_info()
@@ -182,6 +176,20 @@ defmodule Nebulex.Cache.StatsTest do
     setup_with_dynamic_cache(Cache, :stats_with_dispatch, [stats: true] ++ @config)
 
     test "emits a telemetry event when called" do
+      with_mock :telemetry, [], execute: fn _, _, _ -> :ok end do
+        :ok = Cache.dispatch_stats()
+
+        assert called(
+                 :telemetry.execute(
+                   [:stats_with_dispatch, :stats],
+                   %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0},
+                   %{cache: :stats_with_dispatch}
+                 )
+               )
+      end
+    end
+
+    test "emits a telemetry event with custom telemetry_prefix when called" do
       with_mock :telemetry, [], execute: fn _, _, _ -> :ok end do
         :ok = Cache.dispatch_stats(telemetry_prefix: [:my_event], metadata: %{tag: "tag1"})
 

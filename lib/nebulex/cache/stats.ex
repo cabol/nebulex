@@ -11,8 +11,9 @@ defmodule Nebulex.Cache.Stats do
   First of all, we define a cache:
 
       defmodule MyApp.Cache do
-        otp_app: :my_app,
-        adapter: Nebulex.Adapters.Local
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: Nebulex.Adapters.Local
       end
 
   Then we configure it enabling the stats, like so:
@@ -34,12 +35,42 @@ defmodule Nebulex.Cache.Stats do
 
       Nebulex.Cache.Stats.info(MyApp.Cache)
 
+  ## Using stats helpers
+
+  You can inject the stats helpers in the cache like this:
+
+      defmodule MyApp.Cache do
+        use Nebulex.Cache,
+          otp_app: :nebulex,
+          adapter: Nebulex.Adapters.Local
+
+        # Use stats helpers
+        use Nebulex.Cache.Stats
+      end
+
+  ### Retrieving stats info
+
+      MyApp.Cache.stats_info()
+
+  By calling this injected helper, the function `Nebulex.Cache.Stats.info/1`
+  is called under-the-hood, but the cache name is resolved automatically.
+
+  ### Dispatching telemetry events
+
+      MyApp.Cache.dispatch_stats()
+
+      MyApp.Cache.dispatch_stats(telemetry_prefix: [:my_cache, :stats])
+
+  By calling this injected helper, the function `Nebulex.Cache.Stats.dispatch/2`
+  is called under-the-hood, but the cache name is resolved automatically.
+
   ## Telemetry events
 
-  Integrating telemetry is very easy since the cache interface provides the
-  callback `c:Nebulex.Cache.dispatch_stats/1` for emitting telemetry events
-  with the current stats. What we need to resolve is, how to make it in such
-  a way that every X period of time the stats are emitted automatically.
+  Integrating telemetry is very easy since with the helper function
+  `MyApp.Cache.dispatch_stats/1` (via the `__using__` macro) described
+  previously you can emit telemetry events with the current stats at any time.
+  What we need to resolve is, how to make it in such a way that every X period
+  of time the stats are emitted automatically.
 
   To do so, we can use `:telemetry_poller` and define a custom measurement:
 
@@ -73,7 +104,7 @@ defmodule Nebulex.Cache.Stats do
       end
   """
 
-  # Stats
+  # Stats Struct
   defstruct hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0
 
   @type t :: %__MODULE__{
@@ -85,6 +116,23 @@ defmodule Nebulex.Cache.Stats do
         }
 
   @type stat :: :hits | :misses | :writes | :evictions | :expirations
+
+  @doc false
+  defmacro __using__(_opts) do
+    quote do
+      alias Nebulex.Cache.Stats
+
+      @doc false
+      def stats_info do
+        Stats.info(get_dynamic_cache())
+      end
+
+      @doc false
+      def dispatch_stats(opts \\ []) do
+        Stats.dispatch(get_dynamic_cache(), opts)
+      end
+    end
+  end
 
   import Nebulex.Helpers
 
@@ -149,11 +197,18 @@ defmodule Nebulex.Cache.Stats do
   passed so that the counter reference is retrieved and handled internally.
 
   Returns `nil` if the stats are disabled or if the adapter doesn't support
-  and/or feed the required stat counters.
+  this feature.
 
   ## Example
 
-      Nebulex.Cache.Stats.info(MyCache)
+      iex> Nebulex.Cache.Stats.info(MyCache)
+      %Nebulex.Cache.Stats{
+        evictions: 0,
+        expirations: 0,
+        hits: 0,
+        misses: 0,
+        writes: 0
+      }
   """
   @spec info(:counters.counters_ref() | atom | nil) :: t | nil
   def info(nil), do: nil
@@ -178,30 +233,64 @@ defmodule Nebulex.Cache.Stats do
 
   if Code.ensure_loaded?(:telemetry) do
     @doc """
-    This is a helper for dispatching telemetry events with the current stats
-    count.
+    Emits a telemetry event when called with the current stats count.
 
-    See `c:Nebulex.Cache.dispatch_stats/1`.
+    The `:measurements` map will include the current count for each stat:
+
+      * `:hits` - Current **hits** count.
+      * `:misses` - Current **misses** count.
+      * `:writes` - Current **writes** count.
+      * `:evictions` - Current **evictions** count.
+      * `:expirations` - Current **expirations** count.
+
+    The telemetry `:metadata` map will include the following fields:
+
+      * `:cache` - Cache module or name.
+
+    Additionally, you can add your own metadata fields by given the option
+    `:metadata`.
+
+    ## Options
+
+      * `:telemetry_prefix` – By default, the telemetry prefix is based on the
+        cache name, so if your cache module is called `MyApp.Cache`, the prefix
+        will be `[:my_app, :cache]`. But, if you have set an explicit name to
+        your cache, like for example `:my_cache_name`, the default prefix will
+        be `[:my_cache_name]`.
+
+      * `:metadata` – A map with additional metadata fields. Defaults to `%{}`.
+
+    ## Examples
+
+        iex> Nebulex.Cache.Stats.dispatch(MyCache)
+        :ok
+
+        iex> Nebulex.Cache.Stats.dispatch(
+        ...>   MyCache,
+        ...>   telemetry_prefix: [:my_event],
+        ...>   metadata: %{tag: "tag1"}
+        ...> )
+        :ok
     """
     @spec dispatch(atom, Keyword.t()) :: :ok
-    def dispatch(cache, opts \\ []) do
-      if info = __MODULE__.info(cache) do
+    def dispatch(cache_or_name, opts \\ []) do
+      if info = __MODULE__.info(cache_or_name) do
         :telemetry.execute(
-          Keyword.get(opts, :telemetry_prefix, telemetry_prefix(cache)) ++ [:stats],
-          info,
-          opts |> Keyword.get(:metadata, %{}) |> Map.put(:cache, cache)
+          Keyword.get(opts, :telemetry_prefix, telemetry_prefix(cache_or_name)) ++ [:stats],
+          Map.from_struct(info),
+          opts |> Keyword.get(:metadata, %{}) |> Map.put(:cache, cache_or_name)
         )
       else
         :ok
       end
     end
 
-    defp telemetry_prefix(name) do
-      name
+    defp telemetry_prefix(cache_or_name) do
+      cache_or_name
       |> Module.split()
       |> Enum.map(&(&1 |> Macro.underscore() |> String.to_atom()))
     rescue
-      ArgumentError -> [name]
+      ArgumentError -> [cache_or_name]
     end
   end
 end

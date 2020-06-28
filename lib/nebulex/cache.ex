@@ -276,20 +276,6 @@ defmodule Nebulex.Cache do
           Transaction.in_transaction?(get_dynamic_cache())
         end
       end
-
-      ## Stats
-
-      @impl true
-      def stats_info do
-        Stats.info(get_dynamic_cache())
-      end
-
-      if Code.ensure_loaded?(:telemetry) do
-        @impl true
-        def dispatch_stats(opts \\ []) do
-          Stats.dispatch(get_dynamic_cache(), opts)
-        end
-      end
     end
   end
 
@@ -1109,54 +1095,4 @@ defmodule Nebulex.Cache do
       end)
   """
   @callback in_transaction?() :: boolean
-
-  ## Stats
-
-  @optional_callbacks dispatch_stats: 1
-
-  @doc """
-  Return the struct with current stats values or `nil` if the stats are
-  disabled or the adapter doesn't support this feature.
-
-  ## Examples
-
-      MyCache.stats_info()
-  """
-  @callback stats_info() :: Nebulex.Cache.Stats.t() | nil
-
-  @doc """
-  Emits a telemetry event when called with the current stats count.
-
-  The `:measurements` map will include the current count for each stat:
-
-    * `:hits` - Current **hits** count.
-    * `:misses` - Current **misses** count.
-    * `:writes` - Current **writes** count.
-    * `:evictions` - Current **evictions** count.
-    * `:expirations` - Current **expirations** count.
-
-  The telemetry `:metadata` map will include the following fields:
-
-    * `:cache` - Cache module or name.
-
-  Additionally, you can add your own metadata fields by given the option
-  `:metadata`.
-
-  ## Options
-
-    * `:telemetry_prefix` – By default, the telemetry prefix is based on the
-      cache name, so if your cache module is called `MyApp.Cache`, the prefix
-      will be `[:my_app, :cache]`. But, if you have set an explicit name to
-      your cache, like for example `:my_cache_name`, the default prefix will
-      be `[:my_cache_name]`.
-
-    * `:metadata` – A map with additional metadata fields. Defaults to `%{}`.
-
-  ## Examples
-
-      MyCache.dispatch_stats()
-
-      MyCache.dispatch_stats(telemetry_prefix: [:my_event], metadata: %{tag: "tag1"})
-  """
-  @callback dispatch_stats(opts) :: :ok
 end
