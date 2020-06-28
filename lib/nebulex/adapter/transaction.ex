@@ -53,14 +53,16 @@ defmodule Nebulex.Adapter.Transaction do
     quote do
       @behaviour Nebulex.Adapter.Transaction
 
+      alias Nebulex.Cache.Cluster
+
       @impl true
-      def transaction(%{cache: cache, name: name} = adapter_meta, opts, fun) do
+      def transaction(%{name: name} = adapter_meta, opts, fun) do
         adapter_meta
         |> in_transaction?()
         |> do_transaction(
           name,
           Keyword.get(opts, :keys, []),
-          Keyword.get(opts, :nodes, get_nodes(cache, name)),
+          Keyword.get(opts, :nodes, Cluster.get_nodes(name)),
           Keyword.get(opts, :retries, :infinity),
           fun
         )
@@ -105,9 +107,7 @@ defmodule Nebulex.Adapter.Transaction do
           end
         end
 
-        ids
-        |> Enum.reduce_while({:ok, []}, maybe_set_lock)
-        |> case do
+        case Enum.reduce_while(ids, {:ok, []}, maybe_set_lock) do
           {:ok, _} ->
             true
 
@@ -129,14 +129,6 @@ defmodule Nebulex.Adapter.Transaction do
 
       defp lock_ids(name, keys) do
         for key <- keys, do: {{name, key}, self()}
-      end
-
-      defp get_nodes(cache, name) do
-        if function_exported?(cache, :nodes, 1) do
-          cache.nodes(name)
-        else
-          [node() | Node.list()]
-        end
       end
     end
   end

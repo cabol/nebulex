@@ -1,5 +1,6 @@
 defmodule Nebulex.Adapters.MultilevelExclusiveTest do
   use ExUnit.Case, async: true
+  use Nebulex.NodeCase
   use Nebulex.MultilevelTest
   use Nebulex.Cache.QueryableTest
   use Nebulex.Cache.TransactionTest
@@ -46,9 +47,36 @@ defmodule Nebulex.Adapters.MultilevelExclusiveTest do
     end
   end
 
-  describe "partitioned levels" do
-    test "return cluster nodes" do
+  describe "partitioned level" do
+    test "returns cluster nodes" do
       assert Cluster.get_nodes(normalize_module_name([:multilevel_exclusive, "L3"])) == [node()]
+    end
+
+    test "joining new node" do
+      node = :"node1@127.0.0.1"
+
+      {:ok, pid} =
+        start_cache(node, Multilevel,
+          name: :multilevel_exclusive,
+          model: :exclusive,
+          levels: @levels
+        )
+
+      # check cluster nodes
+      dist_cache_name = normalize_module_name([:multilevel_exclusive, "L3"])
+      assert Cluster.get_nodes(dist_cache_name) == [node, node()]
+
+      kv_pairs = for k <- 1..100, do: {k, k}
+
+      Multilevel.transaction(fn ->
+        assert Multilevel.put_all(kv_pairs) == :ok
+
+        for k <- 1..100 do
+          assert Multilevel.get(k) == k
+        end
+      end)
+
+      :ok = stop_cache(:"node1@127.0.0.1", pid)
     end
   end
 end

@@ -130,9 +130,8 @@ defmodule Nebulex.Adapters.Replicated do
 
   @impl true
   def init(opts) do
-    # required cache module and name
-    cache = Keyword.fetch!(opts, :cache)
-    name = opts[:name] || cache
+    # required cache name
+    name = opts[:name] || Keyword.fetch!(opts, :cache)
 
     # maybe use stats
     stat_counter = opts[:stat_counter] || Stats.init(opts)
@@ -154,7 +153,6 @@ defmodule Nebulex.Adapters.Replicated do
 
     meta = %{
       name: name,
-      cache: cache,
       primary: primary_adapter,
       primary_meta: primary_meta,
       task_sup: task_sup_name,
@@ -324,6 +322,7 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
 
   import Nebulex.Helpers
 
+  alias Nebulex.Adapters.Replicated
   alias Nebulex.Cache.Cluster
   alias Nebulex.Entry
 
@@ -349,7 +348,7 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
     {:noreply, state}
   end
 
-  defp import_from_nodes(%{name: name, cache: cache, primary: primary, primary_meta: primary_meta}) do
+  defp import_from_nodes(%{name: name, primary: primary, primary_meta: primary_meta} = meta) do
     cluster_nodes = Cluster.get_nodes(name)
 
     case cluster_nodes -- [node()] do
@@ -357,25 +356,26 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
         :ok
 
       nodes ->
-        cache.transaction(
+        Replicated.transaction(
+          meta,
           [
             keys: [:"$global_lock"],
             nodes: cluster_nodes
           ],
           fn ->
             nodes
-            |> Enum.reduce_while([], &stream_entries(cache, &1, &2))
+            |> Enum.reduce_while([], &stream_entries(meta, &1, &2))
             |> Enum.each(&primary.put(primary_meta, &1.key, &1.value, Entry.ttl(&1), :put, []))
           end
         )
     end
   end
 
-  defp stream_entries(cache, node, acc) do
+  defp stream_entries(meta, node, acc) do
     # coveralls-ignore-start
     stream_fun = fn ->
-      :unexpired
-      |> cache.stream(return: :entry, page_size: 10)
+      meta
+      |> Replicated.stream(:unexpired, return: :entry, page_size: 10)
       |> Stream.map(& &1)
       |> Enum.to_list()
     end

@@ -109,7 +109,7 @@ defmodule Nebulex.Adapters.Multilevel do
   import Nebulex.Helpers
 
   alias Nebulex.Adapter
-  alias Nebulex.Cache.Stats
+  alias Nebulex.Cache.{Cluster, Stats}
 
   # Multi-level Cache Models
   @models [:inclusive, :exclusive]
@@ -318,6 +318,27 @@ defmodule Nebulex.Adapters.Multilevel do
       end,
       & &1
     )
+  end
+
+  ## Transaction
+
+  @impl true
+  def transaction(%{levels: levels} = adapter_meta, opts, fun) do
+    # Perhaps one of the levels is a distributed adapter so that we have to
+    # ensure we perform the locking on the right cluster nodes.
+    nodes =
+      levels
+      |> Enum.reduce([node()], fn
+        {adapter, %{name: name}}, acc
+        when adapter in [Nebulex.Adapters.Partitioned, Nebulex.Adapters.Replicated] ->
+          Cluster.get_nodes(name) ++ acc
+
+        _, acc ->
+          acc
+      end)
+      |> Enum.uniq()
+
+    super(adapter_meta, Keyword.put(opts, :nodes, nodes), fun)
   end
 
   ## Helpers
