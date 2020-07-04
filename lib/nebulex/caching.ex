@@ -252,6 +252,8 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     use Decorator.Define, cacheable: 1, cache_evict: 1, cache_put: 1
 
+    alias Nebulex.Caching
+
     @doc """
     Provides a way of annotating functions to be cached (cacheable aspect).
 
@@ -441,11 +443,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     defp match_logic(block) do
       quote do
-        apply(
-          Nebulex.Caching,
-          :eval_match,
-          [unquote(block), match, cache, key, opts]
-        )
+        Caching.eval_match(unquote(block), match, cache, key, opts)
       end
     end
 

@@ -102,6 +102,8 @@ defmodule Nebulex.Cache.Stats do
         opts = [strategy: :one_for_one, name: MyApp.Supervisor]
         Supervisor.start_link(children, opts)
       end
+
+  See [Nebulex Telemetry Guide](http://hexdocs.pm/nebulex/telemetry.html).
   """
 
   # Stats Struct

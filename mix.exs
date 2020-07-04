@@ -85,7 +85,9 @@ defmodule Nebulex.Mixfile do
       source_url: "https://github.com/cabol/nebulex",
       extras: [
         "guides/getting-started.md",
-        "guides/cache-usage-patterns.md"
+        "guides/cache-usage-patterns.md",
+        "guides/telemetry.md",
+        "guides/migrating-to-v2.md"
       ]
     ]
   end

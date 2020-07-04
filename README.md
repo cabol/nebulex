@@ -184,6 +184,8 @@ end
  * [Getting Started](http://hexdocs.pm/nebulex/getting-started.html)
  * [Documentation](http://hexdocs.pm/nebulex/Nebulex.html)
  * [Cache Usage Patterns via Nebulex.Caching](http://hexdocs.pm/nebulex/cache-usage-patterns.html)
+ * [Instrumenting the Cache with Telemetry](http://hexdocs.pm/nebulex/telemetry.html)
+ * [Migrating to v2.x](http://hexdocs.pm/nebulex/migrating-to-v2.html)
  * [Examples](https://github.com/cabol/nebulex_examples)
 
 ## Testing

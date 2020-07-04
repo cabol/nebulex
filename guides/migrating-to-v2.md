@@ -1,0 +1,82 @@
+# Migrating to v2.x
+
+For the v2, Nebulex introduces several breaking changes, so this guide aims to
+highlight most of these changes to make easier the transition to v2. Be aware
+this guide won't focus on every change, just the most significant ones that can
+affect how your application code interacts with the cache. Also, it is not a
+detailed guide about how to translate the current code from older versions to
+v2, just pointing out the areas the new documentation should be consulted on.
+
+## Configiration
+
+This is one of the biggest changes. Version 1.x, most of the configuration
+options are resolved in compile-time, but this brings with a lot of limitations.
+Since version 2.x, the only argument or option configured in compile-time is the
+adapter when defining a new cache module, the rest of them are given via config
+file or at startup time. For more information and examples, see `Nebulex.Cache`,
+`Nebulex.Adapters.Local`, `Nebulex.Adapters.Partitioned`,
+`Nebulex.Adapters.Replicated`, `Nebulex.Adapters.Multilevel`.
+
+## Cache API
+
+There are several changes on the `Nebulex.Cache` API:
+
+  * The `:return` option is not available anymore, so it has to be removed.
+  * The `:version` option is not available anymore, so it has to be removed.
+  * Callback `c:set/3` was refactored to `c:put/3`.
+  * Callback `c:set_many/2` was refactored to `c:put_all/2`.
+  * Callbacks `c:add/3` and `c:add!/3` were refactored to `c:put_new/3` and
+    `c:put_new!/3`.
+  * Callback `c:update_counter/3` was refactored to `c:incr/3`.
+  * Callback `c:add_or_replace/3` was removed.
+  * Callback `c:object_info/2` was removed, and callbacks `c:ttl/1` and
+    `c:touch/1` were added instead.
+
+## Declarative annotation-based caching via decorators
+
+  * Module `Nebulex.Caching.Decorators` was refactored to `Nebulex.Caching` –
+    Keep in mind that since v1.2.x the caching decorators were included instead
+    of the previous macros or DSL (this applies for version lower than v1.1.x).
+  * Decorator `cache/3` was refactored to `cacheable/3`.
+  * Decorator `evict/3` was refactored to `cache_evict/3`.
+  * Decorator `update/3` was refactored to `cache_put/3`.
+  * Improved the `:match` option to return not only a boolean but return a
+    specific value to be cached `(term -> boolean | {true, term})` – If `true`
+    the code-block evaluation result is cached as it is (the default). If
+    `{true, value}` is returned, then the `value` is what is cached.
+
+## Hooks
+
+Since v2.x, pre/post hooks are deprecated and won't be longer supported by
+`Nebulex`, at least not directly. Mainly, because the hooks feature is not a
+common use-case and also it is something that can be be easily implemented
+on top of the Cache at the application level. However, to keep backward
+compatibility somehow, `Nebulex` provides decorators for implementing
+pre/post hooks very easily. For that reason, it is highly recommended
+to removed all pre/post hooks related code and adapt it to the new way.
+See `Nebulex.Hook` for more information.
+
+## Built-In Adapters
+
+There have been several and significant improvements on the built-in adapters,
+so it is also highly recommended to take a look at them;
+`Nebulex.Adapters.Local`, `Nebulex.Adapters.Partitioned`,
+`Nebulex.Adapters.Replicated`, and `Nebulex.Adapters.Multilevel`.
+
+## Statistics
+
+For older versions (<= 1.x), the stats were implemented via a post-hook and the
+measurements were oriented for counting the number of times a cache function is
+called. But what is interesting and useful to see is, for instance, the number
+of writes, hits, misses, evictions, etc. Therefore, the whole stats'
+functionality was refactored entirely.
+
+  1. This feature is not longer using pre/post hooks. Besides, pre/post hooks
+     are deprecated in v2.x.
+  2. The stats support is something each adapter is responsible for. However,
+     Nebulex built-in adapters support the stats suggested and defined by
+     `Nebulex.Cache.Stats`.
+  3. Default stats via `Nebulex.Cache.Stats` are implemented by means of
+     Erlang `:counters`.
+  4. See `Nebulex.Cache.Stats` for more information about how to use stats in
+     Nebulex v2.x.
