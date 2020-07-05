@@ -59,10 +59,10 @@ defmodule Nebulex.RPC do
 
   ## Options
 
-    * `timeout` - A timeout, in milliseconds or `:infinity`, can be given with
+    * `:timeout` - A timeout, in milliseconds or `:infinity`, can be given with
       a default value of `5000`. It uses `Task.yield_many/2` internally.
 
-    * `reducer` - Reducer function to be executed on each collected result.
+    * `:reducer` - Reducer function to be executed on each collected result.
       (check out `reducer` type).
 
   ## Example
@@ -138,7 +138,7 @@ defmodule Nebulex.RPC do
     {reducer_acc, reducer_fun} = Keyword.get(opts, :reducer, default_reducer())
 
     tasks
-    |> Task.yield_many(Keyword.get(opts, :timeout, 5000))
+    |> Task.yield_many(opts[:timeout] || 5000)
     |> :lists.zip(node_group)
     |> Enum.reduce(reducer_acc, fn
       {{_task, {:ok, res}}, group}, acc ->

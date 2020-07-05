@@ -6,11 +6,11 @@ defmodule Nebulex.Cluster do
 
   def spawn(nodes) do
     # Turn node into a distributed node with the given long name
-    :net_kernel.start([:"primary@127.0.0.1"])
+    _ = :net_kernel.start([:"primary@127.0.0.1"])
 
     # Allow spawned nodes to fetch all code from this node
-    :erl_boot_server.start([])
-    allow_boot(to_charlist("127.0.0.1"))
+    _ = :erl_boot_server.start([])
+    _ = allow_boot(to_charlist("127.0.0.1"))
 
     nodes
     |> Enum.map(&Task.async(fn -> spawn_node(&1) end))
@@ -19,9 +19,9 @@ defmodule Nebulex.Cluster do
 
   def spawn_node(node_host) do
     {:ok, node} = :slave.start(to_charlist("127.0.0.1"), node_name(node_host), inet_loader_args())
-    add_code_paths(node)
-    transfer_configuration(node)
-    ensure_applications_started(node)
+    _ = add_code_paths(node)
+    _ = transfer_configuration(node)
+    _ = ensure_applications_started(node)
     {:ok, node}
   end
 

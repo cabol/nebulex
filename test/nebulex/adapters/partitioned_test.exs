@@ -1,137 +1,170 @@
 defmodule Nebulex.Adapters.PartitionedTest do
   use Nebulex.NodeCase
-  use Nebulex.CacheTest, cache: Nebulex.TestCache.Partitioned
+  use Nebulex.CacheTest
 
+  import Nebulex.TestCase
+
+  alias Nebulex.Adapter
   alias Nebulex.Cache.Cluster
-
-  alias Nebulex.TestCache.{
-    Partitioned,
-    PartitionedMock,
-    PartitionedWithCustomHashSlot
-  }
-
-  alias Nebulex.TestCache.Partitioned.Primary, as: PartitionedPrimary
-  alias Nebulex.TestCache.PartitionedMock.Primary, as: PartitionedMockPrimary
-  alias Nebulex.TestCache.PartitionedWithCustomHashSlot.Primary, as: PrimaryWithCustomHashSlot
+  alias Nebulex.TestCache.Partitioned
 
   @primary :"primary@127.0.0.1"
   @cluster :lists.usort([@primary | Application.get_env(:nebulex, :nodes, [])])
 
+  :ok = Application.put_env(:nebulex, Partitioned, primary: [adapter: Nebulex.Adapters.Local])
+
   setup do
-    node_pid_list = start_caches([node() | Node.list()], [PartitionedPrimary, Partitioned])
-    :ok
+    node_pid_list =
+      start_caches([node() | Node.list()], [{Partitioned, [primary: [backend: :shards]]}])
 
     on_exit(fn ->
       :ok = Process.sleep(100)
       stop_caches(node_pid_list)
     end)
+
+    {:ok, cache: Partitioned, name: Partitioned}
   end
 
-  test "fail on __before_compile__ because missing primary storage" do
-    assert_raise ArgumentError, ~r"missing :primary configuration", fn ->
-      defmodule WrongPartitioned do
-        use Nebulex.Cache,
-          otp_app: :nebulex,
-          adapter: Nebulex.Adapters.Partitioned
+  describe "c:init/1" do
+    test "primary store backend" do
+      Adapter.with_meta(Partitioned, fn _, meta ->
+        assert meta.primary_meta.backend == :shards
+      end)
+    end
+
+    test "fail because invalid primary adapter" do
+      assert {:error, {%RuntimeError{message: msg}, _}} =
+               Partitioned.start_link(
+                 name: :invalid_primary_adapter,
+                 primary: [adapter: __MODULE__]
+               )
+
+      mod = inspect(__MODULE__)
+      assert Regex.match?(~r"expected #{mod} to implement the behaviour Nebulex.Adapter", msg)
+    end
+
+    test "fail because unloaded hash_slot module" do
+      assert {:error, {%RuntimeError{message: msg}, _}} =
+               Partitioned.start_link(name: :unloaded_hash_slot, hash_slot: UnloadedHashSlot)
+
+      assert Regex.match?(~r"hash_slot UnloadedHashSlot was not compiled", msg)
+    end
+
+    test "fail because invalid hash_slot module" do
+      assert {:error, {%RuntimeError{message: msg}, _}} =
+               Partitioned.start_link(name: :invalid_hash_slot, hash_slot: __MODULE__)
+
+      mod = inspect(__MODULE__)
+      behaviour = "Nebulex.Adapter.HashSlot"
+      assert Regex.match?(~r"expected #{mod} to implement the behaviour #{behaviour}", msg)
+    end
+  end
+
+  describe "partitioned cache" do
+    test "custom hash_slot" do
+      defmodule HashSlot do
+        @behaviour Nebulex.Adapter.HashSlot
+
+        @impl true
+        def keyslot(key, range) do
+          key
+          |> :erlang.phash2()
+          |> rem(range)
+        end
+      end
+
+      with_dynamic_cache(Partitioned, [name: :custom_hash_slot, hash_slot: HashSlot], fn ->
+        refute Partitioned.get("foo")
+        assert Partitioned.put("foo", "bar") == :ok
+        assert Partitioned.get("foo") == "bar"
+      end)
+    end
+
+    test "get_and_update" do
+      assert Partitioned.get_and_update(1, &Partitioned.get_and_update_fun/1) == {nil, 1}
+      assert Partitioned.get_and_update(1, &Partitioned.get_and_update_fun/1) == {1, 2}
+      assert Partitioned.get_and_update(1, &Partitioned.get_and_update_fun/1) == {2, 4}
+
+      assert_raise ArgumentError, fn ->
+        Partitioned.get_and_update(1, &Partitioned.get_and_update_bad_fun/1)
       end
     end
   end
 
-  test "check cluster nodes" do
-    assert @primary == node()
-    assert @cluster -- [node()] == :lists.usort(Node.list())
-    assert @cluster == Partitioned.__nodes__()
+  describe "custer" do
+    test "check cluster nodes" do
+      assert node() == @primary
+      assert :lists.usort(Node.list()) == @cluster -- [node()]
+      assert Partitioned.nodes() == @cluster
 
-    :ok = Cluster.leave(Partitioned)
-    assert @cluster -- [node()] == Partitioned.__nodes__()
-  end
-
-  test "get_and_update" do
-    assert {nil, 1} == Partitioned.get_and_update(1, &Partitioned.get_and_update_fun/1)
-    assert {1, 2} == Partitioned.get_and_update(1, &Partitioned.get_and_update_fun/1)
-    assert {2, 4} == Partitioned.get_and_update(1, &Partitioned.get_and_update_fun/1)
-
-    {4, %Object{key: 1, value: 8, expire_at: _, version: _}} =
-      Partitioned.get_and_update(1, &Partitioned.get_and_update_fun/1, return: :object)
-
-    assert_raise ArgumentError, fn ->
-      Partitioned.get_and_update(1, &Partitioned.get_and_update_bad_fun/1)
+      :ok = Cluster.leave(Partitioned)
+      assert Partitioned.nodes() == @cluster -- [node()]
     end
 
-    assert_raise Nebulex.VersionConflictError, fn ->
-      1
-      |> Partitioned.set(1, return: :key)
-      |> Partitioned.get_and_update(&Partitioned.get_and_update_fun/1, version: -1)
-    end
-  end
+    test "teardown cache" do
+      assert Partitioned.put(4, 4) == :ok
+      assert Partitioned.get(4) == 4
 
-  test "set_many rollback" do
-    assert 4 == Partitioned.set(4, 4)
-    assert 4 == Partitioned.get(4)
+      assert Partitioned.nodes() == @cluster
 
-    :ok = teardown_cache(1)
+      node = teardown_cache(1)
+      :ok = Process.sleep(1000)
 
-    assert {:error, [1]} == Partitioned.set_many([{4, 44}, {2, 2}, {1, 1}])
+      assert Partitioned.nodes() == @cluster -- [node]
 
-    assert 44 == Partitioned.get(4)
-    assert 2 == Partitioned.get(2)
+      assert :ok == Partitioned.put_all([{4, 44}, {2, 2}, {1, 1}])
 
-    assert_raise ArgumentError, fn ->
-      Partitioned.get(1)
+      assert Partitioned.get(4) == 44
+      assert Partitioned.get(2) == 2
+      assert Partitioned.get(1) == 1
     end
   end
 
-  test "rpc timeout" do
-    assert :ok == Partitioned.set_many(for(x <- 1..100_000, do: {x, x}), timeout: 60_000)
-    assert 1 == Partitioned.get(1, timeout: 1000)
+  describe "rpc" do
+    test "timeout error" do
+      assert Partitioned.put_all(for(x <- 1..100_000, do: {x, x}), timeout: 60_000) == :ok
+      assert Partitioned.get(1, timeout: 1000) == 1
 
-    msg = ~r"RPC error executing action: all\n\nErrors:\n\n\[\n  timeout:"
+      msg = ~r"RPC error executing action: all\n\nErrors:\n\n\[\n  timeout:"
 
-    assert_raise Nebulex.RPCMultiCallError, msg, fn ->
-      Partitioned.all(nil, timeout: 1)
-    end
-  end
-
-  test "rpc errors" do
-    _ = Process.flag(:trap_exit, true)
-
-    {:ok, pid1} = PartitionedMock.start_link()
-    {:ok, pid2} = PartitionedMockPrimary.start_link()
-
-    assert 0 == map_size(PartitionedMock.get_many([1, 2, 3], timeout: 10))
-
-    {:error, err_keys} = PartitionedMock.set_many(a: 1, b: 2)
-    assert [:a, :b] == :lists.usort(err_keys)
-
-    assert_raise ArgumentError, fn ->
-      PartitionedMock.get(1)
+      assert_raise Nebulex.RPCMultiCallError, msg, fn ->
+        Partitioned.all(nil, timeout: 1)
+      end
     end
 
-    msg = ~r"RPC error executing action: size\n\nErrors:\n\n\[\n  {{:exit,"
+    test "runtime error" do
+      with_dynamic_cache(
+        Partitioned,
+        [name: :partitioned_mock, primary: [adapter: Nebulex.TestCache.AdapterMock]],
+        fn ->
+          _ = Process.flag(:trap_exit, true)
 
-    assert_raise Nebulex.RPCMultiCallError, msg, fn ->
-      PartitionedMock.size()
+          assert [1, 2] |> Partitioned.get_all(timeout: 10) |> map_size() == 0
+
+          assert Partitioned.put_all(a: 1, b: 2) == :ok
+
+          assert [1, 2] |> Partitioned.get_all() |> map_size() == 0
+
+          assert_raise ArgumentError, fn ->
+            Partitioned.get(1)
+          end
+
+          msg = ~r"RPC error executing action: size\n\nErrors:\n\n\[\n  {{:exit,"
+
+          assert_raise Nebulex.RPCMultiCallError, msg, fn ->
+            Partitioned.size()
+          end
+        end
+      )
     end
-
-    :ok = Enum.each([pid1, pid2], &PartitionedMock.stop/1)
-  end
-
-  test "custom hash_slot" do
-    {:ok, pid1} = PartitionedWithCustomHashSlot.start_link()
-    {:ok, pid2} = PrimaryWithCustomHashSlot.start_link()
-
-    refute PartitionedWithCustomHashSlot.get("foo")
-    assert "bar" == PartitionedWithCustomHashSlot.set("foo", "bar")
-    assert "bar" == PartitionedWithCustomHashSlot.get("foo")
-
-    :ok = Enum.each([pid1, pid2], &PartitionedMock.stop/1)
   end
 
   ## Private Functions
 
   defp teardown_cache(key) do
     node = Partitioned.get_node(key)
-    remote_pid = :rpc.call(node, Process, :whereis, [Partitioned.__primary__()])
-    :ok = :rpc.call(node, Partitioned.__primary__(), :stop, [remote_pid])
+    remote_pid = :rpc.call(node, Process, :whereis, [Partitioned])
+    :ok = :rpc.call(node, Supervisor, :stop, [remote_pid])
+    node
   end
 end

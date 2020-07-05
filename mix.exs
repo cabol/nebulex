@@ -1,7 +1,7 @@
 defmodule Nebulex.Mixfile do
   use Mix.Project
 
-  @version "1.2.2"
+  @version "2.0.0-rc.0"
 
   def project do
     [
@@ -29,7 +29,10 @@ defmodule Nebulex.Mixfile do
 
       # Hex
       package: package(),
-      description: "A fast, flexible and powerful distributed caching framework for Elixir."
+      description: """
+      In-Process and Distributed Caching Toolkit for Elixir. Easily craft and
+      deploy distributed cache topologies and different cache usage patterns.
+      """
     ]
   end
 
@@ -37,13 +40,16 @@ defmodule Nebulex.Mixfile do
   defp elixirc_paths(_), do: ["lib"]
 
   def application do
-    []
+    [
+      mod: {Nebulex.Application, []}
+    ]
   end
 
   defp deps do
     [
-      {:shards, "~> 0.6"},
-      {:decorator, "~> 1.3"},
+      {:shards, "~> 0.6", optional: true},
+      {:decorator, "~> 1.3", optional: true},
+      {:telemetry, "~> 0.4.2", optional: true},
 
       # Test
       {:excoveralls, "~> 0.13", only: :test},
@@ -51,6 +57,8 @@ defmodule Nebulex.Mixfile do
       {:mock, "~> 0.3", only: :test},
       {:benchee, "~> 1.0", optional: true, only: :test},
       {:benchee_html, "~> 1.0", optional: true, only: :test},
+
+      # Code Analysis
       {:dialyxir, "~> 1.0", optional: true, only: [:dev, :test], runtime: false},
       {:credo, "~> 1.4", optional: true, only: [:dev, :test]},
 
@@ -77,15 +85,16 @@ defmodule Nebulex.Mixfile do
       source_url: "https://github.com/cabol/nebulex",
       extras: [
         "guides/getting-started.md",
-        "guides/hooks.md",
-        "guides/caching-decorators.md"
+        "guides/cache-usage-patterns.md",
+        "guides/telemetry.md",
+        "guides/migrating-to-v2.md"
       ]
     ]
   end
 
   defp dialyzer do
     [
-      plt_add_apps: [:shards, :mix, :eex],
+      plt_add_apps: [:shards, :mix, :eex, :telemetry],
       plt_file: {:no_warn, "priv/plts/dialyzer-#{Mix.env()}.plt"},
       flags: [
         :unmatched_returns,

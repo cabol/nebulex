@@ -1,94 +1,96 @@
 defmodule Nebulex.Cache.TransactionTest do
-  import Nebulex.SharedTestCase
+  import Nebulex.TestCase
 
-  deftests do
-    test "transaction" do
-      refute @cache.transaction(fn ->
-               1
-               |> @cache.set(11, return: :key)
-               |> @cache.get!(return: :key)
-               |> @cache.delete(return: :key)
-               |> @cache.get()
+  deftests "transaction" do
+    import Nebulex.CacheHelpers
+
+    test "transaction", %{cache: cache} do
+      refute cache.transaction(fn ->
+               with :ok <- cache.put(1, 11),
+                    11 <- cache.get!(1),
+                    :ok <- cache.delete(1),
+                    value <- cache.get(1) do
+                 value
+               end
              end)
 
       assert_raise MatchError, fn ->
-        @cache.transaction(fn ->
-          :ok =
-            1
-            |> @cache.set(11, return: :key)
-            |> @cache.get!(return: :key)
-            |> @cache.delete(return: :key)
-            |> @cache.get()
+        cache.transaction(fn ->
+          with :ok <- cache.put(1, 11),
+               11 <- cache.get!(1),
+               :ok <- cache.delete(1) do
+            :ok = cache.get(1)
+          end
         end)
       end
     end
 
-    test "nested transaction" do
-      refute @cache.transaction(
+    test "nested transaction", %{cache: cache} do
+      refute cache.transaction(
+               [keys: [1]],
                fn ->
-                 @cache.transaction(
+                 cache.transaction(
+                   [keys: [2]],
                    fn ->
-                     1
-                     |> @cache.set(11, return: :key)
-                     |> @cache.get!(return: :key)
-                     |> @cache.delete(return: :key)
-                     |> @cache.get
-                   end,
-                   keys: [2]
+                     with :ok <- cache.put(1, 11),
+                          11 <- cache.get!(1),
+                          :ok <- cache.delete(1),
+                          value <- cache.get(1) do
+                       value
+                     end
+                   end
                  )
-               end,
-               keys: [1]
+               end
              )
     end
 
-    test "set and get within a transaction" do
-      assert ["old value"] == @cache.set(:test, ["old value"])
+    test "set and get within a transaction", %{cache: cache} do
+      assert cache.put(:test, ["old value"]) == :ok
+      assert cache.get(:test) == ["old value"]
 
-      assert ["new value", "old value"] ==
-               @cache.transaction(
-                 fn ->
-                   value = @cache.get(:test)
+      assert cache.transaction(
+               [keys: [:test]],
+               fn ->
+                 ["old value"] = value = cache.get(:test)
+                 :ok = cache.put(:test, ["new value" | value])
+                 cache.get(:test)
+               end
+             ) == ["new value", "old value"]
 
-                   assert ["old value"] == value
-
-                   @cache.set(:test, ["new value" | value])
-                 end,
-                 keys: [:test]
-               )
-
-      assert ["new value", "old value"] == @cache.get(:test)
+      assert cache.get(:test) == ["new value", "old value"]
     end
 
-    test "transaction aborted" do
-      spawn_link(fn ->
-        @cache.transaction(
+    test "transaction aborted", %{name: name, cache: cache} do
+      Task.start_link(fn ->
+        _ = cache.put_dynamic_cache(name)
+
+        cache.transaction(
+          [keys: [:aborted], retries: 1],
           fn ->
+            :ok = cache.put(:aborted, true)
             Process.sleep(1100)
-          end,
-          keys: [1],
-          retries: 1
+          end
         )
       end)
 
-      Process.sleep(200)
+      :ok = Process.sleep(200)
 
       assert_raise RuntimeError, "transaction aborted", fn ->
-        @cache.transaction(
+        cache.transaction(
+          [keys: [:aborted], retries: 1],
           fn ->
-            @cache.get(1)
-          end,
-          keys: [1],
-          retries: 1
+            cache.get(:aborted)
+          end
         )
       end
     end
 
-    test "in_transaction?" do
-      refute @cache.in_transaction?()
+    test "in_transaction?", %{cache: cache} do
+      refute cache.in_transaction?()
 
-      @cache.transaction(fn ->
-        _ = @cache.set(1, 11, return: :key)
-        true = @cache.in_transaction?()
+      cache.transaction(fn ->
+        :ok = cache.put(1, 11, return: :key)
+        true = cache.in_transaction?()
       end)
     end
   end

@@ -17,24 +17,24 @@ defmodule Nebulex.NodeCase do
   end
 
   def start_caches(nodes, caches) do
-    for node <- nodes, cache <- caches do
-      {:ok, pid} = start_cache(node, cache)
+    for node <- nodes, {cache, opts} <- caches do
+      {:ok, pid} = start_cache(node, cache, opts)
       {node, cache, pid}
     end
   end
 
   def start_cache(node, cache, opts \\ []) do
-    rpc(node, cache, :start_link, opts)
+    rpc(node, cache, :start_link, [opts])
   end
 
   def stop_caches(node_pid_list) do
-    Enum.each(node_pid_list, fn {node, cache, pid} ->
-      stop_cache(node, cache, pid)
+    Enum.each(node_pid_list, fn {node, _cache, pid} ->
+      stop_cache(node, pid)
     end)
   end
 
-  def stop_cache(node, cache, pid) do
-    rpc(node, cache, :stop, [pid, @timeout])
+  def stop_cache(node, pid) do
+    rpc(node, Supervisor, :stop, [pid, :normal, @timeout])
   end
 
   def rpc(node, module, function, args) do

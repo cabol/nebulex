@@ -1,12 +1,12 @@
-# Cache Usage Patterns via Nebulex.Caching.Decorators
+# Cache Usage Patterns via Nebulex.Caching
 
 There are several common access patterns when using a cache. **Nebulex**
-supports most of these patterns by means of [Nebulex.Caching.Decorators][Decorators].
+supports most of these patterns by means of [Nebulex.Caching][nbx_caching].
 
-[Decorators]: http://hexdocs.pm/nebulex/Nebulex.Caching.Decorators.html
+[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
 
-> Most of the following documentation about caching patterns it has been taken
-  from [EHCache Doc][EHCache]
+> Most of the following documentation about caching patterns it based on
+  [EHCache Docs][EHCache]
 
 [EHCache]: https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc
 
@@ -28,14 +28,15 @@ if value = MyCache.get(key) do
   value
 else
   value = SoR.get(key) # maybe Ecto?
-  MyCache.set(key, value)
+  :ok = MyCache.put(key, value)
+  value
 end
 ```
 
 ### Writing values
 
 ```elixir
-MyCache.set(key, value)
+:ok = MyCache.put(key, value)
 SoR.insert(key, value) # maybe Ecto?
 ```
 
@@ -93,21 +94,23 @@ This pattern can be easily implemented using `cache` decorator as follows:
 
 ```elixir
 defmodule MyApp.Example do
-  use Nebulex.Caching.Decorators
+  use Nebulex.Caching
 
   alias MyApp.Cache
 
-  @decorate cache(cache: Cache, key: name)
-  def get_by_name(name, age) do
+  @ttl Nebulex.Time.expiry_time(1, :hour)
+
+  @decorate cacheable(cache: Cache, key: name)
+  def get_by_name(name) do
     # your logic (the loader to retrieve the value from the SoR)
   end
 
-  @decorate cache(cache: Cache, key: age, opts: [ttl: 3600])
+  @decorate cacheable(cache: Cache, key: age, opts: [ttl: @ttl])
   def get_by_age(age) do
     # your logic (the loader to retrieve the value from the SoR)
   end
 
-  @decorate cache(cache: Cache)
+  @decorate cacheable(cache: Cache)
   def all(query) do
     # your logic (the loader to retrieve the value from the SoR)
   end
@@ -132,18 +135,18 @@ associated with the given key using `defupdatable`, or just delete it using
 
 ```elixir
 defmodule MyApp.Example do
-  use Nebulex.Caching.Decorators
+  use Nebulex.Caching
 
   alias MyApp.Cache
 
   # When the data is written to the SoR, it is updated in the cache
-  @decorate update(cache: Cache, key: something)
+  @decorate cache_put(cache: Cache, key: something)
   def update(something) do
     # Write data to the SoR (most likely the Database)
   end
 
   # When the data is written to the SoR, it is deleted (evicted) from the cache
-  @decorate evict(cache: Cache, key: something)
+  @decorate cache_evict(cache: Cache, key: something)
   def update_something(something) do
     # Write data to the SoR (most likely the Database)
   end

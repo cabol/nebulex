@@ -14,7 +14,7 @@ defmodule Nebulex.Adapter.Persistence do
   The default implementation accepts the following options only for `dump`
   operation (there are not options for `load`):
 
-    * `objects_per_line` - The number of objects to be written per line in the
+    * `entries_per_line` - The number of entries to be written per line in the
       file. Defaults to `10`.
 
     * `compression` - The compression level. The values are the same as
@@ -24,23 +24,24 @@ defmodule Nebulex.Adapter.Persistence do
   information.
   """
 
+  alias Nebulex.Entry
+
   @doc false
   defmacro __using__(_opts) do
     quote do
       @behaviour Nebulex.Adapter.Persistence
 
-      alias Nebulex.Object
-
       @impl true
-      def dump(cache, path, opts) do
+      def dump(%{cache: cache}, path, opts) do
         path
         |> File.open([:read, :write], fn io_dev ->
-          nil
-          |> cache.stream(return: :object)
-          |> Stream.filter(&(not Object.expired?(&1)))
-          |> Stream.chunk_every(Keyword.get(opts, :objects_per_line, 10))
-          |> Enum.each(fn objs ->
-            bin = Object.encode(objs, get_compression(opts))
+          :unexpired
+          |> cache.stream(return: :entry)
+          |> Stream.filter(&(not Entry.expired?(&1)))
+          |> Stream.map(&{&1.key, &1.value})
+          |> Stream.chunk_every(Keyword.get(opts, :entries_per_line, 10))
+          |> Enum.each(fn entries ->
+            bin = Entry.encode(entries, get_compression(opts))
             :ok = IO.puts(io_dev, bin)
           end)
         end)
@@ -48,15 +49,15 @@ defmodule Nebulex.Adapter.Persistence do
       end
 
       @impl true
-      def load(cache, path, _opts) do
+      def load(%{cache: cache}, path, opts) do
         path
         |> File.open([:read], fn io_dev ->
           io_dev
           |> IO.stream(:line)
           |> Stream.map(&String.trim/1)
           |> Enum.each(fn line ->
-            objs = Object.decode(line, [:safe])
-            cache.__adapter__.set_many(cache, objs, [])
+            entries = Entry.decode(line, [:safe])
+            cache.put_all(entries, opts)
           end)
         end)
         |> handle_response()
@@ -86,11 +87,8 @@ defmodule Nebulex.Adapter.Persistence do
 
   See `c:Nebulex.Cache.dump/2`.
   """
-  @callback dump(
-              cache :: Nebulex.Cache.t(),
-              path :: Path.t(),
-              opts :: Nebulex.Cache.opts()
-            ) :: :ok | {:error, term}
+  @callback dump(Nebulex.Adapter.adapter_meta(), Path.t(), Nebulex.Cache.opts()) ::
+              :ok | {:error, term}
 
   @doc """
   Loads a dumped cache from the given `path`.
@@ -99,9 +97,6 @@ defmodule Nebulex.Adapter.Persistence do
 
   See `c:Nebulex.Cache.load/2`.
   """
-  @callback load(
-              cache :: Nebulex.Cache.t(),
-              path :: Path.t(),
-              opts :: Nebulex.Cache.opts()
-            ) :: :ok | {:error, term}
+  @callback load(Nebulex.Adapter.adapter_meta(), Path.t(), Nebulex.Cache.opts()) ::
+              :ok | {:error, term}
 end

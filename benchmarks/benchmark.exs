@@ -4,51 +4,47 @@ nodes = [:"node1@127.0.0.1", :"node2@127.0.0.1"]
 Nebulex.Cluster.spawn(nodes)
 
 alias Nebulex.NodeCase
-alias Nebulex.TestCache.{Local, Partitioned}
-alias Nebulex.TestCache.Partitioned.Primary
+alias Nebulex.TestCache.Cache
+alias Nebulex.TestCache.Partitioned
 
-# start caches
-{:ok, local} = Local.start_link()
-{:ok, primary} = Primary.start_link()
-{:ok, dist} = Partitioned.start_link()
-node_pid_list = NodeCase.start_caches(Node.list(), [Primary, Partitioned])
+# start local caches
+{:ok, local_ets} = Cache.start_link(name: :cache_ets_bench)
+{:ok, local_shards} = Cache.start_link(name: :cache_shards_bench, backend: :shards)
+
+# start distributed caches
+{:ok, dist} = Partitioned.start_link(primary: [backend: :shards])
+node_pid_list = NodeCase.start_caches(Node.list(), [{Partitioned, primary: [backend: :shards]}])
+
+# default cache
+default_dynamic_cache = Cache.get_dynamic_cache()
 
 # samples
 keys = Enum.to_list(1..10_000)
-bulk = for x <- 1..100, do: {x, x}
-
-# init caches
-Enum.each(1..5000, fn x ->
-  Local.set(x, x)
-  Partitioned.set(x, x)
-end)
 
 inputs = %{
-  "Generational Local Cache" => Local,
-  "Partitioned Cache" => Partitioned
+  "Generational Local Cache with ETS" => {Cache, :cache_ets_bench},
+  "Generational Local Cache with Shards" => {Cache, :cache_shards_bench},
+  "Partitioned Cache" => {Partitioned, Partitioned}
 }
 
 benchmarks = %{
   "get" => fn {cache, random} ->
     cache.get(random)
   end,
-  "set" => fn {cache, random} ->
-    cache.set(random, random)
+  "get_all" => fn {cache, random} ->
+    cache.get_all([random])
   end,
-  "add" => fn {cache, random} ->
-    cache.add(random, random)
+  "put" => fn {cache, random} ->
+    cache.put(random, random)
+  end,
+  "put_new" => fn {cache, random} ->
+    cache.put_new(random, random)
   end,
   "replace" => fn {cache, random} ->
     cache.replace(random, random)
   end,
-  "add_or_replace!" => fn {cache, random} ->
-    cache.add_or_replace!(random, random)
-  end,
-  "get_many" => fn {cache, _random} ->
-    cache.get_many(1..10)
-  end,
-  "set_many" => fn {cache, _random} ->
-    cache.set_many(bulk)
+  "put_all" => fn {cache, random} ->
+    cache.put_all([{random, random}])
   end,
   "delete" => fn {cache, random} ->
     cache.delete(random)
@@ -62,8 +58,8 @@ benchmarks = %{
   "size" => fn {cache, _random} ->
     cache.size()
   end,
-  "object_info" => fn {cache, random} ->
-    cache.object_info(random, :ttl)
+  "ttl" => fn {cache, random} ->
+    cache.ttl(random)
   end,
   "expire" => fn {cache, random} ->
     cache.expire(random, 1)
@@ -74,28 +70,28 @@ benchmarks = %{
   "update" => fn {cache, random} ->
     cache.update(random, 1, &Kernel.+(&1, 1))
   end,
-  "update_counter" => fn {cache, _random} ->
-    cache.update_counter(:counter, 1)
+  "incr" => fn {cache, _random} ->
+    cache.incr(:counter, 1)
   end,
   "all" => fn {cache, _random} ->
     cache.all()
   end,
   "transaction" => fn {cache, random} ->
-    cache.transaction(
-      fn ->
-        cache.update_counter(random, 1)
-        :ok
-      end,
-      keys: [random]
-    )
+    cache.transaction([keys: [random]], fn ->
+      cache.incr(random, 1)
+    end)
   end
 }
 
 Benchee.run(
   benchmarks,
   inputs: inputs,
-  before_scenario: fn cache ->
+  before_scenario: fn {cache, name} ->
+    _ = cache.put_dynamic_cache(name)
     {cache, Enum.random(keys)}
+  end,
+  after_scenario: fn {cache, _} ->
+    _ = cache.put_dynamic_cache(default_dynamic_cache)
   end,
   formatters: [
     {Benchee.Formatters.Console, comparison: false, extended_statistics: true},
@@ -107,7 +103,7 @@ Benchee.run(
 )
 
 # stop caches s
-if Process.alive?(local), do: Local.stop(local)
-if Process.alive?(primary), do: Primary.stop(primary)
-if Process.alive?(dist), do: Partitioned.stop(dist)
+if Process.alive?(local_ets), do: Supervisor.stop(local_ets)
+if Process.alive?(local_shards), do: Supervisor.stop(local_shards)
+if Process.alive?(dist), do: Supervisor.stop(dist)
 NodeCase.stop_caches(node_pid_list)

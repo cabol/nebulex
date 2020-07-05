@@ -5,10 +5,27 @@ defmodule Nebulex.Adapter do
   """
 
   @type t :: module
+
+  @typedoc """
+  The metadata returned by the adapter `c:init/1`.
+
+  It must be a map and Nebulex itself will always inject two keys into the meta:
+
+    * `:cache` - The cache module.
+    * `:name` - The nase of the cache.
+    * `:pid` - The PID returned by the child spec returned in `c:init/1`
+  """
+  @type adapter_meta :: map
+
   @type cache :: Nebulex.Cache.t()
   @type key :: Nebulex.Cache.key()
-  @type object :: Nebulex.Object.t()
+  @type value :: Nebulex.Cache.value()
+  @type entry :: Nebulex.Entry.t()
   @type opts :: Nebulex.Cache.opts()
+  @type entries :: Nebulex.Cache.entries()
+  @type ttl :: timeout
+  @type on_write :: :put | :put_new | :replace
+  @type child_spec :: :supervisor.child_spec() | {module(), term()} | module() | nil
 
   @doc """
   The callback invoked in case the adapter needs to inject code.
@@ -16,132 +33,161 @@ defmodule Nebulex.Adapter do
   @macrocallback __before_compile__(env :: Macro.Env.t()) :: Macro.t()
 
   @doc """
-  Initializes the adapter supervision tree by returning the children
+  Initializes the adapter supervision tree by returning the children.
   """
-  @callback init(opts) :: {:ok, [:supervisor.child_spec() | {module(), term()} | module()]}
+  @callback init(opts) :: {:ok, child_spec, adapter_meta}
 
   @doc """
-  Retrieves a single object from cache.
+  Gets the value for a specific `key` in `cache`.
 
   See `c:Nebulex.Cache.get/2`.
   """
-  @callback get(cache, key, opts) :: object | nil
+  @callback get(adapter_meta, key, opts) :: value
 
   @doc """
-  Returns a map with the objects for all specified keys. For every key that
-  does not hold a value or does not exist, that key is simply ignored.
-  Because of this, the operation never fails.
+  Gets a collection of entries from the Cache, returning them as `Map.t()` of
+  the values associated with the set of keys requested.
 
-  See `c:Nebulex.Cache.get_many/2`.
+  For every key that does not hold a value or does not exist, that key is
+  simply ignored. Because of this, the operation never fails.
+
+  See `c:Nebulex.Cache.get_all/2`.
   """
-  @callback get_many(cache, [key], opts) :: map
+  @callback get_all(adapter_meta, [key], opts) :: map
 
   @doc """
-  Sets the given `object` under `key` into the cache.
+  Puts the given `value` under `key` into the `cache`.
 
-  If the object already exists, it is overwritten. Any previous time to live
-  associated with the key is discarded on successful `set` operation.
+  Returns `true` if the `value` with key `key` is successfully inserted;
+  otherwise `false` is returned.
 
-  Returns `true` if an object with key `key` is found and successfully inserted,
-  otherwise `false`.
+  The `ttl` argument sets the time-to-live for the stored entry. If it is not
+  set, it means the entry hasn't a time-to-live, then it shouldn't expire.
 
-  ## Options
+  ## OnWrite
 
-  Besides the "Shared options" section in `Nebulex.Cache` documentation,
-  it accepts:
+  The `on_write` argument supports the following values:
 
-    * `:action` - It may be one of `:add`, `:replace`, `:set` (the default).
-      See the "Actions" section for more information.
+    * `:put` - If the `key` already exists, it is overwritten. Any previous
+      time-to-live associated with the key is discarded on successful `write`
+      operation.
 
-  ## Actions
+    * `:put_new` - It only stores the entry if the `key` does not already exist,
+      otherwise, `false` is returned.
 
-  The `:action` option supports the following values:
+    * `:replace` - Alters the value stored under the given `key`, but only
+      if the key already exists into the cache, otherwise, `false` is
+      returned.
 
-    * `:add` - Only set the `key` if it does not already exist. If it does,
-      `false` is returned.
-
-    * `:replace` - Alters the object stored under `key`, but only if the object
-      already exists into the cache.
-
-    * `:set` - Set `key` to hold the given `object` (default).
-
-  See `c:Nebulex.Cache.set/3`, `c:Nebulex.Cache.add/3`, `c:Nebulex.Cache.replace/3`.
+  See `c:Nebulex.Cache.put/3`, `c:Nebulex.Cache.put_new/3`, `c:Nebulex.Cache.replace/3`.
   """
-  @callback set(cache, object, opts) :: boolean
+  @callback put(adapter_meta, key, value, ttl, on_write, opts) :: boolean
 
   @doc """
-  Sets the given `objects`, replacing existing ones, just as regular `set`.
+  Puts the given `entries` (key/value pairs) into the `cache`.
 
-  Returns `:ok` if the all objects were successfully set, otherwise
-  `{:error, failed_keys}`, where `failed_keys` contains the keys that
-  could not be set.
+  Returns `true` if all the keys were inserted. If no key was inserted
+  (at least one key already existed), `false` is returned.
+
+  The `ttl` argument sets the time-to-live for the stored entry. If it is not
+  set, it means the entry hasn't a time-to-live, then it shouldn't expire.
+  The given `ttl` is applied to all keys.
+
+  ## OnWrite
+
+  The `on_write` argument supports the following values:
+
+    * `:put` - If the `key` already exists, it is overwritten. Any previous
+      time-to-live associated with the key is discarded on successful `write`
+      operation.
+
+    * `:put_new` - It only stores the entry if the `key` does not already exist,
+      otherwise, `false` is returned.
 
   Ideally, this operation should be atomic, so all given keys are set at once.
   But it depends purely on the adapter's implementation and the backend used
   internally by the adapter. Hence, it is recommended to checkout the
   adapter's documentation.
 
-  See `c:Nebulex.Cache.set_many/2`.
+  See `c:Nebulex.Cache.put_all/2`.
   """
-  @callback set_many(cache, [object], opts) :: :ok | {:error, failed_keys :: [key]}
+  @callback put_all(adapter_meta, entries, ttl, on_write, opts) :: boolean
 
   @doc """
-  Deletes a single object from cache.
+  Deletes a single entry from cache.
 
   See `c:Nebulex.Cache.delete/2`.
   """
-  @callback delete(cache, key, opts) :: :ok
+  @callback delete(adapter_meta, key, opts) :: :ok
 
   @doc """
-  Returns and removes the object with key `key` in the cache.
+  Returns and removes the entry with key `key` in the cache.
 
   See `c:Nebulex.Cache.take/2`.
   """
-  @callback take(cache, key, opts) :: object | nil
+  @callback take(adapter_meta, key, opts) :: value
+
+  @doc """
+  Increments or decrements the counter mapped to the given `key`.
+
+  See `c:Nebulex.Cache.incr/3`.
+  """
+  @callback incr(adapter_meta, key, incr :: integer, ttl, opts) :: integer
 
   @doc """
   Returns whether the given `key` exists in cache.
 
   See `c:Nebulex.Cache.has_key?/1`.
   """
-  @callback has_key?(cache, key) :: boolean
+  @callback has_key?(adapter_meta, key) :: boolean
 
   @doc """
-  Returns the information associated with `attr` for the given `key`,
-  or returns `nil` if `key` doesn't exist.
+  Returns the TTL (time-to-live) for the given `key`. If the `key` does not
+  exist, then `nil` is returned.
 
-  See `c:Nebulex.Cache.object_info/2`.
+  See `c:Nebulex.Cache.ttl/1`.
   """
-  @callback object_info(cache, key, attr :: :ttl | :version) :: term | nil
+  @callback ttl(adapter_meta, key) :: ttl | nil
 
   @doc """
-  Returns the expiry timestamp for the given `key`, if the timeout `ttl`
-  (in seconds) is successfully updated.
-
-  If `key` doesn't exist, `nil` is returned.
+  Returns `true` if the given `key` exists and the new `ttl` was successfully
+  updated, otherwise, `false` is returned.
 
   See `c:Nebulex.Cache.expire/2`.
   """
-  @callback expire(cache, key, ttl :: timeout) :: timeout | nil
+  @callback expire(adapter_meta, key, ttl) :: boolean
 
   @doc """
-  Updates (increment or decrement) the counter mapped to the given `key`.
+  Returns `true` if the given `key` exists and the last access time was
+  successfully updated, otherwise, `false` is returned.
 
-  See `c:Nebulex.Cache.update_counter/3`.
+  See `c:Nebulex.Cache.touch/1`.
   """
-  @callback update_counter(cache, key, incr :: integer, opts) :: integer
+  @callback touch(adapter_meta, key) :: boolean
 
   @doc """
   Returns the total number of cached entries.
 
   See `c:Nebulex.Cache.size/0`.
   """
-  @callback size(cache) :: integer
+  @callback size(adapter_meta) :: integer
 
   @doc """
-  Flushes the cache.
+  Flushes the cache and returns the number of evicted keys.
 
   See `c:Nebulex.Cache.flush/0`.
   """
-  @callback flush(cache) :: :ok
+  @callback flush(adapter_meta) :: integer
+
+  @doc """
+  RExecutes the function `fun` passing as parameters the adapter and metadata
+  (from the `c:init/1` callback) associated with the given cache `name_or_pid`.
+
+  It expects a name or a PID representing the cache.
+  """
+  @spec with_meta(atom | pid, (module, adapter_meta -> term)) :: term
+  def with_meta(name_or_pid, fun) do
+    {adapter, adapter_meta} = Nebulex.Cache.Registry.lookup(name_or_pid)
+    fun.(adapter, adapter_meta)
+  end
 end

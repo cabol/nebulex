@@ -1,45 +1,42 @@
 defmodule Nebulex.Cache.QueryableTest do
-  import Nebulex.SharedTestCase
+  import Nebulex.TestCase
 
-  deftests do
-    alias Nebulex.Object
+  deftests "queryable" do
+    import Nebulex.CacheHelpers
 
-    test "all" do
-      set1 = for x <- 1..50, do: @cache.set(x, x)
-      set2 = for x <- 51..100, do: @cache.set(x, x)
+    test "all", %{cache: cache} do
+      set1 = cache_put(cache, 1..50)
+      set2 = cache_put(cache, 51..100)
 
-      for x <- 1..100, do: assert(@cache.get(x) == x)
+      for x <- 1..100, do: assert(cache.get(x) == x)
       expected = set1 ++ set2
 
-      assert expected == :lists.usort(@cache.all())
+      assert :lists.usort(cache.all()) == expected
 
-      set3 = for x <- 20..60, do: @cache.delete(x, return: :key)
+      set3 = Enum.to_list(20..60)
+      :ok = Enum.each(set3, &cache.delete(&1))
       expected = :lists.usort(expected -- set3)
 
-      assert expected == :lists.usort(@cache.all())
+      assert :lists.usort(cache.all()) == expected
     end
 
-    test "stream" do
+    test "stream", %{cache: cache} do
       entries = for x <- 1..10, do: {x, x * 2}
-      assert :ok == @cache.set_many(entries)
+      assert cache.put_all(entries) == :ok
 
       expected = Keyword.keys(entries)
-      assert expected == nil |> @cache.stream() |> Enum.to_list() |> :lists.usort()
+      assert nil |> cache.stream() |> Enum.to_list() |> :lists.usort() == expected
 
       expected = Keyword.values(entries)
 
-      assert expected ==
-               nil
-               |> @cache.stream(return: :value, page_size: 3)
-               |> Enum.to_list()
-               |> :lists.usort()
-
-      stream = @cache.stream(nil, return: :object, page_size: 3)
-      [%Object{key: 1, value: 2} | _] = stream |> Enum.to_list() |> :lists.usort()
+      assert nil
+             |> cache.stream(return: :value, page_size: 3)
+             |> Enum.to_list()
+             |> :lists.usort() == expected
 
       assert_raise Nebulex.QueryError, fn ->
         :invalid_query
-        |> @cache.stream()
+        |> cache.stream()
         |> Enum.to_list()
       end
     end

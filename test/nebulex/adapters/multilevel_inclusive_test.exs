@@ -1,27 +1,127 @@
 defmodule Nebulex.Adapters.MultilevelInclusiveTest do
   use ExUnit.Case, async: true
-  use Nebulex.MultilevelTest, cache: Nebulex.TestCache.Multilevel
-  use Nebulex.Cache.QueryableTest, cache: Nebulex.TestCache.Multilevel
-  use Nebulex.Cache.TransactionTest, cache: Nebulex.TestCache.Multilevel
+  use Nebulex.NodeCase
+  use Nebulex.MultilevelTest
+  use Nebulex.Cache.QueryableTest
+  use Nebulex.Cache.TransactionTest
 
+  import Nebulex.Helpers
+  import Nebulex.TestCase
+
+  alias Nebulex.Cache.Cluster
   alias Nebulex.TestCache.Multilevel
+  alias Nebulex.Time
 
-  test "get for inclusive mode" do
-    1 = @l1.set(1, 1)
-    2 = @l2.set(2, 2)
-    3 = @l3.set(3, 3)
+  @gc_interval Time.expiry_time(1, :hour)
 
-    assert 1 == Multilevel.get(1)
-    assert 2 == Multilevel.get(2, return: :key)
-    %Object{value: 2, key: 2, version: _} = Multilevel.get(2, return: :object)
-    assert 2 == 2 |> @l1.get(return: :key) |> @l2.get()
-    refute @l2.get(1)
-    refute @l3.get(1)
-    refute @l3.get(2)
-    assert 3 == @l3.get(3)
-    refute @l1.get(3)
-    refute @l2.get(3)
-    assert 3 == Multilevel.get(3)
-    assert 3 == 3 |> @l1.get(return: :key) |> @l2.get(return: :key) |> @l3.get()
+  @levels [
+    l1: [gc_interval: @gc_interval, backend: :shards, partitions: 2],
+    l2: [
+      adapter: Nebulex.Adapters.Partitioned,
+      primary: [gc_interval: @gc_interval]
+    ],
+    l3: [
+      adapter: Nebulex.Adapters.Replicated,
+      primary: [
+        gc_interval: @gc_interval,
+        backend: :shards,
+        partitions: 2
+      ]
+    ]
+  ]
+
+  setup_with_dynamic_cache(Multilevel, :multilevel_inclusive,
+    model: :inclusive,
+    levels: @levels,
+    fallback: fn _ -> nil end
+  )
+
+  describe "inclusive" do
+    test "get" do
+      :ok = Process.sleep(2000)
+      :ok = Multilevel.put(1, 1, level: 1)
+      :ok = Multilevel.put(2, 2, level: 2)
+      :ok = Multilevel.put(3, 3, level: 3)
+
+      assert Multilevel.get(1) == 1
+      refute Multilevel.get(1, level: 2)
+      refute Multilevel.get(1, level: 3)
+
+      assert Multilevel.get(2) == 2
+      assert Multilevel.get(2, level: 1) == 2
+      assert Multilevel.get(2, level: 2) == 2
+      refute Multilevel.get(2, level: 3)
+
+      assert Multilevel.get(3, level: 3) == 3
+      refute Multilevel.get(3, level: 1)
+      refute Multilevel.get(3, level: 2)
+
+      assert Multilevel.get(3) == 3
+      assert Multilevel.get(3, level: 1) == 3
+      assert Multilevel.get(3, level: 2) == 3
+      assert Multilevel.get(3, level: 2) == 3
+    end
+
+    test "fetched value is replicated with TTL on previous levels" do
+      assert Multilevel.put(:a, 1, ttl: 1000) == :ok
+      assert Multilevel.ttl(:a) > 0
+
+      :ok = Process.sleep(1100)
+      refute Multilevel.get(:a, level: 1)
+      refute Multilevel.get(:a, level: 2)
+      refute Multilevel.get(:a, level: 3)
+
+      assert Multilevel.put(:b, 1, level: 3) == :ok
+      assert Multilevel.ttl(:b) == :infinity
+      assert Multilevel.expire(:b, 1000)
+      assert Multilevel.ttl(:b) > 0
+      refute Multilevel.get(:b, level: 1)
+      refute Multilevel.get(:b, level: 2)
+      assert Multilevel.get(:b, level: 3) == 1
+
+      assert Multilevel.get(:b) == 1
+      assert Multilevel.get(:b, level: 1) == 1
+      assert Multilevel.get(:b, level: 2) == 1
+      assert Multilevel.get(:b, level: 3) == 1
+
+      :ok = Process.sleep(1100)
+      refute Multilevel.get(:b, level: 1)
+      refute Multilevel.get(:b, level: 2)
+      refute Multilevel.get(:b, level: 3)
+    end
+  end
+
+  describe "disstributed levels" do
+    test "return cluster nodes" do
+      assert Cluster.get_nodes(normalize_module_name([:multilevel_inclusive, "L2"])) == [node()]
+      assert Cluster.get_nodes(normalize_module_name([:multilevel_inclusive, "L3"])) == [node()]
+    end
+
+    test "joining new node" do
+      node = :"node1@127.0.0.1"
+
+      {:ok, pid} =
+        start_cache(node, Multilevel,
+          name: :multilevel_inclusive,
+          model: :inclusive,
+          levels: @levels
+        )
+
+      # check cluster nodes
+      dist_cache_name = normalize_module_name([:multilevel_inclusive, "L3"])
+      assert Cluster.get_nodes(dist_cache_name) == [node, node()]
+
+      kv_pairs = for k <- 1..100, do: {k, k}
+
+      Multilevel.transaction(fn ->
+        assert Multilevel.put_all(kv_pairs) == :ok
+
+        for k <- 1..100 do
+          assert Multilevel.get(k) == k
+        end
+      end)
+
+      :ok = stop_cache(:"node1@127.0.0.1", pid)
+    end
   end
 end
