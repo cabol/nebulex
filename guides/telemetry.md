@@ -84,11 +84,11 @@ defmodule MyApp.Telemetry do
   defp metrics do
     [
       # Nebulex Stats Metrics
-      last_value("my_app.cache.stats.hits"),
-      last_value("my_app.cache.stats.misses"),
-      last_value("my_app.cache.stats.writes"),
-      last_value("my_app.cache.stats.evictions"),
-      last_value("my_app.cache.stats.expirations"),
+      last_value("nebulex.cache.stats.hits", tags: [:cache]),
+      last_value("nebulex.cache.stats.misses", tags: [:cache]),
+      last_value("nebulex.cache.stats.writes", tags: [:cache]),
+      last_value("nebulex.cache.stats.evictions", tags: [:cache]),
+      last_value("nebulex.cache.stats.expirations", tags: [:cache]),
 
       # VM Metrics
       summary("vm.memory.total", unit: {:byte, :kilobyte}),
@@ -122,36 +122,49 @@ children = [
 Now start an IEx session and call the server:
 
 ```
-iex(1)> MyApp.Cache.put 1, 1
+iex(1)> MyApp.Cache.get 1
+nil
+iex(2)> MyApp.Cache.put 1, 1, ttl: 10
+:ok
+iex(3)> MyApp.Cache.get 1
+1
+iex(4)> MyApp.Cache.put 2, 2
+:ok
+iex(5)> MyApp.Cache.delete 2
+:ok
+iex(6)> Process.sleep(20)
+:ok
+iex(7)> MyApp.Cache.get 1
+nil
 ```
 
 and you should see something like the following output:
 
 ```
 [Telemetry.Metrics.ConsoleReporter] Got new event!
-Event name: my_app.cache.stats
-All measurements: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 1}
+Event name: nebulex.cache.stats
+All measurements: %{evictions: 2, expirations: 1, hits: 1, misses: 2, writes: 2}
 All metadata: %{cache: MyApp.Cache}
 
 Metric measurement: :hits (last_value)
-With value: 0
-Tag values: %{}
+With value: 1
+Tag values: %{cache: MyApp.Cache}
 
 Metric measurement: :misses (last_value)
-With value: 0
-Tag values: %{}
+With value: 2
+Tag values: %{cache: MyApp.Cache}
 
 Metric measurement: :writes (last_value)
-With value: 1
-Tag values: %{}
+With value: 2
+Tag values: %{cache: MyApp.Cache}
 
 Metric measurement: :evictions (last_value)
-With value: 0
-Tag values: %{}
+With value: 2
+Tag values: %{cache: MyApp.Cache}
 
 Metric measurement: :expirations (last_value)
-With value: 0
-Tag values: %{}
+With value: 1
+Tag values: %{cache: MyApp.Cache}
 ```
 
 ## Adding other custom metrics
@@ -172,7 +185,7 @@ defmodule MyApp.Cache do
 
   def dispatch_cache_size do
     :telemetry.execute(
-      [:my_app, :cache, :size],
+      [:nebulex, :cache, :size],
       %{value: size()},
       %{cache: __MODULE__}
     )
@@ -198,14 +211,14 @@ Metrics:
 defp metrics do
   [
     # Nebulex Stats Metrics
-    last_value("my_app.cache.stats.hits"),
-    last_value("my_app.cache.stats.misses"),
-    last_value("my_app.cache.stats.writes"),
-    last_value("my_app.cache.stats.evictions"),
-    last_value("my_app.cache.stats.expirations"),
+    last_value("nebulex.cache.stats.hits", tags: [:cache]),
+    last_value("nebulex.cache.stats.misses", tags: [:cache]),
+    last_value("nebulex.cache.stats.writes", tags: [:cache]),
+    last_value("nebulex.cache.stats.evictions", tags: [:cache]),
+    last_value("nebulex.cache.stats.expirations", tags: [:cache]),
 
     # Nebulex custom Metrics
-    last_value("my_app.cache.size.value"),
+    last_value("nebulex.cache.size.value", tags: [:cache]),
 
     # VM Metrics
     summary("vm.memory.total", unit: {:byte, :kilobyte}),
@@ -220,11 +233,11 @@ If you start an IEx session like previously, you should see the new metric too:
 
 ```
 [Telemetry.Metrics.ConsoleReporter] Got new event!
-Event name: my_app.cache.size
+Event name: nebulex.cache.size
 All measurements: %{value: 0}
 All metadata: %{cache: MyApp.Cache}
 
 Metric measurement: :value (last_value)
 With value: 0
-Tag values: %{}
+Tag values: %{cache: MyApp.Cache}
 ```

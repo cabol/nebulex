@@ -163,7 +163,7 @@ defmodule Nebulex.Cache.StatsTest do
 
         assert called(
                  :telemetry.execute(
-                   [:nebulex, :cache, :stats_test, :cache, :stats],
+                   [:nebulex, :cache, :stats],
                    %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0},
                    %{cache: Nebulex.Cache.StatsTest.Cache}
                  )
@@ -175,23 +175,9 @@ defmodule Nebulex.Cache.StatsTest do
   describe "dispatch_stats with dynamic cache" do
     setup_with_dynamic_cache(Cache, :stats_with_dispatch, [stats: true] ++ @config)
 
-    test "emits a telemetry event when called" do
-      with_mock :telemetry, [], execute: fn _, _, _ -> :ok end do
-        :ok = Cache.dispatch_stats()
-
-        assert called(
-                 :telemetry.execute(
-                   [:stats_with_dispatch, :stats],
-                   %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0},
-                   %{cache: :stats_with_dispatch}
-                 )
-               )
-      end
-    end
-
     test "emits a telemetry event with custom telemetry_prefix when called" do
       with_mock :telemetry, [], execute: fn _, _, _ -> :ok end do
-        :ok = Cache.dispatch_stats(telemetry_prefix: [:my_event], metadata: %{tag: "tag1"})
+        :ok = Cache.dispatch_stats(event_prefix: [:my_event], metadata: %{tag: "tag1"})
 
         assert called(
                  :telemetry.execute(

@@ -3,6 +3,7 @@ defmodule Nebulex.Cache.Cluster do
   # distributed caching functionality.
   # TODO: Use pg when depending on Erlang/OTP 23+, since the pg2 module is
   #       deprecated as of OTP 23 and scheduled for removal in OTP 24.
+  #       Nebulex v2 will support both.
   @moduledoc false
 
   @doc """

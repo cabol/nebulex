@@ -59,7 +59,7 @@ defmodule Nebulex.Cache.Stats do
 
       MyApp.Cache.dispatch_stats()
 
-      MyApp.Cache.dispatch_stats(telemetry_prefix: [:my_cache, :stats])
+      MyApp.Cache.dispatch_stats(event_prefix: [:my_cache, :stats])
 
   By calling this injected helper, the function `Nebulex.Cache.Stats.dispatch/2`
   is called under-the-hood, but the cache name is resolved automatically.
@@ -78,7 +78,8 @@ defmodule Nebulex.Cache.Stats do
         measurements: [
           {MyApp.Cache, :dispatch_stats, []},
         ],
-        period: :timer.seconds(10), # configure sampling period - default is :timer.seconds(5)
+        # configure sampling period - default is :timer.seconds(5)
+        period: :timer.seconds(10),
         name: :my_cache_stats_poller
       )
 
@@ -247,18 +248,16 @@ defmodule Nebulex.Cache.Stats do
 
     The telemetry `:metadata` map will include the following fields:
 
-      * `:cache` - Cache module or name.
+      * `:cache` - The cache module, or the name (if an explicit name has been
+        given to the cache).
 
     Additionally, you can add your own metadata fields by given the option
     `:metadata`.
 
     ## Options
 
-      * `:telemetry_prefix` – By default, the telemetry prefix is based on the
-        cache name, so if your cache module is called `MyApp.Cache`, the prefix
-        will be `[:my_app, :cache]`. But, if you have set an explicit name to
-        your cache, like for example `:my_cache_name`, the default prefix will
-        be `[:my_cache_name]`.
+      * `:event_prefix` – The prefix of the telemetry event.
+        Defaults to `[:nebulex, :cache]`.
 
       * `:metadata` – A map with additional metadata fields. Defaults to `%{}`.
 
@@ -269,7 +268,7 @@ defmodule Nebulex.Cache.Stats do
 
         iex> Nebulex.Cache.Stats.dispatch(
         ...>   MyCache,
-        ...>   telemetry_prefix: [:my_event],
+        ...>   event_prefix: [:my_cache],
         ...>   metadata: %{tag: "tag1"}
         ...> )
         :ok
@@ -278,21 +277,13 @@ defmodule Nebulex.Cache.Stats do
     def dispatch(cache_or_name, opts \\ []) do
       if info = __MODULE__.info(cache_or_name) do
         :telemetry.execute(
-          Keyword.get(opts, :telemetry_prefix, telemetry_prefix(cache_or_name)) ++ [:stats],
+          Keyword.get(opts, :event_prefix, [:nebulex, :cache]) ++ [:stats],
           Map.from_struct(info),
           opts |> Keyword.get(:metadata, %{}) |> Map.put(:cache, cache_or_name)
         )
       else
         :ok
       end
-    end
-
-    defp telemetry_prefix(cache_or_name) do
-      cache_or_name
-      |> Module.split()
-      |> Enum.map(&(&1 |> Macro.underscore() |> String.to_atom()))
-    rescue
-      ArgumentError -> [cache_or_name]
     end
   end
 end

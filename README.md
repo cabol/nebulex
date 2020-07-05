@@ -183,7 +183,7 @@ end
 
  * [Getting Started](http://hexdocs.pm/nebulex/getting-started.html)
  * [Documentation](http://hexdocs.pm/nebulex/Nebulex.html)
- * [Cache Usage Patterns via Nebulex.Caching](http://hexdocs.pm/nebulex/cache-usage-patterns.html)
+ * [Cache Usage Patterns](http://hexdocs.pm/nebulex/cache-usage-patterns.html)
  * [Instrumenting the Cache with Telemetry](http://hexdocs.pm/nebulex/telemetry.html)
  * [Migrating to v2.x](http://hexdocs.pm/nebulex/migrating-to-v2.html)
  * [Examples](https://github.com/cabol/nebulex_examples)
@@ -235,13 +235,12 @@ alongside new or changed code.
 
 Before to submit a PR it is highly recommended to run:
 
- * `mix test` to run tests
+ * `mix format` to format the code properly.
+ * `MIX_ENV=test mix credo --strict` to find code style issues.
  * `mix coveralls.html && open cover/excoveralls.html` to run tests and check
    out code coverage (expected 100%).
- * `mix format && mix credo --strict` to format your code properly and find code
-   style issues
- * `mix dialyzer` to run dialyzer for type checking; might take a while on the
-   first invocation
+ * `MIX_ENV=test mix dialyzer` to run dialyzer for type checking; might take a
+   while on the first invocation.
 
 ## Copyright and License
 
