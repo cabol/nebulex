@@ -23,8 +23,8 @@ and `:telemetry_poller` packages:
 def deps do
   [
     {:nebulex, "~> 2.0"},
-    {:shards, "~> 0.6"},   #=> For using :shards as backend
-    {:decorator, "~> 1.3"} #=> For using Caching Annotations
+    {:shards, "~> 0.6"},
+    {:decorator, "~> 1.3"},
     {:telemetry_metrics, "~> 0.5"},
     {:telemetry_poller, "~> 0.5"}
   ]
@@ -71,7 +71,7 @@ defmodule MyApp.Telemetry do
   def init(_arg) do
     children = [
       # Configure `:telemetry_poller` for reporting the cache stats
-      {:telemetry_poller, measurements: periodic_measurements(), period: 10_000}
+      {:telemetry_poller, measurements: periodic_measurements(), period: 10_000},
 
       # For example, we use the console reporter, but you can change it.
       # See `:telemetry_metrics` for for information.
