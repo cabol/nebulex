@@ -1,5 +1,19 @@
 # Changelog
 
+## [v2.0.0-rc.0](https://github.com/cabol/nebulex/tree/v2.0.0-rc.0) (2020-07-05)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v1.2.2...v2.0.0-rc.0)
+
+**Closed issues:**
+
+- Asynchronous testing struggles [\#72](https://github.com/cabol/nebulex/issues/72)
+- MyCache.ttl/0 is undefined or private [\#71](https://github.com/cabol/nebulex/issues/71)
+- Add telemetry integration [\#62](https://github.com/cabol/nebulex/issues/62)
+
+**Merged pull requests:**
+
+- Crafting Nebulex v2 [\#68](https://github.com/cabol/nebulex/pull/68) ([cabol](https://github.com/cabol))
+
 ## [v1.2.2](https://github.com/cabol/nebulex/tree/v1.2.2) (2020-06-11)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v1.2.1...v1.2.2)
