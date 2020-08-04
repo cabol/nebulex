@@ -36,7 +36,7 @@ defmodule Nebulex.Adapters.Partitioned do
     * Support for partitioned topology (Sharding Distribution Model).
     * Support for transactions via Erlang global name registration facility.
     * Configurable primary store (primary local cache).
-    * Configurable hash-slot module to compute the node.
+    * Configurable keyslot module to compute the node.
 
   We can define a partitioned cache as follows:
 
@@ -45,10 +45,10 @@ defmodule Nebulex.Adapters.Partitioned do
           otp_app: :my_app,
           adapter: Nebulex.Adapters.Partitioned
 
-        @behaviour Nebulex.Adapter.HashSlot
+        @behaviour Nebulex.Adapter.Keyslot
 
         @impl true
-        def keyslot(key, range) do
+        def compute(key, range) do
           key
           |> :erlang.phash2()
           |> :jchash.compute(range)
@@ -59,7 +59,7 @@ defmodule Nebulex.Adapters.Partitioned do
   usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.PartitionedCache,
-        hash_slot: MyApp.PartitionedCache
+        keyslot: MyApp.PartitionedCache,
         primary: [
           adapter: Nebulex.Adapters.Local,
           gc_interval: 86_400_000,
@@ -79,8 +79,8 @@ defmodule Nebulex.Adapters.Partitioned do
       except for the shared option `adapter:` (see shared primary options
       below).
 
-    * `:hash_slot` - Defines the module implementing
-      `Nebulex.Adapter.HashSlot` behaviour.
+    * `:keyslot` - Defines the module implementing `Nebulex.Adapter.Keyslot`
+      behaviour.
 
     * `task_supervisor_opts` - Start-time options passed to
       `Task.Supervisor.start_link/1` when the adapter is initialized.
@@ -141,8 +141,8 @@ defmodule Nebulex.Adapters.Partitioned do
   # Inherit default persistence implementation
   use Nebulex.Adapter.Persistence
 
-  # Inherit default keyslot callback
-  use Nebulex.Adapter.HashSlot
+  # Inherit default compute callback
+  use Nebulex.Adapter.Keyslot
 
   import Nebulex.Helpers
 
@@ -164,8 +164,8 @@ defmodule Nebulex.Adapters.Partitioned do
       A convenience function to get the node of the given `key`.
       """
       def get_node(name \\ __MODULE__, key) do
-        Adapter.with_meta(name, fn _adapter, %{hash_slot: hash_slot} ->
-          Cluster.get_node(name, key, hash_slot)
+        Adapter.with_meta(name, fn _adapter, %{keyslot: keyslot} ->
+          Cluster.get_node(name, key, keyslot)
         end)
       end
     end
@@ -191,11 +191,11 @@ defmodule Nebulex.Adapters.Partitioned do
     task_sup_name = normalize_module_name([name, TaskSupervisor])
     task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
 
-    # hash-slot module for selecting nodes
-    hash_slot =
+    # keyslot module for selecting nodes
+    keyslot =
       opts
-      |> Keyword.get(:hash_slot, __MODULE__)
-      |> assert_behaviour(Nebulex.Adapter.HashSlot, "hash_slot")
+      |> Keyword.get(:keyslot, __MODULE__)
+      |> assert_behaviour(Nebulex.Adapter.Keyslot, "keyslot")
 
     child_spec =
       Nebulex.Adapters.Supervisor.child_spec(
@@ -212,7 +212,7 @@ defmodule Nebulex.Adapters.Partitioned do
       primary: primary_adapter,
       primary_meta: primary_meta,
       task_sup: task_sup_name,
-      hash_slot: hash_slot,
+      keyslot: keyslot,
       stat_counter: stat_counter
     }
 
@@ -417,8 +417,8 @@ defmodule Nebulex.Adapters.Partitioned do
     |> rpc_call(adapter_meta, fun, args, opts)
   end
 
-  def get_node(%{name: name, hash_slot: hash_slot}, key) do
-    Cluster.get_node(name, key, hash_slot)
+  def get_node(%{name: name, keyslot: keyslot}, key) do
+    Cluster.get_node(name, key, keyslot)
   end
 
   defp rpc_call(

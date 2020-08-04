@@ -43,37 +43,37 @@ defmodule Nebulex.Adapters.PartitionedTest do
       assert Regex.match?(~r"expected #{mod} to implement the behaviour Nebulex.Adapter", msg)
     end
 
-    test "fail because unloaded hash_slot module" do
+    test "fail because unloaded keyslot module" do
       assert {:error, {%RuntimeError{message: msg}, _}} =
-               Partitioned.start_link(name: :unloaded_hash_slot, hash_slot: UnloadedHashSlot)
+               Partitioned.start_link(name: :unloaded_keyslot, keyslot: UnloadedKeyslot)
 
-      assert Regex.match?(~r"hash_slot UnloadedHashSlot was not compiled", msg)
+      assert Regex.match?(~r"keyslot UnloadedKeyslot was not compiled", msg)
     end
 
-    test "fail because invalid hash_slot module" do
+    test "fail because invalid keyslot module" do
       assert {:error, {%RuntimeError{message: msg}, _}} =
-               Partitioned.start_link(name: :invalid_hash_slot, hash_slot: __MODULE__)
+               Partitioned.start_link(name: :invalid_keyslot, keyslot: __MODULE__)
 
       mod = inspect(__MODULE__)
-      behaviour = "Nebulex.Adapter.HashSlot"
+      behaviour = "Nebulex.Adapter.Keyslot"
       assert Regex.match?(~r"expected #{mod} to implement the behaviour #{behaviour}", msg)
     end
   end
 
   describe "partitioned cache" do
-    test "custom hash_slot" do
-      defmodule HashSlot do
-        @behaviour Nebulex.Adapter.HashSlot
+    test "custom keyslot" do
+      defmodule Keyslot do
+        @behaviour Nebulex.Adapter.Keyslot
 
         @impl true
-        def keyslot(key, range) do
+        def compute(key, range) do
           key
           |> :erlang.phash2()
           |> rem(range)
         end
       end
 
-      with_dynamic_cache(Partitioned, [name: :custom_hash_slot, hash_slot: HashSlot], fn ->
+      with_dynamic_cache(Partitioned, [name: :custom_keyslot, keyslot: Keyslot], fn ->
         refute Partitioned.get("foo")
         assert Partitioned.put("foo", "bar") == :ok
         assert Partitioned.get("foo") == "bar"

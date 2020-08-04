@@ -46,12 +46,12 @@ defmodule Nebulex.Cache.Cluster do
   end
 
   @doc """
-  Selects only one node based on the `keyslot` computation of the `key`.
+  Selects one node based on the computation of the `key` slot.
   """
-  @spec get_node(name :: atom, Nebulex.Cache.key(), module) :: node
-  def get_node(name, key, module) do
+  @spec get_node(name :: atom, Nebulex.Cache.key(), keyslot :: module) :: node
+  def get_node(name, key, keyslot) do
     nodes = get_nodes(name)
-    index = module.keyslot(key, length(nodes))
+    index = keyslot.compute(key, length(nodes))
     Enum.at(nodes, index)
   end
 
