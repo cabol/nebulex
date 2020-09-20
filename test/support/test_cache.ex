@@ -76,6 +76,27 @@ defmodule Nebulex.TestCache do
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Multilevel
+
+    defmodule L1 do
+      @moduledoc false
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+    end
+
+    defmodule L2 do
+      @moduledoc false
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Replicated
+    end
+
+    defmodule L3 do
+      @moduledoc false
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Partitioned
+    end
   end
 
   ## Mocks
@@ -154,5 +175,21 @@ defmodule Nebulex.TestCache do
 
     @impl true
     def put_all(_, _, _, _, _), do: Process.exit(self(), :normal)
+  end
+
+  defmodule PartitionedMock do
+    @moduledoc false
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Partitioned,
+      primary_storage_adapter: Nebulex.TestCache.AdapterMock
+  end
+
+  defmodule ReplicatedMock do
+    @moduledoc false
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Replicated,
+      primary_storage_adapter: Nebulex.TestCache.AdapterMock
   end
 end

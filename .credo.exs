@@ -11,6 +11,10 @@
         ## Design Checks
         {Credo.Check.Design.AliasUsage, priority: :low},
 
+        # Deactivate due to they're not compatible with current Elixir version
+        {Credo.Check.Refactor.MapInto, false},
+        {Credo.Check.Warning.LazyLogging, false},
+
         ## Readability Checks
         {Credo.Check.Readability.MaxLineLength, priority: :low, max_length: 100},
 

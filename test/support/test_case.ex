@@ -18,6 +18,29 @@ defmodule Nebulex.TestCase do
   end
 
   @doc false
+  defmacro setup_with_cache(cache, opts \\ []) do
+    quote do
+      setup do
+        cache = unquote(cache)
+        opts = unquote(opts)
+
+        {:ok, pid} = cache.start_link(opts)
+
+        on_exit(fn ->
+          try do
+            :ok = Process.sleep(20)
+            if Process.alive?(pid), do: Supervisor.stop(pid, :normal, 5000)
+          catch
+            :exit, _ -> :noop
+          end
+        end)
+
+        {:ok, cache: cache}
+      end
+    end
+  end
+
+  @doc false
   defmacro setup_with_dynamic_cache(cache, name, opts \\ []) do
     quote do
       setup do

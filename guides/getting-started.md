@@ -79,7 +79,7 @@ Could be configured in `config/config.exs` like so:
 
 ```elixir
 config :blog, Blog.Cache,
-  gc_interval: 86_400_000, #=> 1 day
+  gc_interval: :timer.seconds(3600),
   backend: :shards,
   partitions: System.schedulers_online() #=> The default
 ```
@@ -411,12 +411,14 @@ defmodule Blog.PartitionedCache do
 end
 ```
 
+> By default, the `primary_storage_adapter:` is set to `Nebulex.Adapters.Local`.
+
 Could be configured with (`config/config.exs`):
 
 ```elixir
 config :blog, Blog.PartitionedCache,
   primary: [
-    gc_interval: 86_400_000,
+    gc_interval: :timer.seconds(3600),
     backend: :shards,
     partitions: 2
   ]
@@ -483,6 +485,18 @@ defmodule Blog.MultilevelCache do
   use Nebulex.Cache,
     otp_app: :blog,
     adapter: Nebulex.Adapters.Multilevel
+
+  defmodule L1 do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
+  end
+
+  defmodule L2 do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Partitioned
+  end
 end
 ```
 
@@ -492,17 +506,14 @@ Could be configured with (`config/config.exs`):
 config :blog, Blog.MultilevelCache,
   model: :inclusive,
   levels: [
-    l1: [
-      gc_interval: 86_400_000,
-      backend: :shards
-    ],
-    l2: [
-      adapter: Nebulex.Adapters.Partitioned,
-      primary: [
-        gc_interval: 86_400_000,
-        backend: :shards
-      ]
-    ]
+    {
+      Blog.MultilevelCache.L1,
+      gc_interval: :timer.seconds(3600), backend: :shards
+    },
+    {
+      Blog.MultilevelCache.L2,
+      primary: [gc_interval: :timer.seconds(3600), backend: :shards]
+    }
   ]
 ```
 

@@ -11,10 +11,11 @@ v2, just pointing out the areas the new documentation should be consulted on.
 
 This is one of the biggest changes. Version 1.x, most of the configuration
 options are resolved in compile-time, but this brings with a lot of limitations.
-Since version 2.x, the only argument or option configured in compile-time is the
-adapter when defining a new cache module, the rest of them are given via config
-file or at startup time. For more information and examples, see `Nebulex.Cache`,
-`Nebulex.Adapters.Local`, `Nebulex.Adapters.Partitioned`,
+Since version 2.x, only few arguments are configured in compile-time when
+defining a cache, e.g.: `otp_app:`, `adapter:`, and `primary_storage_adapter:`
+(for partitioned and replicated adapters). The rest of configuration parameters
+are given via config file or at startup time. For more information and examples,
+see `Nebulex.Cache`, `Nebulex.Adapters.Local`, `Nebulex.Adapters.Partitioned`,
 `Nebulex.Adapters.Replicated`, `Nebulex.Adapters.Multilevel`.
 
 ## Cache API

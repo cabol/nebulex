@@ -5,35 +5,34 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
   use Nebulex.Cache.QueryableTest
   use Nebulex.Cache.TransactionTest
 
-  import Nebulex.Helpers
   import Nebulex.TestCase
 
   alias Nebulex.Cache.Cluster
   alias Nebulex.TestCache.Multilevel
+  alias Nebulex.TestCache.Multilevel.{L1, L2, L3}
   alias Nebulex.Time
 
   @gc_interval Time.expiry_time(1, :hour)
 
   @levels [
-    l1: [gc_interval: @gc_interval, backend: :shards, partitions: 2],
-    l2: [
-      adapter: Nebulex.Adapters.Partitioned,
-      primary: [gc_interval: @gc_interval]
-    ],
-    l3: [
-      adapter: Nebulex.Adapters.Replicated,
-      primary: [
-        gc_interval: @gc_interval,
-        backend: :shards,
-        partitions: 2
-      ]
-    ]
+    {
+      L1,
+      name: :multilevel_inclusive_l1, gc_interval: @gc_interval, backend: :shards, partitions: 2
+    },
+    {
+      L2,
+      name: :multilevel_inclusive_l2, primary: [gc_interval: @gc_interval]
+    },
+    {
+      L3,
+      name: :multilevel_inclusive_l3,
+      primary: [gc_interval: @gc_interval, backend: :shards, partitions: 2]
+    }
   ]
 
   setup_with_dynamic_cache(Multilevel, :multilevel_inclusive,
     model: :inclusive,
-    levels: @levels,
-    fallback: fn _ -> nil end
+    levels: @levels
   )
 
   describe "inclusive" do
@@ -93,8 +92,8 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
 
   describe "disstributed levels" do
     test "return cluster nodes" do
-      assert Cluster.get_nodes(normalize_module_name([:multilevel_inclusive, "L2"])) == [node()]
-      assert Cluster.get_nodes(normalize_module_name([:multilevel_inclusive, "L3"])) == [node()]
+      assert Cluster.get_nodes(:multilevel_inclusive_l2) == [node()]
+      assert Cluster.get_nodes(:multilevel_inclusive_l3) == [node()]
     end
 
     test "joining new node" do
@@ -108,8 +107,7 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
         )
 
       # check cluster nodes
-      dist_cache_name = normalize_module_name([:multilevel_inclusive, "L3"])
-      assert Cluster.get_nodes(dist_cache_name) == [node, node()]
+      assert Cluster.get_nodes(:multilevel_inclusive_l3) == [node, node()]
 
       kv_pairs = for k <- 1..100, do: {k, k}
 

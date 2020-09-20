@@ -36,3 +36,4 @@ erl_crash.dump
 .elixir*
 .vs*
 /priv
+.sobelow*

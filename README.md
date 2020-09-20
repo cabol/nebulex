@@ -27,7 +27,7 @@ some functions:
 # In the config/config.exs file
 config :my_app, MyApp.PartitionedCache,
   primary: [
-    gc_interval: 86_400_000, #=> 1 day
+    gc_interval: :timer.seconds(3600),
     backend: :shards,
     partitions: 2
   ]
@@ -36,7 +36,8 @@ config :my_app, MyApp.PartitionedCache,
 defmodule MyApp.PartitionedCache do
   use Nebulex.Cache,
     otp_app: :my_app,
-    adapter: Nebulex.Adapters.Partitioned
+    adapter: Nebulex.Adapters.Partitioned,
+    primary_storage_adapter: Nebulex.Adapters.Local
 end
 
 # Some Ecto schema

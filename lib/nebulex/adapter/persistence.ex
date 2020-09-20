@@ -31,6 +31,7 @@ defmodule Nebulex.Adapter.Persistence do
     quote do
       @behaviour Nebulex.Adapter.Persistence
 
+      # sobelow_skip ["Traversal.FileModule"]
       @impl true
       def dump(%{cache: cache}, path, opts) do
         path
@@ -48,6 +49,7 @@ defmodule Nebulex.Adapter.Persistence do
         |> handle_response()
       end
 
+      # sobelow_skip ["Traversal.FileModule"]
       @impl true
       def load(%{cache: cache}, path, opts) do
         path

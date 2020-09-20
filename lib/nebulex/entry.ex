@@ -42,8 +42,9 @@ defmodule Nebulex.Entry do
       ...> |> Nebulex.Entry.decode()
       _decoded_entry
   """
+  # sobelow_skip ["Misc.BinToTerm"]
   @spec decode(binary, [term]) :: term
-  def decode(data, opts \\ []) do
+  def decode(data, opts \\ []) when is_binary(data) do
     data
     |> Base.url_decode64!()
     |> :erlang.binary_to_term(opts)

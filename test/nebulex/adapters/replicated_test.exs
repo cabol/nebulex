@@ -4,7 +4,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
 
   import Nebulex.TestCase
 
-  alias Nebulex.TestCache.Replicated
+  alias Nebulex.TestCache.{Replicated, ReplicatedMock}
 
   setup do
     node_pid_list = start_caches(cluster_nodes(), [{Replicated, []}])
@@ -18,15 +18,15 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   end
 
   describe "c:init/1" do
-    test "fail because invalid primary adapter" do
-      assert {:error, {%RuntimeError{message: msg}, _}} =
-               Replicated.start_link(
-                 name: :invalid_primary_adapter,
-                 primary: [adapter: __MODULE__]
-               )
-
-      mod = inspect(__MODULE__)
-      assert Regex.match?(~r"expected #{mod} to implement the behaviour Nebulex.Adapter", msg)
+    test "raises an exception because invalid primary store" do
+      assert_raise ArgumentError, ~r"adapter Invalid was not compiled", fn ->
+        defmodule Demo do
+          use Nebulex.Cache,
+            otp_app: :nebulex,
+            adapter: Nebulex.Adapters.Replicated,
+            primary_storage_adapter: Invalid
+        end
+      end
     end
   end
 
@@ -87,19 +87,15 @@ defmodule Nebulex.Adapters.ReplicatedTest do
 
   describe "cluster" do
     test "rpc errors" do
-      with_dynamic_cache(
-        Replicated,
-        [name: :replicated_mock, primary: [adapter: Nebulex.TestCache.AdapterMock]],
-        fn ->
-          _ = Process.flag(:trap_exit, true)
+      with_dynamic_cache(ReplicatedMock, [name: :replicated_mock], fn ->
+        _ = Process.flag(:trap_exit, true)
 
-          msg = ~r"RPC error executing action: put_all\n\nErrors:\n\n\[\n  {{:exit,"
+        msg = ~r"RPC error executing action: put_all\n\nErrors:\n\n\[\n  {{:exit,"
 
-          assert_raise Nebulex.RPCMultiCallError, msg, fn ->
-            Replicated.put_all(a: 1, b: 2)
-          end
+        assert_raise Nebulex.RPCMultiCallError, msg, fn ->
+          ReplicatedMock.put_all(a: 1, b: 2)
         end
-      )
+      end)
     end
 
     test "join new cache node" do
@@ -124,34 +120,30 @@ defmodule Nebulex.Adapters.ReplicatedTest do
 
   describe "global lock" do
     test "concurrency" do
-      with_dynamic_cache(
-        Replicated,
-        [name: :replicated_global_mock, primary: [adapter: Nebulex.TestCache.AdapterMock]],
-        fn ->
-          true = Process.register(self(), __MODULE__)
-          _ = Process.flag(:trap_exit, true)
+      with_dynamic_cache(ReplicatedMock, [name: :replicated_global_mock], fn ->
+        true = Process.register(self(), __MODULE__)
+        _ = Process.flag(:trap_exit, true)
 
-          task1 =
-            Task.async(fn ->
-              _ = Replicated.put_dynamic_cache(:replicated_global_mock)
-              _ = Replicated.flush()
-              send(__MODULE__, :flush)
-            end)
+        task1 =
+          Task.async(fn ->
+            _ = ReplicatedMock.put_dynamic_cache(:replicated_global_mock)
+            _ = ReplicatedMock.flush()
+            send(__MODULE__, :flush)
+          end)
 
-          task2 =
-            Task.async(fn ->
-              :ok = Process.sleep(500)
-              _ = Replicated.put_dynamic_cache(:replicated_global_mock)
-              assert :ok == Replicated.put("foo", "bar")
-              send(__MODULE__, :put)
-            end)
+        task2 =
+          Task.async(fn ->
+            :ok = Process.sleep(500)
+            _ = ReplicatedMock.put_dynamic_cache(:replicated_global_mock)
+            assert :ok == ReplicatedMock.put("foo", "bar")
+            send(__MODULE__, :put)
+          end)
 
-          assert_receive :flush, 5000
-          assert_receive :put, 5000
+        assert_receive :flush, 5000
+        assert_receive :put, 5000
 
-          [_, _] = Task.yield_many([task1, task2])
-        end
-      )
+        [_, _] = Task.yield_many([task1, task2])
+      end)
     end
   end
 

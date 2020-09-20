@@ -8,8 +8,8 @@ defmodule Nebulex.Cache do
   implements a local generational cache.
 
   When used, the Cache expects the `:otp_app` and `:adapter` as options.
-  The `:otp_app` should point to an OTP application that has the Cache
-  configuration. For example, the Cache:
+  The `:otp_app` should point to an OTP application that has the cache
+  configuration. For example, the Ccche:
 
       defmodule MyCache do
         use Nebulex.Cache,
@@ -22,11 +22,10 @@ defmodule Nebulex.Cache do
       config :my_app, MyCache,
         stats: true,
         backend: :shards,
-        gc_interval: 86_400_000, #=> 1 day
+        gc_interval: 3_600_000, #=> 1 hr
         max_size: 200_000,
         gc_cleanup_min_timeout: 10_000,
-        gc_cleanup_max_timeout: 900_000,
-        partitions: System.schedulers_online()
+        gc_cleanup_max_timeout: 900_000
 
   Most of the configuration that goes into the `config` is specific
   to the adapter. For this particular example, you can check
@@ -47,6 +46,18 @@ defmodule Nebulex.Cache do
       information, See `Nebulex.Cache.Stats`.
 
   **NOTE:** It is highly recommendable to check the adapters' documentation.
+
+  ## Distributed topologies
+
+  Nebulex provides the following adapters for distributed topologies:
+
+    * `Nebulex.Adapters.Partitioned` - Partitioned cache topology.
+    * `Nebulex.Adapters.Replicated` - Replicated cache topology.
+
+  These adapters work more as wrappers for an existing local adapter and provide
+  the distributed topology on top of it. Optionally, you can set the adapter for
+  the primary cache storage with the option `:primary_storage_adapter`. Defaults
+  to `Nebulex.Adapters.Local`.
   """
 
   @type t :: module
@@ -121,6 +132,18 @@ defmodule Nebulex.Cache do
       @impl true
       def put_dynamic_cache(dynamic) when is_atom(dynamic) or is_pid(dynamic) do
         Process.put({__MODULE__, :dynamic_cache}, dynamic) || @default_dynamic_cache
+      end
+
+      @impl true
+      def with_dynamic_cache(name, fun) do
+        default_dynamic_cache = get_dynamic_cache()
+
+        try do
+          _ = put_dynamic_cache(name)
+          fun.()
+        after
+          _ = put_dynamic_cache(default_dynamic_cache)
+        end
       end
 
       ## Entries
@@ -360,6 +383,19 @@ defmodule Nebulex.Cache do
   will run on `:another_cache_name`.
   """
   @callback put_dynamic_cache(atom() | pid()) :: atom() | pid()
+
+  @doc """
+  Executes the function `fun` for the given dynamic cache.
+
+  ## Example
+
+      MyCache.with_dynamic_cache(:cache_name, fn ->
+        MyCache.put("foo", "var")
+      end)
+
+  See `c:get_dynamic_cache/0` and `c:put_dynamic_cache/1`.
+  """
+  @callback with_dynamic_cache(atom() | pid(), fun) :: term
 
   @doc """
   Gets a value from Cache where the key matches the given `key`.

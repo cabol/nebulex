@@ -15,7 +15,7 @@ defmodule Nebulex.Adapter do
     * `:name` - The nase of the cache.
     * `:pid` - The PID returned by the child spec returned in `c:init/1`
   """
-  @type adapter_meta :: map
+  @type adapter_meta :: %{optional(atom) => term}
 
   @type cache :: Nebulex.Cache.t()
   @type key :: Nebulex.Cache.key()

@@ -36,7 +36,11 @@ defmodule Nebulex.RPC do
   def call(_supervisor, node, mod, fun, args, _timeout) when node == node() do
     apply(mod, fun, args)
   rescue
-    exception -> {:badrpc, exception}
+    # FIXME: this is because coveralls does not check this as covered
+    # coveralls-ignore-start
+    exception ->
+      {:badrpc, exception}
+      # coveralls-ignore-stop
   end
 
   def call(supervisor, node, mod, fun, args, timeout) do

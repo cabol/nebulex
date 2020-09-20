@@ -94,7 +94,7 @@ defmodule Nebulex.Adapters.Local do
 
       config :my_app, MyApp.LocalCache,
         backend: :shards,
-        gc_interval: 86_400_000,
+        gc_interval: 3_600_000,
         max_size: 200_000,
         allocated_memory: 2_000_000_000,
         gc_cleanup_min_timeout: 10_000,
@@ -107,12 +107,12 @@ defmodule Nebulex.Adapters.Local do
 
       config :my_app, MyApp.LocalCache,
         backend: :shards,
-        gc_interval: 86_400_000,
+        gc_interval: 3_600_000,
         max_size: 200_000,
         allocated_memory: 2_000_000_000,
         gc_cleanup_min_timeout: 10_000,
         gc_cleanup_max_timeout: 600_000,
-        partitions: System.schedulers_online()
+        partitions: System.schedulers_online() * 2
 
   For more information about the usage, check out `Nebulex.Cache`.
 
@@ -311,16 +311,16 @@ defmodule Nebulex.Adapters.Local do
         entry(key: key, value: value, touched: touched, ttl: ttl)
       end
 
-    do_put_all(name, backend, ref, entries, on_write)
+    do_put_all(on_write, name, backend, ref, entries)
   end
 
-  defp do_put_all(name, backend, ref, entries, :put) do
+  defp do_put_all(:put, name, backend, ref, entries) do
     name
     |> put_entries(backend, entries)
     |> update_stats(:put_all, {ref, entries})
   end
 
-  defp do_put_all(name, backend, ref, entries, :put_new) do
+  defp do_put_all(:put_new, name, backend, ref, entries) do
     name
     |> put_new_entries(backend, entries)
     |> update_stats(:put_all, {ref, entries})

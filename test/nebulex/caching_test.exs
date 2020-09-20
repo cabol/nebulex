@@ -2,6 +2,8 @@ defmodule Nebulex.CachingTest do
   use ExUnit.Case, async: true
   use Nebulex.Caching
 
+  import Nebulex.TestCase
+
   defmodule Cache do
     use Nebulex.Cache,
       otp_app: :nebulex,
@@ -14,18 +16,10 @@ defmodule Nebulex.CachingTest do
 
   alias Nebulex.CachingTest.{Cache, Meta}
 
-  setup do
-    {:ok, pid} = Cache.start_link()
-    :ok
+  setup_with_cache(Cache)
 
-    on_exit(fn ->
-      :ok = Process.sleep(20)
-      if Process.alive?(pid), do: Cache.stop()
-    end)
-  end
-
-  describe "compile-time errors" do
-    test "fail on cacheable because missing cache" do
+  describe "decorator" do
+    test "cacheable fails because missing cache" do
       assert_raise ArgumentError, "expected cache: to be given as argument", fn ->
         defmodule Test do
           use Nebulex.Caching

@@ -5,16 +5,19 @@ defmodule Nebulex.MultilevelTest do
     alias Nebulex.Helpers
 
     test "partitions for L1 with shards backend", %{name: name} do
-      assert [name, "L1", Generation, 0]
+      assert [:"#{name}_l1", Generation, 0]
              |> Helpers.normalize_module_name()
              |> :shards_state.get()
              |> :shards_state.n_shards() == 2
     end
 
-    test "fail on c:init/1 because missing levels config", %{cache: cache} do
+    test "fails on c:init/1 because missing levels config", %{cache: cache} do
       assert {:error, {%RuntimeError{message: msg}, _}} = cache.start_link(name: :missing_levels)
 
-      assert msg == "expected levels: to be a keyword with at least one entry"
+      assert Regex.match?(
+               ~r"expected levels: to be a list with at least one level definition",
+               msg
+             )
     end
 
     test "put", %{cache: cache} do
@@ -76,7 +79,7 @@ defmodule Nebulex.MultilevelTest do
 
     test "get_all", %{cache: cache} do
       assert cache.put_all(a: 1, c: 3) == :ok
-      assert cache.get_all([:a, :b, :c], version: -1) == %{a: 1, c: 3}
+      assert cache.get_all([:a, :b, :c]) == %{a: 1, c: 3}
     end
 
     test "delete", %{cache: cache} do
@@ -171,6 +174,7 @@ defmodule Nebulex.MultilevelTest do
     end
 
     test "size", %{cache: cache} do
+      assert cache.size() == 0
       for x <- 1..10, do: cache.put(x, x, level: 1)
       for x <- 11..20, do: cache.put(x, x, level: 2)
       for x <- 21..30, do: cache.put(x, x, level: 3)

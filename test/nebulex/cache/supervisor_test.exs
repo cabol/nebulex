@@ -14,23 +14,23 @@ defmodule Nebulex.Cache.SupervisorTest do
     end
   end
 
-  test "fail on init because :ignore is returned" do
+  test "fails on init because :ignore is returned" do
     assert MyCache.start_link(ignore: true) == :ignore
   end
 
-  test "fail on compile_config because missing otp_app" do
+  test "fails on compile_config because missing otp_app" do
     assert_raise ArgumentError, "expected otp_app: to be given as argument", fn ->
       Nebulex.Cache.Supervisor.compile_config(adapter: TestAdapter)
     end
   end
 
-  test "fail on compile_config because missing adapter" do
+  test "fails on compile_config because missing adapter" do
     assert_raise ArgumentError, "expected adapter: to be given as argument", fn ->
       Nebulex.Cache.Supervisor.compile_config(otp_app: :nebulex)
     end
   end
 
-  test "fail on compile_config because adapter was not compiled" do
+  test "fails on compile_config because adapter was not compiled" do
     msg = ~r"adapter TestAdapter was not compiled, ensure"
 
     assert_raise ArgumentError, msg, fn ->
@@ -38,7 +38,7 @@ defmodule Nebulex.Cache.SupervisorTest do
     end
   end
 
-  test "fail on compile_config because adapter error" do
+  test "fails on compile_config because adapter error" do
     msg = "expected :adapter option given to Nebulex.Cache to list Nebulex.Adapter as a behaviour"
 
     assert_raise ArgumentError, msg, fn ->

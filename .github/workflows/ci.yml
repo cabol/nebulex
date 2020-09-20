@@ -52,26 +52,17 @@ jobs:
       - name: Compile Code
         run: mix compile --warnings-as-errors
 
-      - name: Check Format
-        run: mix format --check-formatted
-
-      - name: Check Style
-        run: mix credo --strict
-
-      - name: Tests and Coverage
-        run: |
-          epmd -daemon
-          mix coveralls.github
-
       - uses: actions/cache@v1
         with:
           path: priv/plts
-          key: ${{ runner.os }}-plt-v3-${{ env.MIX_ENV }}
+          key: ${{ runner.os }}-plt-v4-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
           restore-keys: |
-            ${{ runner.os }}-plt-v3
+            ${{ runner.os }}-plt-v4-
 
-      - name: Dialyzer
-        run: mix dialyzer --format short
+      - name: Checks
+        run: |
+          epmd -daemon
+          mix check --except ex_unit
 
       - name: Report Doc Coverage
         run: MIX_ENV=docs mix inch.report

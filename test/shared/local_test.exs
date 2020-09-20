@@ -8,7 +8,7 @@ defmodule Nebulex.LocalTest do
     alias Nebulex.{Adapter, Entry}
     alias Nebulex.Adapters.Local.Generation
 
-    test "fail on init because invalid backend", %{cache: cache} do
+    test "fails on init because invalid backend", %{cache: cache} do
       assert {:error, {%RuntimeError{message: msg}, _}} =
                cache.start_link(name: :invalid_backend, backend: :xyz)
 
@@ -17,7 +17,7 @@ defmodule Nebulex.LocalTest do
                  "backends [:ets, :shards], got: :xyz"
     end
 
-    test "fail with ArgumentError because cache was stopped", %{cache: cache} do
+    test "fails with ArgumentError because cache was stopped", %{cache: cache} do
       :ok = cache.stop()
 
       msg = ~r"could not lookup Nebulex cache"

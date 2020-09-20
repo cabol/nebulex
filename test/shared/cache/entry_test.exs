@@ -41,7 +41,7 @@ defmodule Nebulex.Cache.EntryTest do
 
     test "get_all", %{cache: cache} do
       assert cache.put_all(a: 1, c: 3)
-      assert cache.get_all([:a, :b, :c], version: -1) == %{a: 1, c: 3}
+      assert cache.get_all([:a, :b, :c]) == %{a: 1, c: 3}
       assert map_size(cache.get_all([])) == 0
       assert cache.flush() == 2
     end

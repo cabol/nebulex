@@ -48,22 +48,22 @@ defmodule Nebulex.MixProject do
   defp deps do
     [
       {:shards, "~> 0.6", optional: true},
-      {:decorator, "~> 1.3", optional: true},
+      {:decorator, "~> 1.3.2", optional: true},
       {:telemetry, "~> 0.4.2", optional: true},
 
-      # Test
-      {:excoveralls, "~> 0.13", only: :test},
+      # Test & Code Analysis
       {:ex2ms, "~> 1.6", only: :test},
       {:mock, "~> 0.3", only: :test},
-      {:benchee, "~> 1.0", optional: true, only: :test},
-      {:benchee_html, "~> 1.0", optional: true, only: :test},
-
-      # Code Analysis
-      {:dialyxir, "~> 1.0", optional: true, only: [:dev, :test], runtime: false},
-      {:credo, "~> 1.4", optional: true, only: [:dev, :test]},
+      {:benchee, "~> 1.0", only: :test},
+      {:benchee_html, "~> 1.0", only: :test},
+      {:excoveralls, "~> 0.13", only: :test},
+      {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.4", only: [:dev, :test]},
+      {:ex_check, "~> 0.12", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.10", only: [:dev, :test], runtime: false},
 
       # Docs
-      {:ex_doc, "~> 0.22", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.22", only: [:dev, :test], runtime: false},
       {:inch_ex, "~> 2.0", only: :docs}
     ]
   end
@@ -95,7 +95,7 @@ defmodule Nebulex.MixProject do
   defp dialyzer do
     [
       plt_add_apps: [:shards, :mix, :eex, :telemetry],
-      plt_file: {:no_warn, "priv/plts/dialyzer-#{Mix.env()}.plt"},
+      plt_file: {:no_warn, "priv/plts/dialyzer_#{Mix.env()}.plt"},
       flags: [
         :unmatched_returns,
         :error_handling,
