@@ -30,8 +30,8 @@ defmodule Nebulex.Adapters.LocalWithShardsTest do
 
       assert [CustomPartitions, Generation, 0]
              |> normalize_module_name()
-             |> :shards_state.get()
-             |> :shards_state.n_shards() == 2
+             |> :shards.meta()
+             |> :shards_meta.partitions() == 2
 
       :ok = CustomPartitions.stop()
     end

@@ -18,9 +18,6 @@ node_pid_list = NodeCase.start_caches(Node.list(), [{Partitioned, primary: [back
 # default cache
 default_dynamic_cache = Cache.get_dynamic_cache()
 
-# samples
-keys = Enum.to_list(1..10_000)
-
 inputs = %{
   "Generational Local Cache with ETS" => {Cache, :cache_ets_bench},
   "Generational Local Cache with Shards" => {Cache, :cache_shards_bench},
@@ -28,57 +25,57 @@ inputs = %{
 }
 
 benchmarks = %{
-  "get" => fn {cache, random} ->
-    cache.get(random)
+  "get" => fn {cache, sample} ->
+    cache.get(sample)
   end,
-  "get_all" => fn {cache, random} ->
-    cache.get_all([random])
+  "get_all" => fn {cache, sample} ->
+    cache.get_all([sample])
   end,
-  "put" => fn {cache, random} ->
-    cache.put(random, random)
+  "put" => fn {cache, sample} ->
+    cache.put(sample, sample)
   end,
-  "put_new" => fn {cache, random} ->
-    cache.put_new(random, random)
+  "put_new" => fn {cache, sample} ->
+    cache.put_new(sample, sample)
   end,
-  "replace" => fn {cache, random} ->
-    cache.replace(random, random)
+  "replace" => fn {cache, sample} ->
+    cache.replace(sample, sample)
   end,
-  "put_all" => fn {cache, random} ->
-    cache.put_all([{random, random}])
+  "put_all" => fn {cache, sample} ->
+    cache.put_all([{sample, sample}])
   end,
-  "delete" => fn {cache, random} ->
-    cache.delete(random)
+  "delete" => fn {cache, sample} ->
+    cache.delete(sample)
   end,
-  "take" => fn {cache, random} ->
-    cache.take(random)
+  "take" => fn {cache, sample} ->
+    cache.take(sample)
   end,
-  "has_key?" => fn {cache, random} ->
-    cache.has_key?(random)
+  "has_key?" => fn {cache, sample} ->
+    cache.has_key?(sample)
   end,
-  "size" => fn {cache, _random} ->
+  "size" => fn {cache, _sample} ->
     cache.size()
   end,
-  "ttl" => fn {cache, random} ->
-    cache.ttl(random)
+  "ttl" => fn {cache, sample} ->
+    cache.ttl(sample)
   end,
-  "expire" => fn {cache, random} ->
-    cache.expire(random, 1)
+  "expire" => fn {cache, sample} ->
+    cache.expire(sample, 1)
   end,
-  "get_and_update" => fn {cache, random} ->
-    cache.get_and_update(random, &Partitioned.get_and_update_fun/1)
+  "get_and_update" => fn {cache, sample} ->
+    cache.get_and_update(sample, &Partitioned.get_and_update_fun/1)
   end,
-  "update" => fn {cache, random} ->
-    cache.update(random, 1, &Kernel.+(&1, 1))
+  "update" => fn {cache, sample} ->
+    cache.update(sample, 1, &Kernel.+(&1, 1))
   end,
-  "incr" => fn {cache, _random} ->
+  "incr" => fn {cache, _sample} ->
     cache.incr(:counter, 1)
   end,
-  "all" => fn {cache, _random} ->
+  "all" => fn {cache, _sample} ->
     cache.all()
   end,
-  "transaction" => fn {cache, random} ->
-    cache.transaction([keys: [random]], fn ->
-      cache.incr(random, 1)
+  "transaction" => fn {cache, sample} ->
+    cache.transaction([keys: [sample]], fn ->
+      cache.incr(sample, 1)
     end)
   end
 }
@@ -88,7 +85,7 @@ Benchee.run(
   inputs: inputs,
   before_scenario: fn {cache, name} ->
     _ = cache.put_dynamic_cache(name)
-    {cache, Enum.random(keys)}
+    {cache, 1}
   end,
   after_scenario: fn {cache, _} ->
     _ = cache.put_dynamic_cache(default_dynamic_cache)

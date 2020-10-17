@@ -9,16 +9,17 @@ on:
 jobs:
   nebulex_test:
     name: 'Nebulex Test (Elixir ${{ matrix.elixir }} OTP ${{ matrix.otp }})'
+    runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        elixir:
-          - '1.10.x'
-          - '1.9.x'
-        otp:
-          - '22.x'
-
-    runs-on: ubuntu-latest
+        include:
+          - elixir: '1.10.x'
+            otp: '23.x'
+          - elixir: '1.10.x'
+            otp: '22.x'
+          - elixir: '1.9.x'
+            otp: '22.x'
 
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -55,11 +56,11 @@ jobs:
       - uses: actions/cache@v1
         with:
           path: priv/plts
-          key: ${{ runner.os }}-plt-v4-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+          key: ${{ runner.os }}-plt-v6-${{ matrix.otp }}-${{ matrix.elixir }}
           restore-keys: |
-            ${{ runner.os }}-plt-v4-
+            ${{ runner.os }}-plt-v6-
 
-      - name: Checks
+      - name: Run Checks
         run: |
           epmd -daemon
           mix check --except ex_unit

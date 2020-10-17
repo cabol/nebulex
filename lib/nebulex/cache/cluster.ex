@@ -51,7 +51,7 @@ defmodule Nebulex.Cache.Cluster do
   @spec get_node(name :: atom, Nebulex.Cache.key(), keyslot :: module) :: node
   def get_node(name, key, keyslot) do
     nodes = get_nodes(name)
-    index = keyslot.compute(key, length(nodes))
+    index = keyslot.hash_slot(key, length(nodes))
     Enum.at(nodes, index)
   end
 

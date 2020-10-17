@@ -69,7 +69,7 @@ defmodule Nebulex.Cache.Supervisor do
     case apply(mod, fun, args) do
       {:ok, pid} ->
         meta = Map.put(meta, :pid, pid)
-        :ok = Nebulex.Cache.Registry.associate(self(), {adapter, meta})
+        :ok = Nebulex.Cache.Registry.register(self(), {adapter, meta})
         {:ok, pid}
 
       other ->

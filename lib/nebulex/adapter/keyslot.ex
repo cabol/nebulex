@@ -14,7 +14,7 @@ defmodule Nebulex.Adapter.Keyslot do
       defmodule MyApp.Keyslot do
         @behaviour Nebulex.Adapter.Keyslot
 
-        def compute(key, range) do
+        def hash_slot(key, range) do
           key
           |> :erlang.phash2()
           |> :jchash.compute(range)
@@ -30,9 +30,9 @@ defmodule Nebulex.Adapter.Keyslot do
       @behaviour Nebulex.Adapter.Keyslot
 
       @impl true
-      defdelegate compute(key, range), to: :erlang, as: :phash2
+      defdelegate hash_slot(key, range), to: :erlang, as: :phash2
 
-      defoverridable compute: 2
+      defoverridable hash_slot: 2
     end
   end
 
@@ -42,8 +42,8 @@ defmodule Nebulex.Adapter.Keyslot do
 
   ## Example
 
-      iex> MyKeyslot.compute("mykey", 10)
+      iex> MyKeyslot.hash_slot("mykey", 10)
       2
   """
-  @callback compute(key :: any, range :: pos_integer) :: non_neg_integer
+  @callback hash_slot(key :: any, range :: pos_integer) :: non_neg_integer
 end

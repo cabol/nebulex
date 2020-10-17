@@ -69,7 +69,7 @@ defmodule Nebulex.Adapters.Partitioned do
         @behaviour Nebulex.Adapter.Keyslot
 
         @impl true
-        def compute(key, range) do
+        def hash_slot(key, range) do
           key
           |> :erlang.phash2()
           |> :jchash.compute(range)
@@ -157,7 +157,7 @@ defmodule Nebulex.Adapters.Partitioned do
   # Inherit default persistence implementation
   use Nebulex.Adapter.Persistence
 
-  # Inherit default compute callback
+  # Inherit default keyslot implementation
   use Nebulex.Adapter.Keyslot
 
   import Nebulex.Helpers

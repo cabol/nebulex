@@ -10,9 +10,9 @@ defmodule Nebulex.Cache.Registry do
     GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
   end
 
-  @spec associate(pid, term) :: :ok
-  def associate(pid, value) when is_pid(pid) do
-    GenServer.call(__MODULE__, {:associate, pid, value})
+  @spec register(pid, term) :: :ok
+  def register(pid, value) when is_pid(pid) do
+    GenServer.call(__MODULE__, {:register, pid, value})
   end
 
   @spec lookup(atom | pid) :: term
@@ -40,7 +40,7 @@ defmodule Nebulex.Cache.Registry do
   end
 
   @impl true
-  def handle_call({:associate, pid, value}, _from, state) do
+  def handle_call({:register, pid, value}, _from, state) do
     ref = Process.monitor(pid)
     :ok = :persistent_term.put({__MODULE__, pid}, {ref, value})
     {:reply, :ok, state}
