@@ -63,6 +63,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   import Nebulex.Helpers
 
   alias Nebulex.Adapters.Local
+  alias Nebulex.Adapters.Local.Backend
 
   @compile {:inline, server_name: 1}
 
@@ -153,10 +154,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   """
   @spec list(atom) :: [atom]
   def list(name) do
-    [
-      :persistent_term.get({__MODULE__, name, :newer})
-      | if(older = :persistent_term.get({__MODULE__, name, :older}, nil), do: [older], else: [])
-    ]
+    get_meta(name, :generations, [])
   end
 
   @doc """
@@ -168,14 +166,17 @@ defmodule Nebulex.Adapters.Local.Generation do
   """
   @spec newer(atom) :: atom
   def newer(name) do
-    :persistent_term.get({__MODULE__, name, :newer})
+    name
+    |> get_meta(:generations, [])
+    |> hd()
   end
 
   ## GenServer Callbacks
 
   @impl true
   def init({name, opts}) do
-    _ = Process.flag(:trap_exit, true)
+    # create metadata table for storing the generation tables
+    ^name = :ets.new(name, [:named_table, :public, read_concurrency: true])
 
     # backend for creating new tables
     backend = Keyword.fetch!(opts, :backend)
@@ -210,14 +211,6 @@ defmodule Nebulex.Adapters.Local.Generation do
     }
 
     {:ok, init_state}
-  end
-
-  @impl true
-  def terminate(_reason, %__MODULE__{name: name} = state) do
-    # cleanup
-    true = :persistent_term.erase({__MODULE__, name, :older})
-    true = :persistent_term.erase({__MODULE__, name, :newer})
-    state
   end
 
   @impl true
@@ -383,21 +376,35 @@ defmodule Nebulex.Adapters.Local.Generation do
     |> GenServer.call(message)
   end
 
-  defp new_gen(name, gen_index, backend, backend_opts) do
-    # get current generations
-    older = :persistent_term.get({__MODULE__, name, :older}, nil)
-    newer = :persistent_term.get({__MODULE__, name, :newer}, nil)
+  defp get_meta(name, key, default) do
+    :ets.lookup_element(name, key, 2)
+  rescue
+    ArgumentError -> default
+  end
 
+  defp put_meta(name, key, value) do
+    true = :ets.insert(name, {key, value})
+    :ok
+  end
+
+  defp new_gen(name, gen_index, backend, backend_opts) do
     # create new generation
     gen_name = normalize_module_name([name, Generation, gen_index])
-    ^gen_name = backend.new(gen_name, backend_opts)
+    ^gen_name = Backend.new(backend, name, gen_name, backend_opts)
 
-    # update generations
-    :ok = :persistent_term.put({__MODULE__, name, :older}, newer)
-    :ok = :persistent_term.put({__MODULE__, name, :newer}, gen_name)
+    # update generation list
+    :ok =
+      case get_meta(name, :generations, []) do
+        [newer, older] ->
+          _ = Backend.delete(backend, name, older)
+          put_meta(name, :generations, [gen_name, newer])
 
-    # maybe delete older generation
-    _ = if not is_nil(older), do: backend.delete(older)
+        [newer] ->
+          put_meta(name, :generations, [gen_name, newer])
+
+        [] ->
+          put_meta(name, :generations, [gen_name])
+      end
 
     # increment the generation index
     gen_index = if gen_index < 2, do: gen_index + 1, else: 0

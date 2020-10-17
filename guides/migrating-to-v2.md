@@ -24,14 +24,14 @@ There are several changes on the `Nebulex.Cache` API:
 
   * The `:return` option is not available anymore, so it has to be removed.
   * The `:version` option is not available anymore, so it has to be removed.
-  * Callback `c:set/3` was refactored to `c:put/3`.
-  * Callback `c:set_many/2` was refactored to `c:put_all/2`.
-  * Callbacks `c:add/3` and `c:add!/3` were refactored to `c:put_new/3` and
-    `c:put_new!/3`.
-  * Callback `c:update_counter/3` was refactored to `c:incr/3`.
-  * Callback `c:add_or_replace/3` was removed.
-  * Callback `c:object_info/2` was removed, and callbacks `c:ttl/1` and
-    `c:touch/1` were added instead.
+  * Callback `set/3` was refactored to `put/3`.
+  * Callback `set_many/2` was refactored to `put_all/2`.
+  * Callbacks `add/3` and `add!/3` were refactored to `put_new/3` and
+    `put_new!/3`.
+  * Callback `update_counter/3` was refactored to `incr/3`.
+  * Callback `add_or_replace/3` was removed.
+  * Callback `object_info/2` was removed, and callbacks `ttl/1` and
+    `touch/1` were added instead.
 
 ## Declarative annotation-based caching via decorators
 
@@ -63,6 +63,10 @@ There have been several and significant improvements on the built-in adapters,
 so it is also highly recommended to take a look at them;
 `Nebulex.Adapters.Local`, `Nebulex.Adapters.Partitioned`,
 `Nebulex.Adapters.Replicated`, and `Nebulex.Adapters.Multilevel`.
+
+In case of using a distributed adapter, the module/callback
+`Nebulex.Adapter.HashSlot.keyslot /2` was refactored to
+`Nebulex.Adapter.Keyslot.hash_slot/2`.
 
 ## Statistics
 

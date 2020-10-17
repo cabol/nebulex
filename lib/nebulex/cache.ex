@@ -321,7 +321,7 @@ defmodule Nebulex.Cache do
   @doc """
   Returns the adapter configuration stored in the `:otp_app` environment.
 
-  If the `c:init/2` callback is implemented in the cache, it will be invoked.
+  If the `c:init/1` callback is implemented in the cache, it will be invoked.
   """
   @callback config() :: Keyword.t()
 

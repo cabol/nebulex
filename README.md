@@ -237,10 +237,10 @@ alongside new or changed code.
 Before to submit a PR it is highly recommended to run:
 
  * `mix format` to format the code properly.
- * `MIX_ENV=test mix credo --strict` to find code style issues.
+ * `mix credo --strict` to find code style issues.
  * `mix coveralls.html && open cover/excoveralls.html` to run tests and check
    out code coverage (expected 100%).
- * `MIX_ENV=test mix dialyzer` to run dialyzer for type checking; might take a
+ * `mix dialyzer` to run dialyzer for type checking; might take a
    while on the first invocation.
 
 ## Copyright and License

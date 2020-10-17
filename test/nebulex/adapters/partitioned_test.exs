@@ -80,7 +80,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
         @behaviour Nebulex.Adapter.Keyslot
 
         @impl true
-        def compute(key, range) do
+        def hash_slot(key, range) do
           key
           |> :erlang.phash2()
           |> rem(range)

@@ -81,11 +81,13 @@ Could be configured in `config/config.exs` like so:
 config :blog, Blog.Cache,
   gc_interval: :timer.seconds(3600),
   backend: :shards,
-  partitions: System.schedulers_online() #=> The default
+  partitions: 2
 ```
 
-> For more information about the provided options, see the adapter's
-  documentation.
+> By default, `partitions:` option is set to `System.schedulers_online()`.
+
+**NOTE:** For more information about the provided options, see the adapter's
+documentation.
 
 The final piece of configuration is to setup the `Blog.Cache` as a
 supervisor within the application's supervision tree, which we can do in

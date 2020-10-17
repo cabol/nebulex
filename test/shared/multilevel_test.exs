@@ -7,8 +7,8 @@ defmodule Nebulex.MultilevelTest do
     test "partitions for L1 with shards backend", %{name: name} do
       assert [:"#{name}_l1", Generation, 0]
              |> Helpers.normalize_module_name()
-             |> :shards_state.get()
-             |> :shards_state.n_shards() == 2
+             |> :shards.meta()
+             |> :shards_meta.partitions() == 2
     end
 
     test "fails on c:init/1 because missing levels config", %{cache: cache} do
