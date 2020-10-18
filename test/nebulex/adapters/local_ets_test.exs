@@ -3,7 +3,7 @@ defmodule Nebulex.Adapters.LocalEtsTest do
   use Nebulex.LocalTest
   use Nebulex.CacheTest
 
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
 
   alias Nebulex.Adapter
   alias Nebulex.TestCache.Cache

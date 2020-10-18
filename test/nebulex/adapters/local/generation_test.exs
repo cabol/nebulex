@@ -10,7 +10,7 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
   end
 
   import Nebulex.CacheHelpers
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
 
   alias Nebulex.Adapters.Local.Generation
   alias Nebulex.Adapters.Local.GenerationTest.LocalWithSizeLimit

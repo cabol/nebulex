@@ -1,4 +1,4 @@
-defmodule Nebulex.TestCase do
+defmodule Nebulex.CacheCase do
   @moduledoc false
 
   @doc false

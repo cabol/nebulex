@@ -1,5 +1,5 @@
 defmodule Nebulex.MultilevelTest do
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
 
   deftests "multilevel" do
     alias Nebulex.Adapters.Local.Generation

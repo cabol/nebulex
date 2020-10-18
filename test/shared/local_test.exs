@@ -1,5 +1,5 @@
 defmodule Nebulex.LocalTest do
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
 
   deftests "local" do
     import Ex2ms

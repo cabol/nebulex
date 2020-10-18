@@ -1,5 +1,5 @@
 defmodule Nebulex.Cache.PersistenceTest do
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
 
   deftests "persistence" do
     test "dump and load", %{cache: cache} do

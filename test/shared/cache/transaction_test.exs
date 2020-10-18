@@ -1,9 +1,7 @@
 defmodule Nebulex.Cache.TransactionTest do
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
 
   deftests "transaction" do
-    import Nebulex.CacheHelpers
-
     test "transaction", %{cache: cache} do
       refute cache.transaction(fn ->
                with :ok <- cache.put(1, 11),

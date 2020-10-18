@@ -2,7 +2,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
   use Nebulex.NodeCase
   use Nebulex.CacheTest
 
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
 
   alias Nebulex.Adapter
   alias Nebulex.Cache.Cluster

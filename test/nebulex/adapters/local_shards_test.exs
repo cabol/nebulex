@@ -3,7 +3,7 @@ defmodule Nebulex.Adapters.LocalWithShardsTest do
   use Nebulex.LocalTest
   use Nebulex.CacheTest
 
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
 
   alias Nebulex.Adapter
   alias Nebulex.Adapters.Local.Generation

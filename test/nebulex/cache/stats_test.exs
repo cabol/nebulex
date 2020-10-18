@@ -1,7 +1,7 @@
 defmodule Nebulex.Cache.StatsTest do
   use ExUnit.Case, async: true
 
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
   import Mock
 
   alias Nebulex.Cache.Stats

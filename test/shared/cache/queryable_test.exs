@@ -1,5 +1,5 @@
 defmodule Nebulex.Cache.QueryableTest do
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
 
   deftests "queryable" do
     import Nebulex.CacheHelpers

@@ -2,7 +2,7 @@ defmodule Nebulex.CachingTest do
   use ExUnit.Case, async: true
   use Nebulex.Caching
 
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
 
   defmodule Cache do
     use Nebulex.Cache,

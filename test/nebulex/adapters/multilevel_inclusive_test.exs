@@ -5,7 +5,7 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
   use Nebulex.Cache.QueryableTest
   use Nebulex.Cache.TransactionTest
 
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
 
   alias Nebulex.Cache.Cluster
   alias Nebulex.TestCache.Multilevel

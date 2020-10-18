@@ -443,6 +443,7 @@ defmodule Nebulex.Cache do
   See the "Shared options" section at the module documentation for more options.
 
   ## Example
+
       iex> MyCache.put_all([a: 1, c: 3])
       :ok
 
@@ -460,30 +461,40 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-    * `:ttl` - Time To Live (TTL) or expiration time in milliseconds for a key
-      (default: `:infinity`).
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
 
   See the "Shared options" section at the module documentation for more options.
 
   ## Example
 
-      iex> import Nebulex.Time
-
       iex> MyCache.put("foo", "bar")
       :ok
 
-      # if the value is nil, then it is not stored (operation is skipped)
+  If the value is nil, then it is not stored (operation is skipped):
+
       iex> MyCache.put("foo", nil)
       :ok
 
-      # put key with time-to-live
+  Put key with time-to-live:
+
       iex> MyCache.put("foo", "bar", ttl: 10_000)
       :ok
 
-      # using Nebulex.Time
+  Using Nebulex.Time for TTL:
+
+      iex> import Nebulex.Time
+      Nebulex.Time
+
       iex> MyCache.put("foo", "bar", ttl: expiry_time(10))
+      :ok
+
       iex> MyCache.put("foo", "bar", ttl: expiry_time(10, :minute))
+      :ok
+
       iex> MyCache.put("foo", "bar", ttl: expiry_time(1, :hour))
+      :ok
   """
   @callback put(key, value, opts) :: :ok
 
@@ -493,8 +504,9 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-    * `:ttl` - Time To Live (TTL) or expiration time in milliseconds for a key
-      (default: `:infinity`). It applies to all given `entries`.
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
 
   See the "Shared options" section at the module documentation for more options.
 
@@ -521,8 +533,9 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-    * `:ttl` - Time To Live (TTL) or expiration time in milliseconds for a key
-      (default: `:infinity`).
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
 
   See the "Shared options" section at the module documentation for more options.
 
@@ -534,7 +547,8 @@ defmodule Nebulex.Cache do
       iex> MyCache.put_new("foo", "bar")
       false
 
-      # if the value is nil, it is not stored (operation is skipped)
+  If the value is nil, it is not stored (operation is skipped):
+
       iex> MyCache.put_new("other", nil)
       true
   """
@@ -546,14 +560,16 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-    * `:ttl` - Time To Live (TTL) or expiration time in milliseconds for a key
-      (default: `:infinity`).
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
 
   See the "Shared options" section at the module documentation for more options.
 
   ## Example
 
-      MyCache.put_new!("foo", "bar")
+      iex> MyCache.put_new!("foo", "bar")
+      true
   """
   @callback put_new!(key, value, opts) :: true
 
@@ -566,8 +582,9 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-    * `:ttl` - Time To Live (TTL) or expiration time in milliseconds for a key
-      (default: `:infinity`). It applies to all given `entries`.
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
 
   See the "Shared options" section at the module documentation for more options.
 
@@ -594,8 +611,9 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-    * `:ttl` - Time To Live (TTL) or expiration time in milliseconds for a key
-      (default: `:infinity`).
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
 
   See the "Shared options" section at the module documentation for more options.
 
@@ -610,7 +628,8 @@ defmodule Nebulex.Cache do
       iex> MyCache.replace("foo", "bar2")
       true
 
-      # update current value and TTL
+  Update current value and TTL:
+
       iex> MyCache.replace("foo", "bar3", ttl: 10_000)
       true
   """
@@ -621,14 +640,16 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-    * `:ttl` - Time To Live (TTL) or expiration time in milliseconds for a key
-      (default: `:infinity`).
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
 
   See the "Shared options" section at the module documentation for more options.
 
   ## Example
 
-      MyCache.replace!("foo", "bar")
+      iex> MyCache.replace!("foo", "bar")
+      true
   """
   @callback replace!(key, value, opts) :: true
 
@@ -720,30 +741,35 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-    * `:ttl` - Time To Live (TTL) or expiration time in milliseconds for a key
-      (default: `:infinity`).
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
 
   See the "Shared options" section at the module documentation for more options.
 
   ## Examples
 
-      # update nonexistent key
+  Update nonexistent key:
+
       iex> MyCache.get_and_update(:a, fn current_value ->
       ...>   {current_value, "value!"}
       ...> end)
       {nil, "value!"}
 
-      # update existing key
+  Update existing key:
+
       iex> MyCache.get_and_update(:a, fn current_value ->
       ...>   {current_value, "new value!"}
       ...> end)
       {"value!", "new value!"}
 
-      # pop/remove value if exist
+  Pop/remove value if exist:
+
       iex> MyCache.get_and_update(:a, fn _ -> :pop end)
       {"new value!", nil}
 
-      # pop/remove nonexistent key
+  Pop/remove nonexistent key:
+
       iex> MyCache.get_and_update(:b, fn _ -> :pop end)
       {nil, nil}
   """
@@ -761,8 +787,9 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-    * `:ttl` - Time To Live (TTL) or expiration time in milliseconds for a key
-      (default: `:infinity`).
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
 
   See the "Shared options" section at the module documentation for more options.
 
@@ -785,8 +812,9 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-    * `:ttl` - Time To Live (TTL) or expiration time in milliseconds for a key
-      (default: `:infinity`).
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
 
   See the "Shared options" section at the module documentation for more options.
 
@@ -918,19 +946,23 @@ defmodule Nebulex.Cache do
 
   ## Example
 
-      # set some entries
+  Populate the cache with some entries:
+
       iex> :ok = Enum.each(1..5, &MyCache.put(&1, &1 * 2))
 
-      # fetch all (with default params)
+  Fetch all (with default params):
+
       iex> MyCache.all()
       [1, 2, 3, 4, 5]
 
-      # fetch all entries and return values
+  Fetch all entries and return values:
+
       iex> MyCache.all(nil, return: :value)
       [2, 4, 6, 8, 10]
 
-      # fetch all entries that match with the given query
-      # assuming we are using Nebulex.Adapters.Local adapter
+  Fetch all entries that match with the given query assuming we are using
+  `Nebulex.Adapters.Local` adapter:
+
       iex> query = [{{:_, :"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [:"$1"]}]
       iex> MyCache.all(query)
       [3, 4, 5]
@@ -944,18 +976,21 @@ defmodule Nebulex.Cache do
 
   ## Examples
 
-      # additional built-in queries for Nebulex.Adapters.Local adapter
+  Additional built-in queries for `Nebulex.Adapters.Local` adapter:
+
       iex> unexpired = MyCache.all(:unexpired)
       iex> expired = MyCache.all(:expired)
 
-      # if we are using Nebulex.Adapters.Local adapter, the stored entry tuple
-      # {:entry, key, value, version, expire_at}, then the match spec could be
-      # something like:
+  If we are using Nebulex.Adapters.Local adapter, the stored entry tuple
+  `{:entry, key, value, version, expire_at}`, then the match spec could be
+  something like:
+
       iex> spec = [{{:entry, :"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [{{:"$1", :"$2"}}]}]
       iex> MyCache.all(spec)
       [{3, 6}, {4, 8}, {5, 10}]
 
-      # the same previous query but using Ex2ms
+  The same previous query but using `Ex2ms`:
+
       iex> import Ex2ms
       Ex2ms
 
@@ -990,29 +1025,35 @@ defmodule Nebulex.Cache do
 
   ## Examples
 
-      # set some entries
+  Populate the cache with some entries:
+
       iex> :ok = Enum.each(1..5, &MyCache.put(&1, &1 * 2))
 
-      # stream all (with default params)
+  Stream all (with default params):
+
       iex> MyCache.stream() |> Enum.to_list()
       [1, 2, 3, 4, 5]
 
-      # stream all entries and return values
+  Stream all entries and return values:
+
       iex> MyCache.stream(nil, return: :value, page_size: 3) |> Enum.to_list()
       [2, 4, 6, 8, 10]
 
-      # additional built-in queries for Nebulex.Adapters.Local adapter
-      unexpired_stream = MyCache.stream(:unexpired)
-      expired_stream = MyCache.stream(:expired)
+  Additional built-in queries for `Nebulex.Adapters.Local` adapter:
 
-      # if we are using Nebulex.Adapters.Local adapter, the stored entry tuple
-      # {:entry, key, value, version, expire_at}, then the match spec could be
-      # something like:
+      iex> unexpired_stream = MyCache.stream(:unexpired)
+      iex> expired_stream = MyCache.stream(:expired)
+
+  If we are using Nebulex.Adapters.Local adapter, the stored entry tuple
+  `{:entry, key, value, version, expire_at}`, then the match spec could be
+  something like:
+
       iex> spec = [{{:entry, :"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [{{:"$1", :"$2"}}]}]
       iex> MyCache.stream(spec, page_size: 3) |> Enum.to_list()
       [{3, 6}, {4, 8}, {5, 10}]
 
-      # the same previous query but using Ex2ms
+  The same previous query but using `Ex2ms`:
+
       iex> import Ex2ms
       Ex2ms
 
@@ -1045,12 +1086,14 @@ defmodule Nebulex.Cache do
 
   ## Examples
 
-      # set some entries
+  Populate the cache with some entries:
+
       iex> entries = for x <- 1..10, into: %{}, do: {x, x}
       iex> MyCache.set_many(entries)
       :ok
 
-      # dump cache to a file
+  Dump cache to a file:
+
       iex> MyCache.dump("my_cache")
       :ok
   """
@@ -1071,16 +1114,19 @@ defmodule Nebulex.Cache do
 
   ## Examples
 
-      # set some entries
+  Populate the cache with some entries:
+
       iex> entries = for x <- 1..10, into: %{}, do: {x, x}
       iex> MyCache.set_many(entries)
       :ok
 
-      # dump cache to a file
+  Dump cache to a file:
+
       iex> MyCache.dump("my_cache")
       :ok
 
-      # load the cache from a file
+  Load the cache from a file:
+
       iex> MyCache.load("my_cache")
       :ok
   """
@@ -1108,7 +1154,8 @@ defmodule Nebulex.Cache do
         MyCache.put(:bob, %{bob | balance: bob.balance + 100})
       end
 
-      # locking only the involved key (recommended):
+  Locking only the involved key (recommended):
+
       MyCache.transaction [keys: [:alice, :bob]], fn ->
         alice = MyCache.get(:alice)
         bob = MyCache.get(:bob)

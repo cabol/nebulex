@@ -2,7 +2,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   use Nebulex.NodeCase
   use Nebulex.CacheTest
 
-  import Nebulex.TestCase
+  import Nebulex.CacheCase
 
   alias Nebulex.TestCache.{Replicated, ReplicatedMock}
 
