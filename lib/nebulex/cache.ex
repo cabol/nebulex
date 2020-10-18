@@ -22,7 +22,7 @@ defmodule Nebulex.Cache do
       config :my_app, MyCache,
         stats: true,
         backend: :shards,
-        gc_interval: 3_600_000, #=> 1 hr
+        gc_interval: :timer.seconds(3600),
         max_size: 200_000,
         gc_cleanup_min_timeout: 10_000,
         gc_cleanup_max_timeout: 900_000

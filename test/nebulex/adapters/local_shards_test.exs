@@ -3,10 +3,10 @@ defmodule Nebulex.Adapters.LocalWithShardsTest do
   use Nebulex.LocalTest
   use Nebulex.CacheTest
 
-  import Nebulex.Helpers
   import Nebulex.TestCase
 
   alias Nebulex.Adapter
+  alias Nebulex.Adapters.Local.Generation
   alias Nebulex.TestCache.Cache
 
   setup_with_dynamic_cache(Cache, :local_with_shards, backend: :shards)
@@ -28,8 +28,7 @@ defmodule Nebulex.Adapters.LocalWithShardsTest do
       :ok = Application.put_env(:nebulex, CustomPartitions, backend: :shards, partitions: 2)
       {:ok, _pid} = CustomPartitions.start_link()
 
-      assert [CustomPartitions, Generation, 0]
-             |> normalize_module_name()
+      assert CustomPartitions.newer_generation()
              |> :shards.meta()
              |> :shards_meta.partitions() == 2
 

@@ -32,20 +32,20 @@ defmodule Nebulex.Adapters.Local.Backend do
             false -> []
           end
 
-        Keyword.put(
-          opts,
-          :backend_opts,
-          List.flatten([
+        backend_opts =
+          [
             type,
-            :named_table,
             :public,
             {:keypos, 2},
             {:read_concurrency, get_option(opts, :read_concurrency, &is_boolean/1, true)},
             {:write_concurrency, get_option(opts, :write_concurrency, &is_boolean/1, true)},
             compressed,
             extra
-          ])
-        )
+          ]
+          |> List.flatten()
+          |> Enum.filter(&(&1 != :named_table))
+
+        Keyword.put(opts, :backend_opts, backend_opts)
       end
     end
   end
@@ -62,10 +62,10 @@ defmodule Nebulex.Adapters.Local.Backend do
   @doc """
   Helper function for creating a new table for the given backend.
   """
-  def new(backend, cache_name, tab_name, tab_opts) do
+  def new(backend, cache_name, tab_opts) do
     backend
     |> get_mod()
-    |> apply(:new, [cache_name, tab_name, tab_opts])
+    |> apply(:new, [cache_name, tab_opts])
   end
 
   @doc """

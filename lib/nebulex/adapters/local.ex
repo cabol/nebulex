@@ -94,7 +94,7 @@ defmodule Nebulex.Adapters.Local do
 
       config :my_app, MyApp.LocalCache,
         backend: :shards,
-        gc_interval: 3_600_000,
+        gc_interval: :timer.seconds(3600),
         max_size: 200_000,
         allocated_memory: 2_000_000_000,
         gc_cleanup_min_timeout: 10_000,
@@ -107,7 +107,7 @@ defmodule Nebulex.Adapters.Local do
 
       config :my_app, MyApp.LocalCache,
         backend: :shards,
-        gc_interval: 3_600_000,
+        gc_interval: :timer.seconds(3600),
         max_size: 200_000,
         allocated_memory: 2_000_000_000,
         gc_cleanup_min_timeout: 10_000,
@@ -153,6 +153,26 @@ defmodule Nebulex.Adapters.Local do
   the return value depends on it.
 
   The same applies to the `stream` function.
+
+  ## Extended API (convenience functions)
+
+  This adapter provides some additional convenience functions to the
+  `Nebulex.Cache` API.
+
+  Creating new generations:
+
+      MyCache.new_generation()
+      MyCache.new_generation(name: :my_cache)
+
+  Retrieving the current generations:
+
+      MyCache.generations()
+      MyCache.generations(:my_cache)
+
+  Retrieving the newer generation:
+
+      MyCache.newer_generation()
+      MyCache.newer_generation(:my_cache)
   """
 
   # Provide Cache Implementation
@@ -195,6 +215,16 @@ defmodule Nebulex.Adapters.Local do
         |> Keyword.get(:name, __MODULE__)
         |> Generation.new(opts)
       end
+
+      @doc """
+      A convenience function for retrieving the current generations.
+      """
+      defdelegate generations(name \\ __MODULE__), to: Generation, as: :list
+
+      @doc """
+      A convenience function for retrieving the newer generation.
+      """
+      defdelegate newer_generation(name \\ __MODULE__), to: Generation, as: :newer
     end
   end
 

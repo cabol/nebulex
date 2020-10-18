@@ -95,7 +95,7 @@ defmodule Nebulex.Adapters.Multilevel do
       MyCache.model()
       MyCache.model(:cache_name)
 
-  ## Limitations
+  ## Caveats of multi-level adapter
 
   Because this adapter reuses other existing/configured adapters, it inherits
   all their limitations too. Therefore, it is highly recommended to check the

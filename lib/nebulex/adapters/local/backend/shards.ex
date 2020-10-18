@@ -24,11 +24,11 @@ if Code.ensure_loaded?(:shards) do
     end
 
     @doc false
-    def new(cache_name, tab_name, tab_opts) do
+    def new(cache_name, tab_opts) do
       {:ok, _pid, tab} =
         cache_name
         |> dynamic_sup()
-        |> DynamicSupervisor.start_child(table_spec(tab_name, tab_opts))
+        |> DynamicSupervisor.start_child(table_spec(cache_name, tab_opts))
 
       tab
     end
