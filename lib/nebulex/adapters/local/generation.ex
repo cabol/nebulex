@@ -49,8 +49,6 @@ defmodule Nebulex.Adapters.Local.Generation do
     :backend_opts,
     :gc_interval,
     :gc_heartbeat_ref,
-    :gen_name,
-    :gen_index,
     :max_size,
     :allocated_memory,
     :gc_cleanup_min_timeout,
@@ -190,18 +188,16 @@ defmodule Nebulex.Adapters.Local.Generation do
     gc_cleanup_ref = if max_size || allocated_memory, do: start_timer(cleanup_max, nil, :cleanup)
 
     # GC options
-    {{gen_name, gen_index}, ref} =
+    {:ok, ref} =
       if gc_interval = get_option(opts, :gc_interval, &(is_integer(&1) and &1 > 0)),
-        do: {new_gen(name, 0, backend, backend_opts), start_timer(gc_interval)},
-        else: {new_gen(name, 0, backend, backend_opts), nil}
+        do: {new_gen(name, backend, backend_opts), start_timer(gc_interval)},
+        else: {new_gen(name, backend, backend_opts), nil}
 
     init_state = %__MODULE__{
       name: name,
       backend: backend,
       backend_opts: backend_opts,
       gc_interval: gc_interval,
-      gen_name: gen_name,
-      gen_index: gen_index,
       gc_heartbeat_ref: ref,
       max_size: max_size,
       allocated_memory: allocated_memory,
@@ -219,19 +215,18 @@ defmodule Nebulex.Adapters.Local.Generation do
         _from,
         %__MODULE__{
           name: name,
-          gen_index: gen_index,
           backend: backend,
           backend_opts: backend_opts
         } = state
       ) do
-    {gen_name, gen_index} = new_gen(name, gen_index, backend, backend_opts)
+    :ok = new_gen(name, backend, backend_opts)
 
     ref =
       opts
       |> get_option(:reset_timer, &is_boolean/1, true, & &1)
       |> maybe_reset_timer(state)
 
-    state = %{state | gen_name: gen_name, gen_index: gen_index, gc_heartbeat_ref: ref}
+    state = %{state | gc_heartbeat_ref: ref}
     {:reply, :ok, state}
   end
 
@@ -253,7 +248,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   def handle_call(
         :memory_info,
         _from,
-        %__MODULE__{backend: backend, gen_name: name, allocated_memory: allocated} = state
+        %__MODULE__{backend: backend, name: name, allocated_memory: allocated} = state
       ) do
     {:reply, {memory_info(backend, name), allocated}, state}
   end
@@ -265,21 +260,12 @@ defmodule Nebulex.Adapters.Local.Generation do
           name: name,
           gc_interval: time_interval,
           gc_heartbeat_ref: ref,
-          gen_index: gen_index,
           backend: backend,
           backend_opts: backend_opts
         } = state
       ) do
-    {gen_name, gen_index} = new_gen(name, gen_index, backend, backend_opts)
-
-    state = %{
-      state
-      | gen_name: gen_name,
-        gen_index: gen_index,
-        gc_heartbeat_ref: start_timer(time_interval, ref)
-    }
-
-    {:noreply, state}
+    :ok = new_gen(name, backend, backend_opts)
+    {:noreply, %{state | gc_heartbeat_ref: start_timer(time_interval, ref)}}
   end
 
   def handle_info(:cleanup, state) do
@@ -297,13 +283,14 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp check_size(
          %__MODULE__{
-           gen_name: gen_name,
+           name: name,
            max_size: max_size,
            backend: backend
          } = state
        )
        when not is_nil(max_size) do
-    gen_name
+    name
+    |> newer()
     |> backend.info(:size)
     |> maybe_cleanup(max_size, state)
   end
@@ -312,14 +299,14 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp check_memory(
          %__MODULE__{
-           gen_name: gen_name,
+           name: name,
            backend: backend,
            allocated_memory: allocated
          } = state
        )
        when not is_nil(allocated) do
     backend
-    |> memory_info(gen_name)
+    |> memory_info(name)
     |> maybe_cleanup(allocated, state)
   end
 
@@ -332,7 +319,6 @@ defmodule Nebulex.Adapters.Local.Generation do
            name: name,
            backend: backend,
            backend_opts: backend_opts,
-           gen_index: index,
            gc_cleanup_max_timeout: max_timeout,
            gc_cleanup_ref: cleanup_ref,
            gc_interval: gc_interval,
@@ -340,13 +326,11 @@ defmodule Nebulex.Adapters.Local.Generation do
          } = state
        )
        when size >= max_size do
-    {gen_name, index} = new_gen(name, index, backend, backend_opts)
+    :ok = new_gen(name, backend, backend_opts)
 
     %{
       state
-      | gen_name: gen_name,
-        gen_index: index,
-        gc_cleanup_ref: start_timer(max_timeout, cleanup_ref, :cleanup),
+      | gc_cleanup_ref: start_timer(max_timeout, cleanup_ref, :cleanup),
         gc_heartbeat_ref: start_timer(gc_interval, heartbeat_ref)
     }
   end
@@ -387,29 +371,22 @@ defmodule Nebulex.Adapters.Local.Generation do
     :ok
   end
 
-  defp new_gen(name, gen_index, backend, backend_opts) do
+  defp new_gen(name, backend, backend_opts) do
     # create new generation
-    gen_name = normalize_module_name([name, Generation, gen_index])
-    ^gen_name = Backend.new(backend, name, gen_name, backend_opts)
+    gen_tab = Backend.new(backend, name, backend_opts)
 
     # update generation list
-    :ok =
-      case get_meta(name, :generations, []) do
-        [newer, older] ->
-          _ = Backend.delete(backend, name, older)
-          put_meta(name, :generations, [gen_name, newer])
+    case get_meta(name, :generations, []) do
+      [newer, older] ->
+        _ = Backend.delete(backend, name, older)
+        put_meta(name, :generations, [gen_tab, newer])
 
-        [newer] ->
-          put_meta(name, :generations, [gen_name, newer])
+      [newer] ->
+        put_meta(name, :generations, [gen_tab, newer])
 
-        [] ->
-          put_meta(name, :generations, [gen_name])
-      end
-
-    # increment the generation index
-    gen_index = if gen_index < 2, do: gen_index + 1, else: 0
-
-    {gen_name, gen_index}
+      [] ->
+        put_meta(name, :generations, [gen_tab])
+    end
   end
 
   defp start_timer(time, ref \\ nil, event \\ :heartbeat) do
@@ -430,7 +407,10 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   defp memory_info(backend, name) do
-    backend.info(name, :memory) * :erlang.system_info(:wordsize)
+    name
+    |> newer()
+    |> backend.info(:memory)
+    |> Kernel.*(:erlang.system_info(:wordsize))
   end
 
   defp linear_inverse_backoff(size, max_size, min_timeout, max_timeout) do

@@ -85,7 +85,7 @@ Benchee.run(
   inputs: inputs,
   before_scenario: fn {cache, name} ->
     _ = cache.put_dynamic_cache(name)
-    {cache, 1}
+    {cache, 101}
   end,
   after_scenario: fn {cache, _} ->
     _ = cache.put_dynamic_cache(default_dynamic_cache)

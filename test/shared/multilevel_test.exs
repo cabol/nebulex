@@ -2,11 +2,11 @@ defmodule Nebulex.MultilevelTest do
   import Nebulex.TestCase
 
   deftests "multilevel" do
-    alias Nebulex.Helpers
+    alias Nebulex.Adapters.Local.Generation
 
     test "partitions for L1 with shards backend", %{name: name} do
-      assert [:"#{name}_l1", Generation, 0]
-             |> Helpers.normalize_module_name()
+      assert :"#{name}_l1"
+             |> Generation.newer()
              |> :shards.meta()
              |> :shards_meta.partitions() == 2
     end

@@ -64,9 +64,9 @@ so it is also highly recommended to take a look at them;
 `Nebulex.Adapters.Local`, `Nebulex.Adapters.Partitioned`,
 `Nebulex.Adapters.Replicated`, and `Nebulex.Adapters.Multilevel`.
 
-In case of using a distributed adapter, the module/callback
-`Nebulex.Adapter.HashSlot.keyslot /2` was refactored to
-`Nebulex.Adapter.Keyslot.hash_slot/2`.
+In case of using a distributed adapter, the module `Nebulex.Adapter.HashSlot`
+was refactored to `Nebulex.Adapter.Keyslot` and the callback `keyslot /2` to
+`hash_slot/2`.
 
 ## Statistics
 

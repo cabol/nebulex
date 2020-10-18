@@ -138,7 +138,7 @@ defmodule Nebulex.Adapters.Partitioned do
   > If no cache name is passed to the previous functions, the name of the
     calling cache module is used by default
 
-  ## Limitations
+  ## Caveats of partitioned adapter
 
   For `c:Nebulex.Cache.get_and_update/3` and `c:Nebulex.Cache.update/4`,
   they both have a parameter that is the anonymous function, and it is compiled

@@ -10,8 +10,8 @@ defmodule Nebulex.Adapters.Local.Backend.ETS do
   end
 
   @doc false
-  def new(_name, tab_name, tab_opts) do
-    :ets.new(tab_name, tab_opts)
+  def new(name, tab_opts) do
+    :ets.new(name, tab_opts)
   end
 
   @doc false
