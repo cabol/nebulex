@@ -7,7 +7,7 @@ affect how your application code interacts with the cache. Also, it is not a
 detailed guide about how to translate the current code from older versions to
 v2, just pointing out the areas the new documentation should be consulted on.
 
-## Configiration
+## Configuration
 
 This is one of the biggest changes. Version 1.x, most of the configuration
 options are resolved in compile-time, but this brings with a lot of limitations.

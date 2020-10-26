@@ -9,7 +9,7 @@ defmodule Nebulex.Cache do
 
   When used, the Cache expects the `:otp_app` and `:adapter` as options.
   The `:otp_app` should point to an OTP application that has the cache
-  configuration. For example, the Ccche:
+  configuration. For example, the Cache:
 
       defmodule MyCache do
         use Nebulex.Cache,

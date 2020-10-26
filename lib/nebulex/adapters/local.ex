@@ -199,7 +199,7 @@ defmodule Nebulex.Adapters.Local do
     ttl: nil
   )
 
-  # Suported Backends
+  # Supported Backends
   @backends ~w(ets shards)a
 
   ## Adapter

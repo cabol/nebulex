@@ -100,7 +100,7 @@ defmodule Nebulex.Adapters.Replicated do
   This adapter provides some additional convenience functions to the
   `Nebulex.Cache` API.
 
-  Retrieving the primary sotorage or local cache module:
+  Retrieving the primary storage or local cache module:
 
       MyCache.__primary__()
 
