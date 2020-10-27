@@ -27,7 +27,7 @@ defmodule Nebulex.Adapters.Partitioned do
   a thin layer on top of it in order to distribute requests across a group
   of nodes, where is supposed the local cache is running already. However,
   you don't need to define or declare an additional cache module for the
-  ocal store, instead, the adapter initializes it automatically (adds the
+  local store, instead, the adapter initializes it automatically (adds the
   local cache store as part of the supervision tree) based on the given
   options within the `primary:` argument.
 
@@ -121,7 +121,7 @@ defmodule Nebulex.Adapters.Partitioned do
   This adapter provides some additional convenience functions to the
   `Nebulex.Cache` API.
 
-  Retrieving the primary sotorage or local cache module:
+  Retrieving the primary storage or local cache module:
 
       MyCache.__primary__()
 

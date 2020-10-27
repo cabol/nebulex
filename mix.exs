@@ -1,6 +1,7 @@
 defmodule Nebulex.MixProject do
   use Mix.Project
 
+  @source_url "https://github.com/cabol/nebulex"
   @version "2.0.0-rc.0"
 
   def project do
@@ -78,7 +79,10 @@ defmodule Nebulex.MixProject do
       name: :nebulex,
       maintainers: ["Carlos Bolanos"],
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/cabol/nebulex"}
+      links: %{
+        "Changelog" => "#{@source_url}/blob/master/CHANGELOG.md",
+        "GitHub" => @source_url
+      }
     ]
   end
 
@@ -87,7 +91,7 @@ defmodule Nebulex.MixProject do
       main: "Nebulex",
       source_ref: "v#{@version}",
       canonical: "http://hexdocs.pm/nebulex",
-      source_url: "https://github.com/cabol/nebulex",
+      source_url: @source_url,
       extras: [
         "guides/getting-started.md",
         "guides/cache-usage-patterns.md",

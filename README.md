@@ -6,6 +6,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
 [![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
 [![Hex Version](https://img.shields.io/hexpm/v/nebulex.svg)](https://hex.pm/packages/nebulex)
+[![License](https://img.shields.io/hexpm/l/nebulex.svg)](https://hex.pm/packages/nebulex)
 [![Docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/nebulex)
 
 **Nebulex** provides support for transparently adding caching into an existing
@@ -245,6 +246,6 @@ Before to submit a PR it is highly recommended to run:
 
 ## Copyright and License
 
-Copyright (c) 2017, Carlos Bolaños.
+Copyright (c) 2017-2020, Carlos Bolaños.
 
 Nebulex source code is licensed under the [MIT License](LICENSE).

@@ -59,7 +59,7 @@ defmodule Nebulex.Adapters.Multilevel do
   This adapter supports the following options and all of them can be given via
   the cache configuration:
 
-    * `:levels` - This option is to define the leves, a list of tuples
+    * `:levels` - This option is to define the levels, a list of tuples
       `{cache_level :: Nebulex.Cache.t(), opts :: Keyword.t()}`, where
       the first element is the module that defines the cache for that
       level, and the second one is the options that will be passed to
@@ -67,7 +67,7 @@ defmodule Nebulex.Adapters.Multilevel do
       this level is using). The order in which the levels are defined
       is the same the multi-level cache will use. For example, the first
       cache in the list will be the L1 cache (level 1) and so on;
-      the Nth elemnt will be the LN cache. This option is mandatory,
+      the Nth element will be the LN cache. This option is mandatory,
       if it is not set or empty, an exception will be raised.
 
     * `:model` - Specifies the cache model: `:inclusive` or `:exclusive`;
@@ -234,7 +234,7 @@ defmodule Nebulex.Adapters.Multilevel do
           {:cont, {true, [level | level_acc]}}
 
         false ->
-          _ = delete_fromm_levels(level_acc, entries)
+          _ = delete_from_levels(level_acc, entries)
           {:halt, {on_write == :put, level_acc}}
       end
     end)
@@ -402,7 +402,7 @@ defmodule Nebulex.Adapters.Multilevel do
     end)
   end
 
-  defp delete_fromm_levels(levels, entries) do
+  defp delete_from_levels(levels, entries) do
     for level_meta <- levels, {key, _} <- entries do
       with_dynamic_cache(level_meta, :delete, [key, []])
     end
