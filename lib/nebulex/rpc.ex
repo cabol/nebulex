@@ -45,7 +45,7 @@ defmodule Nebulex.RPC do
 
   def call(supervisor, node, mod, fun, args, timeout) do
     {supervisor, node}
-    |> Task.Supervisor.async(
+    |> Task.Supervisor.async_nolink(
       __MODULE__,
       :call,
       [supervisor, node, mod, fun, args, timeout]
@@ -95,7 +95,7 @@ defmodule Nebulex.RPC do
   def multi_call(supervisor, node_group, opts \\ []) do
     node_group
     |> Enum.map(fn {node, {mod, fun, args}} ->
-      Task.Supervisor.async({supervisor, node}, mod, fun, args)
+      Task.Supervisor.async_nolink({supervisor, node}, mod, fun, args)
     end)
     |> handle_multi_call(node_group, opts)
   end
