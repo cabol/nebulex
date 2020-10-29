@@ -52,8 +52,7 @@ defmodule Nebulex.MixProject do
 
   defp deps do
     [
-      # TODO: Set specific Hex version when it is ready
-      {:shards, github: "cabol/shards", optional: true},
+      {:shards, "~> 1.0", optional: true},
       {:decorator, "~> 1.3", optional: true},
       {:telemetry, "~> 0.4", optional: true},
 
