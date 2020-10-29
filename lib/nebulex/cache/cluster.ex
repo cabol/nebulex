@@ -1,9 +1,6 @@
 defmodule Nebulex.Cache.Cluster do
   # The module used by cache adapters for
   # distributed caching functionality.
-  # TODO: Use pg when depending on Erlang/OTP 23+, since the pg2 module is
-  #       deprecated as of OTP 23 and scheduled for removal in OTP 24.
-  #       Nebulex v2 will support both.
   @moduledoc false
 
   @doc """
@@ -12,13 +9,12 @@ defmodule Nebulex.Cache.Cluster do
   """
   @spec join(name :: atom) :: :ok
   def join(name) do
-    namespace = ensure_namespace(name)
     pid = Process.whereis(name) || self()
 
-    if pid in :pg2.get_members(namespace) do
+    if pid in pg_members(name) do
       :ok
     else
-      :ok = :pg2.join(namespace, pid)
+      :ok = pg_join(name, pid)
     end
   end
 
@@ -28,9 +24,7 @@ defmodule Nebulex.Cache.Cluster do
   """
   @spec leave(name :: atom) :: :ok
   def leave(name) do
-    name
-    |> ensure_namespace()
-    |> :pg2.leave(Process.whereis(name) || self())
+    pg_leave(name, Process.whereis(name) || self())
   end
 
   @doc """
@@ -39,8 +33,7 @@ defmodule Nebulex.Cache.Cluster do
   @spec get_nodes(name :: atom) :: [node]
   def get_nodes(name) do
     name
-    |> ensure_namespace()
-    |> :pg2.get_members()
+    |> pg_members()
     |> Enum.map(&node(&1))
     |> :lists.usort()
   end
@@ -55,13 +48,45 @@ defmodule Nebulex.Cache.Cluster do
     Enum.at(nodes, index)
   end
 
-  ## Private Functions
+  ## PG
 
-  defp ensure_namespace(name) do
-    namespace = namespace(name)
-    :ok = :pg2.create(namespace)
-    namespace
+  if Code.ensure_loaded?(:pg) do
+    defp pg_join(name, pid) do
+      :ok = :pg.join(__MODULE__, name, pid)
+    end
+
+    defp pg_leave(name, pid) do
+      :ok = :pg.leave(__MODULE__, name, pid)
+    end
+
+    defp pg_members(name) do
+      :pg.get_members(__MODULE__, name)
+    end
+  else
+    defp pg_join(name, pid) do
+      name
+      |> ensure_namespace()
+      |> :pg2.join(pid)
+    end
+
+    defp pg_leave(name, pid) do
+      name
+      |> ensure_namespace()
+      |> :pg2.leave(pid)
+    end
+
+    defp pg_members(name) do
+      name
+      |> ensure_namespace()
+      |> :pg2.get_members()
+    end
+
+    defp ensure_namespace(name) do
+      namespace = pg2_namespace(name)
+      :ok = :pg2.create(namespace)
+      namespace
+    end
+
+    defp pg2_namespace(name), do: {:nbx, name}
   end
-
-  defp namespace(name), do: {:nebulex, name}
 end

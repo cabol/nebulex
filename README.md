@@ -6,8 +6,8 @@
 [![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
 [![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
 [![Hex Version](https://img.shields.io/hexpm/v/nebulex.svg)](https://hex.pm/packages/nebulex)
-[![License](https://img.shields.io/hexpm/l/nebulex.svg)](https://hex.pm/packages/nebulex)
 [![Docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/nebulex)
+[![License](https://img.shields.io/hexpm/l/nebulex.svg)](https://hex.pm/packages/nebulex)
 
 **Nebulex** provides support for transparently adding caching into an existing
 Elixir application. Similar to [Ecto][ecto], the caching abstraction allows
