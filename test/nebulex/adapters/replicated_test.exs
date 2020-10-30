@@ -147,7 +147,84 @@ defmodule Nebulex.Adapters.ReplicatedTest do
     end
   end
 
-  # ## Helpers
+  describe "doesn't leave behind EXIT messages after calling, with exits trapped:" do
+    # add/2, all/0, flush/0, set_many/1 and perhaps others were failing in 1.2.2; see #79
+
+    # Put the values, ensure we didn't generate a message before trapping exits, then trap exits.
+    def put_all_and_trap_exits(kv_pairs) do
+      Replicated.put_all(kv_pairs, ttl: :infinity)
+      refute_receive {:EXIT, _, :normal}
+      Process.flag(:trap_exit, true)
+    end
+
+    test "all/0" do
+      put_all_and_trap_exits(a: 1, b: 2, c: 3)
+      Replicated.all()
+      refute_receive {:EXIT, _, :normal}
+    end
+
+    test "delete/1" do
+      put_all_and_trap_exits(a: 1)
+      Replicated.delete(:a)
+      refute_receive {:EXIT, _, :normal}
+    end
+
+    test "flush/0" do
+      put_all_and_trap_exits(a: 1, b: 2, c: 3)
+      Replicated.flush()
+      refute_receive {:EXIT, _, :normal}
+    end
+
+    test "get/1" do
+      put_all_and_trap_exits(a: 1)
+      Replicated.get(:a)
+      refute_receive {:EXIT, _, :normal}
+    end
+
+    test "incr/1" do
+      put_all_and_trap_exits(a: 1)
+      Replicated.incr(:a)
+      refute_receive {:EXIT, _, :normal}
+    end
+
+    test "nodes/0" do
+      put_all_and_trap_exits([])
+      Replicated.nodes()
+      refute_receive {:EXIT, _, :normal}
+    end
+
+    test "put/2" do
+      put_all_and_trap_exits([])
+      Replicated.put(:a, 1)
+      refute_receive {:EXIT, _, :normal}
+    end
+
+    test "put_all/1" do
+      put_all_and_trap_exits([])
+      Replicated.put_all(a: 1, b: 2, c: 3)
+      refute_receive {:EXIT, _, :normal}
+    end
+
+    test "size/0" do
+      put_all_and_trap_exits([])
+      Replicated.size()
+      refute_receive {:EXIT, _, :normal}
+    end
+
+    test "stream/0" do
+      put_all_and_trap_exits(a: 1, b: 2, c: 3)
+      Replicated.stream() |> Enum.take(10)
+      refute_receive {:EXIT, _, :normal}
+    end
+
+    test "take/1" do
+      put_all_and_trap_exits(a: 1)
+      Replicated.take(:a)
+      refute_receive {:EXIT, _, :normal}
+    end
+  end
+
+  ## Helpers
 
   defp assert_for_all_replicas(cache, action, args, expected) do
     assert {res_lst, []} = :rpc.multicall(cache.nodes(cache), cache, action, args)
