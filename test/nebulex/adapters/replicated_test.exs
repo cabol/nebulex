@@ -148,15 +148,6 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   end
 
   describe "doesn't leave behind EXIT messages after calling, with exits trapped:" do
-    # add/2, all/0, flush/0, set_many/1 and perhaps others were failing in 1.2.2; see #79
-
-    # Put the values, ensure we didn't generate a message before trapping exits, then trap exits.
-    def put_all_and_trap_exits(kv_pairs) do
-      Replicated.put_all(kv_pairs, ttl: :infinity)
-      refute_receive {:EXIT, _, :normal}
-      Process.flag(:trap_exit, true)
-    end
-
     test "all/0" do
       put_all_and_trap_exits(a: 1, b: 2, c: 3)
       Replicated.all()
@@ -221,6 +212,14 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       put_all_and_trap_exits(a: 1)
       Replicated.take(:a)
       refute_receive {:EXIT, _, :normal}
+    end
+
+    # Put the values, ensure we didn't generate a message before trapping exits,
+    # then trap exits.
+    defp put_all_and_trap_exits(kv_pairs) do
+      Replicated.put_all(kv_pairs, ttl: :infinity)
+      refute_receive {:EXIT, _, :normal}
+      Process.flag(:trap_exit, true)
     end
   end
 

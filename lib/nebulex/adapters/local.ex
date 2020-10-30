@@ -72,11 +72,13 @@ defmodule Nebulex.Adapters.Local do
 
     * `:gc_cleanup_min_timeout` - The min timeout in milliseconds for triggering
       the next cleanup and memory check. This will be the timeout to use when
-      the max allocated memory is reached. Defaults to `30_000`.
+      either the max size or max allocated memory is reached.
+      Defaults to `10_000` (10 seconds).
 
     * `:gc_cleanup_max_timeout` - The max timeout in milliseconds for triggering
       the next cleanup and memory check. This is the timeout used when the cache
-      starts or the consumed memory is `0`. Defaults to `300_000`.
+      starts and there are few entries or the consumed memory is near to `0`.
+      Defaults to `600_000` (10 minutes).
 
   ## Example
 
@@ -115,6 +117,92 @@ defmodule Nebulex.Adapters.Local do
         partitions: System.schedulers_online() * 2
 
   For more information about the usage, check out `Nebulex.Cache`.
+
+  ## Eviction configuration
+
+  This section is to understand a bit better how the different configuration
+  options work and have an idea what values to set; especially if it is the
+  first time using Nebulex.
+
+  ### `:ttl` option
+
+  The `:ttl` option that is used to set the expiration time for a key, it
+  doesn't work as eviction mechanism, since the local adapter implements a
+  generational cache, the options that control the eviction process are:
+  `:gc_interval`, `:gc_cleanup_min_timeout`, `:gc_cleanup_max_timeout`,
+  `:max_size` and `:allocated_memory`. The `:ttl` is evaluated on-demand
+  when a key is retrieved, and at that moment if it s expired, then remove
+  it from the cache, hence, it can not be used as eviction method, it is
+  more for keep the integrity and consistency in the cache. For this reason,
+  it is highly recommended to configure always the eviction options mentioned
+  before.
+
+  ### Caveats when using `:ttl` option:
+
+    * When using the `:ttl` option, ensure it is less than `:gc_interval`,
+      otherwise, there may be a situation where the key is evicted and the
+      `:ttl` hasn't happened yet (maybe because the garbage collector ran
+      before the key had been fetched).
+    * Assuming you have `:gc_interval` set to 2 hrs, then you put a new key
+      with `:ttl` set to 1 hr, and 1 minute later the GC runs, that key will
+      be moved to the older generation so it can be yet retrieved. On the other
+      hand, if the key is never fetched till the next GC cycle (causing moving
+      it to the newer generation), since the key is already in the oldest
+      generation it will be evicted from the cache so it won't be retrievable
+      anymore.
+
+  ### Garbage collection or eviction options
+
+  This adapter implements a generational cache, which means its main eviction
+  mechanism is pushing a new cache generation and remove the oldest one. In
+  this way, we ensure only the most frequently used keys are always available
+  in the newer generation and the the least frequently used are evicted when
+  the garbage collector runs, and the garbage collector is triggered uppon
+  these conditions:
+
+    * When the time interval defined by `:gc_interval` is completed.
+      This makes the garbage-collector process to run creating a new
+      generation and forcing to delete the oldest one.
+    * When the "cleanup" timeout expires, and then the limits `:max_size`
+      and `:allocated_memory` are checked, if one of those is reached,
+      then the garbage collector runs (a new generation is created and
+      the oldest one is deleted). The cleanup timeout is controlled by
+      `:gc_cleanup_min_timeout` and `:gc_cleanup_max_timeout`, it works
+      with an inverse linear backoff, which means the timeout is inverse
+      proportional to the memory growth; the bigger the cache size is,
+      the shorter the cleanup timeout will be.
+
+  ### First-time configuration
+
+  For configuring the cache with accurate and/or good values it is important
+  to know several things in advance, like for example the size of an entry
+  in average so we can calculate a good value for max size and/or allocated
+  memory, how intensive will be the load in terms of reads and writes, etc.
+  The problem is most of these aspects are unknown when it is a new app or
+  we are using the cache for the first time. Therefore, the following
+  recommendations will help you to configure the cache for the first time:
+
+    * When configuring the `:gc_interval`, think about how that often the
+      least frequently used entries should be evicted. For example, if
+      `:gc_interval` is set to 1 hr, it means you will keep in cache only
+      those entries that are retrieved periodically within a 2 hr period;
+      `gc_interval * 2`, being 2 the number of generations. Longer than that,
+      the GC will ensure is always evicted (the oldest generation is always
+      flushed/deleted). If it is the first time using Nebulex, perhaps you
+      can start with `gc_interval: :timer.seconds(43_200)` (12 hrs), so the
+      max retention period for the keys will be 1 day; but ensure you also
+      set either the `:max_size` or `:allocated_memory`.
+    * It is highly recommended to set either `:max_size` or `:allocated_memory`
+      to ensure the oldest generation is deleted (least frequently used keys
+      are evicted) when one of these limits is reached and also to avoid
+      running out of memory. For example, for the `:allocated_memory` we can
+      set 25% of the total memory, and for the `:max_size` something between
+      `100_000` and `1_000_000`.
+    * For `:gc_cleanup_min_timeout` we can set `10_000`, which means when the
+      cache is reaching the size or memory limit, the polling period for the
+      cleanup process will be 10 seconds. And for `:gc_cleanup_max_timeout`
+      we can set `600_000`, which means when the cache is almost empty the
+      polling period will be close to 10 minutes.
 
   ## Queryable API
 

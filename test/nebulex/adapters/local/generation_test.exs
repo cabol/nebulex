@@ -115,8 +115,8 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
 
       assert %{
                gc_interval: nil,
-               gc_cleanup_min_timeout: 30_000,
-               gc_cleanup_max_timeout: 300_000
+               gc_cleanup_min_timeout: 10_000,
+               gc_cleanup_max_timeout: 600_000
              } = get_state()
 
       :ok = LocalWithSizeLimit.stop()

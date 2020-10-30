@@ -35,11 +35,13 @@ defmodule Nebulex.Adapters.Local.Generation do
 
     * `:gc_cleanup_min_timeout` - The min timeout in milliseconds for triggering
       the next cleanup and memory check. This will be the timeout to use when
-      the max allocated memory is reached. Defaults to `30_000`.
+      either the max size or max allocated memory is reached.
+      Defaults to `10_000` (10 seconds).
 
     * `:gc_cleanup_max_timeout` - The max timeout in milliseconds for triggering
       the next cleanup and memory check. This is the timeout used when the cache
-      starts or the consumed memory is `0`. Defaults to `300_000`.
+      starts and there are few entries or the consumed memory is near to `0`.
+      Defaults to `600_000` (10 minutes).
   """
 
   # State
@@ -183,8 +185,8 @@ defmodule Nebulex.Adapters.Local.Generation do
     # memory check options
     max_size = get_option(opts, :max_size, &(is_integer(&1) and &1 > 0))
     allocated_memory = get_option(opts, :allocated_memory, &(is_integer(&1) and &1 > 0))
-    cleanup_min = get_option(opts, :gc_cleanup_min_timeout, &(is_integer(&1) and &1 > 0), 30_000)
-    cleanup_max = get_option(opts, :gc_cleanup_max_timeout, &(is_integer(&1) and &1 > 0), 300_000)
+    cleanup_min = get_option(opts, :gc_cleanup_min_timeout, &(is_integer(&1) and &1 > 0), 10_000)
+    cleanup_max = get_option(opts, :gc_cleanup_max_timeout, &(is_integer(&1) and &1 > 0), 600_000)
     gc_cleanup_ref = if max_size || allocated_memory, do: start_timer(cleanup_max, nil, :cleanup)
 
     # GC options
