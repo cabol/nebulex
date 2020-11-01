@@ -6,7 +6,6 @@ defmodule Nebulex.Adapters.LocalWithShardsTest do
   import Nebulex.CacheCase
 
   alias Nebulex.Adapter
-  alias Nebulex.Adapters.Local.Generation
   alias Nebulex.TestCache.Cache
 
   setup_with_dynamic_cache(Cache, :local_with_shards, backend: :shards)

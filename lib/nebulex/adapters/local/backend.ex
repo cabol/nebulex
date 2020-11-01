@@ -8,19 +8,19 @@ defmodule Nebulex.Adapters.Local.Backend do
 
       alias Nebulex.Adapters.Local.Generation
 
-      defp generation_spec(name, opts) do
+      defp generation_spec(opts) do
         %{
-          id: {name, Generation},
+          id: Module.concat(__MODULE__, Generation),
           start: {Generation, :start_link, [opts]}
         }
       end
 
-      defp sup_spec(name, children) do
-        Nebulex.Adapters.Supervisor.child_spec(
-          name: normalize_module_name([name, Supervisor]),
-          strategy: :one_for_all,
-          children: children
-        )
+      defp sup_spec(children) do
+        %{
+          id: Nebulex.Adapters.Local.Supervisor,
+          start: {Supervisor, :start_link, [children, [strategy: :one_for_all]]},
+          type: :supervisor
+        }
       end
 
       defp parse_opts(opts, extra \\ []) do
@@ -53,28 +53,28 @@ defmodule Nebulex.Adapters.Local.Backend do
   @doc """
   Helper function for returning the child spec for the given backend.
   """
-  def child_spec(backend, name, opts) do
+  def child_spec(backend, opts) do
     backend
     |> get_mod()
-    |> apply(:child_spec, [name, opts])
+    |> apply(:child_spec, [opts])
   end
 
   @doc """
   Helper function for creating a new table for the given backend.
   """
-  def new(backend, cache_name, tab_opts) do
+  def new(backend, meta_tab, tab_opts) do
     backend
     |> get_mod()
-    |> apply(:new, [cache_name, tab_opts])
+    |> apply(:new, [meta_tab, tab_opts])
   end
 
   @doc """
   Helper function for deleting a table for the given backend.
   """
-  def delete(backend, cache_name, tab) do
+  def delete(backend, meta_tab, gen_tab) do
     backend
     |> get_mod()
-    |> apply(:delete, [cache_name, tab])
+    |> apply(:delete, [meta_tab, gen_tab])
   end
 
   defp get_mod(:ets), do: Nebulex.Adapters.Local.Backend.ETS

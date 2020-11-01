@@ -59,7 +59,7 @@ defmodule Nebulex.Adapters.Local do
     * `:gc_interval` - Interval time in milliseconds to garbage collection to
       run, delete the oldest generation and create a new one. If this option is
       not set, garbage collection is never executed, so new generations must be
-      created explicitly, e.g.: `Generation.new_generation(cache_name, [])`.
+      created explicitly, e.g.: `MyCache.new_generation(name_or_pid, opts)`.
 
     * `:max_size` - Max number of cached entries (cache limit). If it is not
       set (`nil`), the check to release memory is not performed (the default).
@@ -250,7 +250,7 @@ defmodule Nebulex.Adapters.Local do
   Creating new generations:
 
       MyCache.new_generation()
-      MyCache.new_generation(name: :my_cache)
+      MyCache.new_generation(:my_cache, [])
 
   Retrieving the current generations:
 
@@ -275,7 +275,7 @@ defmodule Nebulex.Adapters.Local do
 
   import Record
 
-  alias Nebulex.Adapters.Local.{Backend, Generation}
+  alias Nebulex.Adapters.Local.{Backend, Generation, Metadata}
   alias Nebulex.Cache.Stats
   alias Nebulex.{Entry, Time}
 
@@ -290,6 +290,8 @@ defmodule Nebulex.Adapters.Local do
   # Supported Backends
   @backends ~w(ets shards)a
 
+  @compile {:inline, list_gen: 1, newer_gen: 1}
+
   ## Adapter
 
   @impl true
@@ -298,29 +300,22 @@ defmodule Nebulex.Adapters.Local do
       @doc """
       A convenience function for creating new generations.
       """
-      def new_generation(opts \\ []) do
-        opts
-        |> Keyword.get(:name, __MODULE__)
-        |> Generation.new(opts)
-      end
+      defdelegate new_generation(name_or_pid \\ __MODULE__, opts \\ []), to: Generation, as: :new
 
       @doc """
       A convenience function for retrieving the current generations.
       """
-      defdelegate generations(name \\ __MODULE__), to: Generation, as: :list
+      defdelegate generations(name_or_pid \\ __MODULE__), to: Generation, as: :list
 
       @doc """
       A convenience function for retrieving the newer generation.
       """
-      defdelegate newer_generation(name \\ __MODULE__), to: Generation, as: :newer
+      defdelegate newer_generation(name_or_pid \\ __MODULE__), to: Generation, as: :newer
     end
   end
 
   @impl true
   def init(opts) do
-    # required cache name
-    name = opts[:name] || Keyword.fetch!(opts, :cache)
-
     # resolve the backend to be used
     backend =
       opts
@@ -334,16 +329,18 @@ defmodule Nebulex.Adapters.Local do
                   "#{inspect(@backends)}, got: #{inspect(val)}"
       end
 
+    # init internal metadata table
+    meta_tab = opts[:meta_tab] || Metadata.init()
+
     child =
       Backend.child_spec(
         backend,
-        name,
-        [name: name, backend: backend] ++ opts
+        [backend: backend, meta_tab: meta_tab] ++ opts
       )
 
     meta = %{
-      name: name,
       backend: backend,
+      meta_tab: meta_tab,
       stat_counter: opts[:stat_counter] || Stats.init(opts)
     }
 
@@ -351,9 +348,9 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def get(%{name: name, backend: backend, stat_counter: ref}, key, _opts) do
-    name
-    |> Generation.list()
+  def get(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key, _opts) do
+    meta_tab
+    |> list_gen()
     |> do_get(key, backend, ref)
     |> return(:value)
     |> update_stats(:get, ref)
@@ -387,10 +384,17 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def put(%{name: name, backend: backend, stat_counter: ref}, key, value, ttl, on_write, _opts) do
+  def put(
+        %{meta_tab: meta_tab, backend: backend, stat_counter: ref},
+        key,
+        value,
+        ttl,
+        on_write,
+        _opts
+      ) do
     do_put(
       on_write,
-      name,
+      meta_tab,
       backend,
       ref,
       entry(
@@ -402,26 +406,32 @@ defmodule Nebulex.Adapters.Local do
     )
   end
 
-  defp do_put(:put, name, backend, ref, entry) do
-    name
+  defp do_put(:put, meta_tab, backend, ref, entry) do
+    meta_tab
     |> put_entries(backend, entry)
     |> update_stats(:put, ref)
   end
 
-  defp do_put(:put_new, name, backend, ref, entry) do
-    name
+  defp do_put(:put_new, meta_tab, backend, ref, entry) do
+    meta_tab
     |> put_new_entries(backend, entry)
     |> update_stats(:put, ref)
   end
 
-  defp do_put(:replace, name, backend, ref, entry(key: key, value: value, ttl: ttl)) do
-    name
+  defp do_put(:replace, meta_tab, backend, ref, entry(key: key, value: value, ttl: ttl)) do
+    meta_tab
     |> update_entry(backend, key, [{3, value}, {4, nil}, {5, ttl}])
     |> update_stats(:put, ref)
   end
 
   @impl true
-  def put_all(%{name: name, backend: backend, stat_counter: ref}, entries, ttl, on_write, _opts) do
+  def put_all(
+        %{meta_tab: meta_tab, backend: backend, stat_counter: ref},
+        entries,
+        ttl,
+        on_write,
+        _opts
+      ) do
     touched = Time.now()
 
     entries =
@@ -429,33 +439,33 @@ defmodule Nebulex.Adapters.Local do
         entry(key: key, value: value, touched: touched, ttl: ttl)
       end
 
-    do_put_all(on_write, name, backend, ref, entries)
+    do_put_all(on_write, meta_tab, backend, ref, entries)
   end
 
-  defp do_put_all(:put, name, backend, ref, entries) do
-    name
+  defp do_put_all(:put, meta_tab, backend, ref, entries) do
+    meta_tab
     |> put_entries(backend, entries)
     |> update_stats(:put_all, {ref, entries})
   end
 
-  defp do_put_all(:put_new, name, backend, ref, entries) do
-    name
+  defp do_put_all(:put_new, meta_tab, backend, ref, entries) do
+    meta_tab
     |> put_new_entries(backend, entries)
     |> update_stats(:put_all, {ref, entries})
   end
 
   @impl true
-  def delete(%{name: name, backend: backend, stat_counter: ref}, key, _opts) do
-    name
-    |> Generation.list()
+  def delete(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key, _opts) do
+    meta_tab
+    |> list_gen()
     |> Enum.each(&backend.delete(&1, key))
     |> update_stats(:delete, ref)
   end
 
   @impl true
-  def take(%{name: name, backend: backend, stat_counter: ref}, key, _opts) do
-    name
-    |> Generation.list()
+  def take(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key, _opts) do
+    meta_tab
+    |> list_gen()
     |> Enum.reduce_while(nil, fn gen, acc ->
       case pop_entry(gen, key, nil, backend) do
         nil ->
@@ -474,9 +484,9 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def incr(%{name: name, backend: backend, stat_counter: ref}, key, incr, ttl, _opts) do
-    name
-    |> Generation.newer()
+  def incr(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key, incr, ttl, _opts) do
+    meta_tab
+    |> newer_gen()
     |> backend.update_counter(
       key,
       {3, incr},
@@ -494,9 +504,9 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def ttl(%{name: name, backend: backend, stat_counter: ref}, key) do
-    name
-    |> Generation.list()
+  def ttl(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key) do
+    meta_tab
+    |> list_gen()
     |> do_get(key, backend, ref)
     |> return()
     |> entry_ttl()
@@ -515,23 +525,23 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def expire(%{name: name, backend: backend, stat_counter: ref}, key, ttl) do
-    name
+  def expire(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key, ttl) do
+    meta_tab
     |> update_entry(backend, key, [{4, Time.now()}, {5, ttl}])
     |> update_stats(:put, ref)
   end
 
   @impl true
-  def touch(%{name: name, backend: backend, stat_counter: ref}, key) do
-    name
+  def touch(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key) do
+    meta_tab
     |> update_entry(backend, key, [{4, Time.now()}])
     |> update_stats(:put, ref)
   end
 
   @impl true
-  def size(%{name: name, backend: backend}) do
-    name
-    |> Generation.list()
+  def size(%{meta_tab: meta_tab, backend: backend}) do
+    meta_tab
+    |> list_gen()
     |> Enum.reduce(0, fn gen, acc ->
       gen
       |> backend.info(:size)
@@ -540,8 +550,8 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def flush(%{name: name, stat_counter: ref}) do
-    name
+  def flush(%{meta_tab: meta_tab, stat_counter: ref}) do
+    meta_tab
     |> Generation.flush()
     |> update_stats(:flush, ref)
   end
@@ -549,10 +559,10 @@ defmodule Nebulex.Adapters.Local do
   ## Queryable
 
   @impl true
-  def all(%{name: name, backend: backend}, query, opts) do
+  def all(%{meta_tab: meta_tab, backend: backend}, query, opts) do
     query = validate_match_spec(query, opts)
 
-    for gen <- Generation.list(name),
+    for gen <- list_gen(meta_tab),
         elems <- backend.select(gen, query),
         do: elems
   end
@@ -564,10 +574,10 @@ defmodule Nebulex.Adapters.Local do
     |> do_stream(adapter_meta, Keyword.get(opts, :page_size, 10))
   end
 
-  defp do_stream(match_spec, %{name: name, backend: backend}, page_size) do
+  defp do_stream(match_spec, %{meta_tab: meta_tab, backend: backend}, page_size) do
     Stream.resource(
       fn ->
-        [newer | _] = generations = Generation.list(name)
+        [newer | _] = generations = list_gen(meta_tab)
         result = backend.select(newer, match_spec, page_size)
         {result, generations}
       end,
@@ -590,14 +600,17 @@ defmodule Nebulex.Adapters.Local do
     )
   end
 
-  ## Transaction
+  ## Helpers
 
-  @impl true
-  def transaction(adapter_meta, opts, fun) do
-    super(adapter_meta, Keyword.put(opts, :nodes, [node()]), fun)
+  defp list_gen(meta_tab) do
+    Metadata.fetch!(meta_tab, :generations)
   end
 
-  ## Helpers
+  defp newer_gen(meta_tab) do
+    meta_tab
+    |> Metadata.fetch!(:generations)
+    |> hd()
+  end
 
   defp get_entry(tab, key, default, backend) do
     case backend.lookup(tab, key) do
@@ -615,21 +628,21 @@ defmodule Nebulex.Adapters.Local do
     end
   end
 
-  defp put_entries(name, backend, entry_or_entries) do
-    name
-    |> Generation.newer()
+  defp put_entries(meta_tab, backend, entry_or_entries) do
+    meta_tab
+    |> newer_gen()
     |> backend.insert(entry_or_entries)
   end
 
-  defp put_new_entries(name, backend, entry_or_entries) do
-    name
-    |> Generation.newer()
+  defp put_new_entries(meta_tab, backend, entry_or_entries) do
+    meta_tab
+    |> newer_gen()
     |> backend.insert_new(entry_or_entries)
   end
 
-  defp update_entry(name, backend, key, updates) do
-    name
-    |> Generation.newer()
+  defp update_entry(meta_tab, backend, key, updates) do
+    meta_tab
+    |> newer_gen()
     |> backend.update_element(key, updates)
   end
 

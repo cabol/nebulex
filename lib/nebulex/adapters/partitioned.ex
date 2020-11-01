@@ -454,6 +454,13 @@ defmodule Nebulex.Adapters.Partitioned do
     )
   end
 
+  ## Transaction
+
+  @impl true
+  def transaction(%{name: name} = adapter_meta, opts, fun) do
+    super(adapter_meta, Keyword.put(opts, :nodes, Cluster.get_nodes(name)), fun)
+  end
+
   ## Helpers
 
   @doc """

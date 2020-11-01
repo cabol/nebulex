@@ -3,10 +3,10 @@ defmodule Nebulex.LocalTest do
 
   deftests "local" do
     import Ex2ms
+    import Nebulex.CacheCase
     import Nebulex.CacheHelpers
 
     alias Nebulex.{Adapter, Entry}
-    alias Nebulex.Adapters.Local.Generation
 
     test "fails on init because invalid backend", %{cache: cache} do
       assert {:error, {%RuntimeError{message: msg}, _}} =
@@ -24,6 +24,13 @@ defmodule Nebulex.LocalTest do
       assert_raise RuntimeError, msg, fn -> cache.put(1, 13) end
       assert_raise RuntimeError, msg, fn -> cache.get(1) end
       assert_raise RuntimeError, msg, fn -> cache.delete(1) end
+    end
+
+    test "with dynamic cache", %{cache: cache} do
+      with_dynamic_cache(cache, fn ->
+        :ok = cache.put("foo", "bar")
+        assert cache.get("foo") == "bar"
+      end)
     end
 
     test "get_and_update", %{cache: cache} do
@@ -88,7 +95,7 @@ defmodule Nebulex.LocalTest do
 
     test "all and stream using match_spec queries", %{cache: cache, name: name} do
       values = cache_put(cache, 1..5, &(&1 * 2))
-      _ = cache.new_generation(name: name)
+      _ = cache.new_generation(name)
       values = values ++ cache_put(cache, 6..10, &(&1 * 2))
 
       assert nil
@@ -150,7 +157,7 @@ defmodule Nebulex.LocalTest do
       assert cache.get("foo") == "bar"
       assert cache.ttl("foo") == :infinity
 
-      _ = cache.new_generation(name: name)
+      _ = cache.new_generation(name)
       assert cache.get("foo") == "bar"
     end
 
@@ -169,59 +176,59 @@ defmodule Nebulex.LocalTest do
       refute cache.get(:non_existent)
 
       # create a new generation
-      _ = cache.new_generation(name: name)
+      _ = cache.new_generation(name)
 
       # both entries should be in the old generation
-      refute get_from_new(name, 1)
-      refute get_from_new(name, 2)
-      assert get_from_old(name, 1) == 1
-      assert get_from_old(name, 2) == 2
+      refute get_from_new(cache, name, 1)
+      refute get_from_new(cache, name, 2)
+      assert get_from_old(cache, name, 1) == 1
+      assert get_from_old(cache, name, 2) == 2
 
       # fetch entry 1 and put it into the new generation
       assert cache.get(1) == 1
-      assert get_from_new(name, 1) == 1
-      refute get_from_new(name, 2)
-      refute get_from_old(name, 1)
-      assert get_from_old(name, 2) == 2
+      assert get_from_new(cache, name, 1) == 1
+      refute get_from_new(cache, name, 2)
+      refute get_from_old(cache, name, 1)
+      assert get_from_old(cache, name, 2) == 2
 
       # create a new generation, the old generation should be deleted
-      _ = cache.new_generation(name: name)
+      _ = cache.new_generation(name)
 
       # entry 1 should be into the old generation and entry 2 deleted
-      refute get_from_new(name, 1)
-      refute get_from_new(name, 2)
-      assert get_from_old(name, 1) == 1
-      refute get_from_old(name, 2)
+      refute get_from_new(cache, name, 1)
+      refute get_from_new(cache, name, 2)
+      assert get_from_old(cache, name, 1) == 1
+      refute get_from_old(cache, name, 2)
     end
 
     test "push generations with ttl", %{cache: cache, name: name} do
       assert cache.put(1, 1, ttl: 1000) == :ok
       assert cache.get(1) == 1
 
-      _ = cache.new_generation(name: name)
+      _ = cache.new_generation(name)
 
-      refute get_from_new(name, 1)
-      assert get_from_old(name, 1) == 1
+      refute get_from_new(cache, name, 1)
+      assert get_from_old(cache, name, 1) == 1
       assert cache.get(1) == 1
 
       :ok = Process.sleep(1100)
 
       refute cache.get(1)
-      refute get_from_new(name, 1)
-      refute get_from_old(name, 1)
+      refute get_from_new(cache, name, 1)
+      refute get_from_old(cache, name, 1)
     end
 
     ## Helpers
 
-    defp get_from_new(name, key) do
+    defp get_from_new(cache, name, key) do
       name
-      |> Generation.newer()
+      |> cache.newer_generation()
       |> get_from(name, key)
     end
 
-    defp get_from_old(name, key) do
+    defp get_from_old(cache, name, key) do
       name
-      |> Generation.list()
+      |> cache.generations()
       |> List.last()
       |> get_from(name, key)
     end

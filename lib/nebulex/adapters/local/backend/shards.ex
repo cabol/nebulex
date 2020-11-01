@@ -3,12 +3,13 @@ if Code.ensure_loaded?(:shards) do
     @moduledoc false
     use Nebulex.Adapters.Local.Backend
 
+    alias Nebulex.Adapters.Local.Backend.Shards.DynamicSupervisor, as: ShardsDynamicSupervisor
+    alias Nebulex.Adapters.Local.Metadata
+
     ## API
 
     @doc false
-    def child_spec(name, opts) do
-      sup_name = normalize_module_name([name, ShardsSupervisor])
-
+    def child_spec(opts) do
       partitions =
         get_option(
           opts,
@@ -17,44 +18,42 @@ if Code.ensure_loaded?(:shards) do
           System.schedulers_online()
         )
 
-      sup_spec(name, [
-        {DynamicSupervisor, strategy: :one_for_one, name: sup_name},
-        generation_spec(name, parse_opts(opts, partitions: partitions))
+      sup_spec([
+        {ShardsDynamicSupervisor, Keyword.fetch!(opts, :meta_tab)},
+        generation_spec(parse_opts(opts, partitions: partitions))
       ])
     end
 
     @doc false
-    def new(cache_name, tab_opts) do
+    def new(meta_tab, tab_opts) do
       {:ok, _pid, tab} =
-        cache_name
-        |> dynamic_sup()
-        |> DynamicSupervisor.start_child(table_spec(cache_name, tab_opts))
+        meta_tab
+        |> Metadata.get(:shards_sup)
+        |> DynamicSupervisor.start_child(table_spec(tab_opts))
 
       tab
     end
 
     @doc false
-    def delete(cache_name, tab) do
-      cache_name
-      |> dynamic_sup()
-      |> DynamicSupervisor.terminate_child(:shards_meta.tab_pid(tab))
+    def delete(meta_tab, gen_tab) do
+      meta_tab
+      |> Metadata.get(:shards_sup)
+      |> DynamicSupervisor.terminate_child(:shards_meta.tab_pid(gen_tab))
     end
 
     @doc false
-    def start_table(name, opts) do
-      tab = :shards.new(name, opts)
+    def start_table(opts) do
+      tab = :shards.new(__MODULE__, opts)
       pid = :shards_meta.tab_pid(tab)
       {:ok, pid, tab}
     end
 
-    defp table_spec(name, opts) do
+    defp table_spec(opts) do
       %{
-        id: name,
-        start: {__MODULE__, :start_table, [name, opts]},
+        id: __MODULE__,
+        start: {__MODULE__, :start_table, [opts]},
         type: :supervisor
       }
     end
-
-    defp dynamic_sup(name), do: normalize_module_name([name, ShardsSupervisor])
   end
 end

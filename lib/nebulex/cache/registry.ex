@@ -27,9 +27,8 @@ defmodule Nebulex.Cache.Registry do
   end
 
   def lookup(pid) when is_pid(pid) do
-    {__MODULE__, pid}
-    |> :persistent_term.get({nil, nil})
-    |> elem(1)
+    {_ref, value} = :persistent_term.get({__MODULE__, pid})
+    value
   end
 
   ## GenServer Callbacks

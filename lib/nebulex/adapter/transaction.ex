@@ -53,44 +53,42 @@ defmodule Nebulex.Adapter.Transaction do
     quote do
       @behaviour Nebulex.Adapter.Transaction
 
-      alias Nebulex.Cache.Cluster
-
       @impl true
-      def transaction(%{name: name} = adapter_meta, opts, fun) do
+      def transaction(%{pid: pid} = adapter_meta, opts, fun) do
         adapter_meta
         |> in_transaction?()
         |> do_transaction(
-          name,
+          pid,
           Keyword.get(opts, :keys, []),
-          Keyword.get(opts, :nodes, Cluster.get_nodes(name)),
+          Keyword.get(opts, :nodes, [node()]),
           Keyword.get(opts, :retries, :infinity),
           fun
         )
       end
 
       @impl true
-      def in_transaction?(%{name: name}) do
-        if Process.get({name, self()}), do: true, else: false
+      def in_transaction?(%{pid: pid}) do
+        if Process.get({pid, self()}), do: true, else: false
       end
 
       defoverridable transaction: 3, in_transaction?: 1
 
       ## Helpers
 
-      defp do_transaction(true, _name, _keys, _nodes, _retries, fun) do
+      defp do_transaction(true, _pid, _keys, _nodes, _retries, fun) do
         fun.()
       end
 
-      defp do_transaction(false, name, keys, nodes, retries, fun) do
-        ids = lock_ids(name, keys)
+      defp do_transaction(false, pid, keys, nodes, retries, fun) do
+        ids = lock_ids(pid, keys)
 
         case set_locks(ids, nodes, retries) do
           true ->
             try do
-              _ = Process.put({name, self()}, %{keys: keys, nodes: nodes})
+              _ = Process.put({pid, self()}, %{keys: keys, nodes: nodes})
               fun.()
             after
-              _ = Process.delete({name, self()})
+              _ = Process.delete({pid, self()})
               del_locks(ids, nodes)
             end
 
@@ -123,12 +121,12 @@ defmodule Nebulex.Adapter.Transaction do
         end)
       end
 
-      defp lock_ids(name, []) do
-        [{name, self()}]
+      defp lock_ids(pid, []) do
+        [{pid, self()}]
       end
 
-      defp lock_ids(name, keys) do
-        for key <- keys, do: {{name, key}, self()}
+      defp lock_ids(pid, keys) do
+        for key <- keys, do: {{pid, key}, self()}
       end
     end
   end

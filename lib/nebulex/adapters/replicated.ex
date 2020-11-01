@@ -181,7 +181,7 @@ defmodule Nebulex.Adapters.Replicated do
     task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
 
     # bootstrap timeout in milliseconds
-    bootstrap_timeout = Keyword.get(opts, :bootstrap_timeout, 1000)
+    bootstrap_timeout = Keyword.get(opts, :bootstrap_timeout, 1500)
 
     meta = %{
       name: name,
@@ -299,6 +299,13 @@ defmodule Nebulex.Adapters.Replicated do
     with_dynamic_cache(meta, :stream, [query, opts])
   end
 
+  ## Transaction
+
+  @impl true
+  def transaction(%{name: name} = adapter_meta, opts, fun) do
+    super(adapter_meta, Keyword.put(opts, :nodes, Cluster.get_nodes(name)), fun)
+  end
+
   ## Helpers
 
   @doc """
@@ -318,7 +325,7 @@ defmodule Nebulex.Adapters.Replicated do
   ## Private Functions
 
   defp with_transaction(
-         %{name: name} = adapter_meta,
+         %{pid: pid, name: name} = adapter_meta,
          action,
          keys \\ [:"$global_lock"],
          args \\ [],
@@ -330,7 +337,7 @@ defmodule Nebulex.Adapters.Replicated do
     # `flush` action is performed or a new node is joined and the entries are
     # being imported to it from another node. Perhaps find a better way for
     # addressing these scenarios.
-    case :ets.lookup(:global_locks, {name, :"$global_lock"}) do
+    case :ets.lookup(:global_locks, {pid, :"$global_lock"}) do
       [_] ->
         :ok = Process.sleep(1)
         with_transaction(adapter_meta, action, keys, args, opts)
@@ -376,6 +383,7 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
 
   import Nebulex.Helpers
 
+  alias Nebulex.Adapter
   alias Nebulex.Adapters.Replicated
   alias Nebulex.Cache.Cluster
   alias Nebulex.Entry
@@ -396,10 +404,16 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
   end
 
   @impl true
-  def handle_info(:import, %{timer_ref: timer_ref, adapter_meta: adapter_meta} = state) do
+  def handle_info(:import, %{timer_ref: timer_ref, adapter_meta: %{pid: _} = meta} = state) do
     _ = Process.cancel_timer(timer_ref)
-    :ok = import_from_nodes(adapter_meta)
+    :ok = import_from_nodes(meta)
     {:noreply, state}
+  end
+
+  def handle_info(:import, %{adapter_meta: %{name: name}} = state) do
+    Adapter.with_meta(name, fn _adapter, adapter_meta ->
+      handle_info(:import, %{state | adapter_meta: adapter_meta})
+    end)
   end
 
   defp import_from_nodes(%{name: name, cache: cache} = meta) do

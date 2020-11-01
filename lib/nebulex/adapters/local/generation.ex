@@ -46,7 +46,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   # State
   defstruct [
-    :name,
+    :meta_tab,
     :backend,
     :backend_opts,
     :gc_interval,
@@ -62,10 +62,14 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   import Nebulex.Helpers
 
+  alias Nebulex.Adapter
   alias Nebulex.Adapters.Local
-  alias Nebulex.Adapters.Local.Backend
+  alias Nebulex.Adapters.Local.{Backend, Metadata}
 
-  @compile {:inline, server_name: 1}
+  @type t :: :ets.tid()
+  @type server_ref :: pid | atom | :ets.tid()
+
+  @compile {:inline, server: 1, list: 1, newer: 1}
 
   ## API
 
@@ -74,8 +78,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   """
   @spec start_link(Nebulex.Cache.opts()) :: GenServer.on_start()
   def start_link(opts) do
-    name = Keyword.fetch!(opts, :name)
-    GenServer.start_link(__MODULE__, {name, opts}, name: server_name(name))
+    GenServer.start_link(__MODULE__, opts)
   end
 
   @doc """
@@ -92,9 +95,9 @@ defmodule Nebulex.Adapters.Local.Generation do
 
       Nebulex.Adapters.Local.Generation.new(MyCache, reset_timer: :false)
   """
-  @spec new(atom, Nebulex.Cache.opts()) :: [atom]
-  def new(name, opts \\ []) do
-    do_call(name, {:new_generation, opts})
+  @spec new(server_ref, Nebulex.Cache.opts()) :: [atom]
+  def new(server_ref, opts \\ []) do
+    do_call(server_ref, {:new_generation, opts})
   end
 
   @doc """
@@ -104,46 +107,36 @@ defmodule Nebulex.Adapters.Local.Generation do
 
       Nebulex.Adapters.Local.Generation.flush(MyCache)
   """
-  @spec flush(atom) :: integer
-  def flush(name) do
-    do_call(name, :flush)
+  @spec flush(server_ref) :: integer
+  def flush(server_ref) do
+    do_call(server_ref, :flush)
   end
 
   @doc """
   Reallocates the block of memory that was previously allocated for the given
-  `cache` with the new `size`. In other words, reallocates the max memory size
-  for a cache generation.
+  `server_ref` with the new `size`. In other words, reallocates the max memory
+  size for a cache generation.
 
   ## Example
 
       Nebulex.Adapters.Local.Generation.realloc(MyCache, 1_000_000)
   """
-  @spec realloc(atom, pos_integer) :: :ok
-  def realloc(name, size) do
-    do_call(name, {:realloc, size})
+  @spec realloc(server_ref, pos_integer) :: :ok
+  def realloc(server_ref, size) do
+    do_call(server_ref, {:realloc, size})
   end
 
   @doc """
-  Returns the memory info in a tuple `{used_mem, total_mem}`.
+  Returns the memory info in a tuple form `{used_mem, total_mem}`.
 
   ## Example
 
       Nebulex.Adapters.Local.Generation.memory_info(MyCache)
   """
-  @spec memory_info(atom) :: {used_mem :: non_neg_integer, total_mem :: non_neg_integer}
-  def memory_info(name) do
-    do_call(name, :memory_info)
+  @spec memory_info(server_ref) :: {used_mem :: non_neg_integer, total_mem :: non_neg_integer}
+  def memory_info(server_ref) do
+    do_call(server_ref, :memory_info)
   end
-
-  @doc """
-  Returns the name of the GC server for the given cache `name`.
-
-  ## Example
-
-      Nebulex.Adapters.Local.Generation.server_name(MyCache)
-  """
-  @spec server_name(atom) :: atom
-  def server_name(name), do: normalize_module_name([name, Generation])
 
   @doc """
   Returns the list of the generations in the form `[newer, older]`.
@@ -152,9 +145,11 @@ defmodule Nebulex.Adapters.Local.Generation do
 
       Nebulex.Adapters.Local.Generation.list(MyCache)
   """
-  @spec list(atom) :: [atom]
-  def list(name) do
-    get_meta(name, :generations, [])
+  @spec list(server_ref) :: [t]
+  def list(server_ref) do
+    server_ref
+    |> get_meta_tab()
+    |> Metadata.get(:generations, [])
   end
 
   @doc """
@@ -164,19 +159,43 @@ defmodule Nebulex.Adapters.Local.Generation do
 
       Nebulex.Adapters.Local.Generation.newer(MyCache)
   """
-  @spec newer(atom) :: atom
-  def newer(name) do
-    name
-    |> get_meta(:generations, [])
+  @spec newer(server_ref) :: t
+  def newer(server_ref) do
+    server_ref
+    |> get_meta_tab()
+    |> Metadata.get(:generations, [])
     |> hd()
   end
+
+  @doc """
+  Returns the PID of the GC server for the given `server_ref`.
+
+  ## Example
+
+      Nebulex.Adapters.Local.Generation.server(MyCache)
+  """
+  @spec server(server_ref) :: pid
+  def server(server_ref) do
+    server_ref
+    |> get_meta_tab()
+    |> Metadata.fetch!(:gc_pid)
+  end
+
+  defp get_meta_tab(server_ref) when is_atom(server_ref) or is_pid(server_ref) do
+    Adapter.with_meta(server_ref, fn _, %{meta_tab: meta_tab} ->
+      meta_tab
+    end)
+  end
+
+  defp get_meta_tab(server_ref), do: server_ref
 
   ## GenServer Callbacks
 
   @impl true
-  def init({name, opts}) do
-    # create metadata table for storing the generation tables
-    ^name = :ets.new(name, [:named_table, :public, read_concurrency: true])
+  def init(opts) do
+    # add the GC PID to the meta table
+    meta_tab = Keyword.fetch!(opts, :meta_tab)
+    :ok = Metadata.put(meta_tab, :gc_pid, self())
 
     # backend for creating new tables
     backend = Keyword.fetch!(opts, :backend)
@@ -190,17 +209,13 @@ defmodule Nebulex.Adapters.Local.Generation do
     gc_cleanup_ref = if max_size || allocated_memory, do: start_timer(cleanup_max, nil, :cleanup)
 
     # GC options
-    {:ok, ref} =
-      if gc_interval = get_option(opts, :gc_interval, &(is_integer(&1) and &1 > 0)),
-        do: {new_gen(name, backend, backend_opts), start_timer(gc_interval)},
-        else: {new_gen(name, backend, backend_opts), nil}
+    gc_interval = get_option(opts, :gc_interval, &(is_integer(&1) and &1 > 0))
 
     init_state = %__MODULE__{
-      name: name,
+      meta_tab: meta_tab,
       backend: backend,
       backend_opts: backend_opts,
       gc_interval: gc_interval,
-      gc_heartbeat_ref: ref,
       max_size: max_size,
       allocated_memory: allocated_memory,
       gc_cleanup_min_timeout: cleanup_min,
@@ -208,20 +223,18 @@ defmodule Nebulex.Adapters.Local.Generation do
       gc_cleanup_ref: gc_cleanup_ref
     }
 
-    {:ok, init_state}
+    # Timer ref
+    {:ok, ref} =
+      if gc_interval,
+        do: {new_gen(init_state), start_timer(gc_interval)},
+        else: {new_gen(init_state), nil}
+
+    {:ok, %{init_state | gc_heartbeat_ref: ref}}
   end
 
   @impl true
-  def handle_call(
-        {:new_generation, opts},
-        _from,
-        %__MODULE__{
-          name: name,
-          backend: backend,
-          backend_opts: backend_opts
-        } = state
-      ) do
-    :ok = new_gen(name, backend, backend_opts)
+  def handle_call({:new_generation, opts}, _from, %__MODULE__{} = state) do
+    :ok = new_gen(state)
 
     ref =
       opts
@@ -232,11 +245,11 @@ defmodule Nebulex.Adapters.Local.Generation do
     {:reply, :ok, state}
   end
 
-  def handle_call(:flush, _from, %__MODULE__{name: name, backend: backend} = state) do
-    size = Local.size(%{name: name, backend: backend})
+  def handle_call(:flush, _from, %__MODULE__{meta_tab: meta_tab, backend: backend} = state) do
+    size = Local.size(%{meta_tab: meta_tab, backend: backend})
 
     :ok =
-      name
+      meta_tab
       |> list()
       |> Enum.each(&backend.delete_all_objects(&1))
 
@@ -250,24 +263,15 @@ defmodule Nebulex.Adapters.Local.Generation do
   def handle_call(
         :memory_info,
         _from,
-        %__MODULE__{backend: backend, name: name, allocated_memory: allocated} = state
+        %__MODULE__{backend: backend, meta_tab: meta_tab, allocated_memory: allocated} = state
       ) do
-    {:reply, {memory_info(backend, name), allocated}, state}
+    {:reply, {memory_info(backend, meta_tab), allocated}, state}
   end
 
   @impl true
-  def handle_info(
-        :heartbeat,
-        %__MODULE__{
-          name: name,
-          gc_interval: time_interval,
-          gc_heartbeat_ref: ref,
-          backend: backend,
-          backend_opts: backend_opts
-        } = state
-      ) do
-    :ok = new_gen(name, backend, backend_opts)
-    {:noreply, %{state | gc_heartbeat_ref: start_timer(time_interval, ref)}}
+  def handle_info(:heartbeat, %__MODULE__{gc_interval: time, gc_heartbeat_ref: ref} = state) do
+    :ok = new_gen(state)
+    {:noreply, %{state | gc_heartbeat_ref: start_timer(time, ref)}}
   end
 
   def handle_info(:cleanup, state) do
@@ -285,13 +289,13 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp check_size(
          %__MODULE__{
-           name: name,
+           meta_tab: meta_tab,
            max_size: max_size,
            backend: backend
          } = state
        )
        when not is_nil(max_size) do
-    name
+    meta_tab
     |> newer()
     |> backend.info(:size)
     |> maybe_cleanup(max_size, state)
@@ -301,14 +305,14 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp check_memory(
          %__MODULE__{
-           name: name,
+           meta_tab: meta_tab,
            backend: backend,
            allocated_memory: allocated
          } = state
        )
        when not is_nil(allocated) do
     backend
-    |> memory_info(name)
+    |> memory_info(meta_tab)
     |> maybe_cleanup(allocated, state)
   end
 
@@ -318,9 +322,6 @@ defmodule Nebulex.Adapters.Local.Generation do
          size,
          max_size,
          %__MODULE__{
-           name: name,
-           backend: backend,
-           backend_opts: backend_opts,
            gc_cleanup_max_timeout: max_timeout,
            gc_cleanup_ref: cleanup_ref,
            gc_interval: gc_interval,
@@ -328,7 +329,7 @@ defmodule Nebulex.Adapters.Local.Generation do
          } = state
        )
        when size >= max_size do
-    :ok = new_gen(name, backend, backend_opts)
+    :ok = new_gen(state)
 
     %{
       state
@@ -356,38 +357,27 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   ## Private Functions
 
-  defp do_call(name, message) do
-    name
-    |> server_name()
+  defp do_call(tab, message) do
+    tab
+    |> server()
     |> GenServer.call(message)
   end
 
-  defp get_meta(name, key, default) do
-    :ets.lookup_element(name, key, 2)
-  rescue
-    ArgumentError -> default
-  end
-
-  defp put_meta(name, key, value) do
-    true = :ets.insert(name, {key, value})
-    :ok
-  end
-
-  defp new_gen(name, backend, backend_opts) do
+  defp new_gen(%__MODULE__{meta_tab: meta_tab, backend: backend, backend_opts: backend_opts}) do
     # create new generation
-    gen_tab = Backend.new(backend, name, backend_opts)
+    gen_tab = Backend.new(backend, meta_tab, backend_opts)
 
     # update generation list
-    case get_meta(name, :generations, []) do
+    case list(meta_tab) do
       [newer, older] ->
-        _ = Backend.delete(backend, name, older)
-        put_meta(name, :generations, [gen_tab, newer])
+        _ = Backend.delete(backend, meta_tab, older)
+        Metadata.put(meta_tab, :generations, [gen_tab, newer])
 
       [newer] ->
-        put_meta(name, :generations, [gen_tab, newer])
+        Metadata.put(meta_tab, :generations, [gen_tab, newer])
 
       [] ->
-        put_meta(name, :generations, [gen_tab])
+        Metadata.put(meta_tab, :generations, [gen_tab])
     end
   end
 
@@ -408,8 +398,8 @@ defmodule Nebulex.Adapters.Local.Generation do
     start_timer(state.gc_interval, state.gc_heartbeat_ref)
   end
 
-  defp memory_info(backend, name) do
-    name
+  defp memory_info(backend, meta_tab) do
+    meta_tab
     |> newer()
     |> backend.info(:memory)
     |> Kernel.*(:erlang.system_info(:wordsize))

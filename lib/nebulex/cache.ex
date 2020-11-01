@@ -33,9 +33,7 @@ defmodule Nebulex.Cache do
   for more information. In spite of this, the following configuration values
   are shared across all adapters:
 
-    * `:name`- The name of the Cache supervisor process (Optional). If it is
-      not passed within the options, the name of the cache module will be used
-      as the name by default.
+    * `:name` - The name of the Cache supervisor process.
 
     * `:stats` - The stats are supposed to be handled by the adapters, hence,
       it is recommended to check the adapters' documentation for supported
@@ -367,6 +365,15 @@ defmodule Nebulex.Cache do
 
       MyApp.Cache.start_link(name: :cache1)
       MyApp.Cache.start_link(name: :cache2, backend: :shards)
+
+  You can also start caches without names by explicitly setting the name
+  to `nil`:
+
+      MyApp.Cache.start_link(name: nil, backend: :shards)
+
+  > **NOTE:** There may be adapters requiring the `:name` option anyway,
+    therefore, it is highly recommended to see the adapter's documentation
+    you want to use.
 
   However, once the cache is started, it is not possible to interact directly
   with it, since all operations through `MyApp.Cache` are sent by default to
