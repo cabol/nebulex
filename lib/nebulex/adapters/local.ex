@@ -183,15 +183,16 @@ defmodule Nebulex.Adapters.Local do
   recommendations will help you to configure the cache for the first time:
 
     * When configuring the `:gc_interval`, think about how that often the
-      least frequently used entries should be evicted. For example, if
-      `:gc_interval` is set to 1 hr, it means you will keep in cache only
-      those entries that are retrieved periodically within a 2 hr period;
-      `gc_interval * 2`, being 2 the number of generations. Longer than that,
-      the GC will ensure is always evicted (the oldest generation is always
-      flushed/deleted). If it is the first time using Nebulex, perhaps you
-      can start with `gc_interval: :timer.seconds(43_200)` (12 hrs), so the
-      max retention period for the keys will be 1 day; but ensure you also
-      set either the `:max_size` or `:allocated_memory`.
+      least frequently used entries should be evicted, or what is the desired
+      retention period for the cached entries. For example, if `:gc_interval`
+      is set to 1 hr, it means you will keep in cache only those entries that
+      are retrieved periodically within a 2 hr period; `gc_interval * 2`,
+      being 2 the number of generations. Longer than that, the GC will ensure
+      is always evicted (the oldest generation is always flushed/deleted).
+      If it is the first time using Nebulex, perhaps you can start with
+      `gc_interval: :timer.seconds(43_200)` (12 hrs), so the max retention
+      period for the keys will be 1 day; but ensure you also set either the
+      `:max_size` or `:allocated_memory`.
     * It is highly recommended to set either `:max_size` or `:allocated_memory`
       to ensure the oldest generation is deleted (least frequently used keys
       are evicted) when one of these limits is reached and also to avoid

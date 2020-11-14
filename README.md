@@ -7,7 +7,7 @@
 [![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
 [![Hex Version](https://img.shields.io/hexpm/v/nebulex.svg)](https://hex.pm/packages/nebulex)
 [![Docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/nebulex)
-[![License](https://img.shields.io/hexpm/l/nebulex.svg)](https://hex.pm/packages/nebulex)
+[![License](https://img.shields.io/hexpm/l/nebulex.svg)](LICENSE)
 
 **Nebulex** provides support for transparently adding caching into an existing
 Elixir application. Similar to [Ecto][ecto], the caching abstraction allows
@@ -144,9 +144,10 @@ For example, if you want to use a built-in cache, add to your `mix.exs` file:
 ```elixir
 def deps do
   [
-    {:nebulex, "~> 2.0"},
-    {:shards, "~> 0.6"},   #=> For using :shards as backend
-    {:decorator, "~> 1.3"} #=> For using Caching Annotations
+    {:nebulex, "~> 2.0-pre"},
+    {:shards, "~> 1.0"},      #=> For using :shards as backend
+    {:decorator, "~> 1.3"},   #=> For using Caching Annotations
+    {:telemetry, "~> 0.4"}    #=> For using the Telemetry events (Nebulex stats)
   ]
 end
 ```
@@ -154,17 +155,22 @@ end
 In order to give more flexibility and loading only needed dependencies, Nebulex
 makes all its dependencies as optional. For example:
 
- * For intensive workloads, we may want to use `:shards` as the backend for the
-   local adapter and having partitioned tables. In such a case, you have to add
-   `:shards` to the dependency list.
+  * For intensive workloads, we may want to use `:shards` as the backend for the
+    local adapter and having partitioned tables. In such a case, you have to add
+    `:shards` to the dependency list.
 
- * For enabling the usage of
-   [declarative annotation-based caching via decorators][nbx_caching],
-   you have to add `:decorator` to the dependency list.
+  * For enabling the usage of
+    [declarative annotation-based caching via decorators][nbx_caching],
+    you have to add `:decorator` to the dependency list.
 
- * Also, all the external adapters have to be added as a dependency as well.
+  * For enabling Telemetry events dispatched when using Nebulex stats you have
+    to add `:telemetry` to the dependency list.
+    See [telemetry guide][telemetry].
+
+  * Also, all the external adapters have to be added as a dependency as well.
 
 [nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
+[telemetry]: http://hexdocs.pm/nebulex/telemetry.html
 
 Then run `mix deps.get` in your shell to fetch the dependencies. If you want to
 use another cache adapter, just choose the proper dependency from the table
@@ -183,12 +189,12 @@ end
 
 ## Important links
 
- * [Getting Started](http://hexdocs.pm/nebulex/getting-started.html)
- * [Documentation](http://hexdocs.pm/nebulex/Nebulex.html)
- * [Cache Usage Patterns](http://hexdocs.pm/nebulex/cache-usage-patterns.html)
- * [Instrumenting the Cache with Telemetry](http://hexdocs.pm/nebulex/telemetry.html)
- * [Migrating to v2.x](http://hexdocs.pm/nebulex/migrating-to-v2.html)
- * [Examples](https://github.com/cabol/nebulex_examples)
+  * [Getting Started](http://hexdocs.pm/nebulex/getting-started.html)
+  * [Documentation](http://hexdocs.pm/nebulex/Nebulex.html)
+  * [Cache Usage Patterns](http://hexdocs.pm/nebulex/cache-usage-patterns.html)
+  * [Instrumenting the Cache with Telemetry](http://hexdocs.pm/nebulex/telemetry.html)
+  * [Migrating to v2.x](http://hexdocs.pm/nebulex/migrating-to-v2.html)
+  * [Examples](https://github.com/cabol/nebulex_examples)
 
 ## Testing
 
@@ -218,10 +224,9 @@ To run the benchmarks:
 $ MIX_ENV=test mix run benchmarks/benchmark.exs
 ```
 
-If you are interested to run more sophisticated load tests, perhaps you should
-checkout the [Nebulex Load Tests](https://github.com/cabol/nebulex_examples/tree/master/nebulex_bench)
-example, it allows you to run your own performance/load tests against Nebulex,
-and it also comes with load tests results.
+Additionally, you can also run performance tests using `:basho_bench`.
+See [nebulex_bench example](https://github.com/cabol/nebulex_examples/tree/master/nebulex_bench)
+for more information.
 
 ## Contributing
 
@@ -235,14 +240,8 @@ When submitting a pull request you should not update the [CHANGELOG.md](CHANGELO
 and also make sure you test your changes thoroughly, include unit tests
 alongside new or changed code.
 
-Before to submit a PR it is highly recommended to run:
-
- * `mix format` to format the code properly.
- * `mix credo --strict` to find code style issues.
- * `mix coveralls.html && open cover/excoveralls.html` to run tests and check
-   out code coverage (expected 100%).
- * `mix dialyzer` to run dialyzer for type checking; might take a
-   while on the first invocation.
+Before to submit a PR it is highly recommended to run `mix check` and ensure
+all checks run successfully.
 
 ## Copyright and License
 

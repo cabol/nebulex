@@ -154,13 +154,13 @@ defmodule Nebulex.Cache.StatsTest do
 
     test "emits a telemetry event when called" do
       with_mock :telemetry, [], execute: fn _, _, _ -> :ok end do
-        :ok = Cache.dispatch_stats()
+        :ok = Cache.dispatch_stats(metadata: %{node: node()})
 
         assert called(
                  :telemetry.execute(
                    [:nebulex, :cache, :stats],
                    %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0},
-                   %{cache: Nebulex.Cache.StatsTest.Cache}
+                   %{cache: Nebulex.Cache.StatsTest.Cache, node: node()}
                  )
                )
       end
@@ -172,13 +172,13 @@ defmodule Nebulex.Cache.StatsTest do
 
     test "emits a telemetry event with custom telemetry_prefix when called" do
       with_mock :telemetry, [], execute: fn _, _, _ -> :ok end do
-        :ok = Cache.dispatch_stats(event_prefix: [:my_event], metadata: %{tag: "tag1"})
+        :ok = Cache.dispatch_stats(event_prefix: [:my_event], metadata: %{foo: :bar})
 
         assert called(
                  :telemetry.execute(
                    [:my_event, :stats],
                    %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0},
-                   %{cache: :stats_with_dispatch, tag: "tag1"}
+                   %{cache: :stats_with_dispatch, foo: :bar}
                  )
                )
       end

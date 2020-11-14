@@ -84,18 +84,26 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       assert_mem_size(:>)
 
       # wait until the cleanup event is triggered
-      :ok = Process.sleep(3000)
+      :ok = Process.sleep(3100)
 
-      assert generations_len(LocalWithSizeLimit) == 2
-      assert_mem_size(:<=)
-
-      :ok = flood_cache(mem_size, mem_size * 2)
-      assert generations_len(LocalWithSizeLimit) == 2
-      assert_mem_size(:>)
+      wait_until(fn ->
+        assert generations_len(LocalWithSizeLimit) == 2
+        assert_mem_size(:<=)
+      end)
 
       :ok = flood_cache(mem_size, mem_size * 2)
-      assert generations_len(LocalWithSizeLimit) == 2
-      assert_mem_size(:>)
+
+      wait_until(fn ->
+        assert generations_len(LocalWithSizeLimit) == 2
+        assert_mem_size(:>)
+      end)
+
+      :ok = flood_cache(mem_size, mem_size * 2)
+
+      wait_until(fn ->
+        assert generations_len(LocalWithSizeLimit) == 2
+        assert_mem_size(:>)
+      end)
 
       # triggers the cleanup event
       :ok = check_cache_size(LocalWithSizeLimit)

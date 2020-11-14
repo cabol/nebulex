@@ -44,11 +44,15 @@ defmodule Nebulex.Adapters.Multilevel do
         levels: [
           {
             MyApp.Multilevel.L1,
-            gc_interval: 3_600_000, backend: :shards
+            gc_interval: :timer.seconds(3600) * 12,
+            backend: :shards
           },
           {
             MyApp.Multilevel.L2,
-            primary: [gc_interval: 3_600_000, backend: :shards]
+            primary: [
+              gc_interval: :timer.seconds(3600) * 12,
+              backend: :shards
+            ]
           }
         ]
 
@@ -343,8 +347,8 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   def transaction(%{levels: levels} = adapter_meta, opts, fun) do
-    # Perhaps one of the levels is a distributed adapter so that we have to
-    # ensure the lock on the right cluster nodes.
+    # Perhaps one of the levels is a distributed adapter,
+    # then ensure the lock on the right cluster nodes.
     nodes =
       levels
       |> Enum.reduce([node()], fn %{name: name, cache: cache}, acc ->

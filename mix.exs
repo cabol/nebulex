@@ -19,14 +19,11 @@ defmodule Nebulex.MixProject do
       # Testing
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [
+        check: :test,
         coveralls: :test,
         "coveralls.detail": :test,
         "coveralls.post": :test,
-        "coveralls.html": :test,
-        check: :test,
-        credo: :test,
-        dialyzer: :test,
-        sobelow: :test
+        "coveralls.html": :test
       ],
 
       # Dialyzer
@@ -63,7 +60,7 @@ defmodule Nebulex.MixProject do
       {:benchee_html, "~> 1.0", only: :test},
       {:excoveralls, "~> 0.13", only: :test},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
-      {:credo, "~> 1.4", only: [:dev, :test]},
+      {:credo, "~> 1.5", only: [:dev, :test]},
       {:ex_check, "~> 0.12", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.10", only: [:dev, :test], runtime: false},
 

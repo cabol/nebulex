@@ -81,4 +81,17 @@ defmodule Nebulex.CacheCase do
       Supervisor.stop(pid)
     end
   end
+
+  @doc false
+  def wait_until(retries \\ 50, delay \\ 100, fun)
+
+  def wait_until(1, _delay, fun), do: fun.()
+
+  def wait_until(retries, delay, fun) when retries > 1 do
+    fun.()
+  rescue
+    _ ->
+      :ok = Process.sleep(delay)
+      wait_until(retries - 1, delay, fun)
+  end
 end

@@ -29,9 +29,10 @@ changing the `deps` definition in that file to this:
 ```elixir
 defp deps do
   [
-    {:nebulex, "~> 2.0"},
-    {:shards, "~> 0.6"},   #=> Since we will use :shards as backend
-    {:decorator, "~> 1.3"} #=> If you want to use Caching Annotations
+    {:nebulex, "~> 2.0-pre"},
+    {:shards, "~> 1.0"},      #=> For using :shards as backend
+    {:decorator, "~> 1.3"},   #=> For using Caching Annotations
+    {:telemetry, "~> 0.4"}    #=> For using the Telemetry events (Nebulex stats)
   ]
 end
 ```
@@ -39,17 +40,22 @@ end
 In order to give more flexibility and loading only needed dependencies, Nebulex
 makes all its dependencies as optional. For example:
 
- * For intensive workloads, we may want to use `:shards` as the backend for the
-   local adapter and having partitioned tables. In such a case, you have to add
-   `:shards` to the dependency list.
+  * For intensive workloads, we may want to use `:shards` as the backend for the
+    local adapter and having partitioned tables. In such a case, you have to add
+    `:shards` to the dependency list.
 
- * For enabling the usage of
-   [declarative annotation-based caching via decorators][nbx_caching],
-   you have to add `:decorator` to the dependency list.
+  * For enabling the usage of
+    [declarative annotation-based caching via decorators][nbx_caching],
+    you have to add `:decorator` to the dependency list.
 
- * Also, all the external adapters have to be added as a dependency as well.
+  * For enabling Telemetry events dispatched when using Nebulex stats you have
+    to add `:telemetry` to the dependency list.
+    See [telemetry guide][telemetry].
+
+  * Also, all the external adapters have to be added as a dependency as well.
 
 [nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
+[telemetry]: http://hexdocs.pm/nebulex/telemetry.html
 
 To install these dependencies, we will run this command:
 

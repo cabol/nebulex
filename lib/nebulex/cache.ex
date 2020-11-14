@@ -11,7 +11,7 @@ defmodule Nebulex.Cache do
   The `:otp_app` should point to an OTP application that has the cache
   configuration. For example, the Cache:
 
-      defmodule MyCache do
+      defmodule MyApp.Cache do
         use Nebulex.Cache,
           otp_app: :my_app,
           adapter: Nebulex.Adapters.Local
@@ -19,7 +19,7 @@ defmodule Nebulex.Cache do
 
   Could be configured with:
 
-      config :my_app, MyCache,
+      config :my_app, MyApp.Cache,
         stats: true,
         backend: :shards,
         gc_interval: :timer.seconds(3600),

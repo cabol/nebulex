@@ -22,10 +22,11 @@ and `:telemetry_poller` packages:
 ```elixir
 def deps do
   [
-    {:nebulex, "~> 2.0"},
-    {:shards, "~> 0.6"},
+    {:nebulex, "~> 2.0-pre"},
+    {:shards, "~> 1.0"},
     {:decorator, "~> 1.3"},
-    {:telemetry_metrics, "~> 0.5"},
+    {:telemetry, "~> 0.4"},
+    {:telemetry_metrics, "~> 0.6"},
     {:telemetry_poller, "~> 0.5"}
   ]
 end
@@ -114,7 +115,7 @@ Then add to your main application's supervision tree
 ```elixir
 children = [
   MyApp.Cache,
-  MyAppWeb.Telemetry,
+  MyApp.Telemetry,
   ...
 ]
 ```
@@ -187,7 +188,7 @@ defmodule MyApp.Cache do
     :telemetry.execute(
       [:nebulex, :cache, :size],
       %{value: size()},
-      %{cache: __MODULE__}
+      %{cache: __MODULE__, node: node()}
     )
   end
 end
@@ -199,11 +200,14 @@ supervisor:
 ```elixir
 defp periodic_measurements do
   [
-    {MyApp.Cache, :dispatch_stats, []},
+    {MyApp.Cache, :dispatch_stats, [[metadata: %{node: node()}]]}
     {MyApp.Cache, :dispatch_cache_size, []}
   ]
 end
 ```
+
+> **NOTE:** Notice we added in the metadata the node name so that we can use it
+  in the tags of the metrics.
 
 Metrics:
 
@@ -211,14 +215,14 @@ Metrics:
 defp metrics do
   [
     # Nebulex Stats Metrics
-    last_value("nebulex.cache.stats.hits", tags: [:cache]),
-    last_value("nebulex.cache.stats.misses", tags: [:cache]),
-    last_value("nebulex.cache.stats.writes", tags: [:cache]),
-    last_value("nebulex.cache.stats.evictions", tags: [:cache]),
-    last_value("nebulex.cache.stats.expirations", tags: [:cache]),
+    last_value("nebulex.cache.stats.hits", tags: [:cache, :node]),
+    last_value("nebulex.cache.stats.misses", tags: [:cache, :node]),
+    last_value("nebulex.cache.stats.writes", tags: [:cache, :node]),
+    last_value("nebulex.cache.stats.evictions", tags: [:cache, :node]),
+    last_value("nebulex.cache.stats.expirations", tags: [:cache, :node]),
 
     # Nebulex custom Metrics
-    last_value("nebulex.cache.size.value", tags: [:cache]),
+    last_value("nebulex.cache.size.value", tags: [:cache, :node]),
 
     # VM Metrics
     summary("vm.memory.total", unit: {:byte, :kilobyte}),
@@ -233,11 +237,36 @@ If you start an IEx session like previously, you should see the new metric too:
 
 ```
 [Telemetry.Metrics.ConsoleReporter] Got new event!
+Event name: nebulex.cache.stats
+All measurements: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0}
+All metadata: %{cache: MyApp.Cache, node: :nonode@nohost}
+
+Metric measurement: :hits (last_value)
+With value: 0
+Tag values: %{cache: MyApp.Cache, node: :nonode@nohost}
+
+Metric measurement: :misses (last_value)
+With value: 0
+Tag values: %{cache: MyApp.Cache, node: :nonode@nohost}
+
+Metric measurement: :writes (last_value)
+With value: 0
+Tag values: %{cache: MyApp.Cache, node: :nonode@nohost}
+
+Metric measurement: :evictions (last_value)
+With value: 0
+Tag values: %{cache: MyApp.Cache, node: :nonode@nohost}
+
+Metric measurement: :expirations (last_value)
+With value: 0
+Tag values: %{cache: MyApp.Cache, node: :nonode@nohost}
+
+[Telemetry.Metrics.ConsoleReporter] Got new event!
 Event name: nebulex.cache.size
 All measurements: %{value: 0}
-All metadata: %{cache: MyApp.Cache}
+All metadata: %{cache: MyApp.Cache, node: :nonode@nohost}
 
 Metric measurement: :value (last_value)
 With value: 0
-Tag values: %{cache: MyApp.Cache}
+Tag values: %{cache: MyApp.Cache, node: :nonode@nohost}
 ```

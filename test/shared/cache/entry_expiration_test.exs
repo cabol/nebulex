@@ -1,4 +1,4 @@
-defmodule Nebulex.Cache.EntryExpTest do
+defmodule Nebulex.Cache.EntryExpirationTest do
   import Nebulex.CacheCase
 
   deftests "cache expiration" do

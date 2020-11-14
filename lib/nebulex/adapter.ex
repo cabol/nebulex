@@ -12,7 +12,6 @@ defmodule Nebulex.Adapter do
   It must be a map and Nebulex itself will always inject two keys into the meta:
 
     * `:cache` - The cache module.
-    * `:name` - The name of the cache.
     * `:pid` - The PID returned by the child spec returned in `c:init/1`
   """
   @type adapter_meta :: %{optional(atom) => term}

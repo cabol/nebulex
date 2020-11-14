@@ -12,6 +12,7 @@ jobs:
   nebulex_test:
     name: 'Nebulex Test (Elixir ${{ matrix.elixir }} OTP ${{ matrix.otp }})'
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
         include:
@@ -21,15 +22,19 @@ jobs:
             otp: 22.x
           - elixir: 1.9.x
             otp: 22.x
+
     env:
       GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
       MIX_ENV: test
+
     steps:
       - uses: actions/checkout@v2
+
       - uses: actions/setup-elixir@v1
         with:
           otp-version: '${{ matrix.otp }}'
           elixir-version: '${{ matrix.elixir }}'
+
       - uses: actions/cache@v1
         with:
           path: deps
@@ -38,6 +43,7 @@ jobs:
             hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-mix-
+
       - uses: actions/cache@v1
         with:
           path: _build
@@ -46,19 +52,35 @@ jobs:
             hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-build-
+
       - name: Install Dependencies
-        run: mix deps.get
-      - name: Compile Code
-        run: mix compile --warnings-as-errors
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get
+
+      - name: Run style and code consistency checks
+        run: |
+          mix compile --warnings-as-errors
+          mix format --check-formatted
+          mix credo --strict
+
+      - name: Run tests
+        run: |
+          epmd -daemon
+          mix coveralls.github
+
       - uses: actions/cache@v1
         with:
           path: priv/plts
           key: '${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plt-v1'
           restore-keys: |
             ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plt-v1
-      - name: Run Checks
+
+      - name: Run static analysis checks
         run: |
-          epmd -daemon
-          mix check --except ex_unit
-      - name: Report Doc Coverage
+          mix sobelow --exit --skip
+          mix dialyzer --format short
+
+      - name: Doc Coverage Report
         run: MIX_ENV=docs mix inch.report

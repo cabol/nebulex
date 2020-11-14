@@ -10,11 +10,13 @@ defmodule Nebulex.Adapters.PartitionedTest do
   alias Nebulex.TestCache.{Partitioned, PartitionedMock}
 
   @primary :"primary@127.0.0.1"
-  @cluster :lists.usort([@primary | Application.get_env(:nebulex, :nodes, [])])
 
+  # Set config
   :ok = Application.put_env(:nebulex, Partitioned, primary: [backend: :shards])
 
   setup do
+    cluster = :lists.usort([@primary | Application.get_env(:nebulex, :nodes, [])])
+
     node_pid_list =
       start_caches(
         [node() | Node.list()],
@@ -29,7 +31,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
       stop_caches(node_pid_list)
     end)
 
-    {:ok, cache: Partitioned, name: Partitioned}
+    {:ok, cache: Partitioned, name: Partitioned, cluster: cluster}
   end
 
   describe "c:init/1" do
@@ -106,25 +108,25 @@ defmodule Nebulex.Adapters.PartitionedTest do
   end
 
   describe "custer" do
-    test "check cluster nodes" do
+    test "check cluster nodes", %{cluster: cluster} do
       assert node() == @primary
-      assert :lists.usort(Node.list()) == @cluster -- [node()]
-      assert Partitioned.nodes() == @cluster
+      assert :lists.usort(Node.list()) == cluster -- [node()]
+      assert Partitioned.nodes() == cluster
 
       :ok = Cluster.leave(Partitioned)
-      assert Partitioned.nodes() == @cluster -- [node()]
+      assert Partitioned.nodes() == cluster -- [node()]
     end
 
-    test "teardown cache" do
+    test "teardown cache", %{cluster: cluster} do
       assert Partitioned.put(4, 4) == :ok
       assert Partitioned.get(4) == 4
 
-      assert Partitioned.nodes() == @cluster
+      assert Partitioned.nodes() == cluster
 
       node = teardown_cache(1)
       :ok = Process.sleep(1000)
 
-      assert Partitioned.nodes() == @cluster -- [node]
+      assert Partitioned.nodes() == cluster -- [node]
 
       assert :ok == Partitioned.put_all([{4, 44}, {2, 2}, {1, 1}])
 
