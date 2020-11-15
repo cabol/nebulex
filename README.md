@@ -215,13 +215,29 @@ before running the tests.
 
 ## Benchmarks
 
-Some basic benchmarks were added using [benchee](https://github.com/PragTob/benchee);
-to learn more, check out the [benchmarks](./benchmarks) directory.
+Nebulex provides a set of basic benchmark tests using the library
+[benchee](https://github.com/PragTob/benchee), and they are located within
+the directory [benchmarks](./benchmarks).
 
-To run the benchmarks:
+To run a benchmark test you have to run:
 
 ```
-$ MIX_ENV=test mix run benchmarks/benchmark.exs
+$ MIX_ENV=test mix run benchmarks/{BENCH_TEST_FILE}
+```
+
+Where `BENCH_TEST_FILE` can be any of:
+
+  * `local_with_ets_bench.exs`: benchmark for the local adapter using
+    `:ets` backend.
+  * `local_with_shards_bench.exs`: benchmark for the local adapter using
+    `:shards` backend.
+  * `partitioned_bench.exs`:  benchmark for the partitioned adapter.
+
+For example, for running the benchmark for the local adapter using `:shards`
+backend:
+
+```
+$ MIX_ENV=test mix run benchmarks/local_with_shards_bench.exs
 ```
 
 Additionally, you can also run performance tests using `:basho_bench`.
@@ -245,6 +261,6 @@ all checks run successfully.
 
 ## Copyright and License
 
-Copyright (c) 2017-2020, Carlos Bolaños.
+Copyright (c) 2017, Carlos Bolaños.
 
 Nebulex source code is licensed under the [MIT License](LICENSE).
