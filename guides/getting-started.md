@@ -29,7 +29,7 @@ changing the `deps` definition in that file to this:
 ```elixir
 defp deps do
   [
-    {:nebulex, "~> 2.0-pre"},
+    {:nebulex, "2.0.0-rc.1"},
     {:shards, "~> 1.0"},      #=> For using :shards as backend
     {:decorator, "~> 1.3"},   #=> For using Caching Annotations
     {:telemetry, "~> 0.4"}    #=> For using the Telemetry events (Nebulex stats)

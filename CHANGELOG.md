@@ -1,18 +1,49 @@
 # Changelog
 
+## [v2.0.0-rc.1](https://github.com/cabol/nebulex/tree/v2.0.0-rc.1) (2020-11-15)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.0.0-rc.0...v2.0.0-rc.1)
+
+**Implemented enhancements:**
+
+- Make the local adapter completely agnostic to the cache name
+- Added documentation in local adapter for eviction settings, caveats and
+  recommendations.
+- Support for new `:pg` module since OTP 23 [#84](https://github.com/cabol/nebulex/issues/84)
+
+**Closed issues:**
+
+- Error on `cache.import` using ReplicatedCache [#86](https://github.com/cabol/nebulex/issues/86)
+- `{:EXIT, #PID<0.2945.0>, :normal}` [#79](https://github.com/cabol/nebulex/issues/79)
+- `opts[:stats]` not getting through to the adapter [#78](https://github.com/cabol/nebulex/issues/78)
+- Partitioned Cache + stats + multiple nodes causes failure [#77](https://github.com/cabol/nebulex/issues/77)
+- Recommended gc settings? [#76](https://github.com/cabol/nebulex/issues/76)
+
+**Merged pull requests:**
+
+- Add test for unflushed messages with exits trapped [#85](https://github.com/cabol/nebulex/pull/85)
+  ([garthk](https://github.com/garthk))
+- Misc doc changes [#83](https://github.com/cabol/nebulex/pull/83)
+  ([kianmeng](https://github.com/kianmeng))
+- Use TIDs for the generation tables instead of names [#82](https://github.com/cabol/nebulex/pull/82)
+  ([cabol](https://github.com/cabol))
+- Update `:shards` dependency to the latest version [#81](https://github.com/cabol/nebulex/pull/81)
+  ([cabol](https://github.com/cabol))
+
 ## [v2.0.0-rc.0](https://github.com/cabol/nebulex/tree/v2.0.0-rc.0) (2020-07-05)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v1.2.2...v2.0.0-rc.0)
 
 **Closed issues:**
 
-- Asynchronous testing struggles [\#72](https://github.com/cabol/nebulex/issues/72)
-- MyCache.ttl/0 is undefined or private [\#71](https://github.com/cabol/nebulex/issues/71)
-- Add telemetry integration [\#62](https://github.com/cabol/nebulex/issues/62)
+- Asynchronous testing struggles [#72](https://github.com/cabol/nebulex/issues/72)
+- `MyCache.ttl/0` is undefined or private [#71](https://github.com/cabol/nebulex/issues/71)
+- Add telemetry integration [#62](https://github.com/cabol/nebulex/issues/62)
 
 **Merged pull requests:**
 
-- Crafting Nebulex v2 [\#68](https://github.com/cabol/nebulex/pull/68) ([cabol](https://github.com/cabol))
+- Crafting Nebulex v2 [#68](https://github.com/cabol/nebulex/pull/68)
+  ([cabol](https://github.com/cabol))
 
 ## [v1.2.2](https://github.com/cabol/nebulex/tree/v1.2.2) (2020-06-11)
 
@@ -20,12 +51,13 @@
 
 **Closed issues:**
 
-- Fix: Dialyzer  [\#74](https://github.com/cabol/nebulex/issues/74)
-- Question: Use environment variables for config [\#70](https://github.com/cabol/nebulex/issues/70)
+- Fix: Dialyzer [#74](https://github.com/cabol/nebulex/issues/74)
+- Question: Use environment variables for config [#70](https://github.com/cabol/nebulex/issues/70)
 
 **Merged pull requests:**
 
-- fix: Dialyzer useless control flow [\#73](https://github.com/cabol/nebulex/pull/73) ([filipeherculano](https://github.com/filipeherculano))
+- Fix: Dialyzer useless control flow [#73](https://github.com/cabol/nebulex/pull/73)
+  ([filipeherculano](https://github.com/filipeherculano))
 
 ## [v1.2.1](https://github.com/cabol/nebulex/tree/v1.2.1) (2020-04-12)
 
@@ -33,7 +65,8 @@
 
 **Fixed bugs:**
 
-- Fix issue when memory check is ran for the generation manager [\#69](https://github.com/cabol/nebulex/issues/69)
+- Fix issue when memory check is ran for the generation manager
+  [#69](https://github.com/cabol/nebulex/issues/69)
 
 ## [v1.2.0](https://github.com/cabol/nebulex/tree/v1.2.0) (2020-03-30)
 
@@ -41,23 +74,27 @@
 
 **Implemented enhancements:**
 
-- Refactor Nebulex.Caching in order to use annotated functions via decorators [\#66](https://github.com/cabol/nebulex/issues/66)
+- Refactor `Nebulex.Caching` in order to use annotated functions via decorators
+  [#66](https://github.com/cabol/nebulex/issues/66)
 
 **Fixed bugs:**
 
-- Sporadic :badarg error [\#52](https://github.com/cabol/nebulex/issues/52)
+- Sporadic `:badarg` error [#52](https://github.com/cabol/nebulex/issues/52)
 
 **Closed issues:**
 
-- Question: disabling cache conditionally in defcacheable [\#63](https://github.com/cabol/nebulex/issues/63)
-- Support for persistence operations [\#61](https://github.com/cabol/nebulex/issues/61)
-- Implement adapter for replicated topology [\#60](https://github.com/cabol/nebulex/issues/60)
+- Question: disabling cache conditionally in defcacheable [#63](https://github.com/cabol/nebulex/issues/63)
+- Support for persistence operations [#61](https://github.com/cabol/nebulex/issues/61)
+- Implement adapter for replicated topology [#60](https://github.com/cabol/nebulex/issues/60)
 
 **Merged pull requests:**
 
-- \[\#66\] Refactor Nebulex.Caching to use annotated functions via decorators [\#67](https://github.com/cabol/nebulex/pull/67) ([cabol](https://github.com/cabol))
-- Fixes and enhancements for v1.2.0 [\#64](https://github.com/cabol/nebulex/pull/64) ([cabol](https://github.com/cabol))
-- Features for next release \(v1.2.0\) [\#59](https://github.com/cabol/nebulex/pull/59) ([cabol](https://github.com/cabol))
+- [#66] Refactor `Nebulex.Caching` to use annotated functions via decorators
+  [#67](https://github.com/cabol/nebulex/pull/67) ([cabol](https://github.com/cabol))
+- Fixes and enhancements for `v1.2.0` [#64](https://github.com/cabol/nebulex/pull/64)
+  ([cabol](https://github.com/cabol))
+- Features for next release (`v1.2.0`) [#59](https://github.com/cabol/nebulex/pull/59)
+  ([cabol](https://github.com/cabol))
 
 ## [v1.1.1](https://github.com/cabol/nebulex/tree/v1.1.1) (2019-11-11)
 
@@ -65,20 +102,22 @@
 
 **Implemented enhancements:**
 
-- Add capability to limit cache size  [\#53](https://github.com/cabol/nebulex/issues/53)
-- Ability to "get or set" a key [\#49](https://github.com/cabol/nebulex/issues/49)
-- Multilevel Cache: transaction/3 is attempting to change all levels multiple times. [\#35](https://github.com/cabol/nebulex/issues/35)
+- Add capability to limit cache size  [#53](https://github.com/cabol/nebulex/issues/53)
+- Ability to "get or set" a key [#49](https://github.com/cabol/nebulex/issues/49)
+- Multilevel Cache: transaction/3 is attempting to change all levels multiple times.
+  [#35](https://github.com/cabol/nebulex/issues/35)
 
 **Closed issues:**
 
-- Pre Expire Hook [\#57](https://github.com/cabol/nebulex/issues/57)
-- Add matching option on returned result to Nebulex.Caching [\#55](https://github.com/cabol/nebulex/issues/55)
-- Multi Level with dist not working as expected [\#54](https://github.com/cabol/nebulex/issues/54)
-- Adapter for FoundationDB [\#51](https://github.com/cabol/nebulex/issues/51)
+- Pre Expire Hook [#57](https://github.com/cabol/nebulex/issues/57)
+- Add matching option on returned result to Nebulex.Caching [#55](https://github.com/cabol/nebulex/issues/55)
+- Multi Level with dist not working as expected [#54](https://github.com/cabol/nebulex/issues/54)
+- Adapter for FoundationDB [#51](https://github.com/cabol/nebulex/issues/51)
 
 **Merged pull requests:**
 
-- Add match option to Nebulex.Caching [\#56](https://github.com/cabol/nebulex/pull/56) ([polmiro](https://github.com/polmiro))
+- Add match option to Nebulex.Caching [#56](https://github.com/cabol/nebulex/pull/56)
+  ([polmiro](https://github.com/polmiro))
 
 ## [v1.1.0](https://github.com/cabol/nebulex/tree/v1.1.0) (2019-05-11)
 
@@ -86,27 +125,30 @@
 
 **Implemented enhancements:**
 
-- Refactor flush action in the local adapter to delete all objects instead of deleting all generation tables [\#48](https://github.com/cabol/nebulex/issues/48)
-- Write a guide for `Nebulex.Caching` [\#45](https://github.com/cabol/nebulex/issues/45)
-- Turn `Nebulex.Adapter.NodeSelector` into a generic hash behavior `Nebulex.Adapter.Hash` [\#44](https://github.com/cabol/nebulex/issues/44)
-- Turn `Nebulex.Adapters.Dist.RPC` into a reusable utility [\#43](https://github.com/cabol/nebulex/issues/43)
-- Add support to evict multiple keys from cache in `defevict`  [\#42](https://github.com/cabol/nebulex/issues/42)
+- Refactor flush action in the local adapter to delete all objects instead of
+  deleting all generation tables [#48](https://github.com/cabol/nebulex/issues/48)
+- Write a guide for `Nebulex.Caching` [#45](https://github.com/cabol/nebulex/issues/45)
+- Turn `Nebulex.Adapter.NodeSelector` into a generic hash behavior `Nebulex.Adapter.Hash`
+  [#44](https://github.com/cabol/nebulex/issues/44)
+- Turn `Nebulex.Adapters.Dist.RPC` into a reusable utility [#43](https://github.com/cabol/nebulex/issues/43)
+- Add support to evict multiple keys from cache in `defevict`  [#42](https://github.com/cabol/nebulex/issues/42)
 
 **Fixed bugs:**
 
-- custom ttl on mulltilevel cache gets overwritten [\#46](https://github.com/cabol/nebulex/issues/46)
+- custom ttl on mulltilevel cache gets overwritten [#46](https://github.com/cabol/nebulex/issues/46)
 
 **Closed issues:**
 
-- Will nebulex support replicating cache partitions? [\#47](https://github.com/cabol/nebulex/issues/47)
-- Add support to define `:opts` in `defcacheable` and `defupdatable` [\#40](https://github.com/cabol/nebulex/issues/40)
-- Random test failure - UndefinedFunctionError [\#28](https://github.com/cabol/nebulex/issues/28)
-- Adapter for Memcached [\#22](https://github.com/cabol/nebulex/issues/22)
-- Invalidate keys cluster-wide [\#18](https://github.com/cabol/nebulex/issues/18)
+- Will nebulex support replicating cache partitions? [#47](https://github.com/cabol/nebulex/issues/47)
+- Add support to define `:opts` in `defcacheable` and `defupdatable` [#40](https://github.com/cabol/nebulex/issues/40)
+- Random test failure - UndefinedFunctionError [#28](https://github.com/cabol/nebulex/issues/28)
+- Adapter for Memcached [#22](https://github.com/cabol/nebulex/issues/22)
+- Invalidate keys cluster-wide [#18](https://github.com/cabol/nebulex/issues/18)
 
 **Merged pull requests:**
 
-- Fix error when running in a release [\#41](https://github.com/cabol/nebulex/pull/41) ([peburrows](https://github.com/peburrows))
+- Fix error when running in a release [#41](https://github.com/cabol/nebulex/pull/41)
+  ([peburrows](https://github.com/peburrows))
 
 ## [v1.0.1](https://github.com/cabol/nebulex/tree/v1.0.1) (2019-01-11)
 
@@ -114,22 +156,28 @@
 
 **Fixed bugs:**
 
-- The `:infinity` atom is being set for unexpired object when is retrieved from an older generation [\#37](https://github.com/cabol/nebulex/issues/37)
+- The `:infinity` atom is being set for unexpired object when is retrieved from
+  an older generation [#37](https://github.com/cabol/nebulex/issues/37)
 
 **Closed issues:**
 
-- Caching utility macros: `defcacheable`, `defevict` and `defupdatable` [\#39](https://github.com/cabol/nebulex/issues/39)
-- Multilevel Cache: replicate/2 is attempting to subtract from :infinity [\#34](https://github.com/cabol/nebulex/issues/34)
-- has\_key?/1 does not respect ttl [\#33](https://github.com/cabol/nebulex/issues/33)
-- Add dialyzer and credo checks to the CI pipeline [\#31](https://github.com/cabol/nebulex/issues/31)
-- Fix documentation about hooks [\#30](https://github.com/cabol/nebulex/issues/30)
-- FAQ list [\#25](https://github.com/cabol/nebulex/issues/25)
+- Caching utility macros: `defcacheable`, `defevict` and `defupdatable`
+  [#39](https://github.com/cabol/nebulex/issues/39)
+- Multilevel Cache: `replicate/2` is attempting to subtract from `:infinity`
+  [#34](https://github.com/cabol/nebulex/issues/34)
+- `has_key?/1` does not respect ttl [#33](https://github.com/cabol/nebulex/issues/33)
+- Add dialyzer and credo checks to the CI pipeline [#31](https://github.com/cabol/nebulex/issues/31)
+- Fix documentation about hooks [#30](https://github.com/cabol/nebulex/issues/30)
+- FAQ list [#25](https://github.com/cabol/nebulex/issues/25)
 
 **Merged pull requests:**
 
-- typo in transaction docs [\#38](https://github.com/cabol/nebulex/pull/38) ([fredr](https://github.com/fredr))
-- Handle an :infinity expiration in multilevel replication. [\#36](https://github.com/cabol/nebulex/pull/36) ([sdost](https://github.com/sdost))
-- add missing coma in conf section of readme file [\#32](https://github.com/cabol/nebulex/pull/32) ([Kociamber](https://github.com/Kociamber))
+- typo in transaction docs [#38](https://github.com/cabol/nebulex/pull/38)
+  ([fredr](https://github.com/fredr))
+- Handle an :infinity expiration in multilevel replication.
+  [#36](https://github.com/cabol/nebulex/pull/36) ([sdost](https://github.com/sdost))
+- Add missing coma in conf section of readme file
+  [#32](https://github.com/cabol/nebulex/pull/32) ([Kociamber](https://github.com/Kociamber))
 
 ## [v1.0.0](https://github.com/cabol/nebulex/tree/v1.0.0) (2018-10-31)
 
@@ -137,19 +185,20 @@
 
 **Implemented enhancements:**
 
-- Refactor `Nebulex.Adapters.Dist` to use `Task` instead of `:rpc` [\#24](https://github.com/cabol/nebulex/issues/24)
-- Create first cache generation by default when the cache is started [\#21](https://github.com/cabol/nebulex/issues/21)
+- Refactor `Nebulex.Adapters.Dist` to use `Task` instead of `:rpc` [#24](https://github.com/cabol/nebulex/issues/24)
+- Create first cache generation by default when the cache is started [#21](https://github.com/cabol/nebulex/issues/21)
 
 **Closed issues:**
 
-- Performance Problem. [\#27](https://github.com/cabol/nebulex/issues/27)
-- Cache Failing to Start on Production [\#26](https://github.com/cabol/nebulex/issues/26)
-- Adapter for Redis [\#23](https://github.com/cabol/nebulex/issues/23)
-- For `update` and `get\_and\_update` functions, the :ttl is being overridden [\#19](https://github.com/cabol/nebulex/issues/19)
-- TTL and EXPIRE functions? [\#17](https://github.com/cabol/nebulex/issues/17)
-- Publish a rc.3 release [\#16](https://github.com/cabol/nebulex/issues/16)
-- Replicated cache adapter [\#15](https://github.com/cabol/nebulex/issues/15)
-- Fulfil the open-source checklist [\#1](https://github.com/cabol/nebulex/issues/1)
+- Performance Problem. [#27](https://github.com/cabol/nebulex/issues/27)
+- Cache Failing to Start on Production [#26](https://github.com/cabol/nebulex/issues/26)
+- Adapter for Redis [#23](https://github.com/cabol/nebulex/issues/23)
+- For `update` and `get_and_update` functions, the :ttl is being overridden
+  [#19](https://github.com/cabol/nebulex/issues/19)
+- TTL and EXPIRE functions? [#17](https://github.com/cabol/nebulex/issues/17)
+- Publish a rc.3 release [#16](https://github.com/cabol/nebulex/issues/16)
+- Replicated cache adapter [#15](https://github.com/cabol/nebulex/issues/15)
+- Fulfil the open-source checklist [#1](https://github.com/cabol/nebulex/issues/1)
 
 ## [v1.0.0-rc.3](https://github.com/cabol/nebulex/tree/v1.0.0-rc.3) (2018-01-10)
 
@@ -157,7 +206,7 @@
 
 **Closed issues:**
 
-- Add stream [\#10](https://github.com/cabol/nebulex/issues/10)
+- Add stream [#10](https://github.com/cabol/nebulex/issues/10)
 
 ## [v1.0.0-rc.2](https://github.com/cabol/nebulex/tree/v1.0.0-rc.2) (2017-11-25)
 
@@ -165,11 +214,12 @@
 
 **Closed issues:**
 
-- Atom exhaustion from generations [\#8](https://github.com/cabol/nebulex/issues/8)
-- Custom ttl for every cache record? [\#7](https://github.com/cabol/nebulex/issues/7)
-- Load/Stress Tests [\#6](https://github.com/cabol/nebulex/issues/6)
-- Update Getting Started guide [\#4](https://github.com/cabol/nebulex/issues/4)
-- Add counters support – increments and decrements by a given amount [\#3](https://github.com/cabol/nebulex/issues/3)
+- Atom exhaustion from generations [#8](https://github.com/cabol/nebulex/issues/8)
+- Custom ttl for every cache record? [#7](https://github.com/cabol/nebulex/issues/7)
+- Load/Stress Tests [#6](https://github.com/cabol/nebulex/issues/6)
+- Update Getting Started guide [#4](https://github.com/cabol/nebulex/issues/4)
+- Add counters support – increments and decrements by a given amount
+  [#3](https://github.com/cabol/nebulex/issues/3)
 
 ## [v1.0.0-rc.1](https://github.com/cabol/nebulex/tree/v1.0.0-rc.1) (2017-07-30)
 
@@ -177,7 +227,7 @@
 
 **Closed issues:**
 
-- Implement mix task to automate cache generation [\#2](https://github.com/cabol/nebulex/issues/2)
+- Implement mix task to automate cache generation [#2](https://github.com/cabol/nebulex/issues/2)
 
 
 
