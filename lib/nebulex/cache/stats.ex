@@ -130,9 +130,11 @@ defmodule Nebulex.Cache.Stats do
         Stats.info(get_dynamic_cache())
       end
 
-      @doc false
-      def dispatch_stats(opts \\ []) do
-        Stats.dispatch(get_dynamic_cache(), opts)
+      if Code.ensure_loaded?(:telemetry) do
+        @doc false
+        def dispatch_stats(opts \\ []) do
+          Stats.dispatch(get_dynamic_cache(), opts)
+        end
       end
     end
   end
