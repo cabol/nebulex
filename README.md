@@ -145,9 +145,9 @@ For example, if you want to use a built-in cache, add to your `mix.exs` file:
 def deps do
   [
     {:nebulex, "2.0.0-rc.1"},
-    {:shards, "~> 1.0"},      #=> For using :shards as backend
-    {:decorator, "~> 1.3"},   #=> For using Caching Annotations
-    {:telemetry, "~> 0.4"}    #=> For using the Telemetry events (Nebulex stats)
+    {:shards, "~> 1.0"},     #=> When using :shards as backend
+    {:decorator, "~> 1.3"},  #=> When using Caching Annotations
+    {:telemetry, "~> 0.4"}   #=> When using the Telemetry events (Nebulex stats)
   ]
 end
 ```

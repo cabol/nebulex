@@ -21,18 +21,18 @@ defmodule Nebulex.Cache.QueryableTest do
     end
 
     test "stream", %{cache: cache} do
-      entries = for x <- 1..10, do: {x, x * 2}
+      entries = for x <- 1..10, into: %{}, do: {x, x * 2}
       assert cache.put_all(entries) == :ok
 
-      expected = Keyword.keys(entries)
-      assert nil |> cache.stream() |> Enum.to_list() |> :lists.usort() == expected
-
-      expected = Keyword.values(entries)
+      assert nil
+             |> cache.stream()
+             |> Enum.to_list()
+             |> :lists.usort() == Map.keys(entries)
 
       assert nil
              |> cache.stream(return: :value, page_size: 3)
              |> Enum.to_list()
-             |> :lists.usort() == expected
+             |> :lists.usort() == Map.values(entries)
 
       assert_raise Nebulex.QueryError, fn ->
         :invalid_query

@@ -12,8 +12,9 @@ defmodule Nebulex.Adapter.Keyslot do
   ## Example
 
       defmodule MyApp.Keyslot do
-        @behaviour Nebulex.Adapter.Keyslot
+        use Nebulex.Adapter.Keyslot
 
+        @impl true
         def hash_slot(key, range) do
           key
           |> :erlang.phash2()

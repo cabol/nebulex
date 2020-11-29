@@ -62,7 +62,7 @@ defmodule Nebulex.Cache.SupervisorTest do
         adapter: Nebulex.TestCache.AdapterMock
     end
 
-    assert {:ok, pid} = CustomCache.start_link(child_name: :custom_cache)
+    assert {:ok, _pid} = CustomCache.start_link(child_name: :custom_cache)
     _ = Process.flag(:trap_exit, true)
 
     assert {:error, error} =

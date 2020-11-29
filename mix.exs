@@ -56,13 +56,15 @@ defmodule Nebulex.MixProject do
       # Test & Code Analysis
       {:ex2ms, "~> 1.6", only: :test},
       {:mock, "~> 0.3", only: :test},
-      {:benchee, "~> 1.0", only: :test},
-      {:benchee_html, "~> 1.0", only: :test},
       {:excoveralls, "~> 0.13", only: :test},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
-      {:credo, "~> 1.5", only: [:dev, :test]},
-      {:ex_check, "~> 0.12", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.10", only: [:dev, :test], runtime: false},
+      {:ex_check, "~> 0.12", only: [:dev, :test], runtime: false},
+
+      # Benchmark Test
+      {:benchee, "~> 1.0", only: :test},
+      {:benchee_html, "~> 1.0", only: :test},
 
       # Docs
       {:ex_doc, "~> 0.23", only: [:dev, :test], runtime: false},
