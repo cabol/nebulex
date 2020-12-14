@@ -126,7 +126,7 @@ if Code.ensure_loaded?(Decorator.Define) do
     keys):
 
         @decorate cache_evict(cache: Cache, key: {Account, email})
-        def delete_account_by email(email) do
+        def delete_account_by_email(email) do
           # the logic for deleting the account ...
         end
 
