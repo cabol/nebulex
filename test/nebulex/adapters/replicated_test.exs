@@ -90,7 +90,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       with_dynamic_cache(ReplicatedMock, [name: :replicated_mock], fn ->
         _ = Process.flag(:trap_exit, true)
 
-        msg = ~r"RPC error executing action: put_all\n\nErrors:\n\n\[\n  {{:exit,"
+        msg = ~r"RPC error executing action: put_all\n\nErrors:\n\n"
 
         assert_raise Nebulex.RPCMultiCallError, msg, fn ->
           ReplicatedMock.put_all(a: 1, b: 2)

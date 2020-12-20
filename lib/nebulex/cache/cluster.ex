@@ -63,6 +63,8 @@ defmodule Nebulex.Cache.Cluster do
       :pg.get_members(__MODULE__, name)
     end
   else
+    @compile {:inline, pg2_namespace: 1}
+
     defp pg_join(name, pid) do
       name
       |> ensure_namespace()
