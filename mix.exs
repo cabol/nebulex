@@ -10,6 +10,7 @@ defmodule Nebulex.MixProject do
       version: @version,
       elixir: "~> 1.9",
       elixirc_paths: elixirc_paths(Mix.env()),
+      aliases: aliases(),
       deps: deps(),
 
       # Docs
@@ -57,10 +58,9 @@ defmodule Nebulex.MixProject do
       {:ex2ms, "~> 1.6", only: :test},
       {:mock, "~> 0.3", only: :test},
       {:excoveralls, "~> 0.13", only: :test},
-      {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.10", only: [:dev, :test], runtime: false},
-      {:ex_check, "~> 0.12", only: [:dev, :test], runtime: false},
 
       # Benchmark Test
       {:benchee, "~> 1.0", only: :test},
@@ -69,6 +69,18 @@ defmodule Nebulex.MixProject do
       # Docs
       {:ex_doc, "~> 0.23", only: [:dev, :test], runtime: false},
       {:inch_ex, "~> 2.0", only: :docs}
+    ]
+  end
+
+  defp aliases do
+    [
+      check: [
+        "compile --warnings-as-errors",
+        "format --check-formatted",
+        "credo --strict",
+        "coveralls.html",
+        "dialyzer --format short"
+      ]
     ]
   end
 

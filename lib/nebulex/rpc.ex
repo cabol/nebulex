@@ -3,7 +3,13 @@ defmodule Nebulex.RPC do
   RPC utilities for distributed task execution.
 
   This module uses supervised tasks underneath `Task.Supervisor`.
+
+  > **NOTE:** The approach by using distributed tasks will be deprecated
+    in the future in favor of `:erpc`.
   """
+
+  @typedoc "Task supervisor"
+  @type task_sup :: Supervisor.supervisor()
 
   @typedoc "Task callback"
   @type callback :: {module, atom, [term]}
@@ -14,8 +20,16 @@ defmodule Nebulex.RPC do
   @typedoc "Node group"
   @type node_group :: %{optional(node) => callback} | [node_callback]
 
+  @typedoc "Reducer function spec"
+  @type reducer_fun :: ({:ok, term} | {:error, term}, node_callback | node, term -> term)
+
   @typedoc "Reducer spec"
-  @type reducer :: {acc :: term, ({:ok, term} | {:error, term}, node_callback, term -> term)}
+  @type reducer :: {acc :: term, reducer_fun}
+
+  # Inline common instructions
+  @compile {:inline, rpc_call: 6, rpc_multi_call: 3, rpc_multi_call: 6}
+
+  ## API
 
   @doc """
   Evaluates `apply(mod, fun, args)` on node `node` and returns the corresponding
@@ -29,28 +43,9 @@ defmodule Nebulex.RPC do
       iex> Nebulex.RPC.call(:my_task_sup, :node1, Kernel, :to_string, [1])
       "1"
   """
-  @spec call(Supervisor.supervisor(), node, module, atom, [term], timeout) ::
-          term | {:badrpc, term}
-  def call(supervisor, node, mod, fun, args, timeout \\ 5000)
-
-  def call(_supervisor, node, mod, fun, args, _timeout) when node == node() do
-    apply(mod, fun, args)
-  rescue
-    # FIXME: this is because coveralls does not check this as covered
-    # coveralls-ignore-start
-    exception ->
-      {:badrpc, exception}
-      # coveralls-ignore-stop
-  end
-
-  def call(supervisor, node, mod, fun, args, timeout) do
-    {supervisor, node}
-    |> Task.Supervisor.async_nolink(
-      __MODULE__,
-      :call,
-      [supervisor, node, mod, fun, args, timeout]
-    )
-    |> Task.await(timeout)
+  @spec call(task_sup, node, module, atom, [term], timeout) :: term | {:badrpc, term}
+  def call(supervisor, node, mod, fun, args, timeout \\ 5000) do
+    rpc_call(supervisor, node, mod, fun, args, timeout)
   end
 
   @doc """
@@ -91,13 +86,9 @@ defmodule Nebulex.RPC do
       ...> )
       ["1", "2"]
   """
-  @spec multi_call(Supervisor.supervisor(), node_group, Keyword.t()) :: term
+  @spec multi_call(task_sup, node_group, Keyword.t()) :: term
   def multi_call(supervisor, node_group, opts \\ []) do
-    node_group
-    |> Enum.map(fn {node, {mod, fun, args}} ->
-      Task.Supervisor.async_nolink({supervisor, node}, mod, fun, args)
-    end)
-    |> handle_multi_call(node_group, opts)
+    rpc_multi_call(supervisor, node_group, opts)
   end
 
   @doc """
@@ -131,30 +122,111 @@ defmodule Nebulex.RPC do
       ...> )
       ["1", "1"]
   """
-  @spec multi_call(Supervisor.supervisor(), [node], module, atom, [term], Keyword.t()) :: term
+  @spec multi_call(task_sup, [node], module, atom, [term], Keyword.t()) :: term
   def multi_call(supervisor, nodes, mod, fun, args, opts \\ []) do
-    multi_call(supervisor, Enum.map(nodes, &{&1, {mod, fun, args}}), opts)
+    rpc_multi_call(supervisor, nodes, mod, fun, args, opts)
   end
 
-  ## Private Functions
+  ## Helpers
 
-  defp handle_multi_call(tasks, node_group, opts) do
-    {reducer_acc, reducer_fun} = Keyword.get(opts, :reducer, default_reducer())
+  if Code.ensure_loaded?(:erpc) do
+    defp rpc_call(_supervisor, node, mod, fun, args, _timeout) when node == node() do
+      apply(mod, fun, args)
+    end
 
-    tasks
-    |> Task.yield_many(opts[:timeout] || 5000)
-    |> :lists.zip(node_group)
-    |> Enum.reduce(reducer_acc, fn
-      {{_task, {:ok, res}}, group}, acc ->
-        reducer_fun.({:ok, res}, group, acc)
+    defp rpc_call(_supervisor, node, mod, fun, args, timeout) do
+      :erpc.call(node, mod, fun, args, timeout)
+    rescue
+      e in ErlangError -> reraise elem(e.original, 1), __STACKTRACE__
+    end
 
-      {{_task, {:exit, reason}}, group}, acc ->
-        reducer_fun.({:error, {:exit, reason}}, group, acc)
+    def rpc_multi_call(_supervisor, node_group, opts) do
+      {reducer_acc, reducer_fun} = opts[:reducer] || default_reducer()
+      timeout = opts[:timeout] || 5000
 
-      {{task, nil}, group}, acc ->
-        _ = Task.shutdown(task, :brutal_kill)
-        reducer_fun.({:error, :timeout}, group, acc)
-    end)
+      node_group
+      |> Enum.map(fn {node, {mod, fun, args}} = group ->
+        {:erpc.send_request(node, mod, fun, args), group}
+      end)
+      |> Enum.reduce(reducer_acc, fn {req_id, group}, acc ->
+        try do
+          res = :erpc.receive_response(req_id, timeout)
+          reducer_fun.({:ok, res}, group, acc)
+        rescue
+          exception ->
+            reducer_fun.({:error, exception}, group, acc)
+        catch
+          :exit, reason ->
+            reducer_fun.({:error, {:exit, reason}}, group, acc)
+        end
+      end)
+    end
+
+    def rpc_multi_call(_supervisor, nodes, mod, fun, args, opts) do
+      {reducer_acc, reducer_fun} = opts[:reducer] || default_reducer()
+
+      nodes
+      |> :erpc.multicall(mod, fun, args, opts[:timeout] || 5000)
+      |> :lists.zip(nodes)
+      |> Enum.reduce(reducer_acc, fn {res, node}, acc ->
+        reducer_fun.(res, node, acc)
+      end)
+    end
+  else
+    # TODO: This approach by using distributed tasks will be deprecated in the
+    #       future in favor of `:erpc` which is proven to improve performance
+    #       almost by 3x.
+
+    defp rpc_call(_supervisor, node, mod, fun, args, _timeout) when node == node() do
+      apply(mod, fun, args)
+    rescue
+      # FIXME: this is because coveralls does not check this as covered
+      # coveralls-ignore-start
+      exception ->
+        {:badrpc, exception}
+        # coveralls-ignore-stop
+    end
+
+    defp rpc_call(supervisor, node, mod, fun, args, timeout) do
+      {supervisor, node}
+      |> Task.Supervisor.async_nolink(
+        __MODULE__,
+        :call,
+        [supervisor, node, mod, fun, args, timeout]
+      )
+      |> Task.await(timeout)
+    end
+
+    defp rpc_multi_call(supervisor, node_group, opts) do
+      node_group
+      |> Enum.map(fn {node, {mod, fun, args}} ->
+        Task.Supervisor.async_nolink({supervisor, node}, mod, fun, args)
+      end)
+      |> handle_multi_call(node_group, opts)
+    end
+
+    defp rpc_multi_call(supervisor, nodes, mod, fun, args, opts) do
+      rpc_multi_call(supervisor, Enum.map(nodes, &{&1, {mod, fun, args}}), opts)
+    end
+
+    defp handle_multi_call(tasks, node_group, opts) do
+      {reducer_acc, reducer_fun} = Keyword.get(opts, :reducer, default_reducer())
+
+      tasks
+      |> Task.yield_many(opts[:timeout] || 5000)
+      |> :lists.zip(node_group)
+      |> Enum.reduce(reducer_acc, fn
+        {{_task, {:ok, res}}, group}, acc ->
+          reducer_fun.({:ok, res}, group, acc)
+
+        {{_task, {:exit, reason}}, group}, acc ->
+          reducer_fun.({:error, {:exit, reason}}, group, acc)
+
+        {{task, nil}, group}, acc ->
+          _ = Task.shutdown(task, :brutal_kill)
+          reducer_fun.({:error, :timeout}, group, acc)
+      end)
+    end
   end
 
   defp default_reducer do
@@ -164,8 +236,8 @@ defmodule Nebulex.RPC do
         {:ok, res}, _node_callback, {ok, err} ->
           {[res | ok], err}
 
-        {:error, reason}, node_callback, {ok, err} ->
-          {ok, [{reason, node_callback} | err]}
+        {class, _} = error, node_callback, {ok, err} when class in [:error, :exit, :throw] ->
+          {ok, [{error, node_callback} | err]}
       end
     }
   end

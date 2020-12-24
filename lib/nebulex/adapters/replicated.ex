@@ -176,12 +176,11 @@ defmodule Nebulex.Adapters.Replicated do
         do: [name: normalize_module_name([name, Primary])] ++ primary_opts,
         else: primary_opts
 
-    # task supervisor to execute parallel and/or remote commands
-    task_sup_name = normalize_module_name([name, TaskSupervisor])
-    task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
-
     # bootstrap timeout in milliseconds
     bootstrap_timeout = Keyword.get(opts, :bootstrap_timeout, 1500)
+
+    # maybe task supervisor for distributed tasks
+    {task_sup_name, children} = sup_child_spec(name, opts)
 
     meta = %{
       name: name,
@@ -195,17 +194,35 @@ defmodule Nebulex.Adapters.Replicated do
       Nebulex.Adapters.Supervisor.child_spec(
         name: normalize_module_name([name, Supervisor]),
         strategy: :rest_for_one,
-        children: [
-          {cache.__primary__, primary_opts},
-          {Nebulex.Adapters.Replicated.Bootstrap, Map.put(meta, :cache, cache)},
-          {Task.Supervisor, [name: task_sup_name] ++ task_sup_opts}
-        ]
+        children:
+          [
+            {cache.__primary__, primary_opts},
+            {Nebulex.Adapters.Replicated.Bootstrap, Map.put(meta, :cache, cache)}
+          ] ++ children
       )
 
     # join the cache to the cluster
     :ok = Cluster.join(name)
 
     {:ok, child_spec, meta}
+  end
+
+  if Code.ensure_loaded?(:erpc) do
+    defp sup_child_spec(_name, _opts) do
+      {nil, []}
+    end
+  else
+    defp sup_child_spec(name, opts) do
+      # task supervisor to execute parallel and/or remote commands
+      task_sup_name = normalize_module_name([name, TaskSupervisor])
+      task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
+
+      children = [
+        {Task.Supervisor, [name: task_sup_name] ++ task_sup_opts}
+      ]
+
+      {task_sup_name, children}
+    end
   end
 
   @impl true

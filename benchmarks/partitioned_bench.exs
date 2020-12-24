@@ -14,7 +14,7 @@ node_pid_list = NodeCase.start_caches(Node.list(), [{Partitioned, primary: [back
 
 Partitioned
 |> BenchHelper.benchmarks()
-|> BenchHelper.run()
+|> BenchHelper.run(parallel: 4, time: 30)
 
 # stop caches
 if Process.alive?(dist), do: Supervisor.stop(dist)

@@ -6,65 +6,72 @@ defmodule BenchHelper do
   @doc false
   def benchmarks(cache) do
     %{
-      "get" => fn ->
-        cache.get("foo")
+      "get" => fn input ->
+        cache.get(input)
       end,
-      "get_all" => fn ->
-        cache.get_all(["foo", "bar"])
+      "get_all" => fn input ->
+        cache.get_all([input, "foo", "bar"])
       end,
-      "put" => fn ->
-        cache.put("foo", "bar")
+      "put" => fn input ->
+        cache.put(input, input)
       end,
-      "put_new" => fn ->
-        cache.put_new("foo", "bar")
+      "put_new" => fn input ->
+        cache.put_new(input, input)
       end,
-      "replace" => fn ->
-        cache.replace("foo", "bar")
+      "replace" => fn input ->
+        cache.replace(input, input)
       end,
-      "put_all" => fn ->
-        cache.put_all([{"foo", "bar"}])
+      "put_all" => fn input ->
+        cache.put_all([{input, input}, {"foo", "bar"}])
       end,
-      "delete" => fn ->
-        cache.delete("foo")
+      "delete" => fn input ->
+        cache.delete(input)
       end,
-      "take" => fn ->
-        cache.take("foo")
+      "take" => fn input ->
+        cache.take(input)
       end,
-      "has_key?" => fn ->
-        cache.has_key?("foo")
+      "has_key?" => fn input ->
+        cache.has_key?(input)
       end,
-      "size" => fn ->
+      "size" => fn _input ->
         cache.size()
       end,
-      "ttl" => fn ->
-        cache.ttl("foo")
+      "ttl" => fn input ->
+        cache.ttl(input)
       end,
-      "expire" => fn ->
-        cache.expire("foo", 1)
+      "expire" => fn input ->
+        cache.expire(input, 1)
       end,
-      "incr" => fn ->
+      "incr" => fn _input ->
         cache.incr(:counter, 1)
       end,
-      "update" => fn ->
-        cache.update("update", 1, &Kernel.+(&1, 1))
+      "update" => fn input ->
+        cache.update(input, 1, &Kernel.+(&1, 1))
       end,
-      "all" => fn ->
+      "all" => fn _input ->
         cache.all()
       end
     }
   end
 
   @doc false
-  def run(benchmarks) do
+  def run(benchmarks, opts \\ []) do
     Benchee.run(
       benchmarks,
-      formatters: [
-        {Benchee.Formatters.Console, comparison: false, extended_statistics: true},
-        {Benchee.Formatters.HTML, extended_statistics: true, auto_open: false}
-      ],
-      print: [
-        fast_warning: false
-      ]
+      Keyword.merge(
+        [
+          inputs: %{"rand" => 100_000},
+          before_each: fn n -> :rand.uniform(n) end,
+          formatters: [
+            {Benchee.Formatters.Console, comparison: false, extended_statistics: true},
+            {Benchee.Formatters.HTML, extended_statistics: true, auto_open: false}
+          ],
+          print: [
+            fast_warning: false
+          ]
+        ],
+        opts
+      )
     )
   end
 end

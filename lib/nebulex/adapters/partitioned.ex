@@ -226,24 +226,20 @@ defmodule Nebulex.Adapters.Partitioned do
         do: [name: normalize_module_name([name, Primary])] ++ primary_opts,
         else: primary_opts
 
-    # task supervisor to execute parallel and/or remote commands
-    task_sup_name = normalize_module_name([name, TaskSupervisor])
-    task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
-
     # keyslot module for selecting nodes
     keyslot =
       opts
       |> Keyword.get(:keyslot, __MODULE__)
       |> assert_behaviour(Nebulex.Adapter.Keyslot, "keyslot")
 
+    # maybe task supervisor for distributed tasks
+    {task_sup_name, children} = sup_child_spec(name, opts)
+
     child_spec =
       Nebulex.Adapters.Supervisor.child_spec(
         name: normalize_module_name([name, Supervisor]),
         strategy: :rest_for_one,
-        children: [
-          {cache.__primary__, primary_opts},
-          {Task.Supervisor, [name: task_sup_name] ++ task_sup_opts}
-        ]
+        children: [{cache.__primary__, primary_opts}] ++ children
       )
 
     meta = %{
@@ -261,6 +257,24 @@ defmodule Nebulex.Adapters.Partitioned do
   rescue
     e in ArgumentError ->
       reraise RuntimeError, e.message, __STACKTRACE__
+  end
+
+  if Code.ensure_loaded?(:erpc) do
+    defp sup_child_spec(_name, _opts) do
+      {nil, []}
+    end
+  else
+    defp sup_child_spec(name, opts) do
+      # task supervisor to execute parallel and/or remote commands
+      task_sup_name = normalize_module_name([name, TaskSupervisor])
+      task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
+
+      children = [
+        {Task.Supervisor, [name: task_sup_name] ++ task_sup_opts}
+      ]
+
+      {task_sup_name, children}
+    end
   end
 
   @impl true
@@ -502,19 +516,19 @@ defmodule Nebulex.Adapters.Partitioned do
     rpc_call(task_sup, node, __MODULE__, :with_dynamic_cache, [meta, fun, args], opts)
   end
 
-  defp rpc_call(supervisor, node, mod, fun, args, opts) do
-    opts
-    |> Keyword.get(:timeout)
-    |> case do
-      nil -> RPC.call(supervisor, node, mod, fun, args)
-      val -> RPC.call(supervisor, node, mod, fun, args, val)
+  if Code.ensure_loaded?(:erpc) do
+    defp rpc_call(supervisor, node, mod, fun, args, opts) do
+      RPC.call(supervisor, node, mod, fun, args, opts[:timeout] || 5000)
     end
-    |> case do
-      {:badrpc, remote_ex} ->
-        raise remote_ex
+  else
+    defp rpc_call(supervisor, node, mod, fun, args, opts) do
+      case RPC.call(supervisor, node, mod, fun, args, opts[:timeout] || 5000) do
+        {:badrpc, remote_ex} ->
+          raise remote_ex
 
-      response ->
-        response
+        response ->
+          response
+      end
     end
   end
 
