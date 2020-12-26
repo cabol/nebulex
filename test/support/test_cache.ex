@@ -1,6 +1,19 @@
 defmodule Nebulex.TestCache do
   @moduledoc false
 
+  defmodule Common do
+    @moduledoc false
+
+    defmacro __using__(_opts) do
+      quote do
+        def get_and_update_fun(nil), do: {nil, 1}
+        def get_and_update_fun(current) when is_integer(current), do: {current, current * 2}
+
+        def get_and_update_bad_fun(_), do: :other
+      end
+    end
+  end
+
   defmodule TestHook do
     @moduledoc false
     use GenServer
@@ -50,6 +63,8 @@ defmodule Nebulex.TestCache do
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local
+
+    use Nebulex.TestCache.Common
   end
 
   defmodule Partitioned do
@@ -58,10 +73,7 @@ defmodule Nebulex.TestCache do
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Partitioned
 
-    def get_and_update_fun(nil), do: {nil, 1}
-    def get_and_update_fun(current) when is_integer(current), do: {current, current * 2}
-
-    def get_and_update_bad_fun(_), do: :other
+    use Nebulex.TestCache.Common
   end
 
   defmodule Replicated do
@@ -69,6 +81,8 @@ defmodule Nebulex.TestCache do
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Replicated
+
+    use Nebulex.TestCache.Common
   end
 
   defmodule Multilevel do

@@ -2,8 +2,6 @@ defmodule Nebulex.Cache.EntryExpirationTest do
   import Nebulex.CacheCase
 
   deftests "cache expiration" do
-    alias Nebulex.TestCache.Partitioned
-
     test "put_all", %{cache: cache} do
       entries = [{0, nil} | for(x <- 1..3, do: {x, x})]
       assert cache.put_all(entries, ttl: 1000)
@@ -149,7 +147,7 @@ defmodule Nebulex.Cache.EntryExpirationTest do
 
       :ok = Process.sleep(10)
 
-      assert cache.get_and_update(1, &Partitioned.get_and_update_fun/1) == {1, 2}
+      assert cache.get_and_update(1, &cache.get_and_update_fun/1) == {1, 2}
       assert cache.ttl(1) == :infinity
 
       :ok = Process.sleep(1200)

@@ -736,15 +736,14 @@ defmodule Nebulex.Cache do
   @doc """
   Gets the value from `key` and updates it, all in one pass.
 
-  `fun` is called with the current cached value under `key` (or `nil`
-  if `key` hasn't been cached) and must return a two-element tuple:
-  the "get" value (the retrieved value, which can be operated on before
-  being returned) and the new value to be stored under `key`. `fun` may
-  also return `:pop`, which means the current value shall be removed
-  from Cache and returned.
+  `fun` is called with the current cached value under `key` (or `nil` if `key`
+  hasn't been cached) and must return a two-element tuple: the current value
+  (the retrieved value, which can be operated on before being returned) and
+  the new value to be stored under `key`. `fun` may also return `:pop`, which
+  means the current value shall be removed from Cache and returned.
 
-  The returned value is a tuple with the "get" value returned by
-  `fun` and the new updated value under `key`.
+  The returned value is a tuple with the current value returned by `fun` and
+  the new updated value under `key`.
 
   ## Options
 
@@ -780,8 +779,9 @@ defmodule Nebulex.Cache do
       iex> MyCache.get_and_update(:b, fn _ -> :pop end)
       {nil, nil}
   """
-  @callback get_and_update(key, (value -> {get, update} | :pop), opts) :: {get, update}
-            when get: value, update: value
+  @callback get_and_update(key, (value -> {current_value, new_value} | :pop), opts) ::
+              {current_value, new_value}
+            when current_value: value, new_value: value
 
   @doc """
   Updates the cached `key` with the given function.
