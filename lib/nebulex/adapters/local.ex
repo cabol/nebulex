@@ -274,6 +274,7 @@ defmodule Nebulex.Adapters.Local do
   # Inherit default persistence implementation
   use Nebulex.Adapter.Persistence
 
+  import Nebulex.Helpers
   import Record
 
   alias Nebulex.Adapters.Local.{Backend, Generation, Metadata}
@@ -485,13 +486,15 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def incr(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key, incr, ttl, _opts) do
+  def incr(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key, incr, ttl, opts) do
+    default = get_option(opts, :default, &is_integer/1, 0)
+
     meta_tab
     |> newer_gen()
     |> backend.update_counter(
       key,
       {3, incr},
-      entry(key: key, value: 0, touched: Time.now(), ttl: ttl)
+      entry(key: key, value: default, touched: Time.now(), ttl: ttl)
     )
     |> update_stats(:write, ref)
   end

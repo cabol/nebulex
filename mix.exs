@@ -79,6 +79,7 @@ defmodule Nebulex.MixProject do
         "format --check-formatted",
         "credo --strict",
         "coveralls.html",
+        "sobelow --exit --skip",
         "dialyzer --format short"
       ]
     ]

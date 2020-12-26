@@ -823,6 +823,10 @@ defmodule Nebulex.Cache do
       (or expiry time) for the given key  in **milliseconds**. Defaults
       to `:infinity`.
 
+    * `:default` - If `key` is not present in Cache, the default value is
+      inserted as initial value of key before the it is incremented.
+      Defaults to `0`.
+
   See the "Shared options" section at the module documentation for more options.
 
   ## Examples
@@ -835,6 +839,9 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.incr(:a, -1)
       2
+
+      iex> MyCache.incr(:missing_key, 2, default: 10)
+      12
   """
   @callback incr(key, incr :: integer, opts) :: integer
 

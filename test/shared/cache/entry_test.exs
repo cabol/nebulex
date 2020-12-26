@@ -252,6 +252,12 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
+    test "incr with default", %{cache: cache} do
+      assert cache.incr(:counter1, 1, default: 10) == 11
+      assert cache.incr(:counter2, 2, default: 10) == 12
+      assert cache.incr(:counter3, -2, default: 10) == 8
+    end
+
     ## Helpers
 
     defp to_int(data) when is_integer(data), do: data
