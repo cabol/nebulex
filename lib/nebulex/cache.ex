@@ -43,7 +43,7 @@ defmodule Nebulex.Cache do
       `Nebulex.Cache.Stats.info(cache_or_name)` at any time. For more
       information, See `Nebulex.Cache.Stats`.
 
-  **NOTE:** It is highly recommendable to check the adapters' documentation.
+  > **NOTE:** It is highly recommendable to check the adapters' documentation.
 
   ## Distributed topologies
 
@@ -51,6 +51,7 @@ defmodule Nebulex.Cache do
 
     * `Nebulex.Adapters.Partitioned` - Partitioned cache topology.
     * `Nebulex.Adapters.Replicated` - Replicated cache topology.
+    * `Nebulex.Adapters.Multilevel` - Multi-level distributed cache topology.
 
   These adapters work more as wrappers for an existing local adapter and provide
   the distributed topology on top of it. Optionally, you can set the adapter for
@@ -423,6 +424,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.get(:non_existent_key)
       nil
+
   """
   @callback get(key, opts) :: value
 
@@ -436,6 +438,7 @@ defmodule Nebulex.Cache do
   ## Example
 
       MyCache.get!(:a)
+
   """
   @callback get!(key, opts) :: value
 
@@ -456,6 +459,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.get_all([:a, :b, :c])
       %{a: 1, c: 3}
+
   """
   @callback get_all(keys :: [key], opts) :: map
 
@@ -502,6 +506,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.put("foo", "bar", ttl: expiry_time(1, :hour))
       :ok
+
   """
   @callback put(key, value, opts) :: :ok
 
@@ -558,6 +563,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.put_new("other", nil)
       true
+
   """
   @callback put_new(key, value, opts) :: boolean
 
@@ -577,6 +583,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.put_new!("foo", "bar")
       true
+
   """
   @callback put_new!(key, value, opts) :: true
 
@@ -639,6 +646,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.replace("foo", "bar3", ttl: 10_000)
       true
+
   """
   @callback replace(key, value, opts) :: boolean
 
@@ -657,6 +665,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.replace!("foo", "bar")
       true
+
   """
   @callback replace!(key, value, opts) :: true
 
@@ -680,6 +689,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.delete(:non_existent_key)
       :ok
+
   """
   @callback delete(key, opts) :: :ok
 
@@ -701,6 +711,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.take(:a)
       nil
+
   """
   @callback take(key, opts) :: value
 
@@ -714,6 +725,7 @@ defmodule Nebulex.Cache do
   ## Example
 
       MyCache.take!(:a)
+
   """
   @callback take!(key, opts) :: value
 
@@ -730,6 +742,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.has_key?(:b)
       false
+
   """
   @callback has_key?(key) :: boolean
 
@@ -778,6 +791,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.get_and_update(:b, fn _ -> :pop end)
       {nil, nil}
+
   """
   @callback get_and_update(key, (value -> {current_value, new_value} | :pop), opts) ::
               {current_value, new_value}
@@ -807,6 +821,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.update(:a, 1, &(&1 * 2))
       2
+
   """
   @callback update(key, initial :: value, (value -> value), opts) :: value
 
@@ -842,6 +857,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.incr(:missing_key, 2, default: 10)
       12
+
   """
   @callback incr(key, incr :: integer, opts) :: integer
 
@@ -865,6 +881,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.ttl(:c)
       nil
+
   """
   @callback ttl(key) :: timeout | nil
 
@@ -885,6 +902,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.ttl(:b, 5)
       false
+
   """
   @callback expire(key, ttl :: timeout) :: boolean
 
@@ -902,6 +920,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.ttl(:b)
       false
+
   """
   @callback touch(key) :: boolean
 
@@ -917,6 +936,7 @@ defmodule Nebulex.Cache do
       iex> :ok = Enum.each(1..5, &MyCache.delete(&1))
       iex> MyCache.size()
       5
+
   """
   @callback size() :: integer
 
@@ -941,22 +961,49 @@ defmodule Nebulex.Cache do
   @doc """
   Fetches all entries from cache matching the given `query`.
 
-  If the `query` is `nil`, it fetches all entries from cache; this is common
-  for all adapters. However, the `query` could be any other value, which
-  depends entirely on the adapter's implementation; see the "Query"
-  section below.
-
   May raise `Nebulex.QueryError` if query validation fails.
+
+  ## Query values
+
+  There are two types of query values. The ones shared and implemented
+  by all adapters and the ones that are adapter specific.
+
+  ### Shared queries
+
+    * `nil` - If `nil` is given as query value, all entries in cache will match
+      and return based on the `:return` option. Only the `nil` query is shared
+      for all the adapters.
+
+  ### Adapter-specific queries
+
+  The `query` value depends entirely on the adapter implementation; it could
+  any term. Therefore, it is highly recommended to see adapters' documentation
+  for more information about building queries. For example, the built-in
+  `Nebulex.Adapters.Local` adapter uses `:ets.match_spec()` for queries,
+  as well as other pre-defined ones like `:unexpired` and `:expired`.
 
   ## Options
 
     * `:return` - Tells the query what to return from the matched entries.
-      The possible values are: `:key`, `:value`, and `:entry` (`{key, value}`
-      pairs). Defaults to `:key`. This option is supported by the build-in
-      adapters, but it is recommended to check the adapter's documentation
+      See the possible values in the "Query return option" section below.
+      The default depends on the adapter, for example, the default for the
+      built-in adapters is `:key`. This option is supported by the build-in
+      adapters, but it is recommended to see the adapter's documentation
       to confirm its compatibility with this option.
 
   See the "Shared options" section at the module documentation for more options.
+
+  ## Query return option
+
+  The following are the possible values for the `:return` option:
+
+    * `:key` - Returns a list only with the keys.
+    * `:value` - Returns a list only with the values.
+    * `:entry` - Returns a list of `t:Nebulex.Entry.t/0`.
+    * `{:key, :value}` - Returns a list of tuples in the form `{key, value}`.
+
+  See adapters documentation to confirm what of these options are supported
+  and what other added.
 
   ## Example
 
@@ -973,6 +1020,11 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.all(nil, return: :value)
       [2, 4, 6, 8, 10]
+
+  Fetch all entries and return them as key/value pairs:
+
+      iex> MyCache.all(nil, return: {:key, :value})
+      [{1, 2}, {2, 4}, {3, 6}, {4, 8}, {5, 10}]
 
   Fetch all entries that match with the given query assuming we are using
   `Nebulex.Adapters.Local` adapter:
@@ -1015,6 +1067,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.all(spec)
       [{3, 6}, {4, 8}, {5, 10}]
+
   """
   @callback all(query :: term, opts) :: [any]
 
@@ -1024,18 +1077,52 @@ defmodule Nebulex.Cache do
 
   May raise `Nebulex.QueryError` if query validation fails.
 
+  ## Query values
+
+  There are two types of query values. The ones shared and implemented
+  by all adapters and the ones that are adapter specific.
+
+  ### Shared queries
+
+    * `nil` - If `nil` is given as query value, all entries in cache will match
+      and return based on the `:return` option. Only the `nil` query is shared
+      for all the adapters.
+
+  ### Adapter-specific queries
+
+  The `query` value depends entirely on the adapter implementation; it could
+  any term. Therefore, it is highly recommended to see adapters' documentation
+  for more information about building queries. For example, the built-in
+  `Nebulex.Adapters.Local` adapter uses `:ets.match_spec()` for queries,
+  as well as other pre-defined ones like `:unexpired` and `:expired`.
+
   ## Options
 
     * `:return` - Tells the query what to return from the matched entries.
-      The possible values are: `:key`, `:value`, and `:entry` (`{key, value}`
-      pairs). Defaults to `:key`. This option is supported by the build-in
-      adapters, but it is recommended to check the adapter's documentation
+      See the possible values in the "Query return option" section below.
+      The default depends on the adapter, for example, the default for the
+      built-in adapters is `:key`. This option is supported by the build-in
+      adapters, but it is recommended to see the adapter's documentation
       to confirm its compatibility with this option.
 
-    * `:page_size` - Positive integer (>= 1) that defines the page size for
-      the stream (defaults to `10`).
+    * `:page_size` - Positive integer (>= 1) that defines the page size
+      internally used by the adapter for paginating the results coming
+      back from the cache's backend. Defaults to `20`; it's unlikely
+      this will ever need changing.
 
   See the "Shared options" section at the module documentation for more options.
+
+  ## Query return option
+
+  The following are the possible values for the `:return` option:
+
+    * `:key` - Returns a list only with the keys.
+    * `:value` - Returns a list only with the values.
+    * `:entry` - Returns a list of `t:Nebulex.Entry.t/0`.
+    * `{:key, :value}` - Returns a list of tuples in the form `{key, value}`.
+
+  See adapters documentation to confirm what of these options are supported
+  and what other added.
 
   ## Examples
 
@@ -1050,8 +1137,13 @@ defmodule Nebulex.Cache do
 
   Stream all entries and return values:
 
-      iex> MyCache.stream(nil, return: :value, page_size: 3) |> Enum.to_list()
+      iex> nil |> MyCache.stream(return: :value, page_size: 3) |> Enum.to_list()
       [2, 4, 6, 8, 10]
+
+  Stream all entries and return them as key/value pairs:
+
+      iex> nil |> MyCache.stream(return: {:key, :value}) |> Enum.to_list()
+      [{1, 2}, {2, 4}, {3, 6}, {4, 8}, {5, 10}]
 
   Additional built-in queries for `Nebulex.Adapters.Local` adapter:
 
@@ -1063,7 +1155,7 @@ defmodule Nebulex.Cache do
   something like:
 
       iex> spec = [{{:entry, :"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [{{:"$1", :"$2"}}]}]
-      iex> MyCache.stream(spec, page_size: 3) |> Enum.to_list()
+      iex> MyCache.stream(spec, page_size: 100) |> Enum.to_list()
       [{3, 6}, {4, 8}, {5, 10}]
 
   The same previous query but using `Ex2ms`:
@@ -1076,8 +1168,9 @@ defmodule Nebulex.Cache do
       ...>     {_, key, value, _, _} when value > 5 -> {key, value}
       ...>   end
 
-      iex> spec |> MyCache.stream(page_size: 3) |> Enum.to_list()
+      iex> spec |> MyCache.stream(page_size: 100) |> Enum.to_list()
       [{3, 6}, {4, 8}, {5, 10}]
+
   """
   @callback stream(query :: term, opts) :: Enum.t()
 
@@ -1110,6 +1203,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.dump("my_cache")
       :ok
+
   """
   @callback dump(path :: Path.t(), opts) :: :ok | {:error, term}
 
@@ -1143,6 +1237,7 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.load("my_cache")
       :ok
+
   """
   @callback load(path :: Path.t(), opts) :: :ok | {:error, term}
 
@@ -1176,6 +1271,7 @@ defmodule Nebulex.Cache do
         MyCache.put(:alice, %{alice | balance: alice.balance + 100})
         MyCache.put(:bob, %{bob | balance: bob.balance + 100})
       end
+
   """
   @callback transaction(opts, function :: fun) :: term
 
@@ -1190,6 +1286,7 @@ defmodule Nebulex.Cache do
       MyCache.transaction(fn ->
         MyCache.in_transaction? #=> true
       end)
+
   """
   @callback in_transaction?() :: boolean
 end

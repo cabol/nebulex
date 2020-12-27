@@ -45,6 +45,7 @@ defmodule Nebulex.Adapter.Keyslot do
 
       iex> MyKeyslot.hash_slot("mykey", 10)
       2
+
   """
   @callback hash_slot(key :: any, range :: pos_integer) :: non_neg_integer
 end

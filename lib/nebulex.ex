@@ -56,6 +56,9 @@ defmodule Nebulex do
         Supervisor.start_link(children, opts)
       end
 
+  Otherwise, you can start and stop the cache directly at any time by calling
+  `MyApp.Cache.start_link/1` and `MyApp.Cache.stop/1`.
+
   ## Declarative annotation-based caching
 
   See [Nebulex.Caching](http://hexdocs.pm/nebulex/Nebulex.Caching.html).

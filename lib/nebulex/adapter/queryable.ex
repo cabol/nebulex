@@ -1,18 +1,21 @@
 defmodule Nebulex.Adapter.Queryable do
   @moduledoc """
   Specifies the query API required from adapters.
+
+  ## Query values
+
+  If `nil` is given as query value, all entries in cache will match and return
+  based on the `:return` option. Only the `nil` query is shared for all the
+  adapters. Other than `nil` query, the adapter is responsible to define the
+  query specification. For example, the built-in `Nebulex.Adapters.Local`
+  adapter defines `:ets.match_spec()`, `:unexpired` and `:expired` as query
+  values aside form `nil`.
   """
 
   @doc """
   Fetches all entries from cache matching the given `query`.
 
-  If the `query` is `nil`, it fetches all entries from cache; this is common
-  for all adapters. However, the `query` could be any other value, that
-  depends entirely on the adapter's implementation. Therefore, it is
-  recommended to check out adapters' documentation. For instance, the built-in
-  `Nebulex.Adapters.Local` adapter supports `:ets.match_spec()` as query.
-
-  May raise `Nebulex.QueryError` if query validation fails.
+  Raises `Nebulex.QueryError` if query is invalid.
 
   See `c:Nebulex.Cache.all/2`.
   """
@@ -21,9 +24,7 @@ defmodule Nebulex.Adapter.Queryable do
   @doc """
   Streams the given `query`.
 
-  It returns a stream of values.
-
-  May raise `Nebulex.QueryError` if query validation fails.
+  Raises `Nebulex.QueryError` if query is invalid.
 
   See `c:Nebulex.Cache.stream/2`.
   """

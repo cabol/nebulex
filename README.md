@@ -9,7 +9,7 @@
 [![Docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/nebulex)
 [![License](https://img.shields.io/hexpm/l/nebulex.svg)](LICENSE)
 
-**Nebulex** provides support for transparently adding caching into an existing
+Nebulex provides support for transparently adding caching into an existing
 Elixir application. Similar to [Ecto][ecto], the caching abstraction allows
 consistent use of various caching solutions with minimal impact on the code.
 Furthermore, it enables the implementation of different
@@ -20,6 +20,88 @@ and more.
 [ecto]: https://github.com/elixir-ecto/ecto
 [cache_patterns]: https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc
 [cache_topologies]: https://docs.oracle.com/middleware/1221/coherence/develop-applications/cache_intro.htm
+
+Nebulex is commonly used to interact with different cache implementations and/or
+stores (such as Redis, Memcached, or other implementations of cache in Elixir),
+being completely agnostic from them, avoiding the vendor lock-in.
+
+See the [getting started guide](http://hexdocs.pm/nebulex/getting-started.html)
+and the [online documentation](http://hexdocs.pm/nebulex/Nebulex.html)
+for more information.
+
+## Usage
+
+You need to add `nebulex` as a dependency to your `mix.exs` file. However, in
+the case you want to use an external (a non built-in adapter) cache adapter,
+you also have to add the proper dependency to your `mix.exs` file.
+
+The supported caches and their adapters are:
+
+Cache | Nebulex Adapter | Dependency
+:-----| :---------------| :---------
+Generational Local Cache (ETS + Shards) | [Nebulex.Adapters.Local][la] | Built-In
+Partitioned (layer on top of a local cache) | [Nebulex.Adapters.Partitioned][pa] | Built-In
+Replicated (layer on top of a local cache) | [Nebulex.Adapters.Replicated][ra] | Built-In
+Multilevel (layer on top of existing caches) | [Nebulex.Adapters.Multilevel][ma] | Built-In
+Cachex | Nebulex.Adapters.Cachex | [nebulex_adapters_cachex][nebulex_adapters_cachex]
+Redis | NebulexRedisAdapter | [nebulex_redis_adapter][nebulex_redis_adapter]
+
+[la]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Local.html
+[pa]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Partitioned.html
+[ra]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Replicated.html
+[ma]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Multilevel.html
+[nebulex_adapters_cachex]: https://github.com/cabol/nebulex_adapters_cachex
+[nebulex_redis_adapter]: https://github.com/cabol/nebulex_redis_adapter
+
+For example, if you want to use a built-in cache, add to your `mix.exs` file:
+
+```elixir
+def deps do
+  [
+    {:nebulex, "2.0.0-rc.1"},
+    {:shards, "~> 1.0"},     #=> When using :shards as backend
+    {:decorator, "~> 1.3"},  #=> When using Caching Annotations
+    {:telemetry, "~> 0.4"}   #=> When using the Telemetry events (Nebulex stats)
+  ]
+end
+```
+
+In order to give more flexibility and loading only needed dependencies, Nebulex
+makes all its dependencies as optional. For example:
+
+  * For intensive workloads, we may want to use `:shards` as the backend for the
+    local adapter and having partitioned tables. In such a case, you have to add
+    `:shards` to the dependency list.
+
+  * For enabling the usage of
+    [declarative annotation-based caching via decorators][nbx_caching],
+    you have to add `:decorator` to the dependency list.
+
+  * For enabling Telemetry events dispatched when using Nebulex stats you have
+    to add `:telemetry` to the dependency list.
+    See [telemetry guide][telemetry].
+
+  * Also, all the external adapters have to be added as a dependency as well.
+
+[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
+[telemetry]: http://hexdocs.pm/nebulex/telemetry.html
+
+Then run `mix deps.get` in your shell to fetch the dependencies. If you want to
+use another cache adapter, just choose the proper dependency from the table
+above.
+
+Finally, in the cache definition, you will need to specify the `adapter:`
+respective to the chosen dependency. For the local built-in cache it is:
+
+```elixir
+defmodule MyApp.Cache do
+  use Nebulex.Cache,
+    otp_app: :my_app,
+    adapter: Nebulex.Adapters.Local
+end
+```
+
+## Quickstart example
 
 Supposing we are using `Ecto` and we want to apply caching declaratively on
 some functions:
@@ -105,87 +187,7 @@ defmodule MyApp.Accounts do
 end
 ```
 
-Nebulex is commonly used to interact with different cache implementations and/or
-stores (such as Redis, Memcached, or other implementations of cache in Elixir),
-being completely agnostic from them, avoiding the vendor lock-in.
-
-See the [getting started guide](http://hexdocs.pm/nebulex/getting-started.html)
-and the [online documentation](http://hexdocs.pm/nebulex/Nebulex.html)
-for more information.
-
-## Usage
-
-You need to add `nebulex` as a dependency to your `mix.exs` file. However, in
-the case you want to use an external (a non built-in adapter) cache adapter,
-you also have to add the proper dependency to your `mix.exs` file.
-
-The supported caches and their adapters are:
-
-Cache | Nebulex Adapter | Dependency
-:-----| :---------------| :---------
-Generational Local Cache (ETS + Shards) | [Nebulex.Adapters.Local][la] | Built-In
-Partitioned (layer on top of a local cache) | [Nebulex.Adapters.Partitioned][pa] | Built-In
-Replicated (layer on top of a local cache) | [Nebulex.Adapters.Replicated][ra] | Built-In
-Multilevel (layer on top of existing caches) | [Nebulex.Adapters.Multilevel][ma] | Built-In
-Redis | NebulexRedisAdapter | [nebulex_redis_adapter][nebulex_redis_adapter]
-Memcached | NebulexMemcachedAdapter | [nebulex_memcached_adapter][nebulex_memcached_adapter]
-FoundationDB | NebulexFdbAdapter | [nebulex_fdb_adapter][nebulex_fdb_adapter]
-
-[la]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Local.html
-[pa]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Partitioned.html
-[ra]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Replicated.html
-[ma]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Multilevel.html
-[nebulex_redis_adapter]: https://github.com/cabol/nebulex_redis_adapter
-[nebulex_memcached_adapter]: https://github.com/vasuadari/nebulex_memcached_adapter
-[nebulex_fdb_adapter]: https://github.com/fire/nebulex_fdb_adapter
-
-For example, if you want to use a built-in cache, add to your `mix.exs` file:
-
-```elixir
-def deps do
-  [
-    {:nebulex, "2.0.0-rc.1"},
-    {:shards, "~> 1.0"},     #=> When using :shards as backend
-    {:decorator, "~> 1.3"},  #=> When using Caching Annotations
-    {:telemetry, "~> 0.4"}   #=> When using the Telemetry events (Nebulex stats)
-  ]
-end
-```
-
-In order to give more flexibility and loading only needed dependencies, Nebulex
-makes all its dependencies as optional. For example:
-
-  * For intensive workloads, we may want to use `:shards` as the backend for the
-    local adapter and having partitioned tables. In such a case, you have to add
-    `:shards` to the dependency list.
-
-  * For enabling the usage of
-    [declarative annotation-based caching via decorators][nbx_caching],
-    you have to add `:decorator` to the dependency list.
-
-  * For enabling Telemetry events dispatched when using Nebulex stats you have
-    to add `:telemetry` to the dependency list.
-    See [telemetry guide][telemetry].
-
-  * Also, all the external adapters have to be added as a dependency as well.
-
-[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
-[telemetry]: http://hexdocs.pm/nebulex/telemetry.html
-
-Then run `mix deps.get` in your shell to fetch the dependencies. If you want to
-use another cache adapter, just choose the proper dependency from the table
-above.
-
-Finally, in the cache definition, you will need to specify the `adapter:`
-respective to the chosen dependency. For the local built-in cache it is:
-
-```elixir
-defmodule MyApp.Cache do
-  use Nebulex.Cache,
-    otp_app: :my_app,
-    adapter: Nebulex.Adapters.Local
-end
-```
+See more [Nebulex examples](https://github.com/cabol/nebulex_examples).
 
 ## Important links
 

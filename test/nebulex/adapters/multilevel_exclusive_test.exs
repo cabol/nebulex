@@ -36,8 +36,8 @@ defmodule Nebulex.Adapters.MultilevelExclusiveTest do
     levels: @levels
   )
 
-  describe "exclusive" do
-    test "partitions for L1 with shards backend", %{name: name} do
+  describe "multilevel exclusive" do
+    test "returns partitions for L1 with shards backend", %{name: name} do
       assert :"#{name}_l1"
              |> Generation.newer()
              |> :shards.meta()

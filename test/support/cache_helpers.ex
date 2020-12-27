@@ -13,7 +13,7 @@ defmodule Nebulex.CacheHelpers do
   end
 
   @doc false
-  def with_dynamic_cache(name, cache, callback) do
+  def exec_with_dynamic_cache(name, cache, callback) do
     default_dynamic_cache = cache.get_dynamic_cache()
     _ = cache.put_dynamic_cache(name)
 

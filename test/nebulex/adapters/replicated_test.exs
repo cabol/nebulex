@@ -73,6 +73,14 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       assert_for_all_replicas(Replicated, :get, [:counter], 4)
     end
 
+    test "incr raises when the counter is not an integer" do
+      :ok = Replicated.put(:counter, "string")
+
+      assert_raise Nebulex.RPCMultiCallError, fn ->
+        Replicated.incr(:counter, 10)
+      end
+    end
+
     test "flush" do
       assert Replicated.put_all(a: 1, b: 2, c: 3) == :ok
 
@@ -119,7 +127,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   end
 
   describe "global lock" do
-    test "concurrency" do
+    test "set when flush action runs" do
       with_dynamic_cache(ReplicatedMock, [name: :replicated_global_mock], fn ->
         true = Process.register(self(), __MODULE__)
         _ = Process.flag(:trap_exit, true)
@@ -139,19 +147,10 @@ defmodule Nebulex.Adapters.ReplicatedTest do
             send(__MODULE__, :put)
           end)
 
-        task3 =
-          Task.async(fn ->
-            :ok = Process.sleep(500)
-            _ = ReplicatedMock.put_dynamic_cache(:replicated_global_mock)
-            _ = ReplicatedMock.put_new("foo", "bar")
-            send(__MODULE__, :put_new)
-          end)
-
         assert_receive :flush, 5000
         assert_receive :put, 5000
-        assert_receive :put_new, 5000
 
-        [_, _, _] = Task.yield_many([task1, task2, task3])
+        [_, _] = Task.yield_many([task1, task2])
       end)
     end
   end

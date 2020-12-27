@@ -64,7 +64,19 @@ defmodule Nebulex.Adapters.Replicated do
           backend: :shards
         ]
 
-  For more information about the usage, see `Nebulex.Cache` documentation.
+  If your application was generated with a supervisor (by passing `--sup`
+  to `mix new`) you will have a `lib/my_app/application.ex` file containing
+  the application start callback that defines and starts your supervisor.
+  You just need to edit the `start/2` function to start the cache as a
+  supervisor on your application's supervisor:
+
+      def start(_type, _args) do
+        children = [
+          {MyApp.ReplicatedCache, []},
+          ...
+        ]
+
+  See `Nebulex.Cache` for more information.
 
   ## Options
 
@@ -108,6 +120,7 @@ defmodule Nebulex.Adapters.Replicated do
 
       MyCache.nodes()
       MyCache.nodes(:cache_name)
+
   """
 
   # Provide Cache Implementation
@@ -466,7 +479,8 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
     # coveralls-ignore-start
     stream_fun = fn ->
       meta
-      |> Replicated.stream(:unexpired, return: :entry, page_size: 10)
+      |> Replicated.stream(nil, return: :entry, page_size: 100)
+      |> Stream.filter(&(not Entry.expired?(&1)))
       |> Stream.map(& &1)
       |> Enum.to_list()
     end

@@ -36,8 +36,8 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
     levels: @levels
   )
 
-  describe "inclusive" do
-    test "partitions for L1 with shards backend", %{name: name} do
+  describe "multilevel inclusive" do
+    test "returns partitions for L1 with shards backend", %{name: name} do
       assert :"#{name}_l1"
              |> Generation.newer()
              |> :shards.meta()

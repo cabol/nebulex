@@ -3,7 +3,7 @@ defmodule Nebulex.Cache.Queryable do
 
   alias Nebulex.Adapter
 
-  @default_page_size 10
+  @default_page_size 20
 
   @doc """
   Implementation for `c:Nebulex.Cache.all/2`.

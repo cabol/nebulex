@@ -13,6 +13,7 @@ defmodule Nebulex.Adapter do
 
     * `:cache` - The cache module.
     * `:pid` - The PID returned by the child spec returned in `c:init/1`
+
   """
   @type adapter_meta :: %{optional(atom) => term}
 

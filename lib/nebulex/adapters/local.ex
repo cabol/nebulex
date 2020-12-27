@@ -116,7 +116,19 @@ defmodule Nebulex.Adapters.Local do
         gc_cleanup_max_timeout: 600_000,
         partitions: System.schedulers_online() * 2
 
-  For more information about the usage, check out `Nebulex.Cache`.
+  If your application was generated with a supervisor (by passing `--sup`
+  to `mix new`) you will have a `lib/my_app/application.ex` file containing
+  the application start callback that defines and starts your supervisor.
+  You just need to edit the `start/2` function to start the cache as a
+  supervisor on your application's supervisor:
+
+      def start(_type, _args) do
+        children = [
+          {MyApp.LocalCache, []},
+          ...
+        ]
+
+  See `Nebulex.Cache` for more information.
 
   ## Eviction configuration
 
@@ -262,6 +274,7 @@ defmodule Nebulex.Adapters.Local do
 
       MyCache.newer_generation()
       MyCache.newer_generation(:my_cache)
+
   """
 
   # Provide Cache Implementation
@@ -575,7 +588,7 @@ defmodule Nebulex.Adapters.Local do
   def stream(adapter_meta, query, opts) do
     query
     |> validate_match_spec(opts)
-    |> do_stream(adapter_meta, Keyword.get(opts, :page_size, 10))
+    |> do_stream(adapter_meta, Keyword.get(opts, :page_size, 20))
   end
 
   defp do_stream(match_spec, %{meta_tab: meta_tab, backend: backend}, page_size) do
@@ -711,6 +724,7 @@ defmodule Nebulex.Adapters.Local do
     case Keyword.get(opts, :return, :key) do
       :key -> [:"$1"]
       :value -> [:"$2"]
+      {:key, :value} -> [{{:"$1", :"$2"}}]
       :entry -> [%Entry{key: :"$1", value: :"$2", touched: :"$3", ttl: :"$4"}]
     end
   end

@@ -105,6 +105,14 @@ defmodule Nebulex.Adapters.PartitionedTest do
         Partitioned.get_and_update(1, &Partitioned.get_and_update_bad_fun/1)
       end
     end
+
+    test "incr raises when the counter is not an integer" do
+      :ok = Partitioned.put(:counter, "string")
+
+      assert_raise ArgumentError, fn ->
+        Partitioned.incr(:counter, 10)
+      end
+    end
   end
 
   describe "cluster" do

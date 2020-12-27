@@ -56,7 +56,19 @@ defmodule Nebulex.Adapters.Multilevel do
           }
         ]
 
-  For more information about the usage, see `Nebulex.Cache` documentation.
+  If your application was generated with a supervisor (by passing `--sup`
+  to `mix new`) you will have a `lib/my_app/application.ex` file containing
+  the application start callback that defines and starts your supervisor.
+  You just need to edit the `start/2` function to start the cache as a
+  supervisor on your application's supervisor:
+
+      def start(_type, _args) do
+        children = [
+          {MyApp.Multilevel, []},
+          ...
+        ]
+
+  See `Nebulex.Cache` for more information.
 
   ## Options
 

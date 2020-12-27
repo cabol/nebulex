@@ -109,6 +109,7 @@ if Code.ensure_loaded?(Decorator.Define) do
         10:19:47.736 [info] Elixir.MyApp.Cache.put/3, Duration: 27
         iex> MyApp.Cache.get 1
         10:20:14.941 [info] Elixir.MyApp.Cache.get/2, Duration: 11
+
     """
 
     use Decorator.Define, before: 1, after_return: 1, around: 1
@@ -145,6 +146,7 @@ if Code.ensure_loaded?(Decorator.Define) do
             # logic ...
           end
         end
+
     """
     @spec before(hook_fun, term, map) :: term
     def before(fun, block, context) do
@@ -168,6 +170,7 @@ if Code.ensure_loaded?(Decorator.Define) do
             # logic ...
           end
         end
+
     """
     @spec after_return(hook_fun, term, map) :: term
     def after_return(fun, block, context) do
@@ -210,6 +213,7 @@ if Code.ensure_loaded?(Decorator.Define) do
             # logic ...
           end
         end
+
     """
     @spec around(hook_fun, term, map) :: term
     def around(fun, block, context) do

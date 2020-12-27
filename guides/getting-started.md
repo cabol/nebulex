@@ -385,12 +385,12 @@ In the same way, we can stream all entries:
 
 ```elixir
 iex> Blog.Cache.stream()
-iex> Blog.Cache.stream(nil, page_size: 3, return: :value)
-iex> Blog.Cache.stream(nil, page_size: 3, return: :entry)
+iex> Blog.Cache.stream(nil, page_size: 100, return: :value)
+iex> Blog.Cache.stream(nil, page_size: 100, return: :entry)
 
 # using `Nebulex.Adapters.Local` adapter
 iex> spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
-iex> Blog.Cache.stream(spec, page_size: 3)
+iex> Blog.Cache.stream(spec)
 _all_matched
 
 # using Ex2ms
@@ -399,7 +399,7 @@ iex> spec =
 ...>   fun do
 ...>     {key, value, _, _} when value > 10 -> {key, value}
 ...>   end
-iex> Blog.Cache.stream(spec, page_size: 3)
+iex> Blog.Cache.stream(spec)
 _all_matched
 ```
 

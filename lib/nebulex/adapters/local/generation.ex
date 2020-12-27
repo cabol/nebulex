@@ -42,6 +42,7 @@ defmodule Nebulex.Adapters.Local.Generation do
       the next cleanup and memory check. This is the timeout used when the cache
       starts and there are few entries or the consumed memory is near to `0`.
       Defaults to `600_000` (10 minutes).
+
   """
 
   # State

@@ -46,6 +46,7 @@ defmodule Nebulex.Adapter.Transaction do
         MyCache.set(:alice, %{alice | balance: alice.balance + 100})
         MyCache.set(:bob, %{bob | balance: bob.balance + 100})
       end
+
   """
 
   @doc false

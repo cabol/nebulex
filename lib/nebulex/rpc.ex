@@ -42,6 +42,7 @@ defmodule Nebulex.RPC do
 
       iex> Nebulex.RPC.call(:my_task_sup, :node1, Kernel, :to_string, [1])
       "1"
+
   """
   @spec call(task_sup, node, module, atom, [term], timeout) :: term | {:badrpc, term}
   def call(supervisor, node, mod, fun, args, timeout \\ 5000) do
@@ -85,6 +86,7 @@ defmodule Nebulex.RPC do
       ...>   }
       ...> )
       ["1", "2"]
+
   """
   @spec multi_call(task_sup, node_group, Keyword.t()) :: term
   def multi_call(supervisor, node_group, opts \\ []) do
@@ -121,6 +123,7 @@ defmodule Nebulex.RPC do
       ...>   }
       ...> )
       ["1", "1"]
+
   """
   @spec multi_call(task_sup, [node], module, atom, [term], Keyword.t()) :: term
   def multi_call(supervisor, nodes, mod, fun, args, opts \\ []) do
@@ -137,7 +140,14 @@ defmodule Nebulex.RPC do
     defp rpc_call(_supervisor, node, mod, fun, args, timeout) do
       :erpc.call(node, mod, fun, args, timeout)
     rescue
-      e in ErlangError -> reraise elem(e.original, 1), __STACKTRACE__
+      e in ErlangError ->
+        case e.original do
+          {:exception, original, _} when is_struct(original) ->
+            reraise original, __STACKTRACE__
+
+          {:exception, original, _} ->
+            :erlang.raise(:error, original, __STACKTRACE__)
+        end
     end
 
     def rpc_multi_call(_supervisor, node_group, opts) do

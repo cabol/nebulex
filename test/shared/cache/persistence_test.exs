@@ -3,7 +3,8 @@ defmodule Nebulex.Cache.PersistenceTest do
 
   deftests "persistence" do
     test "dump and load", %{cache: cache} do
-      path = "tmp_#{cache}"
+      tmp = System.tmp_dir!()
+      path = "#{tmp}/#{cache}"
 
       try do
         assert cache.size() == 0
@@ -21,12 +22,12 @@ defmodule Nebulex.Cache.PersistenceTest do
         assert cache.size() == count + 4
 
         :ok = Process.sleep(1000)
+
         assert cache.dump(path) == :ok
         assert File.exists?(path)
         assert cache.flush() == count + 4
         assert cache.size() == 0
 
-        assert cache.load("wrong_file") == {:error, :enoent}
         assert cache.load(path) == :ok
         assert cache.get_all(1..count) == unexpired
         assert cache.get_all([:a, :b, :c, :d]) == %{c: 1, d: 2}

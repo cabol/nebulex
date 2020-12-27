@@ -5,8 +5,19 @@ defmodule Nebulex.Entry do
   This is the structure used by the caches for representing cache entries.
   """
 
-  defstruct [:key, :value, :touched, ttl: :infinity, time_unit: :millisecond]
+  # Cache entry definition
+  defstruct key: nil,
+            value: nil,
+            touched: nil,
+            ttl: :infinity,
+            time_unit: :millisecond
 
+  @typedoc """
+  Defines a generic struct for a cache entry.
+
+  The entry depends on the adapter completely, this struct/type aims to define
+  the common fields.
+  """
   @type t :: %__MODULE__{
           key: any,
           value: any,

@@ -2,6 +2,19 @@ defmodule Nebulex.CacheCase do
   @moduledoc false
 
   @doc false
+  defmacro deftests(do: block) do
+    quote do
+      defmacro __using__(opts) do
+        block = unquote(Macro.escape(block))
+
+        quote do
+          unquote(block)
+        end
+      end
+    end
+  end
+
+  @doc false
   defmacro deftests(text, do: block) do
     quote do
       defmacro __using__(opts) do

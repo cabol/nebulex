@@ -36,7 +36,7 @@ defmodule Nebulex.Adapter.Persistence do
       def dump(%{cache: cache}, path, opts) do
         path
         |> File.open([:read, :write], fn io_dev ->
-          :unexpired
+          nil
           |> cache.stream(return: :entry)
           |> Stream.filter(&(not Entry.expired?(&1)))
           |> Stream.map(&{&1.key, &1.value})
