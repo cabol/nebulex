@@ -2,6 +2,31 @@ defmodule Nebulex.Cache.EntryTest do
   import Nebulex.CacheCase
 
   deftests "cache" do
+    use ExUnitProperties
+
+    property "any term", %{cache: cache} do
+      check all term <- term() do
+        refute cache.get(term)
+
+        refute cache.replace(term, term)
+        assert cache.put(term, term) == :ok
+        refute cache.put_new(term, term)
+        assert cache.get(term) == term
+
+        assert cache.replace(term, "replaced")
+        assert cache.get(term) == "replaced"
+
+        assert cache.take(term) == "replaced"
+        refute cache.take(term)
+
+        assert cache.put_new(term, term)
+        assert cache.get(term) == term
+
+        assert cache.delete(term) == :ok
+        refute cache.get(term)
+      end
+    end
+
     test "delete", %{cache: cache} do
       for x <- 1..3, do: cache.put(x, x * 2)
 
@@ -43,12 +68,12 @@ defmodule Nebulex.Cache.EntryTest do
     end
 
     test "put", %{cache: cache} do
-      for x <- 1..4, do: assert(:ok == cache.put(x, x))
+      for x <- 1..4, do: assert(cache.put(x, x) == :ok)
 
       assert cache.get(1) == 1
       assert cache.get(2) == 2
 
-      for x <- 3..4, do: assert(:ok = cache.put(x, x * x))
+      for x <- 3..4, do: assert(cache.put(x, x * x) == :ok)
       assert cache.get(3) == 9
       assert cache.get(4) == 16
 
@@ -98,16 +123,6 @@ defmodule Nebulex.Cache.EntryTest do
       assert cache.put("foo", "bar") == :ok
       assert cache.replace!("foo", "bar bar")
       assert cache.get("foo") == "bar bar"
-    end
-
-    test "put key terms", %{cache: cache} do
-      refute cache.get({:mykey, 1, "hello"})
-      assert cache.put({:mykey, 1, "hello"}, "world") == :ok
-      assert cache.get({:mykey, 1, "hello"}) == "world"
-
-      refute cache.get(%{a: 1, b: 2})
-      assert cache.put(%{a: 1, b: 2}, "value") == :ok
-      assert cache.get(%{a: 1, b: 2}) == "value"
     end
 
     test "put with invalid options", %{cache: cache} do

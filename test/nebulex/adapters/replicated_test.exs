@@ -31,7 +31,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   end
 
   describe "replicated cache" do
-    test "set" do
+    test "put" do
       assert Replicated.put(1, 1) == :ok
       assert Replicated.get(1) == 1
 
@@ -86,7 +86,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   end
 
   describe "cluster" do
-    test "rpc errors" do
+    test "rpc error" do
       with_dynamic_cache(ReplicatedMock, [name: :replicated_mock], fn ->
         _ = Process.flag(:trap_exit, true)
 
@@ -135,14 +135,23 @@ defmodule Nebulex.Adapters.ReplicatedTest do
           Task.async(fn ->
             :ok = Process.sleep(500)
             _ = ReplicatedMock.put_dynamic_cache(:replicated_global_mock)
-            assert :ok == ReplicatedMock.put("foo", "bar")
+            :ok = ReplicatedMock.put("foo", "bar")
             send(__MODULE__, :put)
+          end)
+
+        task3 =
+          Task.async(fn ->
+            :ok = Process.sleep(500)
+            _ = ReplicatedMock.put_dynamic_cache(:replicated_global_mock)
+            _ = ReplicatedMock.put_new("foo", "bar")
+            send(__MODULE__, :put_new)
           end)
 
         assert_receive :flush, 5000
         assert_receive :put, 5000
+        assert_receive :put_new, 5000
 
-        [_, _] = Task.yield_many([task1, task2])
+        [_, _, _] = Task.yield_many([task1, task2, task3])
       end)
     end
   end

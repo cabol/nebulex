@@ -7,6 +7,7 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
 
   import Nebulex.CacheCase
 
+  alias Nebulex.Adapters.Local.Generation
   alias Nebulex.Cache.Cluster
   alias Nebulex.TestCache.Multilevel
   alias Nebulex.TestCache.Multilevel.{L1, L2, L3}
@@ -36,6 +37,13 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
   )
 
   describe "inclusive" do
+    test "partitions for L1 with shards backend", %{name: name} do
+      assert :"#{name}_l1"
+             |> Generation.newer()
+             |> :shards.meta()
+             |> :shards_meta.partitions() == 2
+    end
+
     test "get" do
       :ok = Process.sleep(2000)
       :ok = Multilevel.put(1, 1, level: 1)
@@ -90,7 +98,7 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
     end
   end
 
-  describe "disstributed levels" do
+  describe "distributed levels" do
     test "return cluster nodes" do
       assert Cluster.get_nodes(:multilevel_inclusive_l2) == [node()]
       assert Cluster.get_nodes(:multilevel_inclusive_l3) == [node()]

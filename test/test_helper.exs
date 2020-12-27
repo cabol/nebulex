@@ -11,14 +11,10 @@ for file <- File.ls!("test/shared"), not File.dir?("test/shared/" <> file) do
   Code.require_file("./shared/" <> file, __DIR__)
 end
 
-# Spawn remote nodes and load support files on them if clustered is present
+# Spawn remote nodes
 unless :clustered in Keyword.get(ExUnit.configuration(), :exclude, []) do
   Nebulex.Cluster.spawn(nodes)
 end
-
-# For tasks/generators testing
-Mix.start()
-Mix.shell(Mix.Shell.Process)
 
 # Start ExUnit
 ExUnit.start()

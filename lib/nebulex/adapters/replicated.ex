@@ -226,13 +226,13 @@ defmodule Nebulex.Adapters.Replicated do
   end
 
   @impl true
-  def get(meta, key, opts) do
-    with_dynamic_cache(meta, :get, [key, opts])
+  def get(adapter_meta, key, opts) do
+    with_dynamic_cache(adapter_meta, :get, [key, opts])
   end
 
   @impl true
-  def get_all(meta, keys, opts) do
-    with_dynamic_cache(meta, :get_all, [keys, opts])
+  def get_all(adapter_meta, keys, opts) do
+    with_dynamic_cache(adapter_meta, :get_all, [keys, opts])
   end
 
   @impl true
@@ -272,13 +272,13 @@ defmodule Nebulex.Adapters.Replicated do
   end
 
   @impl true
-  def has_key?(meta, key) do
-    with_dynamic_cache(meta, :has_key?, [key])
+  def has_key?(adapter_meta, key) do
+    with_dynamic_cache(adapter_meta, :has_key?, [key])
   end
 
   @impl true
-  def ttl(meta, key) do
-    with_dynamic_cache(meta, :ttl, [key])
+  def ttl(adapter_meta, key) do
+    with_dynamic_cache(adapter_meta, :ttl, [key])
   end
 
   @impl true
@@ -292,28 +292,34 @@ defmodule Nebulex.Adapters.Replicated do
   end
 
   @impl true
-  def size(meta) do
-    with_dynamic_cache(meta, :size, [])
+  def size(adapter_meta) do
+    with_dynamic_cache(adapter_meta, :size, [])
   end
 
   @impl true
-  def flush(cache) do
-    # This operation locks all later write-like operations, but not the ones
-    # taking place at the moment the flush is performed, this may yield to
-    # inconsistency issues. Come up with a better solution.
-    with_transaction(cache, :flush)
+  def flush(%{name: name} = adapter_meta) do
+    # This call gets blocked if there are any write operation ongoing.
+    # Once it is executed, all later write-like operations are blocked
+    # until it finishes.
+    :global.trans(
+      {name, self()},
+      fn ->
+        multi_call(adapter_meta, :flush, [], [])
+      end,
+      Cluster.get_nodes(name)
+    )
   end
 
   ## Queryable
 
   @impl true
-  def all(meta, query, opts) do
-    with_dynamic_cache(meta, :all, [query, opts])
+  def all(adapter_meta, query, opts) do
+    with_dynamic_cache(adapter_meta, :all, [query, opts])
   end
 
   @impl true
-  def stream(meta, query, opts) do
-    with_dynamic_cache(meta, :stream, [query, opts])
+  def stream(adapter_meta, query, opts) do
+    with_dynamic_cache(adapter_meta, :stream, [query, opts])
   end
 
   ## Transaction
@@ -344,30 +350,29 @@ defmodule Nebulex.Adapters.Replicated do
   defp with_transaction(
          %{pid: pid, name: name} = adapter_meta,
          action,
-         keys \\ [:"$global_lock"],
-         args \\ [],
+         keys,
+         args,
          opts \\ []
        ) do
-    # Encapsulation is being broken here since we are accessing to the internal
-    # table `:global_locks` managed by `:global`, but thus far, it was the
-    # simplest and fastest way to block all write-like operations when the
-    # `flush` action is performed or a new node is joined and the entries are
-    # being imported to it from another node. Perhaps find a better way for
-    # addressing these scenarios.
-    case :ets.lookup(:global_locks, {pid, :"$global_lock"}) do
-      [_] ->
-        :ok = Process.sleep(1)
-        with_transaction(adapter_meta, action, keys, args, opts)
+    nodes = Cluster.get_nodes(name)
 
-      [] ->
+    # Ensure it waits until ongoing flush or import operations finish,
+    # if there's any.
+    :global.trans(
+      {name, pid},
+      fn ->
+        # Write-like operation must be wrapped within a transaction
+        # to ensure proper replication
         transaction(
           adapter_meta,
-          [keys: keys, nodes: Cluster.get_nodes(name)],
+          [keys: keys, nodes: nodes],
           fn ->
             multi_call(adapter_meta, action, args, opts)
           end
         )
-    end
+      end,
+      nodes
+    )
   end
 
   defp multi_call(
@@ -441,17 +446,17 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
         :ok
 
       nodes ->
-        Replicated.transaction(
-          meta,
-          [
-            keys: [:"$global_lock"],
-            nodes: cluster_nodes
-          ],
+        # This call gets blocked if there are any write operation ongoing.
+        # Once it is executed, all later write-like operations are blocked
+        # until it finishes.
+        :global.trans(
+          {name, self()},
           fn ->
             nodes
             |> Enum.reduce_while([], &stream_entries(meta, &1, &2))
             |> Enum.each(&cache.__primary__.put(&1.key, &1.value, ttl: Entry.ttl(&1)))
-          end
+          end,
+          cluster_nodes
         )
     end
   end

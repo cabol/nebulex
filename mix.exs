@@ -61,6 +61,7 @@ defmodule Nebulex.MixProject do
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.10", only: [:dev, :test], runtime: false},
+      {:stream_data, "~> 0.5", only: [:dev, :test]},
 
       # Benchmark Test
       {:benchee, "~> 1.0", only: :test},

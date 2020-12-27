@@ -402,25 +402,25 @@ defmodule Nebulex.Adapters.Partitioned do
   end
 
   @impl true
-  def size(%{name: name, task_sup: task_sup} = meta) do
+  def size(%{name: name, task_sup: task_sup} = adapter_meta) do
     task_sup
     |> RPC.multi_call(
       Cluster.get_nodes(name),
       __MODULE__,
       :with_dynamic_cache,
-      [meta, :size, []]
+      [adapter_meta, :size, []]
     )
     |> handle_rpc_multi_call(:size, &Enum.sum/1)
   end
 
   @impl true
-  def flush(%{name: name, task_sup: task_sup} = meta) do
+  def flush(%{name: name, task_sup: task_sup} = adapter_meta) do
     task_sup
     |> RPC.multi_call(
       Cluster.get_nodes(name),
       __MODULE__,
       :with_dynamic_cache,
-      [meta, :flush, []]
+      [adapter_meta, :flush, []]
     )
     |> elem(0)
     |> Enum.sum()
@@ -429,20 +429,20 @@ defmodule Nebulex.Adapters.Partitioned do
   ## Queryable
 
   @impl true
-  def all(%{name: name, task_sup: task_sup} = meta, query, opts) do
+  def all(%{name: name, task_sup: task_sup} = adapter_meta, query, opts) do
     task_sup
     |> RPC.multi_call(
       Cluster.get_nodes(name),
       __MODULE__,
       :with_dynamic_cache,
-      [meta, :all, [query, opts]],
+      [adapter_meta, :all, [query, opts]],
       opts
     )
     |> handle_rpc_multi_call(:all, &List.flatten/1)
   end
 
   @impl true
-  def stream(%{name: name, task_sup: task_sup} = meta, query, opts) do
+  def stream(%{name: name, task_sup: task_sup} = adapter_meta, query, opts) do
     Stream.resource(
       fn ->
         Cluster.get_nodes(name)
@@ -458,7 +458,7 @@ defmodule Nebulex.Adapters.Partitioned do
               node,
               __MODULE__,
               :eval_stream,
-              [meta, query, opts],
+              [adapter_meta, query, opts],
               opts
             )
 

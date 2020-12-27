@@ -2,15 +2,6 @@ defmodule Nebulex.MultilevelTest do
   import Nebulex.CacheCase
 
   deftests "multilevel" do
-    alias Nebulex.Adapters.Local.Generation
-
-    test "partitions for L1 with shards backend", %{name: name} do
-      assert :"#{name}_l1"
-             |> Generation.newer()
-             |> :shards.meta()
-             |> :shards_meta.partitions() == 2
-    end
-
     test "fails on c:init/1 because missing levels config", %{cache: cache} do
       assert {:error, {%RuntimeError{message: msg}, _}} = cache.start_link(name: :missing_levels)
 

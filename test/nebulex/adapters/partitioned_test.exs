@@ -107,8 +107,8 @@ defmodule Nebulex.Adapters.PartitionedTest do
     end
   end
 
-  describe "custer" do
-    test "check cluster nodes", %{cluster: cluster} do
+  describe "cluster" do
+    test "established", %{cluster: cluster} do
       assert node() == @primary
       assert :lists.usort(Node.list()) == cluster -- [node()]
       assert Partitioned.nodes() == cluster
@@ -117,7 +117,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
       assert Partitioned.nodes() == cluster -- [node()]
     end
 
-    test "teardown cache", %{cluster: cluster} do
+    test "teardown cache node", %{cluster: cluster} do
       assert Partitioned.put(4, 4) == :ok
       assert Partitioned.get(4) == 4
 

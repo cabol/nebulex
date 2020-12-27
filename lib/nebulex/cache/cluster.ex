@@ -3,6 +3,8 @@ defmodule Nebulex.Cache.Cluster do
   # distributed caching functionality.
   @moduledoc false
 
+  @compile {:inline, get_nodes: 1, get_node: 3}
+
   @doc """
   Joins the node where the cache `name`'s supervisor process is running to the
   `name`'s node group.

@@ -7,6 +7,7 @@ defmodule Nebulex.Adapters.MultilevelExclusiveTest do
 
   import Nebulex.CacheCase
 
+  alias Nebulex.Adapters.Local.Generation
   alias Nebulex.Cache.Cluster
   alias Nebulex.TestCache.Multilevel
   alias Nebulex.TestCache.Multilevel.{L1, L2, L3}
@@ -36,6 +37,13 @@ defmodule Nebulex.Adapters.MultilevelExclusiveTest do
   )
 
   describe "exclusive" do
+    test "partitions for L1 with shards backend", %{name: name} do
+      assert :"#{name}_l1"
+             |> Generation.newer()
+             |> :shards.meta()
+             |> :shards_meta.partitions() == 2
+    end
+
     test "get" do
       :ok = Multilevel.put(1, 1, level: 1)
       :ok = Multilevel.put(2, 2, level: 2)
