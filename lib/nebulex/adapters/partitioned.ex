@@ -161,6 +161,8 @@ defmodule Nebulex.Adapters.Partitioned do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Entry
+  @behaviour Nebulex.Adapter.Storage
   @behaviour Nebulex.Adapter.Queryable
 
   # Inherit default transaction implementation

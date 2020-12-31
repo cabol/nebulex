@@ -214,6 +214,7 @@ defmodule Nebulex.Cache.Stats do
         misses: 0,
         writes: 0
       }
+
   """
   @spec info(:counters.counters_ref() | atom | nil) :: t | nil
   def info(nil), do: nil
@@ -274,6 +275,7 @@ defmodule Nebulex.Cache.Stats do
         ...>   metadata: %{tag: "tag1"}
         ...> )
         :ok
+
     """
     @spec dispatch(atom, Keyword.t()) :: :ok
     def dispatch(cache_or_name, opts \\ []) do

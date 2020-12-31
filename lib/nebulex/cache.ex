@@ -78,8 +78,16 @@ defmodule Nebulex.Cache do
     quote bind_quoted: [opts: opts] do
       @behaviour Nebulex.Cache
 
+      alias Nebulex.Cache.{
+        Entry,
+        Persistence,
+        Queryable,
+        Stats,
+        Storage,
+        Transaction
+      }
+
       alias Nebulex.Hook
-      alias Nebulex.Cache.{Entry, Persistence, Queryable, Stats, Transaction}
 
       {otp_app, adapter, behaviours} = Nebulex.Cache.Supervisor.compile_config(opts)
 
@@ -145,7 +153,7 @@ defmodule Nebulex.Cache do
         end
       end
 
-      ## Entries
+      ## Entry
 
       @impl true
       def get(key, opts \\ []) do
@@ -247,14 +255,16 @@ defmodule Nebulex.Cache do
         Entry.touch(get_dynamic_cache(), key)
       end
 
+      ## Storage
+
       @impl true
       def size do
-        Entry.size(get_dynamic_cache())
+        Storage.size(get_dynamic_cache())
       end
 
       @impl true
       def flush do
-        Entry.flush(get_dynamic_cache())
+        Storage.flush(get_dynamic_cache())
       end
 
       ## Queryable
@@ -404,6 +414,8 @@ defmodule Nebulex.Cache do
   See `c:get_dynamic_cache/0` and `c:put_dynamic_cache/1`.
   """
   @callback with_dynamic_cache(atom() | pid(), fun) :: term
+
+  ## Nebulex.Adapter.Entry
 
   @doc """
   Gets a value from Cache where the key matches the given `key`.
@@ -923,6 +935,8 @@ defmodule Nebulex.Cache do
 
   """
   @callback touch(key) :: boolean
+
+  ## Nebulex.Adapter.Storage
 
   @doc """
   Returns the total number of cached entries.
