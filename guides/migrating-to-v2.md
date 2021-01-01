@@ -78,10 +78,11 @@ functionality was refactored entirely.
 
   1. This feature is not longer using pre/post hooks. Besides, pre/post hooks
      are deprecated in v2.x.
-  2. The stats support is something each adapter is responsible for. However,
-     Nebulex built-in adapters support the stats suggested and defined by
-     `Nebulex.Cache.Stats`.
-  3. Default stats via `Nebulex.Cache.Stats` are implemented by means of
+  2. The stats support is optional by implementing the `Nebulex.Adapter.Stats`
+     behaviour from the adapter. However, Nebulex provides a default
+     implementation which is supported by the built-in adapters (with all
+     callbacks overridable).
+  3. Default stats via `Nebulex.Adapter.Stats` are implemented by means of
      Erlang `:counters`.
-  4. See `Nebulex.Cache.Stats` for more information about how to use stats in
-     Nebulex v2.x.
+  4. See `Nebulex.Adapter.Stats` for more information about how to implement
+     stats from the adapters in Nebulex v2.x.

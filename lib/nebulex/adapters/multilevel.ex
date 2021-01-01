@@ -127,10 +127,14 @@ defmodule Nebulex.Adapters.Multilevel do
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
 
+  # Inherit default stats implementation
+  use Nebulex.Adapter.Stats
+
   import Nebulex.Helpers
 
   alias Nebulex.Adapter
-  alias Nebulex.Cache.{Cluster, Stats}
+  alias Nebulex.Adapter.Stats
+  alias Nebulex.Cache.Cluster
 
   # Multi-level Cache Models
   @models [:inclusive, :exclusive]
@@ -158,7 +162,7 @@ defmodule Nebulex.Adapters.Multilevel do
     name = opts[:name] || cache
 
     # maybe use stats
-    stat_counter = Stats.init(opts)
+    stats_counter = Stats.init(opts)
 
     # get cache levels
     levels =
@@ -177,7 +181,7 @@ defmodule Nebulex.Adapters.Multilevel do
       |> Enum.reverse()
       |> Enum.reduce({[], []}, fn {l_cache, l_opts}, {child_acc, meta_acc} ->
         meta = %{cache: l_cache, name: l_opts[:name]}
-        l_opts = [stat_counter: stat_counter] ++ l_opts
+        l_opts = [stats_counter: stats_counter] ++ l_opts
         {[{l_cache, l_opts} | child_acc], [meta | meta_acc]}
       end)
 
@@ -192,7 +196,7 @@ defmodule Nebulex.Adapters.Multilevel do
       name: name,
       levels: meta_list,
       model: model,
-      stat_counter: stat_counter
+      stats_counter: stats_counter
     }
 
     {:ok, child_spec, meta}

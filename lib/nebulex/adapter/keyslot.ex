@@ -25,18 +25,6 @@ defmodule Nebulex.Adapter.Keyslot do
   This example uses [Jumping Consistent Hash](https://github.com/cabol/jchash).
   """
 
-  @doc false
-  defmacro __using__(_opts) do
-    quote do
-      @behaviour Nebulex.Adapter.Keyslot
-
-      @impl true
-      defdelegate hash_slot(key, range), to: :erlang, as: :phash2
-
-      defoverridable hash_slot: 2
-    end
-  end
-
   @doc """
   Returns an integer within the range `0..range-1` identifying the hash slot
   the specified `key` hashes to.
@@ -48,4 +36,16 @@ defmodule Nebulex.Adapter.Keyslot do
 
   """
   @callback hash_slot(key :: any, range :: pos_integer) :: non_neg_integer
+
+  @doc false
+  defmacro __using__(_opts) do
+    quote do
+      @behaviour Nebulex.Adapter.Keyslot
+
+      @impl true
+      defdelegate hash_slot(key, range), to: :erlang, as: :phash2
+
+      defoverridable hash_slot: 2
+    end
+  end
 end
