@@ -312,7 +312,7 @@ defmodule Nebulex.Adapters.Local do
 
   @compile {:inline, list_gen: 1, newer_gen: 1}
 
-  ## Adapter
+  ## Nebulex.Adapter
 
   @impl true
   defmacro __before_compile__(_env) do
@@ -366,6 +366,8 @@ defmodule Nebulex.Adapters.Local do
 
     {:ok, child, meta}
   end
+
+  ## Nebulex.Adapter.Entry
 
   @impl true
   def get(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, _opts) do
@@ -560,6 +562,8 @@ defmodule Nebulex.Adapters.Local do
     |> update_stats(:put, ref)
   end
 
+  ## Nebulex.Adapter.Storage
+
   @impl true
   def size(%{meta_tab: meta_tab, backend: backend}) do
     meta_tab
@@ -578,7 +582,7 @@ defmodule Nebulex.Adapters.Local do
     |> update_stats(:flush, ref)
   end
 
-  ## Queryable
+  ## Nebulex.Adapter.Queryable
 
   @impl true
   def all(%{meta_tab: meta_tab, backend: backend}, query, opts) do

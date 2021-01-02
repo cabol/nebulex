@@ -139,7 +139,7 @@ defmodule Nebulex.Adapters.Multilevel do
   # Multi-level Cache Models
   @models [:inclusive, :exclusive]
 
-  ## Adapter
+  ## Nebulex.Adapter
 
   @impl true
   defmacro __before_compile__(_env) do
@@ -201,6 +201,8 @@ defmodule Nebulex.Adapters.Multilevel do
 
     {:ok, child_spec, meta}
   end
+
+  ## Nebulex.Adapter.Entry
 
   @impl true
   def get(%{levels: levels, model: model}, key, opts) do
@@ -316,6 +318,8 @@ defmodule Nebulex.Adapters.Multilevel do
     end)
   end
 
+  ## Nebulex.Adapter.Storage
+
   @impl true
   def size(%{levels: levels}) do
     Enum.reduce(levels, 0, fn l_meta, acc ->
@@ -330,7 +334,7 @@ defmodule Nebulex.Adapters.Multilevel do
     end)
   end
 
-  ## Queryable
+  ## Nebulex.Adapter.Queryable
 
   @impl true
   def all(%{levels: levels}, query, opts) do
@@ -361,7 +365,7 @@ defmodule Nebulex.Adapters.Multilevel do
     )
   end
 
-  ## Transaction
+  ## Nebulex.Adapter.Transaction
 
   @impl true
   def transaction(%{levels: levels} = adapter_meta, opts, fun) do

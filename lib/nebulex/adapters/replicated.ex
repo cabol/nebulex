@@ -144,7 +144,7 @@ defmodule Nebulex.Adapters.Replicated do
   alias Nebulex.Cache.Cluster
   alias Nebulex.RPC
 
-  ## Adapter
+  ## Nebulex.Adapter
 
   @impl true
   defmacro __before_compile__(env) do
@@ -244,6 +244,8 @@ defmodule Nebulex.Adapters.Replicated do
     end
   end
 
+  ## Nebulex.Adapter.Entry
+
   @impl true
   def get(adapter_meta, key, opts) do
     with_dynamic_cache(adapter_meta, :get, [key, opts])
@@ -310,6 +312,8 @@ defmodule Nebulex.Adapters.Replicated do
     with_transaction(adapter_meta, :touch, [key], [key])
   end
 
+  ## Nebulex.Adapter.Storage
+
   @impl true
   def size(adapter_meta) do
     with_dynamic_cache(adapter_meta, :size, [])
@@ -329,7 +333,7 @@ defmodule Nebulex.Adapters.Replicated do
     )
   end
 
-  ## Queryable
+  ## Nebulex.Adapter.Queryable
 
   @impl true
   def all(adapter_meta, query, opts) do
@@ -341,7 +345,7 @@ defmodule Nebulex.Adapters.Replicated do
     with_dynamic_cache(adapter_meta, :stream, [query, opts])
   end
 
-  ## Transaction
+  ## Nebulex.Adapter.Transaction
 
   @impl true
   def transaction(%{name: name} = adapter_meta, opts, fun) do

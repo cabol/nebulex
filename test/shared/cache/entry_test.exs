@@ -275,32 +275,6 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "size" do
-      test "returns the current number of entries in cache", %{cache: cache} do
-        for x <- 1..100, do: cache.put(x, x)
-        assert cache.size() == 100
-
-        for x <- 1..50, do: cache.delete(x)
-        assert cache.size() == 50
-
-        for x <- 51..60, do: assert(cache.get(x) == x)
-        assert cache.size() == 50
-      end
-    end
-
-    describe "flush" do
-      test "evicts all entries from cache", %{cache: cache} do
-        Enum.each(1..2, fn _ ->
-          for x <- 1..100, do: cache.put(x, x)
-
-          assert cache.flush() == 100
-          :ok = Process.sleep(500)
-
-          for x <- 1..100, do: refute(cache.get(x))
-        end)
-      end
-    end
-
     describe "update" do
       test "updates an entry under a key applying a function on the value", %{cache: cache} do
         :ok = cache.put("foo", "123")
@@ -321,7 +295,7 @@ defmodule Nebulex.Cache.EntryTest do
     end
 
     describe "incr" do
-      test "increments or decrements a counter", %{cache: cache} do
+      test "increments/decrements a counter", %{cache: cache} do
         assert cache.incr(:counter) == 1
         assert cache.incr(:counter) == 2
         assert cache.incr(:counter, 2) == 4
@@ -336,10 +310,16 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.incr(:counter, -3) == 0
       end
 
-      test "increments or decrements a counter with default", %{cache: cache} do
+      test "increments/decrements a counter with default", %{cache: cache} do
         assert cache.incr(:counter1, 1, default: 10) == 11
         assert cache.incr(:counter2, 2, default: 10) == 12
         assert cache.incr(:counter3, -2, default: 10) == 8
+      end
+
+      test "increments/decrements existing counter ignoring the default", %{cache: cache} do
+        assert cache.incr(:counter) == 1
+        assert cache.incr(:counter, 1, default: 10) == 2
+        assert cache.incr(:counter, -1, default: 100) == 1
       end
 
       test "raises when incr value is invalid", %{cache: cache} do

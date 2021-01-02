@@ -16,9 +16,6 @@ defmodule Nebulex.Adapter do
   """
   @type adapter_meta :: %{optional(atom) => term}
 
-  @typedoc "Proxy type to the options"
-  @type opts :: Nebulex.Cache.opts()
-
   @doc """
   The callback invoked in case the adapter needs to inject code.
   """
@@ -27,12 +24,7 @@ defmodule Nebulex.Adapter do
   @doc """
   Initializes the adapter supervision tree by returning the children.
   """
-  @callback init(opts) :: {:ok, child_spec, adapter_meta}
-            when child_spec:
-                   :supervisor.child_spec()
-                   | {module(), term()}
-                   | module()
-                   | nil
+  @callback init(config :: Keyword.t()) :: {:ok, :supervisor.child_spec(), adapter_meta}
 
   @doc """
   RExecutes the function `fun` passing as parameters the adapter and metadata

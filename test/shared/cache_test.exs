@@ -8,6 +8,7 @@ defmodule Nebulex.CacheTest do
       use Nebulex.Cache.EntryTest
       use Nebulex.Cache.EntryExpirationTest
       use Nebulex.Cache.EntryPropTest
+      use Nebulex.Cache.StorageTest
       use Nebulex.Cache.QueryableTest
       use Nebulex.Cache.TransactionTest
       use Nebulex.Cache.PersistenceTest

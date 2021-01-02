@@ -144,6 +144,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
             :ok = Process.sleep(500)
             _ = ReplicatedMock.put_dynamic_cache(:replicated_global_mock)
             :ok = ReplicatedMock.put("foo", "bar")
+            :ok = Process.sleep(100)
             send(__MODULE__, :put)
           end)
 

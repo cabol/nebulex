@@ -7,7 +7,7 @@ its simplicity, flexibility and pluggable architecture. In the same way
 as Ecto, developers can provide their own cache (adapter) implementations.
 
 In this guide, we're going to learn some basics about Nebulex, such as insert,
-retrieve and destroy cache entries (key/value pairs).
+retrieve and destroy cache entries.
 
 ## Adding Nebulex to an application
 
@@ -40,9 +40,9 @@ end
 In order to give more flexibility and loading only needed dependencies, Nebulex
 makes all its dependencies as optional. For example:
 
-  * For intensive workloads, we may want to use `:shards` as the backend for the
-    local adapter and having partitioned tables. In such a case, you have to add
-    `:shards` to the dependency list.
+  * For intensive workloads, you may want to use `:shards` as the backend for
+    the local adapter and having partitioned tables. In such a case, you have
+    to add `:shards` to the dependency list.
 
   * For enabling the usage of
     [declarative annotation-based caching via decorators][nbx_caching],
@@ -52,7 +52,8 @@ makes all its dependencies as optional. For example:
     to add `:telemetry` to the dependency list.
     See [telemetry guide][telemetry].
 
-  * Also, all the external adapters have to be added as a dependency as well.
+  * If you are using an adapter other than the built-in ones (e.g: Cachex or
+    Redis adapters), you have to add that dependency too.
 
 [nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
 [telemetry]: http://hexdocs.pm/nebulex/telemetry.html
@@ -316,7 +317,7 @@ Nebulex also provides a function to flush all cache entries, like so:
 
 ```elixir
 iex> Blog.Cache.flush()
-:ok
+_evicted_entries
 ```
 
 ## Info

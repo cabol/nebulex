@@ -184,7 +184,7 @@ defmodule Nebulex.Adapters.Partitioned do
   alias Nebulex.Cache.Cluster
   alias Nebulex.RPC
 
-  ## Adapter
+  ## Nebulex.Adapter
 
   @impl true
   defmacro __before_compile__(env) do
@@ -294,6 +294,8 @@ defmodule Nebulex.Adapters.Partitioned do
       {task_sup_name, children}
     end
   end
+
+  ## Nebulex.Adapter.Entry
 
   @impl true
   def get(adapter_meta, key, opts) do
@@ -419,6 +421,8 @@ defmodule Nebulex.Adapters.Partitioned do
     call(adapter_meta, key, :touch, [key])
   end
 
+  ## Nebulex.Adapter.Storage
+
   @impl true
   def size(%{name: name, task_sup: task_sup} = adapter_meta) do
     task_sup
@@ -444,7 +448,7 @@ defmodule Nebulex.Adapters.Partitioned do
     |> Enum.sum()
   end
 
-  ## Queryable
+  ## Nebulex.Adapter.Queryable
 
   @impl true
   def all(%{name: name, task_sup: task_sup} = adapter_meta, query, opts) do
@@ -486,7 +490,7 @@ defmodule Nebulex.Adapters.Partitioned do
     )
   end
 
-  ## Transaction
+  ## Nebulex.Adapter.Transaction
 
   @impl true
   def transaction(%{name: name} = adapter_meta, opts, fun) do

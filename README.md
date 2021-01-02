@@ -39,19 +39,21 @@ The supported caches and their adapters are:
 
 Cache | Nebulex Adapter | Dependency
 :-----| :---------------| :---------
-Generational Local Cache (ETS + Shards) | [Nebulex.Adapters.Local][la] | Built-In
-Partitioned (layer on top of a local cache) | [Nebulex.Adapters.Partitioned][pa] | Built-In
-Replicated (layer on top of a local cache) | [Nebulex.Adapters.Replicated][ra] | Built-In
-Multilevel (layer on top of existing caches) | [Nebulex.Adapters.Multilevel][ma] | Built-In
-Cachex | Nebulex.Adapters.Cachex | [nebulex_adapters_cachex][nebulex_adapters_cachex]
-Redis | NebulexRedisAdapter | [nebulex_redis_adapter][nebulex_redis_adapter]
+Generational Local Cache | [Nebulex.Adapters.Local][la] | Built-In
+Partitioned | [Nebulex.Adapters.Partitioned][pa] | Built-In
+Replicated | [Nebulex.Adapters.Replicated][ra] | Built-In
+Multilevel | [Nebulex.Adapters.Multilevel][ma] | Built-In
+Nil (special adapter that disables the cache) | [Nebulex.Adapters.Nil][nil] | Built-In
+Cachex | Nebulex.Adapters.Cachex | [nebulex_adapters_cachex][nbx_cachex]
+Redis | NebulexRedisAdapter | [nebulex_redis_adapter][nbx_redis]
 
 [la]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Local.html
 [pa]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Partitioned.html
 [ra]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Replicated.html
 [ma]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Multilevel.html
-[nebulex_adapters_cachex]: https://github.com/cabol/nebulex_adapters_cachex
-[nebulex_redis_adapter]: https://github.com/cabol/nebulex_redis_adapter
+[nil]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Nil.html
+[nbx_cachex]: https://github.com/cabol/nebulex_adapters_cachex
+[nbx_redis]: https://github.com/cabol/nebulex_redis_adapter
 
 For example, if you want to use a built-in cache, add to your `mix.exs` file:
 
@@ -66,12 +68,12 @@ def deps do
 end
 ```
 
-In order to give more flexibility and loading only needed dependencies, Nebulex
-makes all its dependencies as optional. For example:
+In order to give more flexibility and fetch only needed dependencies, Nebulex
+makes all dependencies optional. For example:
 
-  * For intensive workloads, we may want to use `:shards` as the backend for the
-    local adapter and having partitioned tables. In such a case, you have to add
-    `:shards` to the dependency list.
+  * For intensive workloads, you may want to use `:shards` as the backend for
+    the local adapter and having partitioned tables. In such a case, you have
+    to add `:shards` to the dependency list.
 
   * For enabling the usage of
     [declarative annotation-based caching via decorators][nbx_caching],
@@ -81,7 +83,8 @@ makes all its dependencies as optional. For example:
     to add `:telemetry` to the dependency list.
     See [telemetry guide][telemetry].
 
-  * Also, all the external adapters have to be added as a dependency as well.
+  * If you are using an adapter other than the built-in ones (e.g: Cachex or
+    Redis adapters), you have to add that dependency too.
 
 [nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
 [telemetry]: http://hexdocs.pm/nebulex/telemetry.html
