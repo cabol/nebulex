@@ -80,9 +80,9 @@ functionality was refactored entirely.
      are deprecated in v2.x.
   2. The stats support is optional by implementing the `Nebulex.Adapter.Stats`
      behaviour from the adapter. However, Nebulex provides a default
-     implementation which is supported by the built-in adapters (with all
-     callbacks overridable).
-  3. Default stats via `Nebulex.Adapter.Stats` are implemented by means of
-     Erlang `:counters`.
-  4. See `Nebulex.Adapter.Stats` for more information about how to implement
-     stats from the adapters in Nebulex v2.x.
+     implementation using [Erlang counters][https://erlang.org/doc/man/counters.html]
+     which is supported by the built-in adapters. See `Nebulex.Adapter.Stats`
+     for more information about how to implement stats from the adapters in
+     Nebulex 2.x.
+  3. Since Nebulex 2.x on-wards, enabling stats is a matter of setting the
+     option `:stats` to `true`. See `Nebulex.Cache` for more information.

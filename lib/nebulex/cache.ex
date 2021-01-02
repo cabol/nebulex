@@ -20,7 +20,6 @@ defmodule Nebulex.Cache do
   Could be configured with:
 
       config :my_app, MyApp.Cache,
-        stats: true,
         backend: :shards,
         gc_interval: :timer.seconds(3600),
         max_size: 200_000,
@@ -37,12 +36,72 @@ defmodule Nebulex.Cache do
 
     * `:stats` - Boolean to define whether or not the cache will provide stats.
       Defaults to `false`. Each adapter is responsible for providing stats by
-      implementing `Nebulex.Adapter.Stats` behaviour. Nevertheless, Nebulex
-      provides a default implementation using [Erlang counters][counters],
-      which is supported by the built-in adapters (with all callbacks
-      overridable). See `Nebulex.Adapter.Stats` for more information.
+      implementing `Nebulex.Adapter.Stats` behaviour. See the "Stats" section
+      below.
 
-  > **NOTE:** It is highly recommendable to check the adapters' documentation.
+  ## Stats
+
+  Stats support depends on the adapter entirely, it should implement the
+  optional behaviour `Nebulex.Adapter.Stats` to support so. Nevertheless,
+  the behaviour `Nebulex.Adapter.Stats` brings with a default implementation
+  using [Erlang counters][https://erlang.org/doc/man/counters.html], with all
+  callbacks overridable, which is supported by the built-in adapters.
+
+  To use stats it is a matter to set the option `:stats` to `true` into the
+  Cache options. For example, you can do it in the configuration file:
+
+      config :my_app, MyApp.Cache,
+        stats: true,
+        ...
+
+  > Remember to check if the adapter to use implements the
+    `Nebulex.Adapter.Stats` behaviour.
+
+  See `c:Nebulex.Cache.stats_info/0` and `c:Nebulex.Cache.stats_info/1`.
+
+  ## Telemetry events
+
+  It is possible to emit Telemetry events for the current stats via
+  `c:Nebulex.Cache.dispatch_stats/1`, but it has to be called explicitly,
+  Nebulex does not emit Telemetry events on its own. But it is pretty easy
+  to emit this event using [`:telemetry_poller`][telemetry_poller].
+
+  [telemetry_poller]: https://github.com/beam-telemetry/telemetry_poller
+
+  For example, we can define a custom pollable measurement:
+
+      :telemetry_poller.start_link(
+        measurements: [
+          {MyApp.Cache, :dispatch_stats, []},
+        ],
+        # configure sampling period - default is :timer.seconds(5)
+        period: :timer.seconds(30),
+        name: :my_cache_stats_poller
+      )
+
+  Or you can also start the `:telemetry_poller` process along with your
+  application supervision tree, like so:
+
+      def start(_type, _args) do
+        my_cache_stats_poller_opts = [
+          measurements: [
+            {MyApp.Cache, :dispatch_stats, []},
+          ],
+          period: :timer.seconds(30),
+          name: :my_cache_stats_poller
+        ]
+
+        children = [
+          {MyApp.Cache, []},
+          {:telemetry_poller, my_cache_stats_poller_opts}
+        ]
+
+        opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+        Supervisor.start_link(children, opts)
+      end
+
+  See [Nebulex Telemetry Guide](http://hexdocs.pm/nebulex/telemetry.html)
+  for more information.
 
   ## Distributed topologies
 

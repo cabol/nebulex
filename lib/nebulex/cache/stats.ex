@@ -16,7 +16,9 @@ defmodule Nebulex.Cache.Stats do
   Implementation for `c:Nebulex.Cache.stats_info/1`.
   """
   def stats_info(name, stat_name) do
-    Adapter.with_meta(name, & &1.stats_info(&2, stat_name))
+    if info = stats_info(name) do
+      Map.fetch!(info, stat_name)
+    end
   end
 
   if Code.ensure_loaded?(:telemetry) do
@@ -40,8 +42,6 @@ defmodule Nebulex.Cache.Stats do
     @doc """
     Implementation for `c:Nebulex.Cache.dispatch_stats/1`.
     """
-    def dispatch_stats(_name, _opts \\ []) do
-      :ok
-    end
+    def dispatch_stats(_name, _opts \\ []), do: :ok
   end
 end

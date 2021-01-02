@@ -2,11 +2,10 @@ defmodule Nebulex.Adapter.Stats do
   @moduledoc """
   Specifies the stats API required from adapters.
 
-  Each adapter is responsible for providing stats implementation. However,
-  Nebulex provides a default implementation using [Erlang counters][counters],
-  which is supported by the built-in adapters (with all callbacks overridable).
-
-  [counters]: https://erlang.org/doc/man/counters.html
+  Each adapter is responsible for providing support for stats by implementing
+  this behaviour. However, this module brings with a default implementation
+  using [Erlang counters][https://erlang.org/doc/man/counters.html], with all
+  callbacks overridable, which is supported by the built-in adapters.
 
   See `Nebulex.Adapters.Local` for more information about how can be used from
   the adapter, and also [Nebulex Telemetry Guide][telemetry_guide] to learn how
@@ -21,16 +20,6 @@ defmodule Nebulex.Adapter.Stats do
   See `c:Nebulex.Cache.stats_info/0`.
   """
   @callback stats_info(Nebulex.Adapter.adapter_meta()) :: Nebulex.Stats.t()
-
-  @doc """
-  Returns the current value for the given `stat_name`.
-
-  See `c:Nebulex.Cache.stats_info/1`.
-  """
-  @callback stats_info(
-              Nebulex.Adapter.adapter_meta(),
-              Nebulex.Stats.stat_name()
-            ) :: non_neg_integer
 
   @doc false
   defmacro __using__(_opts) do
@@ -50,14 +39,7 @@ defmodule Nebulex.Adapter.Stats do
         }
       end
 
-      @impl true
-      def stats_info(adapter_meta, stat_field) do
-        if info = stats_info(adapter_meta) do
-          Map.fetch!(info, stat_field)
-        end
-      end
-
-      defoverridable stats_info: 1, stats_info: 2
+      defoverridable stats_info: 1
     end
   end
 
