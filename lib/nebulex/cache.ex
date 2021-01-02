@@ -35,13 +35,12 @@ defmodule Nebulex.Cache do
 
     * `:name` - The name of the Cache supervisor process.
 
-    * `:stats` - The stats are supposed to be handled by the adapters, hence,
-      it is recommended to check the adapters' documentation for supported
-      stats, config, and so on. Nevertheless, Nebulex built-in adapters
-      provide support for stats by setting the `:stats` option to `true`
-      (Defaults to `false`). You can get the stats info by calling
-      `Nebulex.Cache.Stats.info(cache_or_name)` at any time. For more
-      information, See `Nebulex.Cache.Stats`.
+    * `:stats` - Boolean to define whether or not the cache will provide stats.
+      Defaults to `false`. Each adapter is responsible for providing stats by
+      implementing `Nebulex.Adapter.Stats` behaviour. Nevertheless, Nebulex
+      provides a default implementation using [Erlang counters][counters],
+      which is supported by the built-in adapters (with all callbacks
+      overridable). See `Nebulex.Adapter.Stats` for more information.
 
   > **NOTE:** It is highly recommendable to check the adapters' documentation.
 
@@ -78,8 +77,16 @@ defmodule Nebulex.Cache do
     quote bind_quoted: [opts: opts] do
       @behaviour Nebulex.Cache
 
+      alias Nebulex.Cache.{
+        Entry,
+        Persistence,
+        Queryable,
+        Stats,
+        Storage,
+        Transaction
+      }
+
       alias Nebulex.Hook
-      alias Nebulex.Cache.{Entry, Persistence, Queryable, Stats, Transaction}
 
       {otp_app, adapter, behaviours} = Nebulex.Cache.Supervisor.compile_config(opts)
 
@@ -145,7 +152,7 @@ defmodule Nebulex.Cache do
         end
       end
 
-      ## Entries
+      ## Entry
 
       @impl true
       def get(key, opts \\ []) do
@@ -247,14 +254,16 @@ defmodule Nebulex.Cache do
         Entry.touch(get_dynamic_cache(), key)
       end
 
+      ## Storage
+
       @impl true
       def size do
-        Entry.size(get_dynamic_cache())
+        Storage.size(get_dynamic_cache())
       end
 
       @impl true
       def flush do
-        Entry.flush(get_dynamic_cache())
+        Storage.flush(get_dynamic_cache())
       end
 
       ## Queryable
@@ -296,6 +305,25 @@ defmodule Nebulex.Cache do
         @impl true
         def in_transaction? do
           Transaction.in_transaction?(get_dynamic_cache())
+        end
+      end
+
+      ## Stats
+
+      if Nebulex.Adapter.Stats in behaviours do
+        @impl true
+        def stats_info do
+          Stats.stats_info(get_dynamic_cache())
+        end
+
+        @impl true
+        def stats_info(stat_name) do
+          Stats.stats_info(get_dynamic_cache(), stat_name)
+        end
+
+        @impl true
+        def dispatch_stats(opts \\ []) do
+          Stats.dispatch_stats(get_dynamic_cache(), opts)
         end
       end
     end
@@ -404,6 +432,8 @@ defmodule Nebulex.Cache do
   See `c:get_dynamic_cache/0` and `c:put_dynamic_cache/1`.
   """
   @callback with_dynamic_cache(atom() | pid(), fun) :: term
+
+  ## Nebulex.Adapter.Entry
 
   @doc """
   Gets a value from Cache where the key matches the given `key`.
@@ -924,6 +954,8 @@ defmodule Nebulex.Cache do
   """
   @callback touch(key) :: boolean
 
+  ## Nebulex.Adapter.Storage
+
   @doc """
   Returns the total number of cached entries.
 
@@ -1289,4 +1321,87 @@ defmodule Nebulex.Cache do
 
   """
   @callback in_transaction?() :: boolean
+
+  ## Nebulex.Adapter.Stats
+
+  @optional_callbacks stats_info: 0, stats_info: 1, dispatch_stats: 1
+
+  @doc """
+  Returns `Nebulex.Stats.t()` with the current stats values.
+
+  ## Example
+
+      iex> MyCache.stats_info()
+      %Nebulex..Stats{
+        evictions: 0,
+        expirations: 0,
+        hits: 0,
+        misses: 0,
+        writes: 0
+      }
+
+  """
+  @callback stats_info() :: Nebulex.Stats.t()
+
+  @doc """
+  Returns the current value for the given `stat_name`.
+
+  ## Example
+
+      iex> MyCache.stats_info(:hits)
+      0
+      iex> MyCache.stats_info(:misses)
+      0
+      iex> MyCache.stats_info(:writes)
+      0
+      iex> MyCache.stats_info(:evictions)
+      0
+      iex> MyCache.stats_info(:expirations)
+      0
+
+  """
+  @callback stats_info(stat_name :: Nebulex.Stats.stat_name()) :: non_neg_integer
+
+  @doc """
+  Emits a telemetry event when called with the current stats count.
+
+  The `:measurements` map will include the current count for each stat:
+
+    * `:hits` - Current **hits** count.
+    * `:misses` - Current **misses** count.
+    * `:writes` - Current **writes** count.
+    * `:evictions` - Current **evictions** count.
+    * `:expirations` - Current **expirations** count.
+
+  The telemetry `:metadata` map will include the following fields:
+
+    * `:cache` - The cache module, or the name (if an explicit name has been
+      given to the cache).
+
+  Additionally, you can add your own metadata fields by given the option
+  `:metadata`.
+
+  ## Options
+
+    * `:event_prefix` – The prefix of the telemetry event.
+      Defaults to `[:nebulex, :cache]`.
+
+    * `:metadata` – A map with additional metadata fields. Defaults to `%{}`.
+
+  ## Examples
+
+      iex> MyCache.dispatch_stats()
+      :ok
+
+      iex> MyCache.Stats.dispatch_stats(
+      ...>   event_prefix: [:my_cache],
+      ...>   metadata: %{tag: "tag1"}
+      ...> )
+      :ok
+
+  **NOTE:** Since `:telemetry` is an optional dependency, when it is not
+  defined, a default implementation is provided without any logic, just
+  returning `:ok`.
+  """
+  @callback dispatch_stats(opts) :: :ok
 end

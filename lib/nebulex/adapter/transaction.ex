@@ -49,6 +49,22 @@ defmodule Nebulex.Adapter.Transaction do
 
   """
 
+  @doc """
+  Runs the given function inside a transaction.
+
+  A successful transaction returns the value returned by the function.
+
+  See `c:Nebulex.Cache.transaction/2`.
+  """
+  @callback transaction(Nebulex.Adapter.adapter_meta(), Nebulex.Cache.opts(), fun) :: any
+
+  @doc """
+  Returns `true` if the given process is inside a transaction.
+
+  See `c:Nebulex.Cache.in_transaction?/0`.
+  """
+  @callback in_transaction?(Nebulex.Adapter.adapter_meta()) :: boolean
+
   @doc false
   defmacro __using__(_opts) do
     quote do
@@ -131,20 +147,4 @@ defmodule Nebulex.Adapter.Transaction do
       end
     end
   end
-
-  @doc """
-  Runs the given function inside a transaction.
-
-  A successful transaction returns the value returned by the function.
-
-  See `c:Nebulex.Cache.transaction/2`.
-  """
-  @callback transaction(Nebulex.Adapter.adapter_meta(), Nebulex.Cache.opts(), fun) :: any
-
-  @doc """
-  Returns `true` if the given process is inside a transaction.
-
-  See `c:Nebulex.Cache.in_transaction?/0`.
-  """
-  @callback in_transaction?(Nebulex.Adapter.adapter_meta()) :: boolean
 end

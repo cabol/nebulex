@@ -125,6 +125,8 @@ defmodule Nebulex.Adapters.Replicated do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Entry
+  @behaviour Nebulex.Adapter.Storage
   @behaviour Nebulex.Adapter.Queryable
 
   # Inherit default transaction implementation
@@ -133,9 +135,13 @@ defmodule Nebulex.Adapters.Replicated do
   # Inherit default persistence implementation
   use Nebulex.Adapter.Persistence
 
+  # Inherit default stats implementation
+  use Nebulex.Adapter.Stats
+
   import Nebulex.Helpers
 
-  alias Nebulex.Cache.{Cluster, Stats}
+  alias Nebulex.Adapter.Stats
+  alias Nebulex.Cache.Cluster
   alias Nebulex.RPC
 
   ## Adapter
@@ -175,13 +181,13 @@ defmodule Nebulex.Adapters.Replicated do
     name = opts[:name] || cache
 
     # maybe use stats
-    stat_counter = opts[:stat_counter] || Stats.init(opts)
+    stats_counter = opts[:stats_counter] || Stats.init(opts)
 
     # primary cache options
     primary_opts =
       opts
       |> Keyword.get(:primary, [])
-      |> Keyword.put(:stat_counter, stat_counter)
+      |> Keyword.put(:stats_counter, stats_counter)
 
     # maybe put a name to primary storage
     primary_opts =
@@ -199,7 +205,7 @@ defmodule Nebulex.Adapters.Replicated do
       name: name,
       primary_name: primary_opts[:name],
       task_sup: task_sup_name,
-      stat_counter: stat_counter,
+      stats_counter: stats_counter,
       bootstrap_timeout: bootstrap_timeout
     }
 

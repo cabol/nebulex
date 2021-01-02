@@ -11,10 +11,16 @@ guide is also recommended.
 
 ## Instrumenting Nebulex Caches
 
-The stats support is something each adapter is responsible for. However,
-Nebulex built-in adapters support the stats suggested and defined by
-`Nebulex.Cache.Stats`. Besides, when the `:stats` option is enabled,
-we can use Telemetry for emitting the current stat values.
+Each adapter is responsible for providing stats by implementing
+`Nebulex.Adapter.Stats` behaviour. Nevertheless, Nebulex provides a default
+implementation using [Erlang counters][erl_counters], which is supported by
+the built-in adapters (with all callbacks overridable).
+See `Nebulex.Adapter.Stats` for more information.
+
+[erl_counters]: https://erlang.org/doc/man/counters.html
+
+Furthermore, when the `:stats` option is enabled, we can use Telemetry for
+emitting the current stat values.
 
 First of all, let's configure the dependencies adding `:telemetry_metrics`
 and `:telemetry_poller` packages:
@@ -39,9 +45,6 @@ defmodule MyApp.Cache do
   use Nebulex.Cache,
     otp_app: :my_app,
     adapter: Nebulex.Adapters.Local
-
-  # Use stats helpers
-  use Nebulex.Cache.Stats
 end
 ```
 
@@ -107,7 +110,7 @@ defmodule MyApp.Telemetry do
 end
 ```
 
-Make sure to replace `MyApp` by your actual application name.
+> Make sure to replace `MyApp` by your actual application name.
 
 Then add to your main application's supervision tree
 (usually in `lib/my_app/application.ex`):
@@ -181,9 +184,6 @@ defmodule MyApp.Cache do
     otp_app: :my_app,
     adapter: Nebulex.Adapters.Local
 
-  # Use stats helpers
-  use Nebulex.Cache.Stats
-
   def dispatch_cache_size do
     :telemetry.execute(
       [:nebulex, :cache, :size],
@@ -200,7 +200,7 @@ supervisor:
 ```elixir
 defp periodic_measurements do
   [
-    {MyApp.Cache, :dispatch_stats, [[metadata: %{node: node()}]]}
+    {MyApp.Cache, :dispatch_stats, [[metadata: %{node: node()}]]},
     {MyApp.Cache, :dispatch_cache_size, []}
   ]
 end

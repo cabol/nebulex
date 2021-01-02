@@ -24,6 +24,26 @@ defmodule Nebulex.Adapter.Persistence do
   information.
   """
 
+  @doc """
+  Dumps a cache to the given file `path`.
+
+  Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
+
+  See `c:Nebulex.Cache.dump/2`.
+  """
+  @callback dump(Nebulex.Adapter.adapter_meta(), Path.t(), Nebulex.Cache.opts()) ::
+              :ok | {:error, term}
+
+  @doc """
+  Loads a dumped cache from the given `path`.
+
+  Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
+
+  See `c:Nebulex.Cache.load/2`.
+  """
+  @callback load(Nebulex.Adapter.adapter_meta(), Path.t(), Nebulex.Cache.opts()) ::
+              :ok | {:error, term}
+
   alias Nebulex.Entry
 
   @doc false
@@ -81,24 +101,4 @@ defmodule Nebulex.Adapter.Persistence do
       end
     end
   end
-
-  @doc """
-  Dumps a cache to the given file `path`.
-
-  Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
-
-  See `c:Nebulex.Cache.dump/2`.
-  """
-  @callback dump(Nebulex.Adapter.adapter_meta(), Path.t(), Nebulex.Cache.opts()) ::
-              :ok | {:error, term}
-
-  @doc """
-  Loads a dumped cache from the given `path`.
-
-  Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
-
-  See `c:Nebulex.Cache.load/2`.
-  """
-  @callback load(Nebulex.Adapter.adapter_meta(), Path.t(), Nebulex.Cache.opts()) ::
-              :ok | {:error, term}
 end

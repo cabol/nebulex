@@ -12,8 +12,6 @@ defmodule Nebulex.Cache.StatsTest do
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Multilevel
 
-    use Nebulex.Cache.Stats
-
     defmodule L1 do
       use Nebulex.Cache,
         otp_app: :nebulex,
@@ -42,7 +40,7 @@ defmodule Nebulex.Cache.StatsTest do
     ]
   ]
 
-  describe "enabled stats" do
+  describe "stats_info/0 and stats_info/1" do
     setup_with_cache(Cache, [stats: true] ++ @config)
 
     test "hits and misses" do
@@ -58,6 +56,10 @@ defmodule Nebulex.Cache.StatsTest do
       assert stats.writes == 6
       assert stats.hits == 3
       assert stats.misses == 6
+
+      assert Cache.stats_info(:writes) == 6
+      assert Cache.stats_info(:hits) == 3
+      assert Cache.stats_info(:misses) == 6
     end
 
     test "writes" do
@@ -97,10 +99,15 @@ defmodule Nebulex.Cache.StatsTest do
       assert stats.misses == 3
       assert stats.evictions == 6
 
+      assert Cache.stats_info(:writes) == 30
+      assert Cache.stats_info(:misses) == 3
+      assert Cache.stats_info(:evictions) == 6
+
       assert Cache.flush() == 24
 
       assert stats = Cache.stats_info()
       assert stats.evictions == 30
+      assert Cache.stats_info(:evictions) == 30
     end
 
     test "expirations" do
@@ -118,17 +125,23 @@ defmodule Nebulex.Cache.StatsTest do
       assert stats.misses == 6
       assert stats.evictions == 6
       assert stats.expirations == 6
+
+      assert Cache.stats_info(:writes) == 12
+      assert Cache.stats_info(:hits) == 6
+      assert Cache.stats_info(:misses) == 6
+      assert Cache.stats_info(:evictions) == 6
+      assert Cache.stats_info(:expirations) == 6
     end
   end
 
   describe "disabled stats" do
     setup_with_cache(Cache, @config)
 
-    test "stat_counter is nil" do
+    test "stats_info/0 returns nil" do
       refute Cache.stats_info()
     end
 
-    test "dispatch_stats is skipped" do
+    test "dispatch_stats/1 is skipped" do
       with_mock :telemetry, [], execute: fn _, _, _ -> :ok end do
         :ok = Cache.dispatch_stats()
 
@@ -149,7 +162,7 @@ defmodule Nebulex.Cache.StatsTest do
     end
   end
 
-  describe "dispatch_stats" do
+  describe "dispatch_stats/1" do
     setup_with_cache(Cache, [stats: true] ++ @config)
 
     test "emits a telemetry event when called" do
@@ -167,7 +180,7 @@ defmodule Nebulex.Cache.StatsTest do
     end
   end
 
-  describe "dispatch_stats with dynamic cache" do
+  describe "dispatch_stats/1 with dynamic cache" do
     setup_with_dynamic_cache(Cache, :stats_with_dispatch, [stats: true] ++ @config)
 
     test "emits a telemetry event with custom telemetry_prefix when called" do

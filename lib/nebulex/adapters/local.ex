@@ -279,6 +279,8 @@ defmodule Nebulex.Adapters.Local do
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
+  @behaviour Nebulex.Adapter.Entry
+  @behaviour Nebulex.Adapter.Storage
   @behaviour Nebulex.Adapter.Queryable
 
   # Inherit default transaction implementation
@@ -287,11 +289,14 @@ defmodule Nebulex.Adapters.Local do
   # Inherit default persistence implementation
   use Nebulex.Adapter.Persistence
 
+  # Inherit default stats implementation
+  use Nebulex.Adapter.Stats
+
   import Nebulex.Helpers
   import Record
 
+  alias Nebulex.Adapter.Stats
   alias Nebulex.Adapters.Local.{Backend, Generation, Metadata}
-  alias Nebulex.Cache.Stats
   alias Nebulex.{Entry, Time}
 
   # Cache Entry
@@ -356,14 +361,14 @@ defmodule Nebulex.Adapters.Local do
     meta = %{
       backend: backend,
       meta_tab: meta_tab,
-      stat_counter: opts[:stat_counter] || Stats.init(opts)
+      stats_counter: opts[:stats_counter] || Stats.init(opts)
     }
 
     {:ok, child, meta}
   end
 
   @impl true
-  def get(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key, _opts) do
+  def get(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, _opts) do
     meta_tab
     |> list_gen()
     |> do_get(key, backend, ref)
@@ -400,7 +405,7 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def put(
-        %{meta_tab: meta_tab, backend: backend, stat_counter: ref},
+        %{meta_tab: meta_tab, backend: backend, stats_counter: ref},
         key,
         value,
         ttl,
@@ -441,7 +446,7 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def put_all(
-        %{meta_tab: meta_tab, backend: backend, stat_counter: ref},
+        %{meta_tab: meta_tab, backend: backend, stats_counter: ref},
         entries,
         ttl,
         on_write,
@@ -470,7 +475,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def delete(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key, _opts) do
+  def delete(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, _opts) do
     meta_tab
     |> list_gen()
     |> Enum.each(&backend.delete(&1, key))
@@ -478,7 +483,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def take(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key, _opts) do
+  def take(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, _opts) do
     meta_tab
     |> list_gen()
     |> Enum.reduce_while(nil, fn gen, acc ->
@@ -499,7 +504,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def incr(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key, incr, ttl, opts) do
+  def incr(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, incr, ttl, opts) do
     default = get_option(opts, :default, &is_integer/1, 0)
 
     meta_tab
@@ -521,7 +526,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def ttl(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key) do
+  def ttl(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key) do
     meta_tab
     |> list_gen()
     |> do_get(key, backend, ref)
@@ -542,14 +547,14 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def expire(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key, ttl) do
+  def expire(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, ttl) do
     meta_tab
     |> update_entry(backend, key, [{4, Time.now()}, {5, ttl}])
     |> update_stats(:put, ref)
   end
 
   @impl true
-  def touch(%{meta_tab: meta_tab, backend: backend, stat_counter: ref}, key) do
+  def touch(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key) do
     meta_tab
     |> update_entry(backend, key, [{4, Time.now()}])
     |> update_stats(:put, ref)
@@ -567,7 +572,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def flush(%{meta_tab: meta_tab, stat_counter: ref}) do
+  def flush(%{meta_tab: meta_tab, stats_counter: ref}) do
     meta_tab
     |> Generation.flush()
     |> update_stats(:flush, ref)

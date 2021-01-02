@@ -118,6 +118,8 @@ defmodule Nebulex.TestCache do
   defmodule AdapterMock do
     @moduledoc false
     @behaviour Nebulex.Adapter
+    @behaviour Nebulex.Adapter.Entry
+    @behaviour Nebulex.Adapter.Storage
 
     @impl true
     defmacro __before_compile__(_), do: :ok
