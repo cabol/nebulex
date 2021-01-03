@@ -16,5 +16,8 @@ unless :clustered in Keyword.get(ExUnit.configuration(), :exclude, []) do
   Nebulex.Cluster.spawn(nodes)
 end
 
+# For mix tests
+Mix.shell(Mix.Shell.Process)
+
 # Start ExUnit
 ExUnit.start()

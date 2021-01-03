@@ -10,13 +10,13 @@ defmodule Nebulex.Adapters.Partitioned do
   in a single node/machine (sharding), therefore, if a node fails, the data
   kept by this node won't be available for the rest of the cluster.
 
-  PG2 is used under-the-hood by the adapter to manage the cluster nodes.
-  When the partitioned cache is started in a node, it creates a PG2 group
-  and joins it (the cache supervisor PID is joined to the group). Then,
+  `:pg2` or `:pg` (>= OTP 23) is used under-the-hood by the adapter to manage
+  the cluster nodes. When the partitioned cache is started in a node, it creates
+  a group and joins it (the cache supervisor PID is joined to the group). Then,
   when a function is invoked, the adapter picks a node from the node list
-  (using the PG2 group members), and then the function is executed on that
-  node. In the same way, when the supervisor process of the partitioned cache
-  dies, the PID of that process is automatically removed from the PG2 group;
+  (using the group members), and then the function is executed on that node.
+  In the same way, when the supervisor process of the partitioned cache
+  dies, the PID of that process is automatically removed from the PG group;
   this is why it's recommended to use a consistent hashing algorithm for the
   node selector.
 

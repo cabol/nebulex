@@ -21,10 +21,11 @@ defmodule Nebulex.Cache do
 
       config :my_app, MyApp.Cache,
         backend: :shards,
-        gc_interval: :timer.seconds(3600),
-        max_size: 200_000,
-        gc_cleanup_min_timeout: 10_000,
-        gc_cleanup_max_timeout: 900_000
+        gc_interval: :timer.seconds(21_600),
+        max_size: 1_000_000,
+        allocated_memory: 2_000_000_000,
+        gc_cleanup_min_timeout: :timer.seconds(10),
+        gc_cleanup_max_timeout: :timer.seconds(600)
 
   Most of the configuration that goes into the `config` is specific
   to the adapter. For this particular example, you can check

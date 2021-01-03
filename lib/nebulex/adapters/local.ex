@@ -95,25 +95,24 @@ defmodule Nebulex.Adapters.Local do
   environment, usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.LocalCache,
-        backend: :shards,
-        gc_interval: :timer.seconds(3600),
-        max_size: 200_000,
+        gc_interval: :timer.seconds(21_600),
+        max_size: 1_000_000,
         allocated_memory: 2_000_000_000,
-        gc_cleanup_min_timeout: 10_000,
-        gc_cleanup_max_timeout: 600_000
+        gc_cleanup_min_timeout: :timer.seconds(10),
+        gc_cleanup_max_timeout: :timer.seconds(600)
 
-  For intensive workloads, the Cache may also be partitioned (by using `:shards`
-  backend and specifying the `:partitions` option). If partitioning is required
-  then a good default is to set the number of partitions to the number of
-  schedulers available (the default):
+  For intensive workloads, the Cache may also be partitioned using `:shards`
+  as cache backend (`backend: :shards`) and configuring the desired number of
+  partitions via the `:partitions` option. Defaults to
+  `System.schedulers_online()`.
 
       config :my_app, MyApp.LocalCache,
-        backend: :shards,
-        gc_interval: :timer.seconds(3600),
-        max_size: 200_000,
+        gc_interval: :timer.seconds(21_600),
+        max_size: 1_000_000,
         allocated_memory: 2_000_000_000,
-        gc_cleanup_min_timeout: 10_000,
-        gc_cleanup_max_timeout: 600_000,
+        gc_cleanup_min_timeout: :timer.seconds(10),
+        gc_cleanup_max_timeout: :timer.seconds(600),
+        backend: :shards,
         partitions: System.schedulers_online() * 2
 
   If your application was generated with a supervisor (by passing `--sup`

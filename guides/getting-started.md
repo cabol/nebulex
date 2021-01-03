@@ -64,8 +64,60 @@ To install these dependencies, we will run this command:
 mix deps.get
 ```
 
-For the second step, we need to define a Cache so that we can use it within the
-application's code. Let's define `Blog.Cache` module within `lib/blog/cache.ex`:
+We now need to define a Cache and setup some configuration for Nebulex so that
+we can perform actions on a cache from within the application's code.
+
+We can set up this configuration by running this command:
+
+```
+mix nbx.gen.cache -c Blog.Cache
+```
+
+This command will generate the configuration required to use the cache. The
+first bit of configuration is in `config/config.exs`:
+
+```elixir
+config :blog, Blog.Cache,
+  # When using :shards as backend
+  # backend: :shards,
+  # GC interval for pushing new generation: 12 hrs
+  gc_interval: :timer.seconds(3600) * 12,
+  # Max 1 million entries in cache
+  max_size: 1_00_000,
+  # Max 2 GB of memory
+  allocated_memory: 2_000_000_000,
+  # GC min timeout: 10 sec
+  gc_cleanup_min_timeout: :timer.seconds(10),
+  # GC min timeout: 10 min
+  gc_cleanup_max_timeout: :timer.seconds(600)
+```
+
+Assuming we will use `:shards` as backend, can add uncomment the first line in
+the config
+
+```elixir
+config :blog, Blog.Cache,
+  # When using :shards as backend
+  backend: :shards,
+  # GC interval for pushing new generation: 12 hrs
+  gc_interval: :timer.seconds(3600) * 12,
+  # Max 1 million entries in cache
+  max_size: 1_00_000,
+  # Max 2 GB of memory
+  allocated_memory: 2_000_000_000,
+  # GC min timeout: 10 sec
+  gc_cleanup_min_timeout: :timer.seconds(10),
+  # GC min timeout: 10 min
+  gc_cleanup_max_timeout: :timer.seconds(600)
+```
+
+> By default, `partitions:` option is set to `System.schedulers_online()`.
+
+**NOTE:** For more information about the provided options, see the adapter's
+documentation.
+
+And the `Blog.Cache` module is defined in `lib/blog/cache.ex` by our
+`mix nbx.gen.cache` command:
 
 ```elixir
 defmodule Blog.Cache do
@@ -82,39 +134,9 @@ In this case, we've specified that it is the `:blog` application where Nebulex
 can find that configuration and so Nebulex will use the configuration that was
 set up in `config/config.exs`.
 
-Could be configured in `config/config.exs` like so:
-
-```elixir
-config :blog, Blog.Cache,
-  gc_interval: :timer.seconds(3600),
-  backend: :shards,
-  partitions: 2
-```
-
-> By default, `partitions:` option is set to `System.schedulers_online()`.
-
-**NOTE:** For more information about the provided options, see the adapter's
-documentation.
-
 The final piece of configuration is to setup the `Blog.Cache` as a
 supervisor within the application's supervision tree, which we can do in
-`lib/blog/application.ex` (or `lib/blog.ex` for elixir versions `< 1.4.0`),
-inside the `start/2` function:
-
-`Elixir < 1.5.0`:
-
-```elixir
-def start(_type, _args) do
-  import Supervisor.Spec, warn: false
-
-  children = [
-    supervisor(Blog.Cache, [])
-  ]
-
-  ...
-```
-
-`Elixir >= 1.5.0`:
+`lib/blog/application.ex`, inside the `start/2` function:
 
 ```elixir
 def start(_type, _args) do
@@ -409,53 +431,54 @@ _all_matched
 Nebulex provides the adapter `Nebulex.Adapters.Partitioned`, which allows to
 set up a partitioned cache topology.
 
-Let's define the `Blog.PartitionedCache` (`lib/blog/partitioned_cache.ex`)
-like so:
+Let's set up the partitioned cache by using the `mix` task `mix nbx.gen.cache`:
+
+```
+mix nbx.gen.cache -c Blog.PartitionedCache -a Nebulex.Adapters.Partitioned
+```
+
+As we saw previously, this command will generate the cache in
+`lib/bolg/partitioned_cache.ex` (in this case using the partitioned adapter)
+module along with the initial configuration in `config/config.exs`.
+
+The cache:
 
 ```elixir
 defmodule Blog.PartitionedCache do
   use Nebulex.Cache,
     otp_app: :blog,
-    adapter: Nebulex.Adapters.Partitioned
+    adapter: Nebulex.Adapters.Partitioned,
+    primary_storage_adapter: Nebulex.Adapters.Local
 end
 ```
 
-> By default, the `primary_storage_adapter:` is set to `Nebulex.Adapters.Local`.
-
-Could be configured with (`config/config.exs`):
+And the config:
 
 ```elixir
 config :blog, Blog.PartitionedCache,
   primary: [
-    gc_interval: :timer.seconds(3600),
+    # When using :shards as backend
     backend: :shards,
-    partitions: 2
+    # GC interval for pushing new generation: 12 hrs
+    gc_interval: :timer.seconds(3600) * 12,
+    # Max 1 million entries in cache
+    max_size: 1_00_000,
+    # Max 2 GB of memory
+    allocated_memory: 2_000_000_000,
+    # GC min timeout: 10 sec
+    gc_cleanup_min_timeout: :timer.seconds(10),
+    # GC min timeout: 10 min
+    gc_cleanup_max_timeout: :timer.seconds(600)
   ]
 ```
 
-And remember to setup the `Blog.PartitionedCache` as supervisor within the
-application's supervision tree (such as we did it previously):
-
-`Elixir < 1.5.0`:
+And remember to add the new cache `Blog.PartitionedCache` to ypur application's
+supervision tree (such as we did it previously):
 
 ```elixir
 def start(_type, _args) do
-  import Supervisor.Spec, warn: false
-
   children = [
-    supervisor(Blog.PartitionedCache, [])
-  ]
-
-  ...
-```
-
-`Elixir >= 1.5.0`:
-
-```elixir
-def start(_type, _args) do
-  import Supervisor.Spec, warn: false
-
-  children = [
+    Blog.Cache,
     Blog.PartitionedCache
   ]
 
@@ -487,69 +510,83 @@ To learn more about how partitioned cache works, please check
 Nebulex also provides the adapter `Nebulex.Adapters.Multilevel`, which allows to
 setup a multi-level caching hierarchy.
 
-First, let's define out multi-level cache `Blog.MultilevelCache`:
+First, let's set up the multi-level cache by using the `mix` task
+`mix nbx.gen.cache`:
+
+```
+mix nbx.gen.cache -c Blog.NearCache -a Nebulex.Adapters.Multilevel
+```
+
+By default, the command generates a 2-level near-cache topology. The first
+level or `L1` using the built-in local adapter, and the second one or `L2`
+using the built-in partitioned adapter.
+
+The generated cache module `lib/blog/near_cache.ex`:
 
 ```elixir
-defmodule Blog.MultilevelCache do
+defmodule Blog.NearCache do
   use Nebulex.Cache,
     otp_app: :blog,
     adapter: Nebulex.Adapters.Multilevel
 
+  ## Cache Levels
+
+  # Default auto-generated L1 cache (local)
   defmodule L1 do
     use Nebulex.Cache,
-      otp_app: :nebulex,
+      otp_app: :blog,
       adapter: Nebulex.Adapters.Local
   end
 
+  # Default auto-generated L2 cache (partitioned cache)
   defmodule L2 do
     use Nebulex.Cache,
-      otp_app: :nebulex,
+      otp_app: :blog,
       adapter: Nebulex.Adapters.Partitioned
   end
+
+  ## TODO: Add, remove or modify the auto-generated cache levels above
 end
 ```
 
-Could be configured with (`config/config.exs`):
+And the configuration (`config/config.exs`):
 
 ```elixir
-config :blog, Blog.MultilevelCache,
+config :blog, Blog.NearCache,
   model: :inclusive,
   levels: [
+    # Default auto-generated L1 cache (local)
     {
-      Blog.MultilevelCache.L1,
-      gc_interval: :timer.seconds(3600), backend: :shards
+      Blog.NearCache.L1,
+      # GC interval for pushing new generation: 12 hrs
+      gc_interval: :timer.seconds(3600) * 12,
+      # Max 1 million entries in cache
+      max_size: 1_00_000
     },
+    # Default auto-generated L2 cache (partitioned cache)
     {
-      Blog.MultilevelCache.L2,
-      primary: [gc_interval: :timer.seconds(3600), backend: :shards]
+      Blog.NearCache.L2,
+      primary: [
+        # GC interval for pushing new generation: 12 hrs
+        gc_interval: :timer.seconds(3600) * 12,
+        # Max 1 million entries in cache
+        max_size: 1_00_000
+      ]
     }
   ]
 ```
 
-And remember to setup the `Blog.Multilevel` as a supervisor within the
-application's supervision tree (such as we did it previously):
+> Remember you can add `backend: :shards` to use Shards as backend.
 
-`Elixir < 1.5.0`:
-
-```elixir
-def start(_type, _args) do
-  import Supervisor.Spec, warn: false
-
-  children = [
-    supervisor(Blog.MultilevelCache, [])
-  ]
-
-  ...
-```
-
-`Elixir >= 1.5.0`:
+Finally, add the new cache `Blog.NearCache` to your application's supervision
+tree (such as we did it previously):
 
 ```elixir
 def start(_type, _args) do
-  import Supervisor.Spec, warn: false
-
   children = [
-    Blog.Multilevel
+    Blog.Cache,
+    Blog.PartitionedCache,
+    Blog.NearCache
   ]
 
   ...
@@ -558,10 +595,10 @@ def start(_type, _args) do
 Let's try it out!
 
 ```elixir
-iex> Blog.Multilevel.put("foo", "bar", ttl: Nebulex.Time.expiry_time(1, :hour))
+iex> Blog.NearCache.put("foo", "bar", ttl: Nebulex.Time.expiry_time(1, :hour))
 "bar"
 
-iex> Blog.Multilevel.get("foo")
+iex> Blog.NearCache.get("foo")
 "bar"
 ```
 

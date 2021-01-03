@@ -44,6 +44,7 @@ defmodule Nebulex.MixProject do
 
   def application do
     [
+      extra_applications: [:eex],
       mod: {Nebulex.Application, []}
     ]
   end
