@@ -50,6 +50,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     :meta_tab,
     :backend,
     :backend_opts,
+    :stats_counter,
     :gc_interval,
     :gc_heartbeat_ref,
     :max_size,
@@ -64,13 +65,12 @@ defmodule Nebulex.Adapters.Local.Generation do
   import Nebulex.Helpers
 
   alias Nebulex.Adapter
+  alias Nebulex.Adapter.Stats
   alias Nebulex.Adapters.Local
   alias Nebulex.Adapters.Local.{Backend, Metadata}
 
   @type t :: :ets.tid()
   @type server_ref :: pid | atom | :ets.tid()
-
-  @compile {:inline, server: 1, list: 1, newer: 1}
 
   ## API
 
@@ -94,7 +94,9 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   ## Example
 
-      Nebulex.Adapters.Local.Generation.new(MyCache, reset_timer: :false)
+      Nebulex.Adapters.Local.Generation.new(MyCache)
+
+      Nebulex.Adapters.Local.Generation.new(MyCache, reset_timer: false)
   """
   @spec new(server_ref, Nebulex.Cache.opts()) :: [atom]
   def new(server_ref, opts \\ []) do
@@ -137,6 +139,19 @@ defmodule Nebulex.Adapters.Local.Generation do
   @spec memory_info(server_ref) :: {used_mem :: non_neg_integer, total_mem :: non_neg_integer}
   def memory_info(server_ref) do
     do_call(server_ref, :memory_info)
+  end
+
+  @doc """
+  Resets the timer for pushing new cache generations.
+
+  ## Example
+
+      Nebulex.Adapters.Local.Generation.reset_timer(MyCache)
+  """
+  def reset_timer(server_ref) do
+    server_ref
+    |> server()
+    |> GenServer.cast(:reset_timer)
   end
 
   @doc """
@@ -190,6 +205,12 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp get_meta_tab(server_ref), do: server_ref
 
+  defp do_call(tab, message) do
+    tab
+    |> server()
+    |> GenServer.call(message)
+  end
+
   ## GenServer Callbacks
 
   @impl true
@@ -216,6 +237,7 @@ defmodule Nebulex.Adapters.Local.Generation do
       meta_tab: meta_tab,
       backend: backend,
       backend_opts: backend_opts,
+      stats_counter: opts[:stats_counter],
       gc_interval: gc_interval,
       max_size: max_size,
       allocated_memory: allocated_memory,
@@ -234,7 +256,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   @impl true
-  def handle_call({:new_generation, opts}, _from, %__MODULE__{} = state) do
+  def handle_call({:new_generation, opts}, _from, state) do
     :ok = new_gen(state)
 
     ref =
@@ -257,7 +279,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     {:reply, size, state}
   end
 
-  def handle_call({:realloc, mem_size}, _from, %__MODULE__{} = state) do
+  def handle_call({:realloc, mem_size}, _from, state) do
     {:reply, :ok, %{state | allocated_memory: mem_size}}
   end
 
@@ -267,6 +289,11 @@ defmodule Nebulex.Adapters.Local.Generation do
         %__MODULE__{backend: backend, meta_tab: meta_tab, allocated_memory: allocated} = state
       ) do
     {:reply, {memory_info(backend, meta_tab), allocated}, state}
+  end
+
+  @impl true
+  def handle_cast(:reset_timer, state) do
+    {:noreply, %{state | gc_heartbeat_ref: maybe_reset_timer(true, state)}}
   end
 
   @impl true
@@ -358,26 +385,33 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   ## Private Functions
 
-  defp do_call(tab, message) do
-    tab
-    |> server()
-    |> GenServer.call(message)
-  end
-
-  defp new_gen(%__MODULE__{meta_tab: meta_tab, backend: backend, backend_opts: backend_opts}) do
+  defp new_gen(%__MODULE__{
+         meta_tab: meta_tab,
+         backend: backend,
+         backend_opts: backend_opts,
+         stats_counter: stats_counter
+       }) do
     # create new generation
     gen_tab = Backend.new(backend, meta_tab, backend_opts)
 
     # update generation list
     case list(meta_tab) do
       [newer, older] ->
+        # since the older generation is deleted, update evictions count
+        :ok = Stats.incr(stats_counter, :evictions, backend.info(older, :size))
+
+        # delete older generation
         _ = Backend.delete(backend, meta_tab, older)
+
+        # update generations
         Metadata.put(meta_tab, :generations, [gen_tab, newer])
 
       [newer] ->
+        # update generations
         Metadata.put(meta_tab, :generations, [gen_tab, newer])
 
       [] ->
+        # update generations
         Metadata.put(meta_tab, :generations, [gen_tab])
     end
   end

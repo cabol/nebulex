@@ -134,6 +134,29 @@ defmodule Nebulex.Cache.StatsTest do
     end
   end
 
+  describe "new generation" do
+    alias Cache.L1
+
+    setup_with_cache(Cache, [stats: true] ++ @config)
+
+    test "updates evictions" do
+      :ok = Cache.put_all(a: 1, b: 2, c: 3)
+      assert Cache.size() == 9
+
+      assert stats = Cache.stats_info()
+      assert stats.writes == 9
+      assert stats.evictions == 0
+
+      _ = L1.new_generation()
+      assert Cache.size() == 9
+      assert Cache.stats_info(:evictions) == 0
+
+      _ = L1.new_generation()
+      assert Cache.size() == 6
+      assert Cache.stats_info(:evictions) == 3
+    end
+  end
+
   describe "disabled stats" do
     setup_with_cache(Cache, @config)
 

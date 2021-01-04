@@ -59,6 +59,19 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       :ok = Process.sleep(500)
       assert generations_len(name) == 2
     end
+
+    test "reset timer", %{cache: cache, name: name} do
+      assert generations_len(name) == 1
+
+      :ok = Process.sleep(800)
+      :ok = cache.reset_generation_timer(name)
+
+      :ok = Process.sleep(220)
+      assert generations_len(name) == 1
+
+      :ok = Process.sleep(1000)
+      assert generations_len(name) == 2
+    end
   end
 
   describe "allocated memory" do

@@ -26,9 +26,6 @@ defmodule Nebulex.RPC do
   @typedoc "Reducer spec"
   @type reducer :: {acc :: term, reducer_fun}
 
-  # Inline common instructions
-  @compile {:inline, rpc_call: 6, rpc_multi_call: 3, rpc_multi_call: 6}
-
   ## API
 
   @doc """

@@ -309,6 +309,7 @@ defmodule Nebulex.Adapters.Local do
   # Supported Backends
   @backends ~w(ets shards)a
 
+  # Inline common instructions
   @compile {:inline, list_gen: 1, newer_gen: 1}
 
   ## Nebulex.Adapter
@@ -319,22 +320,41 @@ defmodule Nebulex.Adapters.Local do
       @doc """
       A convenience function for creating new generations.
       """
-      defdelegate new_generation(name_or_pid \\ __MODULE__, opts \\ []), to: Generation, as: :new
+      defdelegate new_generation(name_or_pid \\ __MODULE__, opts \\ []),
+        to: Generation,
+        as: :new
+
+      @doc """
+      A convenience function for reset the GC timer.
+      """
+      defdelegate reset_generation_timer(name_or_pid \\ __MODULE__),
+        to: Generation,
+        as: :reset_timer
 
       @doc """
       A convenience function for retrieving the current generations.
       """
-      defdelegate generations(name_or_pid \\ __MODULE__), to: Generation, as: :list
+      defdelegate generations(name_or_pid \\ __MODULE__),
+        to: Generation,
+        as: :list
 
       @doc """
       A convenience function for retrieving the newer generation.
       """
-      defdelegate newer_generation(name_or_pid \\ __MODULE__), to: Generation, as: :newer
+      defdelegate newer_generation(name_or_pid \\ __MODULE__),
+        to: Generation,
+        as: :newer
     end
   end
 
   @impl true
   def init(opts) do
+    # init internal metadata table
+    meta_tab = opts[:meta_tab] || Metadata.init()
+
+    # init stats_counter
+    stats_counter = opts[:stats_counter] || Stats.init(opts)
+
     # resolve the backend to be used
     backend =
       opts
@@ -348,22 +368,19 @@ defmodule Nebulex.Adapters.Local do
                   "#{inspect(@backends)}, got: #{inspect(val)}"
       end
 
-    # init internal metadata table
-    meta_tab = opts[:meta_tab] || Metadata.init()
-
-    child =
+    child_spec =
       Backend.child_spec(
         backend,
-        [backend: backend, meta_tab: meta_tab] ++ opts
+        [backend: backend, stats_counter: stats_counter, meta_tab: meta_tab] ++ opts
       )
 
     meta = %{
-      backend: backend,
       meta_tab: meta_tab,
-      stats_counter: opts[:stats_counter] || Stats.init(opts)
+      stats_counter: stats_counter,
+      backend: backend
     }
 
-    {:ok, child, meta}
+    {:ok, child_spec, meta}
   end
 
   ## Nebulex.Adapter.Entry

@@ -476,12 +476,27 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
           {name, self()},
           fn ->
             nodes
+            |> maybe_push_generation(cache)
             |> Enum.reduce_while([], &stream_entries(meta, &1, &2))
             |> Enum.each(&cache.__primary__.put(&1.key, &1.value, ttl: Entry.ttl(&1)))
           end,
           cluster_nodes
         )
     end
+  end
+
+  defp maybe_push_generation(nodes, cache) do
+    # This is to ensure the GC timer is in-sync (making the gap as short as
+    # possible) among the cache nodes when using the built-in local adapter
+    # as primary store. This will make the GC on all cluster nodes run almost
+    # at the same time.
+    :ok =
+      if cache.__primary__.__adapter__() == Nebulex.Adapters.Local do
+        {_, []} = :rpc.multicall(nodes, cache.__primary__, :reset_generation_timer, [])
+        :ok
+      end
+
+    nodes
   end
 
   defp stream_entries(meta, node, acc) do
