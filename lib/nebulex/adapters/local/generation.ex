@@ -215,15 +215,15 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   @impl true
   def init(opts) do
-    # add the GC PID to the meta table
+    # Add the GC PID to the meta table
     meta_tab = Keyword.fetch!(opts, :meta_tab)
     :ok = Metadata.put(meta_tab, :gc_pid, self())
 
-    # backend for creating new tables
+    # Backend for creating new tables
     backend = Keyword.fetch!(opts, :backend)
     backend_opts = Keyword.get(opts, :backend_opts, [])
 
-    # memory check options
+    # Memory check options
     max_size = get_option(opts, :max_size, &(is_integer(&1) and &1 > 0))
     allocated_memory = get_option(opts, :allocated_memory, &(is_integer(&1) and &1 > 0))
     cleanup_min = get_option(opts, :gc_cleanup_min_timeout, &(is_integer(&1) and &1 > 0), 10_000)
@@ -391,23 +391,23 @@ defmodule Nebulex.Adapters.Local.Generation do
          backend_opts: backend_opts,
          stats_counter: stats_counter
        }) do
-    # create new generation
+    # Create new generation
     gen_tab = Backend.new(backend, meta_tab, backend_opts)
 
-    # update generation list
+    # Update generation list
     case list(meta_tab) do
       [newer, older] ->
-        # since the older generation is deleted, update evictions count
+        # Since the older generation is deleted, update evictions count
         :ok = Stats.incr(stats_counter, :evictions, backend.info(older, :size))
 
-        # delete older generation
+        # Delete older generation
         _ = Backend.delete(backend, meta_tab, older)
 
-        # update generations
+        # Update generations
         Metadata.put(meta_tab, :generations, [gen_tab, newer])
 
       [newer] ->
-        # update generations
+        # Update generations
         Metadata.put(meta_tab, :generations, [gen_tab, newer])
 
       [] ->

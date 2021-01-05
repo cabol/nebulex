@@ -6,7 +6,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
 
   alias Nebulex.TestCache.{Replicated, ReplicatedMock}
 
-  setup do
+  setup_all do
     node_pid_list = start_caches(cluster_nodes(), [{Replicated, []}])
 
     on_exit(fn ->
@@ -15,6 +15,11 @@ defmodule Nebulex.Adapters.ReplicatedTest do
     end)
 
     {:ok, cache: Replicated, name: Replicated}
+  end
+
+  setup do
+    _ = Replicated.flush()
+    :ok
   end
 
   describe "c:init/1" do
@@ -111,7 +116,12 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       assert Replicated.put(:c, 3, ttl: 5000) == :ok
       assert :lists.usort(Replicated.nodes()) == :lists.usort(cluster_nodes())
 
-      assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})
+      assert_for_all_replicas(
+        Replicated,
+        :get_all,
+        [[:a, :b, :c]],
+        %{a: 1, b: 2, c: 3}
+      )
 
       # join new cache node
       node_pid_list = start_caches([:"node3@127.0.0.1"], [{Replicated, []}])
@@ -119,8 +129,14 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       assert :lists.usort(Replicated.nodes()) ==
                :lists.usort([:"node3@127.0.0.1" | cluster_nodes()])
 
-      :ok = Process.sleep(3000)
-      assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})
+      wait_until(fn ->
+        assert_for_all_replicas(
+          Replicated,
+          :get_all,
+          [[:a, :b, :c]],
+          %{a: 1, b: 2, c: 3}
+        )
+      end)
 
       :ok = stop_caches(node_pid_list)
     end

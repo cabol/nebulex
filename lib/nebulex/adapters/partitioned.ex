@@ -225,32 +225,32 @@ defmodule Nebulex.Adapters.Partitioned do
 
   @impl true
   def init(opts) do
-    # required cache name
+    # Required cache name
     cache = Keyword.fetch!(opts, :cache)
     name = opts[:name] || cache
 
-    # maybe use stats
+    # Maybe use stats
     stats_counter = opts[:stats_counter] || Stats.init(opts)
 
-    # primary cache options
+    # Primary cache options
     primary_opts =
       opts
       |> Keyword.get(:primary, [])
       |> Keyword.put(:stats_counter, stats_counter)
 
-    # maybe put a name to primary storage
+    # Maybe put a name to primary storage
     primary_opts =
       if opts[:name],
         do: [name: normalize_module_name([name, Primary])] ++ primary_opts,
         else: primary_opts
 
-    # keyslot module for selecting nodes
+    # Keyslot module for selecting nodes
     keyslot =
       opts
       |> Keyword.get(:keyslot, __MODULE__)
       |> assert_behaviour(Nebulex.Adapter.Keyslot, "keyslot")
 
-    # maybe task supervisor for distributed tasks
+    # Maybe task supervisor for distributed tasks
     {task_sup_name, children} = sup_child_spec(name, opts)
 
     child_spec =
@@ -268,7 +268,7 @@ defmodule Nebulex.Adapters.Partitioned do
       stats_counter: stats_counter
     }
 
-    # join the cache to the cluster
+    # Join the cache to the cluster
     :ok = Cluster.join(name)
 
     {:ok, child_spec, meta}

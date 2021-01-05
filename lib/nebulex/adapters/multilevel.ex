@@ -157,14 +157,14 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   def init(opts) do
-    # required cache name
+    # Required cache name
     cache = Keyword.fetch!(opts, :cache)
     name = opts[:name] || cache
 
-    # maybe use stats
+    # Maybe use stats
     stats_counter = Stats.init(opts)
 
-    # get cache levels
+    # Get cache levels
     levels =
       get_option(opts, :levels, &(Keyword.keyword?(&1) && length(&1) > 0)) ||
         raise """
@@ -173,7 +173,7 @@ defmodule Nebulex.Adapters.Multilevel do
         levels: [{MyCache.L1, gc_interval: 3_600_000, ...}, ...]
         """
 
-    # get multilevel-cache model
+    # Get multilevel-cache model
     model = get_option(opts, :model, &(&1 in @models), :inclusive)
 
     {children, meta_list} =

@@ -349,13 +349,13 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def init(opts) do
-    # init internal metadata table
+    # Init internal metadata table
     meta_tab = opts[:meta_tab] || Metadata.init()
 
-    # init stats_counter
+    # Init stats_counter
     stats_counter = opts[:stats_counter] || Stats.init(opts)
 
-    # resolve the backend to be used
+    # Resolve the backend to be used
     backend =
       opts
       |> Keyword.get(:backend, :ets)

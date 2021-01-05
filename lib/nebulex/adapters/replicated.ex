@@ -90,10 +90,6 @@ defmodule Nebulex.Adapters.Replicated do
     * `task_supervisor_opts` - Start-time options passed to
       `Task.Supervisor.start_link/1` when the adapter is initialized.
 
-    * `:bootstrap_timeout` - a timeout in milliseconds that bootstrap process
-      will wait after the cache supervision tree is started so the data can be
-      imported from remote nodes. Defaults to `1000`.
-
   ## Shared options
 
   Almost all of the cache functions outlined in `Nebulex.Cache` module
@@ -176,37 +172,33 @@ defmodule Nebulex.Adapters.Replicated do
 
   @impl true
   def init(opts) do
-    # required cache name
+    # Required cache name
     cache = Keyword.fetch!(opts, :cache)
     name = opts[:name] || cache
 
-    # maybe use stats
+    # Maybe use stats
     stats_counter = opts[:stats_counter] || Stats.init(opts)
 
-    # primary cache options
+    # Primary cache options
     primary_opts =
       opts
       |> Keyword.get(:primary, [])
       |> Keyword.put(:stats_counter, stats_counter)
 
-    # maybe put a name to primary storage
+    # Maybe put a name to primary storage
     primary_opts =
       if opts[:name],
         do: [name: normalize_module_name([name, Primary])] ++ primary_opts,
         else: primary_opts
 
-    # bootstrap timeout in milliseconds
-    bootstrap_timeout = Keyword.get(opts, :bootstrap_timeout, 1500)
-
-    # maybe task supervisor for distributed tasks
+    # Maybe task supervisor for distributed tasks
     {task_sup_name, children} = sup_child_spec(name, opts)
 
     meta = %{
       name: name,
       primary_name: primary_opts[:name],
       task_sup: task_sup_name,
-      stats_counter: stats_counter,
-      bootstrap_timeout: bootstrap_timeout
+      stats_counter: stats_counter
     }
 
     child_spec =
@@ -220,7 +212,7 @@ defmodule Nebulex.Adapters.Replicated do
           ] ++ children
       )
 
-    # join the cache to the cluster
+    # Join the cache to the cluster
     :ok = Cluster.join(name)
 
     {:ok, child_spec, meta}
@@ -232,7 +224,7 @@ defmodule Nebulex.Adapters.Replicated do
     end
   else
     defp sup_child_spec(name, opts) do
-      # task supervisor to execute parallel and/or remote commands
+      # Task supervisor to execute parallel and/or remote commands
       task_sup_name = normalize_module_name([name, TaskSupervisor])
       task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
 
@@ -379,7 +371,7 @@ defmodule Nebulex.Adapters.Replicated do
        ) do
     nodes = Cluster.get_nodes(name)
 
-    # Ensure it waits until ongoing flush or import operations finish,
+    # Ensure it waits until ongoing flush or sync operations finish,
     # if there's any.
     :global.trans(
       {name, pid},
@@ -433,6 +425,12 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
   alias Nebulex.Cache.Cluster
   alias Nebulex.Entry
 
+  # Max retries in intervals of 1 ms (5 seconds).
+  # If in 5 seconds the cache has not started, stop the server.
+  @max_retries 5000
+
+  ## API
+
   @doc false
   def start_link(%{name: name} = adapter_meta) do
     GenServer.start_link(
@@ -442,26 +440,66 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
     )
   end
 
+  ## GenServer Callbacks
+
   @impl true
-  def init(%{bootstrap_timeout: timeout} = adapter_meta) do
-    timer_ref = Process.send_after(self(), :import, timeout)
-    {:ok, %{timer_ref: timer_ref, adapter_meta: adapter_meta}}
+  def init(adapter_meta) do
+    # Set a global lock to stop any write operation
+    # until the synchronization process finishes
+    :ok = lock(adapter_meta.name)
+
+    # Init retries
+    state = Map.put(adapter_meta, :retries, 0)
+
+    # Start bootstrap process
+    {:ok, state, 1}
   end
 
   @impl true
-  def handle_info(:import, %{timer_ref: timer_ref, adapter_meta: %{pid: _} = meta} = state) do
-    _ = Process.cancel_timer(timer_ref)
-    :ok = import_from_nodes(meta)
+  def handle_info(:timeout, %{pid: _} = state) do
+    # Start synchronization process
+    :ok = sync_data(state)
+
+    # Delete global lock set when the server started
+    :ok = unlock(state.name)
+
+    # Bootstrap process finished
     {:noreply, state}
   end
 
-  def handle_info(:import, %{adapter_meta: %{name: name}} = state) do
+  def handle_info(:timeout, %{name: name, retries: retries} = state)
+      when retries < @max_retries do
     Adapter.with_meta(name, fn _adapter, adapter_meta ->
-      handle_info(:import, %{state | adapter_meta: adapter_meta})
+      handle_info(:timeout, adapter_meta)
     end)
+  rescue
+    ArgumentError -> {:noreply, %{state | retries: retries + 1}, 1}
   end
 
-  defp import_from_nodes(%{name: name, cache: cache} = meta) do
+  def handle_info(:timeout, state) do
+    # coveralls-ignore-start
+    {:stop, :normal, state}
+    # coveralls-ignore-stop
+  end
+
+  ## Helpers
+
+  defp lock(name) do
+    nodes = Cluster.get_nodes(name)
+    true = :global.set_lock({name, self()}, nodes)
+    :ok
+  end
+
+  defp unlock(name) do
+    nodes = Cluster.get_nodes(name)
+    true = :global.del_lock({name, self()}, nodes)
+    :ok
+  end
+
+  # FIXME: this is because coveralls does not mark this as covered
+  # coveralls-ignore-start
+
+  defp sync_data(%{name: name, cache: cache} = meta) do
     cluster_nodes = Cluster.get_nodes(name)
 
     case cluster_nodes -- [node()] do
@@ -469,39 +507,41 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
         :ok
 
       nodes ->
-        # This call gets blocked if there are any write operation ongoing.
-        # Once it is executed, all later write-like operations are blocked
-        # until it finishes.
-        :global.trans(
-          {name, self()},
-          fn ->
-            nodes
-            |> maybe_push_generation(cache)
-            |> Enum.reduce_while([], &stream_entries(meta, &1, &2))
-            |> Enum.each(&cache.__primary__.put(&1.key, &1.value, ttl: Entry.ttl(&1)))
-          end,
-          cluster_nodes
-        )
+        # Sync process:
+        # 1. Push a new generation on all cluster nodes to make the newer one
+        #    empty.
+        # 2. Copy cached data from one of the cluster nodes; entries will be
+        #    stremed from the older generation since the newer one should be
+        #    empty.
+        # 3. Push a new generation on the current/new node to make it a mirror
+        #    of the other cluster nodes.
+        # 4. Reset GC timer for ell cluster nodes (making the generation timer
+        #    gap among cluster nodes as small as possible).
+        with :ok <- maybe_run_on_nodes(nodes, cache, :new_generation),
+             :ok <- copy_entries_from_nodes(nodes, meta),
+             :ok <- maybe_run_on_nodes([node()], cache, :new_generation),
+             :ok <- maybe_run_on_nodes(nodes, cache, :reset_generation_timer) do
+          :ok
+        end
     end
   end
 
-  defp maybe_push_generation(nodes, cache) do
-    # This is to ensure the GC timer is in-sync (making the gap as short as
-    # possible) among the cache nodes when using the built-in local adapter
-    # as primary store. This will make the GC on all cluster nodes run almost
-    # at the same time.
-    :ok =
+  defp maybe_run_on_nodes(nodes, cache, fun) do
+    _ =
       if cache.__primary__.__adapter__() == Nebulex.Adapters.Local do
-        {_, []} = :rpc.multicall(nodes, cache.__primary__, :reset_generation_timer, [])
-        :ok
+        {_, []} = :rpc.multicall(nodes, cache.__primary__, fun, [])
       end
 
+    :ok
+  end
+
+  defp copy_entries_from_nodes(nodes, %{cache: cache} = meta) do
     nodes
+    |> Enum.reduce_while([], &stream_entries(meta, &1, &2))
+    |> Enum.each(&cache.__primary__.put(&1.key, &1.value, ttl: Entry.ttl(&1)))
   end
 
   defp stream_entries(meta, node, acc) do
-    # FIXME: this is because coveralls does not check this as covered
-    # coveralls-ignore-start
     stream_fun = fn ->
       meta
       |> Replicated.stream(nil, return: :entry, page_size: 100)
@@ -510,11 +550,11 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
       |> Enum.to_list()
     end
 
-    # coveralls-ignore-stop
-
     case :rpc.call(node, Kernel, :apply, [stream_fun, []]) do
       {:badrpc, _} -> {:cont, acc}
       entries -> {:halt, entries}
     end
   end
+
+  # coveralls-ignore-stop
 end
