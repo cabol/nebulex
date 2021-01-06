@@ -1,5 +1,56 @@
 # Changelog
 
+## [v2.0.0-rc.2](https://github.com/cabol/nebulex/tree/v2.0.0-rc.2) (2021-01-06)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.0.0-rc.1...v2.0.0-rc.2)
+
+**Added features:**
+
+- Adapter `Nebulex.Adapters.Nil` for disabling caching
+  [#88](https://github.com/cabol/nebulex/issues/88)
+- Adapter for `whitfin/cachex`
+  [#20](https://github.com/cabol/nebulex/issues/20)
+
+**Implemented enhancements:**
+
+- Improve replicated adapter to ensure better consistency across the nodes
+  [#99](https://github.com/cabol/nebulex/issues/99)
+- Refactor and/or improve Nebulex task for generating caches
+  [#97](https://github.com/cabol/nebulex/issues/97)
+- Add `Nebulex.Adapter.Stats` behaviour as optional
+  [#95](https://github.com/cabol/nebulex/issues/95)
+- Add `Nebulex.Adapter.Entry` and `Nebulex.Adapter.Storage` behaviours
+  [#93](https://github.com/cabol/nebulex/issues/93)
+- Add `:default` option to the `incr/3` callback
+  [#92](https://github.com/cabol/nebulex/issues/92)
+- Use `:erpc` when depending on OTP 23 or higher, otherwise use current
+  implementation [#91](https://github.com/cabol/nebulex/issues/91)
+
+**Fixed bugs:**
+
+- Update evictions stats when a new generation is created and the older is
+  deleted [#98](https://github.com/cabol/nebulex/issues/98)
+
+**Closed issues:**
+
+- Is there a way to disable caching entirely?
+  [#87](https://github.com/cabol/nebulex/issues/87)
+- Slow cache under moderate simultaneous load
+  [#80](https://github.com/cabol/nebulex/issues/80)
+- `mix nebulex.gen.cache` replaces everything in folder
+  [#75](https://github.com/cabol/nebulex/issues/75)
+- Replicated hash_slots for partitioned adapter
+  [#65](https://github.com/cabol/nebulex/issues/65)
+
+**Merged pull requests:**
+
+- Overall fixes and enhancements for adapter behaviours
+  [#94](https://github.com/cabol/nebulex/pull/94)
+  ([cabol](https://github.com/cabol))
+- Typo in code example 👀
+  [#89](https://github.com/cabol/nebulex/pull/89)
+  ([Awlexus](https://github.com/Awlexus))
+
 ## [v2.0.0-rc.1](https://github.com/cabol/nebulex/tree/v2.0.0-rc.1) (2020-11-15)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.0.0-rc.0...v2.0.0-rc.1)

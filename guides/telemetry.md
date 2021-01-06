@@ -28,7 +28,7 @@ and `:telemetry_poller` packages:
 ```elixir
 def deps do
   [
-    {:nebulex, "2.0.0-rc.1"},
+    {:nebulex, "2.0.0-rc.2"},
     {:shards, "~> 1.0"},
     {:decorator, "~> 1.3"},
     {:telemetry, "~> 0.4"},

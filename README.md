@@ -1,9 +1,8 @@
 # Nebulex 🌌
-> ### In-Process and Distributed Cache Toolkit for Elixir.
-> Easily craft and deploy distributed cache topologies and cache usage patterns.
+> In-memory and distributed caching toolkit for Elixir.
 
 ![CI](https://github.com/cabol/nebulex/workflows/CI/badge.svg)
-[![Coverage Status](https://coveralls.io/repos/github/cabol/nebulex/badge.svg?branch=master)](https://coveralls.io/github/cabol/nebulex?branch=master)
+[![Coverage Status](https://img.shields.io/coveralls/cabol/nebulex.svg)](https://coveralls.io/github/cabol/nebulex)
 [![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
 [![Hex Version](https://img.shields.io/hexpm/v/nebulex.svg)](https://hex.pm/packages/nebulex)
 [![Docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/nebulex)
@@ -12,15 +11,14 @@
 Nebulex provides support for transparently adding caching into an existing
 Elixir application. Similar to [Ecto][ecto], the caching abstraction allows
 consistent use of various caching solutions with minimal impact on the code.
-Furthermore, it enables the implementation of different
-[cache usage patterns][cache_patterns],
-[distributed cache topologies][cache_topologies],
-and more.
 
-Nebulex is commonly used to interact with different cache implementations and/or
-stores (such as Redis, Memcached, or even other Elixir cache implementations
-like [Cachex][cachex]), being completely agnostic from them, avoiding the vendor
-lock-in.
+Nebulex cache abstraction shields developers from directly dealing with the
+underlying caching implementations, such as [Redis][redis],
+[Memcached][memcached], or even other Elixir cache implementations like
+[Cachex][cachex]. Furthermore, several interesting and useful features like
+[cache usage patterns][cache_patterns],
+[declarative annotation-based caching][nbx_caching], and
+[distributed cache topologies][cache_topologies] are available out-of-box.
 
 See the [getting started guide](http://hexdocs.pm/nebulex/getting-started.html)
 and the [online documentation](http://hexdocs.pm/nebulex/Nebulex.html)
@@ -28,6 +26,9 @@ for more information.
 
 [ecto]: https://github.com/elixir-ecto/ecto
 [cachex]: https://github.com/whitfin/cachex
+[redis]: https://redis.io/
+[memcached]: https://memcached.org/
+[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
 [cache_patterns]: https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc
 [cache_topologies]: https://docs.oracle.com/middleware/1221/coherence/develop-applications/cache_intro.htm
 
@@ -62,7 +63,7 @@ For example, if you want to use a built-in cache, add to your `mix.exs` file:
 ```elixir
 def deps do
   [
-    {:nebulex, "2.0.0-rc.1"},
+    {:nebulex, "2.0.0-rc.2"},
     {:shards, "~> 1.0"},     #=> When using :shards as backend
     {:decorator, "~> 1.3"},  #=> When using Caching Annotations
     {:telemetry, "~> 0.4"}   #=> When using the Telemetry events (Nebulex stats)
@@ -88,7 +89,6 @@ makes all dependencies optional. For example:
   * If you are using an adapter other than the built-in ones (e.g: Cachex or
     Redis adapters), you have to add that dependency too.
 
-[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
 [telemetry]: http://hexdocs.pm/nebulex/telemetry.html
 
 Then run `mix deps.get` in your shell to fetch the dependencies. If you want to

@@ -2,7 +2,7 @@ defmodule Nebulex.MixProject do
   use Mix.Project
 
   @source_url "https://github.com/cabol/nebulex"
-  @version "2.0.0-rc.1"
+  @version "2.0.0-rc.2"
 
   def project do
     [
@@ -12,10 +12,6 @@ defmodule Nebulex.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
       deps: deps(),
-
-      # Docs
-      name: "Nebulex",
-      docs: docs(),
 
       # Testing
       test_coverage: [tool: ExCoveralls],
@@ -31,11 +27,12 @@ defmodule Nebulex.MixProject do
       dialyzer: dialyzer(),
 
       # Hex
+      description: "In-memory and distributed caching toolkit for Elixir",
       package: package(),
-      description: """
-      In-Process and Distributed Caching Toolkit for Elixir. Easily craft and
-      deploy distributed cache topologies and different cache usage patterns.
-      """
+
+      # Docs
+      name: "Nebulex",
+      docs: docs()
     ]
   end
 
