@@ -17,17 +17,19 @@ Furthermore, it enables the implementation of different
 [distributed cache topologies][cache_topologies],
 and more.
 
-[ecto]: https://github.com/elixir-ecto/ecto
-[cache_patterns]: https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc
-[cache_topologies]: https://docs.oracle.com/middleware/1221/coherence/develop-applications/cache_intro.htm
-
 Nebulex is commonly used to interact with different cache implementations and/or
-stores (such as Redis, Memcached, or other implementations of cache in Elixir),
-being completely agnostic from them, avoiding the vendor lock-in.
+stores (such as Redis, Memcached, or even other Elixir cache implementations
+like [Cachex][cachex]), being completely agnostic from them, avoiding the vendor
+lock-in.
 
 See the [getting started guide](http://hexdocs.pm/nebulex/getting-started.html)
 and the [online documentation](http://hexdocs.pm/nebulex/Nebulex.html)
 for more information.
+
+[ecto]: https://github.com/elixir-ecto/ecto
+[cachex]: https://github.com/whitfin/cachex
+[cache_patterns]: https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc
+[cache_topologies]: https://docs.oracle.com/middleware/1221/coherence/develop-applications/cache_intro.htm
 
 ## Usage
 

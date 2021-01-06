@@ -15,16 +15,19 @@ defmodule Nebulex.Adapters.Local do
   (which is more than enough) also referred like the `newer` and
   the `older`.
 
-  ## Features
+  ## Overall features
 
     * Configurable backend (`ets` or `:shards`).
     * Expiration – A status based on TTL (Time To Live) option. To maintain
       cache performance, expired entries may not be immediately flushed or
       evicted, they are expired or evicted on-demand, when the key is read.
-    * Eviction – [Generational Garbage Collection](http://hexdocs.pm/nebulex/Nebulex.Adapters.Local.Generation.html).
+    * Eviction – [Generational Garbage Collection][gc].
     * Sharding – For intensive workloads, the Cache may also be partitioned
       (by using `:shards` backend and specifying the `:partitions` option).
     * Support for transactions via Erlang global name registration facility.
+    * Support for stats.
+
+  [gc]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Local.Generation.html
 
   ## Options
 
@@ -80,7 +83,7 @@ defmodule Nebulex.Adapters.Local do
       starts and there are few entries or the consumed memory is near to `0`.
       Defaults to `600_000` (10 minutes).
 
-  ## Example
+  ## Usage
 
   `Nebulex.Cache` is the wrapper around the cache. We can define a
   local cache as follows:

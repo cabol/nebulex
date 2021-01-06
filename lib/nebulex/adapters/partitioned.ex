@@ -2,23 +2,70 @@ defmodule Nebulex.Adapters.Partitioned do
   @moduledoc ~S"""
   Built-in adapter for partitioned cache topology.
 
-  A partitioned cache is a clustered, fault-tolerant cache that has linear
-  scalability. Data is partitioned among all the machines of the cluster.
-  For fault-tolerance, partitioned caches can be configured to keep each piece
-  of data on one or more unique machines within a cluster. This adapter
-  in particular hasn't fault-tolerance built-in, each piece of data is kept
-  in a single node/machine (sharding), therefore, if a node fails, the data
-  kept by this node won't be available for the rest of the cluster.
+  ## Overall features
+
+    * Partitioned cache topology (Sharding Distribution Model).
+    * Configurable primary storage adapter.
+    * Configurable Keyslot to distributed the keys across the cluster members.
+    * Support for transactions via Erlang global name registration facility.
+    * Stats support rely on the primary storage adapter.
+
+  ## Partitioned Cache Topology
+
+  There are several key points to consider about a partitioned cache:
+
+    * _**Partitioned**_: The data in a distributed cache is spread out over
+      all the servers in such a way that no two servers are responsible for
+      the same piece of cached data. This means that the size of the cache
+      and the processing power associated with the management of the cache
+      can grow linearly with the size of the cluster. Also, it means that
+      operations against data in the cache can be accomplished with a
+      "single hop," in other words, involving at most one other server.
+
+    * _**Load-Balanced**_:  Since the data is spread out evenly over the
+      servers, the responsibility for managing the data is automatically
+      load-balanced across the cluster.
+
+    * _**Ownership**_: Exactly one node in the cluster is responsible for each
+      piece of data in the cache.
+
+    * _**Point-To-Point**_: The communication for the partitioned cache is all
+      point-to-point, enabling linear scalability.
+
+    * _**Location Transparency**_: Although the data is spread out across
+      cluster nodes, the exact same API is used to access the data, and the
+      same behavior is provided by each of the API methods. This is called
+      location transparency, which means that the developer does not have to
+      code based on the topology of the cache, since the API and its behavior
+      will be the same with a local cache, a replicated cache, or a distributed
+      cache.
+
+    * _**Failover**_: Failover of a distributed cache involves promoting backup
+      data to be primary storage. When a cluster node fails, all remaining
+      cluster nodes determine what data each holds in backup that the failed
+      cluster node had primary responsible for when it died. Those data becomes
+      the responsibility of whatever cluster node was the backup for the data.
+      However, this adapter does not provide fault-tolerance implementation,
+      each piece of data is kept in a single node/machine (via sharding), then,
+      if a node fails, the data kept by this node won't be available for the
+      rest of the cluster memebers.
+
+  > Based on **"Distributed Caching Essential Lessons"** by **Cameron Purdy**
+    and [Coherence Partitioned Cache Service][oracle-pcs].
+
+  [oracle-pcs]: https://docs.oracle.com/cd/E13924_01/coh.340/e13819/partitionedcacheservice.htm
+
+  ## Additional implementation notes
 
   `:pg2` or `:pg` (>= OTP 23) is used under-the-hood by the adapter to manage
   the cluster nodes. When the partitioned cache is started in a node, it creates
   a group and joins it (the cache supervisor PID is joined to the group). Then,
-  when a function is invoked, the adapter picks a node from the node list
-  (using the group members), and then the function is executed on that node.
-  In the same way, when the supervisor process of the partitioned cache
-  dies, the PID of that process is automatically removed from the PG group;
-  this is why it's recommended to use a consistent hashing algorithm for the
-  node selector.
+  when a function is invoked, the adapter picks a node from the group members,
+  and then the function is executed on that specific node. In the same way,
+  when a partitioned cache supervisor dies (the cache is stopped or killed for
+  some reason), the PID of that process is automatically removed from the PG
+  group; this is why it's recommended to use consistent hashing for distributing
+  the keys across the cluster nodes.
 
   > **NOTE:** `pg2` will be replaced by `pg` in future, since the `pg2` module
     is deprecated as of OTP 23 and scheduled for removal in OTP 24.
@@ -26,17 +73,12 @@ defmodule Nebulex.Adapters.Partitioned do
   This adapter depends on a local cache adapter (primary storage), it adds
   a thin layer on top of it in order to distribute requests across a group
   of nodes, where is supposed the local cache is running already. However,
-  you don't need to define or declare an additional cache module for the
-  local store, instead, the adapter initializes it automatically (adds the
-  local cache store as part of the supervision tree) based on the given
-  options within the `primary:` argument.
+  you don't need to define any additional cache module for the primary
+  storage, instead, the adapter initializes it automatically (it adds the
+  primary storage as part of the supervision tree) based on the given
+  options within the `primary_storage_adapter:` argument.
 
-  ## Features
-
-    * Support for partitioned topology (Sharding Distribution Model).
-    * Support for transactions via Erlang global name registration facility.
-    * Configurable primary storage adapter (local cache adapter).
-    * Configurable keyslot module to compute the node.
+  ## Usage
 
   When used, the Cache expects the `:otp_app` and `:adapter` as options.
   The `:otp_app` should point to an OTP application that has the cache
@@ -112,7 +154,7 @@ defmodule Nebulex.Adapters.Partitioned do
     * `:keyslot` - Defines the module implementing `Nebulex.Adapter.Keyslot`
       behaviour.
 
-    * `task_supervisor_opts` - Start-time options passed to
+    * `:task_supervisor_opts` - Start-time options passed to
       `Task.Supervisor.start_link/1` when the adapter is initialized.
 
   ## Shared options

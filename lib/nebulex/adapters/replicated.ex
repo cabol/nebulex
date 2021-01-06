@@ -2,10 +2,23 @@ defmodule Nebulex.Adapters.Replicated do
   @moduledoc ~S"""
   Built-in adapter for replicated cache topology.
 
-  The replicated cache excels in its ability to handle data replication,
-  concurrency control and failover in a cluster, all while delivering
-  in-memory data access speeds. A clustered replicated cache is exactly
-  what it says it is: a cache that replicates its data to all cluster nodes.
+  ## Overall features
+
+    * Replicated cache topology.
+    * Configurable primary storage adapter.
+    * Cache-level locking when flushing cache or adding new nodes.
+    * Key-level (or entry-level) locking for key-based write-like operations.
+    * Support for transactions via Erlang global name registration facility.
+    * Stats support rely on the primary storage adapter.
+
+  ## Replicated Cache Topology
+
+  A replicated cache is a clustered, fault tolerant cache where data is fully
+  replicated to every member in the cluster. This cache offers the fastest read
+  performance with linear performance scalability for reads but poor scalability
+  for writes (as writes must be processed by every member in the cluster).
+  Because data is replicated to all servers, adding servers does not increase
+  aggregate cache capacity.
 
   There are several challenges to building a reliably replicated cache. The
   first is how to get it to scale and perform well. Updates to the cache have
@@ -13,7 +26,7 @@ defmodule Nebulex.Adapters.Replicated do
   the same data, even if multiple updates to the same piece of data occur at
   the same time. Also, if a cluster node requests a lock, ideally it should
   not have to get all cluster nodes to agree on the lock or at least do it in
-  a very efficient way (`:global` is used for this), otherwise it will scale
+  a very efficient way (`:global` is used here), otherwise it will scale
   extremely poorly; yet in the case of a cluster node failure, all of the data
   and lock information must be kept safely.
 
@@ -25,15 +38,17 @@ defmodule Nebulex.Adapters.Replicated do
 
   However, there are some limitations:
 
-    * <ins>Cost Per Update</ins> - Updating a replicated cache requires pushing
-      the new version of the data to all other cluster members, which will limit
-      scalability if there is a high frequency of updates per member.
+    * _**Cost Per Update**_ - Updating a replicated cache requires pushing
+      the new version of the data to all other cluster members, which will
+      limit scalability if there is a high frequency of updates per member.
 
-    * <ins>Cost Per Entry</ins> - The data is replicated to every cluster
-      member, so Memory Heap space is used on each member, which will impact
+    * _**Cost Per Entry**_ - The data is replicated to every cluster member,
+      so Memory Heap space is used on each member, which will impact
       performance for large caches.
 
   > Based on **"Distributed Caching Essential Lessons"** by **Cameron Purdy**.
+
+  ## Usage
 
   When used, the Cache expects the `:otp_app` and `:adapter` as options.
   The `:otp_app` should point to an OTP application that has the cache
@@ -87,7 +102,7 @@ defmodule Nebulex.Adapters.Replicated do
       with the local primary storage. These options will depend on the local
       adapter to use.
 
-    * `task_supervisor_opts` - Start-time options passed to
+    * `:task_supervisor_opts` - Start-time options passed to
       `Task.Supervisor.start_link/1` when the adapter is initialized.
 
   ## Shared options
@@ -117,6 +132,46 @@ defmodule Nebulex.Adapters.Replicated do
       MyCache.nodes()
       MyCache.nodes(:cache_name)
 
+  ## Caveats of replicated adapter
+
+  As it is explained in the beginning, a replicated topology not only brings
+  with advantages (mostly for reads) but also with some limitations and
+  challenges.
+
+  This adapter uses global locks (via `:global`) for all operation that modify
+  or alter the cache somehow to ensure as much consistency as possible across
+  all members of the cluster. These locks may be per key or for the entire cache
+  depending on the operation taking place. For that reason, it is very important
+  to be aware about those operation that can potentally lead to performance and
+  scalability issues, so that you can do a better usage of the replicated
+  adapter. The following is with the operations and aspects you should pay
+  attention to:
+
+    * Starting and joining a new replicated node to the cluster is the most
+      expensive action, because all write-like operations across all members of
+      the cluster are blocked until the new node completes the synchronization
+      process, which involves copying cached data from any of the existing
+      cluster nodes into the new node, and this could be very expensive
+      depending on the number of caches entries. For that reason, adding new
+      nodes is something exceptional and expected to happen once in a while.
+
+    * Flushing cache. When flush action is executed, like in the previous case,
+      all write-like operations across all members of the cluster are blocked
+      until the flush is completed (this implies flushing the cached data from
+      all cluster nodes). Therefore, flushing the cache is also considered an
+      exceptional case that happens only once in while.
+
+    * Write-like operations based on a key only block operations related to
+      that key across all members of the cluster. This is not as critical as
+      the previous two cases but it is something to keep in mind anyway because
+      if there is a highly demanded key in terms of writes, that could be also
+      a potential bottleneck.
+
+  Summing up, the replicated cache topology along with this adapter should
+  be used mainly when the the reads clearly dominate over the writes (e.g.:
+  Reads 80% and Writes 20% or less) Also, flushing cache and adding new nodes
+  must be exceptional cases happening only once in a while to avoid performance
+  issues.
   """
 
   # Provide Cache Implementation

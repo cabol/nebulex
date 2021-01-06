@@ -54,7 +54,7 @@ defmodule Nebulex.Cluster do
     rpc(node, Application, :ensure_all_started, [:mix])
     rpc(node, Mix, :env, [Mix.env()])
 
-    for {app_name, _, _} <- Application.loaded_applications() do
+    for {app_name, _, _} <- Application.loaded_applications(), app_name not in [:dialyxir] do
       rpc(node, Application, :ensure_all_started, [app_name])
     end
   end
