@@ -219,6 +219,11 @@ defmodule Nebulex.Adapters.Local do
       we can set `600_000`, which means when the cache is almost empty the
       polling period will be close to 10 minutes.
 
+  ## Stats
+
+  This adapter does support stats by using the default implementation
+  provided by `Nebulex.Adapter.Stats`.
+
   ## Queryable API
 
   The adapter supports as query parameter the following values:
@@ -380,7 +385,8 @@ defmodule Nebulex.Adapters.Local do
     meta = %{
       meta_tab: meta_tab,
       stats_counter: stats_counter,
-      backend: backend
+      backend: backend,
+      started_at: DateTime.utc_now()
     }
 
     {:ok, child_spec, meta}
@@ -643,6 +649,15 @@ defmodule Nebulex.Adapters.Local do
       end,
       & &1
     )
+  end
+
+  ## Nebulex.Adapter.Stats
+
+  @impl true
+  def stats(%{started_at: started_at} = adapter_meta) do
+    if stats = super(adapter_meta) do
+      %{stats | metadata: Map.put(stats.metadata, :started_at, started_at)}
+    end
   end
 
   ## Helpers

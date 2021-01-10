@@ -1,4 +1,4 @@
-defmodule Nebulex.Cache.StatsTest do
+defmodule Nebulex.Adapters.StatsTest do
   use ExUnit.Case, async: true
 
   import Nebulex.CacheCase
@@ -29,6 +29,12 @@ defmodule Nebulex.Cache.StatsTest do
         otp_app: :nebulex,
         adapter: Nebulex.Adapters.Partitioned
     end
+
+    defmodule L4 do
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+    end
   end
 
   @config [
@@ -40,7 +46,7 @@ defmodule Nebulex.Cache.StatsTest do
     ]
   ]
 
-  describe "stats_info/0 and stats_info/1" do
+  describe "stats/0" do
     setup_with_cache(Cache, [stats: true] ++ @config)
 
     test "hits and misses" do
@@ -52,14 +58,11 @@ defmodule Nebulex.Cache.StatsTest do
       refute Cache.get(:c)
       refute Cache.get(:d)
 
-      assert stats = Cache.stats_info()
-      assert stats.writes == 6
-      assert stats.hits == 3
-      assert stats.misses == 6
-
-      assert Cache.stats_info(:writes) == 6
-      assert Cache.stats_info(:hits) == 3
-      assert Cache.stats_info(:misses) == 6
+      assert_stats_measurements(Cache,
+        l1: [hits: 3, misses: 2, writes: 2],
+        l2: [hits: 0, misses: 2, writes: 2],
+        l3: [hits: 0, misses: 2, writes: 2]
+      )
     end
 
     test "writes" do
@@ -80,10 +83,11 @@ defmodule Nebulex.Cache.StatsTest do
       :ok = Process.sleep(1100)
       refute Cache.get(:a)
 
-      assert stats = Cache.stats_info()
-      assert stats.writes == 33
-      assert stats.misses == 3
-      assert stats.expirations == 3
+      assert_stats_measurements(Cache,
+        l1: [expirations: 1, misses: 1, writes: 11],
+        l2: [expirations: 1, misses: 1, writes: 11],
+        l3: [expirations: 1, misses: 1, writes: 11]
+      )
     end
 
     test "evictions" do
@@ -94,20 +98,19 @@ defmodule Nebulex.Cache.StatsTest do
       assert Cache.take(2) == 2
       refute Cache.take(20)
 
-      assert stats = Cache.stats_info()
-      assert stats.writes == 30
-      assert stats.misses == 3
-      assert stats.evictions == 6
-
-      assert Cache.stats_info(:writes) == 30
-      assert Cache.stats_info(:misses) == 3
-      assert Cache.stats_info(:evictions) == 6
+      assert_stats_measurements(Cache,
+        l1: [evictions: 2, misses: 1, writes: 10],
+        l2: [evictions: 2, misses: 1, writes: 10],
+        l3: [evictions: 2, misses: 1, writes: 10]
+      )
 
       assert Cache.flush() == 24
 
-      assert stats = Cache.stats_info()
-      assert stats.evictions == 30
-      assert Cache.stats_info(:evictions) == 30
+      assert_stats_measurements(Cache,
+        l1: [evictions: 10, misses: 1, writes: 10],
+        l2: [evictions: 10, misses: 1, writes: 10],
+        l3: [evictions: 10, misses: 1, writes: 10]
+      )
     end
 
     test "expirations" do
@@ -119,23 +122,38 @@ defmodule Nebulex.Cache.StatsTest do
       :ok = Process.sleep(1100)
       assert Cache.get_all([:a, :b, :c, :d]) == %{a: 1, b: 2}
 
-      assert stats = Cache.stats_info()
-      assert stats.writes == 12
-      assert stats.hits == 6
-      assert stats.misses == 6
-      assert stats.evictions == 6
-      assert stats.expirations == 6
+      assert_stats_measurements(Cache,
+        l1: [evictions: 2, expirations: 2, hits: 6, misses: 2, writes: 4],
+        l2: [evictions: 2, expirations: 2, hits: 0, misses: 2, writes: 4],
+        l3: [evictions: 2, expirations: 2, hits: 0, misses: 2, writes: 4]
+      )
+    end
+  end
 
-      assert Cache.stats_info(:writes) == 12
-      assert Cache.stats_info(:hits) == 6
-      assert Cache.stats_info(:misses) == 6
-      assert Cache.stats_info(:evictions) == 6
-      assert Cache.stats_info(:expirations) == 6
+  describe "level with disabled stats" do
+    setup_with_cache(
+      Cache,
+      [stats: true] ++
+        Keyword.update!(
+          @config,
+          :levels,
+          &(&1 ++ [{Cache.L4, gc_interval: Time.expiry_time(1, :hour), stats: false}])
+        )
+    )
+
+    test "stats/0" do
+      measurements = Cache.stats().measurements
+      assert Map.get(measurements, :l1)
+      assert Map.get(measurements, :l2)
+      assert Map.get(measurements, :l3)
+      refute Map.get(measurements, :l4)
     end
   end
 
   describe "new generation" do
     alias Cache.L1
+    alias Cache.L2.Primary, as: L2Primary
+    alias Cache.L3.Primary, as: L3Primary
 
     setup_with_cache(Cache, [stats: true] ++ @config)
 
@@ -143,25 +161,57 @@ defmodule Nebulex.Cache.StatsTest do
       :ok = Cache.put_all(a: 1, b: 2, c: 3)
       assert Cache.size() == 9
 
-      assert stats = Cache.stats_info()
-      assert stats.writes == 9
-      assert stats.evictions == 0
+      assert_stats_measurements(Cache,
+        l1: [evictions: 0, writes: 3],
+        l2: [evictions: 0, writes: 3],
+        l3: [evictions: 0, writes: 3]
+      )
 
       _ = L1.new_generation()
       assert Cache.size() == 9
-      assert Cache.stats_info(:evictions) == 0
+
+      assert_stats_measurements(Cache,
+        l1: [evictions: 0, writes: 3],
+        l2: [evictions: 0, writes: 3],
+        l3: [evictions: 0, writes: 3]
+      )
 
       _ = L1.new_generation()
       assert Cache.size() == 6
-      assert Cache.stats_info(:evictions) == 3
+
+      assert_stats_measurements(Cache,
+        l1: [evictions: 3, writes: 3],
+        l2: [evictions: 0, writes: 3],
+        l3: [evictions: 0, writes: 3]
+      )
+
+      _ = L2Primary.new_generation()
+      _ = L2Primary.new_generation()
+      assert Cache.size() == 3
+
+      assert_stats_measurements(Cache,
+        l1: [evictions: 3, writes: 3],
+        l2: [evictions: 3, writes: 3],
+        l3: [evictions: 0, writes: 3]
+      )
+
+      _ = L3Primary.new_generation()
+      _ = L3Primary.new_generation()
+      assert Cache.size() == 0
+
+      assert_stats_measurements(Cache,
+        l1: [evictions: 3, writes: 3],
+        l2: [evictions: 3, writes: 3],
+        l3: [evictions: 3, writes: 3]
+      )
     end
   end
 
   describe "disabled stats" do
     setup_with_cache(Cache, @config)
 
-    test "stats_info/0 returns nil" do
-      refute Cache.stats_info()
+    test "stats/0 returns nil" do
+      refute Cache.stats()
     end
 
     test "dispatch_stats/1 is skipped" do
@@ -195,8 +245,12 @@ defmodule Nebulex.Cache.StatsTest do
         assert called(
                  :telemetry.execute(
                    [:nebulex, :cache, :stats],
-                   %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0},
-                   %{cache: Nebulex.Cache.StatsTest.Cache, node: node()}
+                   %{
+                     l1: %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0},
+                     l2: %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0},
+                     l3: %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0}
+                   },
+                   %{cache: Nebulex.Adapters.StatsTest.Cache, node: node()}
                  )
                )
       end
@@ -213,11 +267,25 @@ defmodule Nebulex.Cache.StatsTest do
         assert called(
                  :telemetry.execute(
                    [:my_event, :stats],
-                   %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0},
+                   %{
+                     l1: %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0},
+                     l2: %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0},
+                     l3: %{hits: 0, misses: 0, writes: 0, evictions: 0, expirations: 0}
+                   },
                    %{cache: :stats_with_dispatch, foo: :bar}
                  )
                )
       end
+    end
+  end
+
+  ## Helpers
+
+  defp assert_stats_measurements(cache, levels) do
+    measurements = cache.stats().measurements
+
+    for {level, stats} <- levels, {stat, expected} <- stats do
+      assert get_in(measurements, [level, stat]) == expected
     end
   end
 end

@@ -1,24 +1,45 @@
 defmodule Nebulex.Stats do
   @moduledoc """
-  Basic cache stats.
+  Stats data type.
+
+  Stats struct defines two main keys:
+
+  * `:measurements` - A map with the measurements provided by the underlying
+    adapter.
+  * `:metadata` - A map for including additional information; also provided
+    by the underlying adapter.
+
+  ## Measurements
+
+  The following measurements are expected to be present and fed by the
+  underlying adapter:
+
+    * `:evictions` - When a cache entry is removed.
+    * `:expirations` - When a cache entry is expired.
+    * `:hits` - When a key is looked up in cache and found.
+    * `:misses` - When a key is looked up in cache but not found.
+    * `:writes` - When a cache entry is inserted or updated.
+
+  ## Metadata
+
+  Despite the adapters can include any additional or custom metadata, It is
+  recommended they include the following keys:
+
+    * `:cache` - The cache module, or the name (if an explicit name has been
+      given to the cache).
+
+  **IMPORTANT:** Since the adapter may include any additional or custom
+  measurements, as well as metadata, it is recommended to check out the
+  adapter's documentation.
   """
 
   # Stats data type
-  defstruct hits: 0,
-            misses: 0,
-            writes: 0,
-            evictions: 0,
-            expirations: 0
+  defstruct measurements: %{},
+            metadata: %{}
 
-  @typedoc "Nebulex.Stats fields"
+  @typedoc "Nebulex.Stats data type"
   @type t :: %__MODULE__{
-          hits: non_neg_integer,
-          misses: non_neg_integer,
-          writes: non_neg_integer,
-          evictions: non_neg_integer,
-          expirations: non_neg_integer
+          measurements: %{optional(atom) => term},
+          metadata: %{optional(atom) => term}
         }
-
-  @typedoc "Nebulex.Stats stat names"
-  @type stat_name :: :hits | :misses | :writes | :evictions | :expirations
 end

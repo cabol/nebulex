@@ -8,7 +8,8 @@ defmodule Nebulex.Adapter do
   @typedoc """
   The metadata returned by the adapter `c:init/1`.
 
-  It must be a map and Nebulex itself will always inject two keys into the meta:
+  It must be a map and Nebulex itself will always inject two keys into
+  the meta:
 
     * `:cache` - The cache module.
     * `:pid` - The PID returned by the child spec returned in `c:init/1`

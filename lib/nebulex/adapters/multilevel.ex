@@ -103,6 +103,64 @@ defmodule Nebulex.Adapters.Multilevel do
       level where the operation will take place. By default, the evaluation
       is performed throughout the whole cache hierarchy (all levels).
 
+  ## Stats
+
+  Since the multi-level adapter works as a wrapper for the configured cache
+  levels, the support for stats depends on the underlying levels. Also, the
+  measurements are consolidated per level, they are not aggregated. For example,
+  if we enable the stats for the multi-level cache defined previously and run:
+
+      MyApp.Multilevel.stats()
+
+  The returned stats will look like:
+
+      %Nebulex.Stats{
+        measurements: %{
+          l1: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0},
+          l2: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0},
+          l3: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0}
+        },
+        metadata: %{
+          l1: %{
+            cache: NMyApp.Multilevel.L1,
+            started_at: ~U[2021-01-10 13:06:04.075084Z]
+          },
+          l2: %{
+            cache: MyApp.Multilevel.L2.Primary,
+            started_at: ~U[2021-01-10 13:06:04.089888Z]
+          },
+          cache: MyApp.Multilevel,
+          started_at: ~U[2021-01-10 13:06:04.066750Z]
+        }
+      }
+
+  **IMPORTANT:** Those cache levels with stats disabled won't be included
+  into the returned stats (they are skipped). If a cache level is using
+  an adapter that does not support stats, you may get unexpected errors.
+  Therefore, and as overall recommendation, check out the documentation
+  for adapters used by the underlying cache levels and ensure they
+  implement the `Nebulex.Adapter.Stats` behaviour.
+
+  ### Stats with Telemetry
+
+  In case you are using Telemetry metrics, you can define the metrics per
+  level, for example:
+
+      last_value("nebulex.cache.stats.l1.hits",
+        event_name: "nebulex.cache.stats",
+        measurement: &get_in(&1, [:l1, :hits]),
+        tags: [:cache]
+      )
+      last_value("nebulex.cache.stats.l2.hits",
+        event_name: "nebulex.cache.stats",
+        measurement: &get_in(&1, [:l2, :hits]),
+        tags: [:cache]
+      )
+
+  > See the section **"Instrumenting Multi-level caches"** in the
+    [Telemetry guide](http://hexdocs.pm/nebulex/telemetry.html)
+    for more information.
+
   ## Extended API
 
   This adapter provides one additional convenience function for retrieving
@@ -123,17 +181,14 @@ defmodule Nebulex.Adapters.Multilevel do
   @behaviour Nebulex.Adapter.Entry
   @behaviour Nebulex.Adapter.Storage
   @behaviour Nebulex.Adapter.Queryable
+  @behaviour Nebulex.Adapter.Stats
 
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
 
-  # Inherit default stats implementation
-  use Nebulex.Adapter.Stats
-
   import Nebulex.Helpers
 
   alias Nebulex.Adapter
-  alias Nebulex.Adapter.Stats
   alias Nebulex.Cache.Cluster
 
   # Multi-level Cache Models
@@ -162,7 +217,7 @@ defmodule Nebulex.Adapters.Multilevel do
     name = opts[:name] || cache
 
     # Maybe use stats
-    stats_counter = Stats.init(opts)
+    stats = get_option(opts, :stats, &is_boolean/1, false)
 
     # Get cache levels
     levels =
@@ -181,7 +236,7 @@ defmodule Nebulex.Adapters.Multilevel do
       |> Enum.reverse()
       |> Enum.reduce({[], []}, fn {l_cache, l_opts}, {child_acc, meta_acc} ->
         meta = %{cache: l_cache, name: l_opts[:name]}
-        l_opts = [stats_counter: stats_counter] ++ l_opts
+        l_opts = Keyword.put_new(l_opts, :stats, stats)
         {[{l_cache, l_opts} | child_acc], [meta | meta_acc]}
       end)
 
@@ -196,7 +251,8 @@ defmodule Nebulex.Adapters.Multilevel do
       name: name,
       levels: meta_list,
       model: model,
-      stats_counter: stats_counter
+      stats: stats,
+      started_at: DateTime.utc_now()
     }
 
     {:ok, child_spec, meta}
@@ -383,6 +439,38 @@ defmodule Nebulex.Adapters.Multilevel do
       |> Enum.uniq()
 
     super(adapter_meta, Keyword.put(opts, :nodes, nodes), fun)
+  end
+
+  ## Nebulex.Adapter.Stats
+
+  @impl true
+  def stats(adapter_meta) do
+    if adapter_meta.stats do
+      init_acc = %Nebulex.Stats{
+        metadata: %{
+          cache: adapter_meta.name || adapter_meta.cache,
+          started_at: adapter_meta.started_at
+        }
+      }
+
+      adapter_meta.levels
+      |> Enum.with_index(1)
+      |> Enum.reduce(init_acc, &update_stats/2)
+    end
+  end
+
+  # We can safely disable this warning since the atom created dynamically is
+  # always re-used; the number of levels is limited and known before hand.
+  # sobelow_skip ["DOS.BinToAtom"]
+  defp update_stats({meta, idx}, stats_acc) do
+    if stats = with_dynamic_cache(meta, :stats, []) do
+      level_idx = :"l#{idx}"
+      measurements = Map.put(stats_acc.measurements, level_idx, stats.measurements)
+      metadata = Map.put(stats_acc.metadata, level_idx, stats.metadata)
+      %{stats_acc | measurements: measurements, metadata: metadata}
+    else
+      stats_acc
+    end
   end
 
   ## Helpers

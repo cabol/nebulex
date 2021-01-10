@@ -270,3 +270,104 @@ Metric measurement: :value (last_value)
 With value: 0
 Tag values: %{cache: MyApp.Cache, node: :nonode@nohost}
 ```
+
+## Instrumenting Multi-level caches
+
+When using the multi-level adapter the returned stats measurements may look
+a bit different, because the multi-level adapter works as a wrapper for the
+configured cache levels, so the returned measurements are grouped and
+consolidated by level. For example, suppose you have the cache:
+
+```elixir
+defmodule MyApp.Multilevel do
+  use Nebulex.Cache,
+    otp_app: :nebulex,
+    adapter: Nebulex.Adapters.Multilevel
+
+  defmodule L1 do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
+  end
+
+  defmodule L2 do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Partitioned
+  end
+end
+```
+
+Then, when you run `MyApp.Multilevel.stats()` you get something like:
+
+```elixir
+%Nebulex.Stats{
+  measurements: %{
+    l1: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0},
+    l2: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0},
+    l3: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0}
+  },
+  metadata: %{
+    l1: %{
+      cache: NMyApp.Multilevel.L1,
+      started_at: ~U[2021-01-10 13:06:04.075084Z]
+    },
+    l2: %{
+      cache: MyApp.Multilevel.L2.Primary,
+      started_at: ~U[2021-01-10 13:06:04.089888Z]
+    },
+    cache: MyApp.Multilevel,
+    started_at: ~U[2021-01-10 13:06:04.066750Z]
+  }
+}
+```
+
+As you can see, the measurements map has the stats grouped by level, every key
+is an atom specifying the level and the value is a map with the stats and/or
+measurements for that level. Based on that, you could define the Telemetry
+metrics in this way:
+
+```elixir
+[
+  # L1 metrics
+  last_value("nebulex.cache.stats.l1.hits",
+  event_name: "nebulex.cache.stats",
+  measurement: &get_in(&1, [:l1, :hits]),
+  tags: [:cache]
+  ),
+  last_value("nebulex.cache.stats.l1.misses",
+    event_name: "nebulex.cache.stats",
+    measurement: &get_in(&1, [:l1, :misses]),
+    tags: [:cache]
+  ),
+  last_value("nebulex.cache.stats.l1.writes",
+    event_name: "nebulex.cache.stats",
+    measurement: &get_in(&1, [:l1, :writes]),
+    tags: [:cache]
+  ),
+  last_value("nebulex.cache.stats.l1.evictions",
+    event_name: "nebulex.cache.stats",
+    measurement: &get_in(&1, [:l1, :evictions]),
+    tags: [:cache]
+  ),
+  last_value("nebulex.cache.stats.l1.expirations",
+    event_name: "nebulex.cache.stats",
+    measurement: &get_in(&1, [:l1, :expirations]),
+    tags: [:cache]
+  ),
+
+  # L2 metrics
+  last_value("nebulex.cache.stats.l2.hits",
+    event_name: "nebulex.cache.stats",
+    measurement: &get_in(&1, [:l2, :hits]),
+    tags: [:cache]
+  ),
+  ...
+]
+```
+
+If what you need is the aggregated stats for all levels, you can always define
+your own function to emit the Telemetry events. You just need to call
+`MyApp.Multilevel.stats()` and then you add the logic to process the results
+in the way you need. On the other hand, if you are using Datadog through the
+StatsD reporter, you could do the aggregation directly in Datadog.

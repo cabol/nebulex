@@ -45,8 +45,8 @@ defmodule Nebulex.Cache do
   Stats support depends on the adapter entirely, it should implement the
   optional behaviour `Nebulex.Adapter.Stats` to support so. Nevertheless,
   the behaviour `Nebulex.Adapter.Stats` brings with a default implementation
-  using [Erlang counters][https://erlang.org/doc/man/counters.html], with all
-  callbacks overridable, which is supported by the built-in adapters.
+  using [Erlang counters][https://erlang.org/doc/man/counters.html], which is
+  used by the local built-in adapter (`Nebulex.Adapters.Local`).
 
   To use stats it is a matter to set the option `:stats` to `true` into the
   Cache options. For example, you can do it in the configuration file:
@@ -55,10 +55,10 @@ defmodule Nebulex.Cache do
         stats: true,
         ...
 
-  > Remember to check if the adapter to use implements the
+  > Remember to check if the underlying adapter implements the
     `Nebulex.Adapter.Stats` behaviour.
 
-  See `c:Nebulex.Cache.stats_info/0` and `c:Nebulex.Cache.stats_info/1`.
+  See `c:Nebulex.Cache.stats/0` for more information.
 
   ## Telemetry events
 
@@ -372,13 +372,8 @@ defmodule Nebulex.Cache do
 
       if Nebulex.Adapter.Stats in behaviours do
         @impl true
-        def stats_info do
-          Stats.stats_info(get_dynamic_cache())
-        end
-
-        @impl true
-        def stats_info(stat_name) do
-          Stats.stats_info(get_dynamic_cache(), stat_name)
+        def stats do
+          Stats.stats(get_dynamic_cache())
         end
 
         @impl true
@@ -1384,48 +1379,35 @@ defmodule Nebulex.Cache do
 
   ## Nebulex.Adapter.Stats
 
-  @optional_callbacks stats_info: 0, stats_info: 1, dispatch_stats: 1
+  @optional_callbacks stats: 0, dispatch_stats: 1
 
   @doc """
   Returns `Nebulex.Stats.t()` with the current stats values.
 
+  If the stats are disabled for the cache, then `nil` is returned.
+
   ## Example
 
-      iex> MyCache.stats_info()
-      %Nebulex..Stats{
-        evictions: 0,
-        expirations: 0,
-        hits: 0,
-        misses: 0,
-        writes: 0
+      iex> MyCache.stats()
+      %Nebulex.Stats{
+        measurements: {
+          evictions: 0,
+          expirations: 0,
+          hits: 0,
+          misses: 0,
+          writes: 0
+        },
+        metadata: %{}
       }
 
   """
-  @callback stats_info() :: Nebulex.Stats.t()
-
-  @doc """
-  Returns the current value for the given `stat_name`.
-
-  ## Example
-
-      iex> MyCache.stats_info(:hits)
-      0
-      iex> MyCache.stats_info(:misses)
-      0
-      iex> MyCache.stats_info(:writes)
-      0
-      iex> MyCache.stats_info(:evictions)
-      0
-      iex> MyCache.stats_info(:expirations)
-      0
-
-  """
-  @callback stats_info(stat_name :: Nebulex.Stats.stat_name()) :: non_neg_integer
+  @callback stats() :: Nebulex.Stats.t() | nil
 
   @doc """
   Emits a telemetry event when called with the current stats count.
 
-  The `:measurements` map will include the current count for each stat:
+  The telemetry `:measurements` map will include the same as
+  `Nebulex.Stats.t()`'s measurements. For example:
 
     * `:hits` - Current **hits** count.
     * `:misses` - Current **misses** count.
@@ -1433,7 +1415,8 @@ defmodule Nebulex.Cache do
     * `:evictions` - Current **evictions** count.
     * `:expirations` - Current **expirations** count.
 
-  The telemetry `:metadata` map will include the following fields:
+  The telemetry `:metadata` map will include the same as `Nebulex.Stats.t()`'s
+  metadata by default. For example:
 
     * `:cache` - The cache module, or the name (if an explicit name has been
       given to the cache).

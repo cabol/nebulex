@@ -170,6 +170,12 @@ defmodule Nebulex.Adapters.Partitioned do
       the task is shut down but the current process doesn't exit, only the
       result associated with that task is skipped in the reduce phase.
 
+  ## Stats
+
+  This adapter depends on the primary storage adapter for the stats support.
+  Therefore, it is important to ensure the underlying primary storage adapter
+  does support stats, otherwise, you may get unexpected errors.
+
   ## Extended API
 
   This adapter provides some additional convenience functions to the
@@ -206,15 +212,13 @@ defmodule Nebulex.Adapters.Partitioned do
   @behaviour Nebulex.Adapter.Entry
   @behaviour Nebulex.Adapter.Storage
   @behaviour Nebulex.Adapter.Queryable
+  @behaviour Nebulex.Adapter.Stats
 
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
 
   # Inherit default persistence implementation
   use Nebulex.Adapter.Persistence
-
-  # Inherit default stats implementation
-  use Nebulex.Adapter.Stats
 
   # Inherit default keyslot implementation
   use Nebulex.Adapter.Keyslot
@@ -537,6 +541,13 @@ defmodule Nebulex.Adapters.Partitioned do
   @impl true
   def transaction(%{name: name} = adapter_meta, opts, fun) do
     super(adapter_meta, Keyword.put(opts, :nodes, Cluster.get_nodes(name)), fun)
+  end
+
+  ## Nebulex.Adapter.Stats
+
+  @impl true
+  def stats(adapter_meta) do
+    with_dynamic_cache(adapter_meta, :stats, [])
   end
 
   ## Helpers

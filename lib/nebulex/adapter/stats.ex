@@ -17,9 +17,14 @@ defmodule Nebulex.Adapter.Stats do
   @doc """
   Returns `Nebulex.Stats.t()` with the current stats values.
 
-  See `c:Nebulex.Cache.stats_info/0`.
+  If the stats are disabled for the cache, then `nil` is returned.
+
+  The adapter may also include additional custom measurements,
+  as well as metadata.
+
+  See `c:Nebulex.Cache.stats/0`.
   """
-  @callback stats_info(Nebulex.Adapter.adapter_meta()) :: Nebulex.Stats.t()
+  @callback stats(Nebulex.Adapter.adapter_meta()) :: Nebulex.Stats.t() | nil
 
   @doc false
   defmacro __using__(_opts) do
@@ -27,19 +32,24 @@ defmodule Nebulex.Adapter.Stats do
       @behaviour Nebulex.Adapter.Stats
 
       @impl true
-      def stats_info(%{stats_counter: nil}), do: nil
-
-      def stats_info(%{stats_counter: counter_ref}) do
-        %Nebulex.Stats{
-          hits: :counters.get(counter_ref, 1),
-          misses: :counters.get(counter_ref, 2),
-          writes: :counters.get(counter_ref, 3),
-          evictions: :counters.get(counter_ref, 4),
-          expirations: :counters.get(counter_ref, 5)
-        }
+      def stats(adapter_meta) do
+        if counter_ref = adapter_meta[:stats_counter] do
+          %Nebulex.Stats{
+            measurements: %{
+              hits: :counters.get(counter_ref, 1),
+              misses: :counters.get(counter_ref, 2),
+              writes: :counters.get(counter_ref, 3),
+              evictions: :counters.get(counter_ref, 4),
+              expirations: :counters.get(counter_ref, 5)
+            },
+            metadata: %{
+              cache: adapter_meta[:name] || adapter_meta[:cache]
+            }
+          }
+        end
       end
 
-      defoverridable stats_info: 1
+      defoverridable stats: 1
     end
   end
 
@@ -85,7 +95,7 @@ defmodule Nebulex.Adapter.Stats do
 
   See adapters documentation for more information about stats implementation.
   """
-  @spec incr(:counters.counters_ref() | nil, Nebulex.Stats.stat_name(), integer) :: :ok
+  @spec incr(:counters.counters_ref() | nil, atom, integer) :: :ok
   def incr(counter, stat_name, incr \\ 1)
 
   def incr(nil, _stat, _incr), do: :ok
