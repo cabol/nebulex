@@ -299,7 +299,6 @@ defmodule Nebulex.Adapters.Local do
   # Inherit default stats implementation
   use Nebulex.Adapter.Stats
 
-  import Nebulex.Helpers
   import Record
 
   alias Nebulex.Adapter.Stats
@@ -536,10 +535,9 @@ defmodule Nebulex.Adapters.Local do
         key,
         amount,
         ttl,
-        opts
+        default,
+        _opts
       ) do
-    default = get_option(opts, :default, &is_integer/1, 0)
-
     meta_tab
     |> newer_gen()
     |> backend.update_counter(

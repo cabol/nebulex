@@ -351,7 +351,7 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
-  def update_counter(adapter_meta, key, amount, _ttl, opts) do
+  def update_counter(adapter_meta, key, amount, _ttl, _default, opts) do
     eval(adapter_meta, :incr, [key, amount, opts], opts)
   end
 

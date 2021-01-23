@@ -448,7 +448,7 @@ defmodule Nebulex.Adapters.Partitioned do
   end
 
   @impl true
-  def update_counter(adapter_meta, key, amount, _ttl, opts) do
+  def update_counter(adapter_meta, key, amount, _ttl, _default, opts) do
     call(adapter_meta, key, :incr, [key, amount, opts], opts)
   end
 

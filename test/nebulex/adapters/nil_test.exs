@@ -76,7 +76,13 @@ defmodule Nebulex.Adapters.NilTest do
     test "incr", %{cache: cache} do
       assert cache.incr(:counter) == 1
       assert cache.incr(:counter, 10) == 1
-      assert cache.incr(:counter, -10) == 1
+      assert cache.incr(:counter, -10) == -1
+    end
+
+    test "decr", %{cache: cache} do
+      assert cache.decr(:counter) == -1
+      assert cache.decr(:counter, 10) == -1
+      assert cache.decr(:counter, -10) == 1
     end
   end
 

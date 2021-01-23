@@ -169,7 +169,7 @@ defmodule Nebulex.TestCache do
     def touch(_, _), do: true
 
     @impl true
-    def update_counter(_, _, _, _, _), do: 1
+    def update_counter(_, _, _, _, _, _), do: 1
 
     @impl true
     def size(_) do

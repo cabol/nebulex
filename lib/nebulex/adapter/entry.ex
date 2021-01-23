@@ -58,7 +58,8 @@ defmodule Nebulex.Adapter.Entry do
       if the key already exists into the cache, otherwise, `false` is
       returned.
 
-  See `c:Nebulex.Cache.put/3`, `c:Nebulex.Cache.put_new/3`, `c:Nebulex.Cache.replace/3`.
+  See `c:Nebulex.Cache.put/3`, `c:Nebulex.Cache.put_new/3`,
+  `c:Nebulex.Cache.replace/3`.
   """
   @callback put(adapter_meta, key, value, ttl, on_write, opts) :: boolean
 
@@ -109,13 +110,12 @@ defmodule Nebulex.Adapter.Entry do
   @doc """
   Updates the counter mapped to the given `key`.
 
-  If `amount >= 0` (positive value) then the current value is incremented by
-  that amount, otherwise, it means the X is a negative value so the current
-  value is decremented by the same amount.
-
   See `c:Nebulex.Cache.incr/3`.
+  See `c:Nebulex.Cache.decr/3`.
   """
-  @callback update_counter(adapter_meta, key, amount :: integer, ttl, opts) :: integer
+  @callback update_counter(adapter_meta, key, amount, ttl, default, opts) ::
+              integer
+            when amount: integer, default: integer
 
   @doc """
   Returns whether the given `key` exists in cache.

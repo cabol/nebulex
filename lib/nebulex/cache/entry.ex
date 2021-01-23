@@ -191,10 +191,27 @@ defmodule Nebulex.Cache.Entry do
   Implementation for `c:Nebulex.Cache.incr/3`.
   """
   def incr(name, key, amount, opts) when is_integer(amount) do
-    Adapter.with_meta(name, & &1.update_counter(&2, key, amount, get_ttl(opts), opts))
+    default = Keyword.get(opts, :default, 0)
+
+    if is_integer(default) do
+      Adapter.with_meta(name, & &1.update_counter(&2, key, amount, get_ttl(opts), default, opts))
+    else
+      raise ArgumentError, "expected default: to be an integer, got: #{inspect(default)}"
+    end
   end
 
   def incr(_cache, _key, amount, _opts) do
+    raise ArgumentError, "expected amount to be an integer, got: #{inspect(amount)}"
+  end
+
+  @doc """
+  Implementation for `c:Nebulex.Cache.decr/3`.
+  """
+  def decr(name, key, amount, opts) when is_integer(amount) do
+    incr(name, key, amount * -1, opts)
+  end
+
+  def decr(_cache, _key, amount, _opts) do
     raise ArgumentError, "expected amount to be an integer, got: #{inspect(amount)}"
   end
 

@@ -2,7 +2,7 @@ defmodule Nebulex.Cache.EntryTest do
   import Nebulex.CacheCase
 
   deftests do
-    describe "put" do
+    describe "put/3" do
       test "puts the given entry into the cache", %{cache: cache} do
         for x <- 1..4, do: assert(cache.put(x, x) == :ok)
 
@@ -26,7 +26,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "put_new" do
+    describe "put_new/3" do
       test "puts the given entry into the cache if the key does not exist", %{cache: cache} do
         assert cache.put_new("foo", "bar")
         assert cache.get("foo") == "bar"
@@ -51,7 +51,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "put_new!" do
+    describe "put_new!/3" do
       test "puts the given entry into the cache if the key does not exist", %{cache: cache} do
         assert cache.put_new!("hello", "world")
         assert cache.get("hello") == "world"
@@ -68,7 +68,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "replace" do
+    describe "replace/3" do
       test "replaces the cached entry with a new value", %{cache: cache} do
         refute cache.replace("foo", "bar")
 
@@ -93,7 +93,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "replace!" do
+    describe "replace!/3" do
       test "replaces the cached entry with a new value", %{cache: cache} do
         :ok = cache.put("foo", "bar")
 
@@ -108,7 +108,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "put_all" do
+    describe "put_all/2" do
       test "puts the given entries at once", %{cache: cache} do
         assert cache.put_all(%{"apples" => 1, "bananas" => 3})
         assert cache.put_all(blueberries: 2, strawberries: 5)
@@ -150,7 +150,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "put_new_all" do
+    describe "put_new_all/2" do
       test "puts the given entries only if none of the keys does exist already", %{cache: cache} do
         assert cache.put_new_all(%{"apples" => 1, "bananas" => 3})
         assert cache.get("apples") == 1
@@ -169,7 +169,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "get" do
+    describe "get/2" do
       test "retrieves a cached entry", %{cache: cache} do
         for x <- 1..5 do
           :ok = cache.put(x, x)
@@ -182,7 +182,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "get!" do
+    describe "get!/2" do
       test "retrieves a cached entry", %{cache: cache} do
         for x <- 1..5 do
           :ok = cache.put(x, x)
@@ -197,7 +197,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "get_all" do
+    describe "get_all/2" do
       test "returns a map with the given keys", %{cache: cache} do
         assert cache.put_all(a: 1, c: 3)
         assert cache.get_all([:a, :b, :c]) == %{a: 1, c: 3}
@@ -213,7 +213,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "delete" do
+    describe "delete/2" do
       test "deletes the given key", %{cache: cache} do
         for x <- 1..3, do: cache.put(x, x * 2)
 
@@ -229,7 +229,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "take" do
+    describe "take/2" do
       test "returns the given key and removes it from cache", %{cache: cache} do
         for x <- 1..5 do
           :ok = cache.put(x, x)
@@ -244,7 +244,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "take!" do
+    describe "take!/2" do
       test "returns the given key and removes it from cache", %{cache: cache} do
         assert cache.put(1, 1) == :ok
         assert cache.take!(1) == 1
@@ -261,7 +261,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "has_key?" do
+    describe "has_key?/1" do
       test "returns true if key does exist in cache", %{cache: cache} do
         for x <- 1..5 do
           :ok = cache.put(x, x)
@@ -275,7 +275,7 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "update" do
+    describe "update/4" do
       test "updates an entry under a key applying a function on the value", %{cache: cache} do
         :ok = cache.put("foo", "123")
         :ok = cache.put("bar", "foo")
@@ -294,8 +294,8 @@ defmodule Nebulex.Cache.EntryTest do
       end
     end
 
-    describe "incr" do
-      test "increments/decrements a counter", %{cache: cache} do
+    describe "incr/3" do
+      test "increments a counter by the given amount", %{cache: cache} do
         assert cache.incr(:counter) == 1
         assert cache.incr(:counter) == 2
         assert cache.incr(:counter, 2) == 4
@@ -310,21 +310,56 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.incr(:counter, -3) == 0
       end
 
-      test "increments/decrements a counter with default", %{cache: cache} do
+      test "increments a counter by the given amount with default", %{cache: cache} do
         assert cache.incr(:counter1, 1, default: 10) == 11
         assert cache.incr(:counter2, 2, default: 10) == 12
         assert cache.incr(:counter3, -2, default: 10) == 8
       end
 
-      test "increments/decrements existing counter ignoring the default", %{cache: cache} do
+      test "increments a counter by the given amount ignoring the default", %{cache: cache} do
         assert cache.incr(:counter) == 1
         assert cache.incr(:counter, 1, default: 10) == 2
         assert cache.incr(:counter, -1, default: 100) == 1
       end
 
-      test "raises when incr value is invalid", %{cache: cache} do
+      test "raises when amount is invalid", %{cache: cache} do
         assert_raise ArgumentError, fn ->
           cache.incr(:counter, "foo")
+        end
+      end
+    end
+
+    describe "decr/3" do
+      test "decrements a counter by the given amount", %{cache: cache} do
+        assert cache.decr(:counter) == -1
+        assert cache.decr(:counter) == -2
+        assert cache.decr(:counter, 2) == -4
+        assert cache.decr(:counter, 3) == -7
+        assert cache.decr(:counter, 0) == -7
+
+        assert :counter |> cache.get() |> to_int() == -7
+
+        assert cache.decr(:counter, -1) == -6
+        assert cache.decr(:counter, -1) == -5
+        assert cache.decr(:counter, -2) == -3
+        assert cache.decr(:counter, -3) == 0
+      end
+
+      test "decrements a counter by the given amount with default", %{cache: cache} do
+        assert cache.decr(:counter1, 1, default: 10) == 9
+        assert cache.decr(:counter2, 2, default: 10) == 8
+        assert cache.decr(:counter3, -2, default: 10) == 12
+      end
+
+      test "decrements a counter by the given amount ignoring the default", %{cache: cache} do
+        assert cache.decr(:counter) == -1
+        assert cache.decr(:counter, 1, default: 10) == -2
+        assert cache.decr(:counter, -1, default: 100) == -1
+      end
+
+      test "raises when amount is invalid", %{cache: cache} do
+        assert_raise ArgumentError, fn ->
+          cache.decr(:counter, "foo")
         end
       end
     end

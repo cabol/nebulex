@@ -235,11 +235,6 @@ defmodule Nebulex.Cache do
       end
 
       @impl true
-      def put_all(entries, opts \\ []) do
-        Entry.put_all(get_dynamic_cache(), entries, opts)
-      end
-
-      @impl true
       def put_new(key, value, opts \\ []) do
         Entry.put_new(get_dynamic_cache(), key, value, opts)
       end
@@ -250,11 +245,6 @@ defmodule Nebulex.Cache do
       end
 
       @impl true
-      def put_new_all(entries, opts \\ []) do
-        Entry.put_new_all(get_dynamic_cache(), entries, opts)
-      end
-
-      @impl true
       def replace(key, value, opts \\ []) do
         Entry.replace(get_dynamic_cache(), key, value, opts)
       end
@@ -262,6 +252,16 @@ defmodule Nebulex.Cache do
       @impl true
       def replace!(key, value, opts \\ []) do
         Entry.replace!(get_dynamic_cache(), key, value, opts)
+      end
+
+      @impl true
+      def put_all(entries, opts \\ []) do
+        Entry.put_all(get_dynamic_cache(), entries, opts)
+      end
+
+      @impl true
+      def put_new_all(entries, opts \\ []) do
+        Entry.put_new_all(get_dynamic_cache(), entries, opts)
       end
 
       @impl true
@@ -295,8 +295,13 @@ defmodule Nebulex.Cache do
       end
 
       @impl true
-      def incr(key, incr \\ 1, opts \\ []) do
-        Entry.incr(get_dynamic_cache(), key, incr, opts)
+      def incr(key, amount \\ 1, opts \\ []) do
+        Entry.incr(get_dynamic_cache(), key, amount, opts)
+      end
+
+      @impl true
+      def decr(key, amount \\ 1, opts \\ []) do
+        Entry.decr(get_dynamic_cache(), key, amount, opts)
       end
 
       @impl true
@@ -911,11 +916,10 @@ defmodule Nebulex.Cache do
   @callback update(key, initial :: value, (value -> value), opts) :: value
 
   @doc """
-  Increments or decrements the counter mapped to the given `key`.
+  Increments the counter stored at `key` by the given `amount`.
 
-  If `amount >= 0` (positive value) then the current value is incremented by
-  that amount, otherwise, it means the X is a negative value so the current
-  value is decremented by the same amount.
+  If `amount < 0` (negative), the value is decremented by that `amount`
+  instead.
 
   ## Options
 
@@ -945,6 +949,41 @@ defmodule Nebulex.Cache do
 
   """
   @callback incr(key, amount :: integer, opts) :: integer
+
+  @doc """
+  Decrements the counter stored at `key` by the given `amount`.
+
+  If `amount < 0` (negative), the value is incremented by that `amount`
+  instead (opposite to `incr/3`).
+
+  ## Options
+
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
+
+    * `:default` - If `key` is not present in Cache, the default value is
+      inserted as initial value of key before the it is incremented.
+      Defaults to `0`.
+
+  See the "Shared options" section at the module documentation for more options.
+
+  ## Examples
+
+      iex> MyCache.decr(:a)
+      -1
+
+      iex> MyCache.decr(:a, 2)
+      -3
+
+      iex> MyCache.decr(:a, -1)
+      -2
+
+      iex> MyCache.decr(:missing_key, 2, default: 10)
+      8
+
+  """
+  @callback decr(key, amount :: integer, opts) :: integer
 
   @doc """
   Returns the remaining time-to-live for the given `key`. If the `key` does not
