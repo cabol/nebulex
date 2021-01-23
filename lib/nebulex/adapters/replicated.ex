@@ -339,8 +339,8 @@ defmodule Nebulex.Adapters.Replicated do
   end
 
   @impl true
-  def incr(adapter_meta, key, incr, _ttl, opts) do
-    with_transaction(adapter_meta, :incr, [key], [key, incr, opts], opts)
+  def update_counter(adapter_meta, key, amount, _ttl, opts) do
+    with_transaction(adapter_meta, :incr, [key], [key, amount, opts], opts)
   end
 
   @impl true

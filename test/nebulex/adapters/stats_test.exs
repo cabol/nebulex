@@ -65,7 +65,7 @@ defmodule Nebulex.Adapters.StatsTest do
       )
     end
 
-    test "writes" do
+    test "writes and updates" do
       assert Cache.put_all(a: 1, b: 2) == :ok
       refute Cache.put_new_all(a: 1, b: 2)
       assert Cache.put_new_all(c: 3, d: 4, e: 3)
@@ -75,6 +75,7 @@ defmodule Nebulex.Adapters.StatsTest do
       assert Cache.put_new(2, 2)
       assert Cache.replace(2, 22)
       assert Cache.incr(:counter) == 1
+      assert Cache.incr(:counter) == 2
       refute Cache.expire(:f, 1000)
       assert Cache.expire(:a, 1000)
       refute Cache.touch(:f)
@@ -84,9 +85,9 @@ defmodule Nebulex.Adapters.StatsTest do
       refute Cache.get(:a)
 
       assert_stats_measurements(Cache,
-        l1: [expirations: 1, misses: 1, writes: 11],
-        l2: [expirations: 1, misses: 1, writes: 11],
-        l3: [expirations: 1, misses: 1, writes: 11]
+        l1: [expirations: 1, misses: 1, writes: 8, updates: 4],
+        l2: [expirations: 1, misses: 1, writes: 8, updates: 4],
+        l3: [expirations: 1, misses: 1, writes: 8, updates: 4]
       )
     end
 

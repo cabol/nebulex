@@ -190,12 +190,12 @@ defmodule Nebulex.Cache.Entry do
   @doc """
   Implementation for `c:Nebulex.Cache.incr/3`.
   """
-  def incr(name, key, incr, opts) when is_integer(incr) do
-    Adapter.with_meta(name, & &1.incr(&2, key, incr, get_ttl(opts), opts))
+  def incr(name, key, amount, opts) when is_integer(amount) do
+    Adapter.with_meta(name, & &1.update_counter(&2, key, amount, get_ttl(opts), opts))
   end
 
-  def incr(_cache, _key, incr, _opts) do
-    raise ArgumentError, "expected incr to be an integer, got: #{inspect(incr)}"
+  def incr(_cache, _key, amount, _opts) do
+    raise ArgumentError, "expected amount to be an integer, got: #{inspect(amount)}"
   end
 
   @doc """

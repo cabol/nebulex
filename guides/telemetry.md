@@ -91,6 +91,7 @@ defmodule MyApp.Telemetry do
       last_value("nebulex.cache.stats.hits", tags: [:cache]),
       last_value("nebulex.cache.stats.misses", tags: [:cache]),
       last_value("nebulex.cache.stats.writes", tags: [:cache]),
+      last_value("nebulex.cache.stats.updates", tags: [:cache]),
       last_value("nebulex.cache.stats.evictions", tags: [:cache]),
       last_value("nebulex.cache.stats.expirations", tags: [:cache]),
 
@@ -140,6 +141,8 @@ iex(6)> Process.sleep(20)
 :ok
 iex(7)> MyApp.Cache.get 1
 nil
+iex(2)> MyApp.Cache.replace 1, 11
+true
 ```
 
 and you should see something like the following output:
@@ -147,7 +150,7 @@ and you should see something like the following output:
 ```
 [Telemetry.Metrics.ConsoleReporter] Got new event!
 Event name: nebulex.cache.stats
-All measurements: %{evictions: 2, expirations: 1, hits: 1, misses: 2, writes: 2}
+All measurements: %{evictions: 2, expirations: 1, hits: 1, misses: 2, updates: 1, writes: 2}
 All metadata: %{cache: MyApp.Cache}
 
 Metric measurement: :hits (last_value)
@@ -160,6 +163,10 @@ Tag values: %{cache: MyApp.Cache}
 
 Metric measurement: :writes (last_value)
 With value: 2
+Tag values: %{cache: MyApp.Cache}
+
+Metric measurement: :updates (last_value)
+With value: 1
 Tag values: %{cache: MyApp.Cache}
 
 Metric measurement: :evictions (last_value)
@@ -218,6 +225,7 @@ defp metrics do
     last_value("nebulex.cache.stats.hits", tags: [:cache, :node]),
     last_value("nebulex.cache.stats.misses", tags: [:cache, :node]),
     last_value("nebulex.cache.stats.writes", tags: [:cache, :node]),
+    last_value("nebulex.cache.stats.updates", tags: [:cache, :node]),
     last_value("nebulex.cache.stats.evictions", tags: [:cache, :node]),
     last_value("nebulex.cache.stats.expirations", tags: [:cache, :node]),
 
@@ -238,7 +246,7 @@ If you start an IEx session like previously, you should see the new metric too:
 ```
 [Telemetry.Metrics.ConsoleReporter] Got new event!
 Event name: nebulex.cache.stats
-All measurements: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0}
+All measurements: %{evictions: 0, expirations: 0, hits: 0, misses: 0, updates: 0, writes: 0}
 All metadata: %{cache: MyApp.Cache, node: :nonode@nohost}
 
 Metric measurement: :hits (last_value)
@@ -250,6 +258,10 @@ With value: 0
 Tag values: %{cache: MyApp.Cache, node: :nonode@nohost}
 
 Metric measurement: :writes (last_value)
+With value: 0
+Tag values: %{cache: MyApp.Cache, node: :nonode@nohost}
+
+Metric measurement: :updates (last_value)
 With value: 0
 Tag values: %{cache: MyApp.Cache, node: :nonode@nohost}
 
@@ -303,9 +315,9 @@ Then, when you run `MyApp.Multilevel.stats()` you get something like:
 ```elixir
 %Nebulex.Stats{
   measurements: %{
-    l1: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0},
-    l2: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0},
-    l3: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0}
+    l1: %{evictions: 0, expirations: 0, hits: 0, misses: 0, updates: 0, writes: 0},
+    l2: %{evictions: 0, expirations: 0, hits: 0, misses: 0, updates: 0, writes: 0},
+    l3: %{evictions: 0, expirations: 0, hits: 0, misses: 0, updates: 0, writes: 0}
   },
   metadata: %{
     l1: %{
@@ -331,9 +343,9 @@ metrics in this way:
 [
   # L1 metrics
   last_value("nebulex.cache.stats.l1.hits",
-  event_name: "nebulex.cache.stats",
-  measurement: &get_in(&1, [:l1, :hits]),
-  tags: [:cache]
+    event_name: "nebulex.cache.stats",
+    measurement: &get_in(&1, [:l1, :hits]),
+    tags: [:cache]
   ),
   last_value("nebulex.cache.stats.l1.misses",
     event_name: "nebulex.cache.stats",
@@ -343,6 +355,11 @@ metrics in this way:
   last_value("nebulex.cache.stats.l1.writes",
     event_name: "nebulex.cache.stats",
     measurement: &get_in(&1, [:l1, :writes]),
+    tags: [:cache]
+  ),
+  last_value("nebulex.cache.stats.l1.updates",
+    event_name: "nebulex.cache.stats",
+    measurement: &get_in(&1, [:l1, :updates]),
     tags: [:cache]
   ),
   last_value("nebulex.cache.stats.l1.evictions",

@@ -151,9 +151,9 @@ defmodule Nebulex.Adapters.Multilevel do
         measurement: &get_in(&1, [:l1, :hits]),
         tags: [:cache]
       )
-      last_value("nebulex.cache.stats.l2.hits",
+      last_value("nebulex.cache.stats.l1.misses",
         event_name: "nebulex.cache.stats",
-        measurement: &get_in(&1, [:l2, :hits]),
+        measurement: &get_in(&1, [:l1, :misses]),
         tags: [:cache]
       )
 
@@ -351,8 +351,8 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
-  def incr(adapter_meta, key, incr, _ttl, opts) do
-    eval(adapter_meta, :incr, [key, incr, opts], opts)
+  def update_counter(adapter_meta, key, amount, _ttl, opts) do
+    eval(adapter_meta, :incr, [key, amount, opts], opts)
   end
 
   @impl true

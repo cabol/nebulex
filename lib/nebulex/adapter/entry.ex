@@ -107,11 +107,15 @@ defmodule Nebulex.Adapter.Entry do
   @callback take(adapter_meta, key, opts) :: value
 
   @doc """
-  Increments or decrements the counter mapped to the given `key`.
+  Updates the counter mapped to the given `key`.
+
+  If `amount >= 0` (positive value) then the current value is incremented by
+  that amount, otherwise, it means the X is a negative value so the current
+  value is decremented by the same amount.
 
   See `c:Nebulex.Cache.incr/3`.
   """
-  @callback incr(adapter_meta, key, incr :: integer, ttl, opts) :: integer
+  @callback update_counter(adapter_meta, key, amount :: integer, ttl, opts) :: integer
 
   @doc """
   Returns whether the given `key` exists in cache.

@@ -913,7 +913,7 @@ defmodule Nebulex.Cache do
   @doc """
   Increments or decrements the counter mapped to the given `key`.
 
-  If `incr >= 0` (positive value) then the current value is incremented by
+  If `amount >= 0` (positive value) then the current value is incremented by
   that amount, otherwise, it means the X is a negative value so the current
   value is decremented by the same amount.
 
@@ -944,7 +944,7 @@ defmodule Nebulex.Cache do
       12
 
   """
-  @callback incr(key, incr :: integer, opts) :: integer
+  @callback incr(key, amount :: integer, opts) :: integer
 
   @doc """
   Returns the remaining time-to-live for the given `key`. If the `key` does not
@@ -1395,6 +1395,7 @@ defmodule Nebulex.Cache do
           expirations: 0,
           hits: 0,
           misses: 0,
+          updates: 0,
           writes: 0
         },
         metadata: %{}
@@ -1409,11 +1410,12 @@ defmodule Nebulex.Cache do
   The telemetry `:measurements` map will include the same as
   `Nebulex.Stats.t()`'s measurements. For example:
 
-    * `:hits` - Current **hits** count.
-    * `:misses` - Current **misses** count.
-    * `:writes` - Current **writes** count.
     * `:evictions` - Current **evictions** count.
     * `:expirations` - Current **expirations** count.
+    * `:hits` - Current **hits** count.
+    * `:misses` - Current **misses** count.
+    * `:updates` - Current **updates** count.
+    * `:writes` - Current **writes** count.
 
   The telemetry `:metadata` map will include the same as `Nebulex.Stats.t()`'s
   metadata by default. For example:

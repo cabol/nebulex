@@ -448,8 +448,8 @@ defmodule Nebulex.Adapters.Partitioned do
   end
 
   @impl true
-  def incr(adapter_meta, key, incr, _ttl, opts) do
-    call(adapter_meta, key, :incr, [key, incr, opts], opts)
+  def update_counter(adapter_meta, key, amount, _ttl, opts) do
+    call(adapter_meta, key, :incr, [key, amount, opts], opts)
   end
 
   @impl true

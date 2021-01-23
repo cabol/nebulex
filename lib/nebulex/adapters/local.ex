@@ -468,7 +468,7 @@ defmodule Nebulex.Adapters.Local do
   defp do_put(:replace, meta_tab, backend, ref, entry(key: key, value: value, ttl: ttl)) do
     meta_tab
     |> update_entry(backend, key, [{3, value}, {4, nil}, {5, ttl}])
-    |> update_stats(:put, ref)
+    |> update_stats(:update, ref)
   end
 
   @impl true
@@ -531,17 +531,23 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def incr(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, incr, ttl, opts) do
+  def update_counter(
+        %{meta_tab: meta_tab, backend: backend, stats_counter: ref},
+        key,
+        amount,
+        ttl,
+        opts
+      ) do
     default = get_option(opts, :default, &is_integer/1, 0)
 
     meta_tab
     |> newer_gen()
     |> backend.update_counter(
       key,
-      {3, incr},
+      {3, amount},
       entry(key: key, value: default, touched: Time.now(), ttl: ttl)
     )
-    |> update_stats(:write, ref)
+    |> update_stats({:update, amount, default}, ref)
   end
 
   @impl true
@@ -577,14 +583,14 @@ defmodule Nebulex.Adapters.Local do
   def expire(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, ttl) do
     meta_tab
     |> update_entry(backend, key, [{4, Time.now()}, {5, ttl}])
-    |> update_stats(:put, ref)
+    |> update_stats(:update, ref)
   end
 
   @impl true
   def touch(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key) do
     meta_tab
     |> update_entry(backend, key, [{4, Time.now()}])
-    |> update_stats(:put, ref)
+    |> update_stats(:update, ref)
   end
 
   ## Nebulex.Adapter.Storage
@@ -791,11 +797,6 @@ defmodule Nebulex.Adapters.Local do
     value
   end
 
-  defp update_stats(value, :write, counter_ref) do
-    :ok = Stats.incr(counter_ref, :writes)
-    value
-  end
-
   defp update_stats(true, :put, counter_ref) do
     :ok = Stats.incr(counter_ref, :writes)
     true
@@ -824,6 +825,23 @@ defmodule Nebulex.Adapters.Local do
 
   defp update_stats(value, :flush, counter_ref) do
     :ok = Stats.incr(counter_ref, :evictions, value)
+    value
+  end
+
+  defp update_stats(true, :update, counter_ref) do
+    :ok = Stats.incr(counter_ref, :updates)
+    true
+  end
+
+  defp update_stats(value, {:update, amount, default}, counter_ref) do
+    offset = if amount >= 0, do: -1, else: 1
+
+    if value + amount * offset === default do
+      :ok = Stats.incr(counter_ref, :writes)
+    else
+      :ok = Stats.incr(counter_ref, :updates)
+    end
+
     value
   end
 

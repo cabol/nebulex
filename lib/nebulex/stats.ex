@@ -18,7 +18,8 @@ defmodule Nebulex.Stats do
     * `:expirations` - When a cache entry is expired.
     * `:hits` - When a key is looked up in cache and found.
     * `:misses` - When a key is looked up in cache but not found.
-    * `:writes` - When a cache entry is inserted or updated.
+    * `:updates` - When an existing cache entry is or updated.
+    * `:writes` - When a cache entry is inserted or overwritten.
 
   ## Metadata
 

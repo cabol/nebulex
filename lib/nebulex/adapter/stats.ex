@@ -39,8 +39,9 @@ defmodule Nebulex.Adapter.Stats do
               hits: :counters.get(counter_ref, 1),
               misses: :counters.get(counter_ref, 2),
               writes: :counters.get(counter_ref, 3),
-              evictions: :counters.get(counter_ref, 4),
-              expirations: :counters.get(counter_ref, 5)
+              updates: :counters.get(counter_ref, 4),
+              evictions: :counters.get(counter_ref, 5),
+              expirations: :counters.get(counter_ref, 6)
             },
             metadata: %{
               cache: adapter_meta[:name] || adapter_meta[:cache]
@@ -75,7 +76,7 @@ defmodule Nebulex.Adapter.Stats do
   @spec init(Keyword.t()) :: :counters.counters_ref() | nil
   def init(opts) do
     case get_option(opts, :stats, &is_boolean(&1), false) do
-      true -> :counters.new(5, [:write_concurrency])
+      true -> :counters.new(6, [:write_concurrency])
       false -> nil
     end
   end
@@ -102,6 +103,7 @@ defmodule Nebulex.Adapter.Stats do
   def incr(ref, :hits, incr), do: :counters.add(ref, 1, incr)
   def incr(ref, :misses, incr), do: :counters.add(ref, 2, incr)
   def incr(ref, :writes, incr), do: :counters.add(ref, 3, incr)
-  def incr(ref, :evictions, incr), do: :counters.add(ref, 4, incr)
-  def incr(ref, :expirations, incr), do: :counters.add(ref, 5, incr)
+  def incr(ref, :updates, incr), do: :counters.add(ref, 4, incr)
+  def incr(ref, :evictions, incr), do: :counters.add(ref, 5, incr)
+  def incr(ref, :expirations, incr), do: :counters.add(ref, 6, incr)
 end
