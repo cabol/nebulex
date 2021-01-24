@@ -3,6 +3,9 @@ defmodule Nebulex.Time do
   Time utilities.
   """
 
+  # Inline instructions
+  @compile {:inline, now: 1, timeout?: 1}
+
   ## API
 
   @doc """
@@ -36,9 +39,9 @@ defmodule Nebulex.Time do
       false
   """
   @spec timeout?(term) :: boolean
-  def timeout?(timeout) when is_integer(timeout) and timeout >= 0, do: true
-  def timeout?(:infinity), do: true
-  def timeout?(_timeout), do: false
+  def timeout?(timeout) do
+    (is_integer(timeout) and timeout >= 0) or timeout == :infinity
+  end
 
   @doc """
   Returns the equivalent expiration time in milliseconds for the given `time`.

@@ -54,8 +54,6 @@ defmodule Nebulex.Adapter.Stats do
     end
   end
 
-  import Nebulex.Helpers
-
   @doc """
   Initializes the Erlang's counter to be used by the adapter. See the module
   documentation for more information about the stats default implementation.
@@ -75,9 +73,10 @@ defmodule Nebulex.Adapter.Stats do
   """
   @spec init(Keyword.t()) :: :counters.counters_ref() | nil
   def init(opts) do
-    case get_option(opts, :stats, &is_boolean(&1), false) do
+    case Keyword.get(opts, :stats, false) do
       true -> :counters.new(6, [:write_concurrency])
       false -> nil
+      other -> raise ArgumentError, "expected stats: to be boolean, got: #{inspect(other)}"
     end
   end
 

@@ -323,8 +323,14 @@ defmodule Nebulex.Cache.EntryTest do
       end
 
       test "raises when amount is invalid", %{cache: cache} do
-        assert_raise ArgumentError, fn ->
+        assert_raise ArgumentError, ~r"expected amount to be an integer", fn ->
           cache.incr(:counter, "foo")
+        end
+      end
+
+      test "raises when default is invalid", %{cache: cache} do
+        assert_raise ArgumentError, ~r"expected default: to be an integer", fn ->
+          cache.incr(:counter, 1, default: :invalid)
         end
       end
     end
@@ -358,8 +364,14 @@ defmodule Nebulex.Cache.EntryTest do
       end
 
       test "raises when amount is invalid", %{cache: cache} do
-        assert_raise ArgumentError, fn ->
+        assert_raise ArgumentError, ~r"expected amount to be an integer", fn ->
           cache.decr(:counter, "foo")
+        end
+      end
+
+      test "raises when default is invalid", %{cache: cache} do
+        assert_raise ArgumentError, ~r"expected default: to be an integer", fn ->
+          cache.decr(:counter, 1, default: :invalid)
         end
       end
     end

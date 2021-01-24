@@ -226,7 +226,6 @@ defmodule Nebulex.Adapters.Partitioned do
   import Nebulex.Helpers
 
   alias Nebulex.Adapter
-  alias Nebulex.Adapter.Stats
   alias Nebulex.Cache.Cluster
   alias Nebulex.RPC
 
@@ -276,13 +275,17 @@ defmodule Nebulex.Adapters.Partitioned do
     name = opts[:name] || cache
 
     # Maybe use stats
-    stats_counter = opts[:stats_counter] || Stats.init(opts)
+    stats = Keyword.get(opts, :stats, false)
+
+    unless is_boolean(stats) do
+      raise ArgumentError, "expected stats: to be boolean, got: #{inspect(stats)}"
+    end
 
     # Primary cache options
     primary_opts =
       opts
       |> Keyword.get(:primary, [])
-      |> Keyword.put(:stats_counter, stats_counter)
+      |> Keyword.put_new(:stats, stats)
 
     # Maybe put a name to primary storage
     primary_opts =
@@ -311,16 +314,13 @@ defmodule Nebulex.Adapters.Partitioned do
       primary_name: primary_opts[:name],
       task_sup: task_sup_name,
       keyslot: keyslot,
-      stats_counter: stats_counter
+      stats: stats
     }
 
     # Join the cache to the cluster
     :ok = Cluster.join(name)
 
     {:ok, child_spec, meta}
-  rescue
-    e in ArgumentError ->
-      reraise RuntimeError, e.message, __STACKTRACE__
   end
 
   if Code.ensure_loaded?(:erpc) do

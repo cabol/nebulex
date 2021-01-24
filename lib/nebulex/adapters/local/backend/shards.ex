@@ -36,6 +36,7 @@ if Code.ensure_loaded?(:shards) do
         get_option(
           opts,
           :partitions,
+          "an integer > 0",
           &(is_integer(&1) and &1 > 0),
           System.schedulers_online()
         )

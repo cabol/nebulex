@@ -217,19 +217,23 @@ defmodule Nebulex.Adapters.Multilevel do
     name = opts[:name] || cache
 
     # Maybe use stats
-    stats = get_option(opts, :stats, &is_boolean/1, false)
+    stats = Keyword.get(opts, :stats, false)
+
+    unless is_boolean(stats) do
+      raise ArgumentError, "expected stats: to be boolean, got: #{inspect(stats)}"
+    end
 
     # Get cache levels
     levels =
-      get_option(opts, :levels, &(Keyword.keyword?(&1) && length(&1) > 0)) ||
-        raise """
-        expected levels: to be a list with at least one level definition, e.g.:
-
-        levels: [{MyCache.L1, gc_interval: 3_600_000, ...}, ...]
-        """
+      get_option(
+        opts,
+        :levels,
+        "a list with at least one level definition",
+        &(Keyword.keyword?(&1) && length(&1) > 0)
+      )
 
     # Get multilevel-cache model
-    model = get_option(opts, :model, &(&1 in @models), :inclusive)
+    model = get_option(opts, :model, ":inclusive or :exclusive", &(&1 in @models), :inclusive)
 
     {children, meta_list} =
       levels

@@ -37,17 +37,17 @@ defmodule Nebulex.Adapters.Local do
     * `:backend` - Defines the backend or storage to be used for the adapter.
       Supported backends are: `:ets` and `:shards`. Defaults to `:ets`.
 
-    * `:read_concurrency` - Since this adapter uses ETS tables internally,
-      this option is used when a new table is created. See `:ets.new/2`.
-      Defaults to `true`.
+    * `:read_concurrency` - (boolean) Since this adapter uses ETS tables
+      internally, this option is used when a new table is created; see
+      `:ets.new/2`. Defaults to `true`.
 
-    * `:write_concurrency` - Since this adapter uses ETS tables internally,
-      this option is used when a new table is created. See `:ets.new/2`.
-      Defaults to `true`.
+    * `:write_concurrency` - (boolean) Since this adapter uses ETS tables
+      internally, this option is used when a new table is created; see
+      `:ets.new/2`. Defaults to `true`.
 
-     * `:compressed` - This option is used when a new ETS table is created and
-       it defines whether or not it includes X as an option. See `:ets.new/2`.
-       Defaults to `false`.
+    * `:compressed` - (boolean) This option is used when a new ETS table is
+      created and it defines whether or not it includes X as an option; see
+      `:ets.new/2`. Defaults to `false`.
 
     * `:backend_type` - This option defines the type of ETS to be used
       (Defaults to `:set`). However, it is highly recommended to keep the
@@ -56,32 +56,36 @@ defmodule Nebulex.Adapters.Local do
       Please see the [ETS](https://erlang.org/doc/man/ets.html) docs
       for more information.
 
-    * `:partitions` - The number of partitions in the Cache. This option is only
-      available for `:shards` backend. Defaults to `System.schedulers_online()`.
+    * `:partitions` - If it is set, an integer > 0 is expected, otherwise,
+      it defaults to `System.schedulers_online()`. This option is only
+      available for `:shards` backend.
 
-    * `:gc_interval` - Interval time in milliseconds to garbage collection to
-      run, delete the oldest generation and create a new one. If this option is
-      not set, garbage collection is never executed, so new generations must be
+    * `:gc_interval` - If it is set, an integer > 0 is expected defining the
+      interval time in milliseconds to garbage collection to run, delete the
+      oldest generation and create a new one. If this option is not set,
+      garbage collection is never executed, so new generations must be
       created explicitly, e.g.: `MyCache.new_generation(name_or_pid, opts)`.
 
-    * `:max_size` - Max number of cached entries (cache limit). If it is not
-      set (`nil`), the check to release memory is not performed (the default).
+    * `:max_size` - If it is set, an integer > 0 is expected defining the
+      max number of cached entries (cache limit). If it is not set (`nil`),
+      the check to release memory is not performed (the default).
 
-    * `:allocated_memory` - Max size in bytes allocated for a cache generation.
-      If this option is set and the configured value is reached, a new cache
-      generation is created so the oldest is deleted and force releasing memory
-      space. If it is not set (`nil`), the cleanup check to release memory is
+    * `:allocated_memory` - If it is set, an integer > 0 is expected defining
+      the max size in bytes allocated for a cache generation. When this option
+      is set and the configured value is reached, a new cache generation is
+      created so the oldest is deleted and force releasing memory space.
+      If it is not set (`nil`), the cleanup check to release memory is
       not performed (the default).
 
-    * `:gc_cleanup_min_timeout` - The min timeout in milliseconds for triggering
-      the next cleanup and memory check. This will be the timeout to use when
-      either the max size or max allocated memory is reached.
-      Defaults to `10_000` (10 seconds).
+    * `:gc_cleanup_min_timeout` - An integer > 0 defining the min timeout in
+      milliseconds for triggering the next cleanup and memory check. This will
+      be the timeout to use when either the max size or max allocated memory
+      is reached. Defaults to `10_000` (10 seconds).
 
-    * `:gc_cleanup_max_timeout` - The max timeout in milliseconds for triggering
-      the next cleanup and memory check. This is the timeout used when the cache
-      starts and there are few entries or the consumed memory is near to `0`.
-      Defaults to `600_000` (10 minutes).
+    * `:gc_cleanup_max_timeout` - An integer > 0 defining the max timeout in
+      milliseconds for triggering the next cleanup and memory check. This is
+      the timeout used when the cache starts and there are few entries or the
+      consumed memory is near to `0`. Defaults to `600_000` (10 minutes).
 
   ## Usage
 
@@ -360,7 +364,7 @@ defmodule Nebulex.Adapters.Local do
     meta_tab = opts[:meta_tab] || Metadata.init()
 
     # Init stats_counter
-    stats_counter = opts[:stats_counter] || Stats.init(opts)
+    stats_counter = Stats.init(opts)
 
     # Resolve the backend to be used
     backend =

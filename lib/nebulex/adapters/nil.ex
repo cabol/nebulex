@@ -115,8 +115,7 @@ defmodule Nebulex.Adapters.Nil do
   def touch(_, _), do: true
 
   @impl true
-  def update_counter(_, _, amount, _, _, _) when amount < 0, do: -1
-  def update_counter(_, _, _, _, _, _), do: 1
+  def update_counter(_, _, amount, _, default, _), do: default + amount
 
   ## Nebulex.Adapter.Storage
 

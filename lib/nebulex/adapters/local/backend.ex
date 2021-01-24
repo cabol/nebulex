@@ -24,10 +24,10 @@ defmodule Nebulex.Adapters.Local.Backend do
       end
 
       defp parse_opts(opts, extra \\ []) do
-        type = get_option(opts, :backend_type, &is_atom/1, :set)
+        type = get_option(opts, :backend_type, "an atom", &is_atom/1, :set)
 
         compressed =
-          case get_option(opts, :compressed, &is_boolean/1, false) do
+          case get_option(opts, :compressed, "boolean", &is_boolean/1, false) do
             true -> [:compressed]
             false -> []
           end
@@ -37,8 +37,10 @@ defmodule Nebulex.Adapters.Local.Backend do
             type,
             :public,
             {:keypos, 2},
-            {:read_concurrency, get_option(opts, :read_concurrency, &is_boolean/1, true)},
-            {:write_concurrency, get_option(opts, :write_concurrency, &is_boolean/1, true)},
+            {:read_concurrency,
+             get_option(opts, :read_concurrency, "boolean", &is_boolean/1, true)},
+            {:write_concurrency,
+             get_option(opts, :write_concurrency, "boolean", &is_boolean/1, true)},
             compressed,
             extra
           ]

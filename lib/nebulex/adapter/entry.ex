@@ -110,6 +110,10 @@ defmodule Nebulex.Adapter.Entry do
   @doc """
   Updates the counter mapped to the given `key`.
 
+  If `amount` > 0, the counter is incremented by the given `amount`.
+  If `amount` < 0, the counter is decremented by the given `amount`.
+  If `amount` == 0, the counter is not updated.
+
   See `c:Nebulex.Cache.incr/3`.
   See `c:Nebulex.Cache.decr/3`.
   """

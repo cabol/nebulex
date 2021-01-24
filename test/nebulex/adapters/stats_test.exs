@@ -131,7 +131,7 @@ defmodule Nebulex.Adapters.StatsTest do
     end
   end
 
-  describe "level with disabled stats" do
+  describe "disabled stats in a cache level" do
     setup_with_cache(
       Cache,
       [stats: true] ++
@@ -142,12 +142,53 @@ defmodule Nebulex.Adapters.StatsTest do
         )
     )
 
-    test "stats/0" do
+    test "ignored when returning stats" do
       measurements = Cache.stats().measurements
       assert Map.get(measurements, :l1)
       assert Map.get(measurements, :l2)
       assert Map.get(measurements, :l3)
       refute Map.get(measurements, :l4)
+    end
+  end
+
+  describe "cache init error" do
+    test "because invalid stats option" do
+      _ = Process.flag(:trap_exit, true)
+
+      {:error, {%ArgumentError{message: msg}, _}} =
+        Cache.start_link(stats: 123, levels: [{Cache.L1, []}])
+
+      assert msg == "expected stats: to be boolean, got: 123"
+    end
+
+    test "L1: invalid stats option" do
+      _ = Process.flag(:trap_exit, true)
+
+      {:error, {:shutdown, {_, _, {:shutdown, {_, Cache.L1, {error, _}}}}}} =
+        Cache.start_link(stats: true, levels: [{Cache.L1, [stats: 123]}])
+
+      assert error == %ArgumentError{message: "expected stats: to be boolean, got: 123"}
+    end
+
+    test "L2: invalid stats option" do
+      _ = Process.flag(:trap_exit, true)
+
+      {:error, {:shutdown, {_, _, {:shutdown, {_, Cache.L2, {error, _}}}}}} =
+        Cache.start_link(stats: true, levels: [{Cache.L1, []}, {Cache.L2, [stats: 123]}])
+
+      assert error == %ArgumentError{message: "expected stats: to be boolean, got: 123"}
+    end
+
+    test "L3: invalid stats option" do
+      _ = Process.flag(:trap_exit, true)
+
+      {:error, {:shutdown, {_, _, {:shutdown, {_, Cache.L3, {error, _}}}}}} =
+        Cache.start_link(
+          stats: true,
+          levels: [{Cache.L1, []}, {Cache.L2, []}, {Cache.L3, [stats: 123]}]
+        )
+
+      assert error == %ArgumentError{message: "expected stats: to be boolean, got: 123"}
     end
   end
 
@@ -208,7 +249,7 @@ defmodule Nebulex.Adapters.StatsTest do
     end
   end
 
-  describe "disabled stats" do
+  describe "disabled stats:" do
     setup_with_cache(Cache, @config)
 
     test "stats/0 returns nil" do

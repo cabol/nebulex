@@ -127,20 +127,16 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
     end
 
     test "default options" do
-      {:ok, _pid} =
-        LocalWithSizeLimit.start_link(
-          gc_interval: :invalid,
-          gc_cleanup_min_timeout: -1,
-          gc_cleanup_max_timeout: -1
-        )
+      _ = Process.flag(:trap_exit, true)
 
-      assert %{
-               gc_interval: nil,
-               gc_cleanup_min_timeout: 10_000,
-               gc_cleanup_max_timeout: 600_000
-             } = get_state()
+      assert {:error, {:shutdown, {_, _, {:shutdown, {_, _, {%ArgumentError{message: err}, _}}}}}} =
+               LocalWithSizeLimit.start_link(
+                 gc_interval: :invalid,
+                 gc_cleanup_min_timeout: -1,
+                 gc_cleanup_max_timeout: -1
+               )
 
-      :ok = LocalWithSizeLimit.stop()
+      assert err == "expected gc_cleanup_min_timeout: to be an integer > 0, got: -1"
     end
 
     test "cleanup while cache is being used" do
@@ -202,12 +198,6 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
   end
 
   ## Private Functions
-
-  defp get_state do
-    LocalWithSizeLimit
-    |> Generation.server()
-    |> :sys.get_state()
-  end
 
   defp check_cache_size(cache) do
     :cleanup =

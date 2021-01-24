@@ -54,7 +54,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
     end
 
     test "fails because unloaded keyslot module" do
-      assert {:error, {%RuntimeError{message: msg}, _}} =
+      assert {:error, {%ArgumentError{message: msg}, _}} =
                Partitioned.start_link(
                  name: :unloaded_keyslot,
                  keyslot: UnloadedKeyslot
@@ -64,7 +64,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
     end
 
     test "fails because invalid keyslot module" do
-      assert {:error, {%RuntimeError{message: msg}, _}} =
+      assert {:error, {%ArgumentError{message: msg}, _}} =
                Partitioned.start_link(
                  name: :invalid_keyslot,
                  keyslot: __MODULE__

@@ -4,11 +4,14 @@ defmodule Nebulex.Helpers do
 
   ## API
 
-  @spec get_option(Keyword.t(), atom, (any -> boolean), any, (any -> any) | nil) :: any
-  def get_option(opts, key, on_get, default \\ nil, on_false \\ nil) do
-    case Keyword.get(opts, key) do
-      nil -> default
-      val -> (on_get.(val) && val) || on_false(on_false, val, default)
+  @spec get_option(Keyword.t(), atom, String.t(), (any -> boolean), term) :: term
+  def get_option(opts, key, expected, valid?, default \\ nil) do
+    value = Keyword.get(opts, key, default)
+
+    if valid?.(value) do
+      value
+    else
+      raise ArgumentError, "expected #{key}: to be #{expected}, got: #{inspect(value)}"
     end
   end
 
@@ -41,9 +44,4 @@ defmodule Nebulex.Helpers do
     |> Enum.map(&Macro.camelize("#{&1}"))
     |> Module.concat()
   end
-
-  ## Private Functions
-
-  defp on_false(fun, val, _) when is_function(fun, 1), do: fun.(val)
-  defp on_false(_, _, default), do: default
 end
