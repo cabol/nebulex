@@ -659,6 +659,20 @@ defmodule Nebulex.Adapters.Local do
     )
   end
 
+  @impl true
+  def delete_all(adapter_meta, nil, _opts) do
+    flush(adapter_meta)
+  end
+
+  def delete_all(%{meta_tab: meta_tab, backend: backend}, query, opts) do
+    [{pattern, conds, _ret}] = validate_match_spec(query, opts)
+    query = [{pattern, conds, [true]}]
+
+    meta_tab
+    |> list_gen()
+    |> Enum.reduce(0, &(backend.select_delete(&1, query) + &2))
+  end
+
   ## Nebulex.Adapter.Stats
 
   @impl true
@@ -779,6 +793,8 @@ defmodule Nebulex.Adapters.Local do
       :entry -> [%Entry{key: :"$1", value: :"$2", touched: :"$3", ttl: :"$4"}]
     end
   end
+
+  ## Internal functions for updating stats
 
   defp update_stats(value, _action, nil), do: value
   defp update_stats(value, _action, {nil, _}), do: value

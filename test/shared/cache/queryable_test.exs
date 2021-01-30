@@ -4,7 +4,7 @@ defmodule Nebulex.Cache.QueryableTest do
   deftests do
     import Nebulex.CacheHelpers
 
-    describe "all" do
+    describe "all/2" do
       test "returns all keys in cache", %{cache: cache} do
         set1 = cache_put(cache, 1..50)
         set2 = cache_put(cache, 51..100)
@@ -22,7 +22,7 @@ defmodule Nebulex.Cache.QueryableTest do
       end
     end
 
-    describe "stream" do
+    describe "stream/2" do
       @entries for x <- 1..10, into: %{}, do: {x, x * 2}
 
       test "returns all keys in cache", %{cache: cache} do
@@ -58,6 +58,19 @@ defmodule Nebulex.Cache.QueryableTest do
           |> cache.stream()
           |> Enum.to_list()
         end
+      end
+    end
+
+    describe "delete_all/2" do
+      test "deletes all keys in cache", %{cache: cache} do
+        entries = cache_put(cache, 1..50)
+        all = cache.all()
+
+        assert all |> :lists.usort() |> length() == length(entries)
+
+        assert cache.delete_all() == length(all)
+
+        assert cache.all() == []
       end
     end
   end

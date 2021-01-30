@@ -19,4 +19,11 @@ defmodule Nebulex.Cache.Queryable do
     opts = Keyword.put_new(opts, :page_size, @default_page_size)
     Adapter.with_meta(name, & &1.stream(&2, query, opts))
   end
+
+  @doc """
+  Implementation for `c:Nebulex.Cache.delete_all/2`.
+  """
+  def delete_all(name, query, opts) do
+    Adapter.with_meta(name, & &1.delete_all(&2, query, opts))
+  end
 end

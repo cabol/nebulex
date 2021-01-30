@@ -425,6 +425,11 @@ defmodule Nebulex.Adapters.Multilevel do
     )
   end
 
+  @impl true
+  def delete_all(%{levels: levels}, query, opts) do
+    Enum.reduce(levels, 0, &(with_dynamic_cache(&1, :delete_all, [query, opts]) + &2))
+  end
+
   ## Nebulex.Adapter.Transaction
 
   @impl true

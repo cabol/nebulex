@@ -133,6 +133,9 @@ defmodule Nebulex.Adapters.Nil do
   @impl true
   def stream(_, _, _), do: Stream.each([], & &1)
 
+  @impl true
+  def delete_all(_, _, _), do: 0
+
   ## Nebulex.Adapter.Persistence
 
   @impl true

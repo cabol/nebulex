@@ -343,6 +343,11 @@ defmodule Nebulex.Cache do
         def stream(query \\ nil, opts \\ []) do
           Queryable.stream(get_dynamic_cache(), query, opts)
         end
+
+        @impl true
+        def delete_all(query \\ nil, opts \\ []) do
+          Queryable.delete_all(get_dynamic_cache(), query, opts)
+        end
       end
 
       ## Persistence
@@ -1082,7 +1087,7 @@ defmodule Nebulex.Cache do
 
   ## Nebulex.Adapter.Queryable
 
-  @optional_callbacks all: 2, stream: 2
+  @optional_callbacks all: 2, stream: 2, delete_all: 2
 
   @doc """
   Fetches all entries from cache matching the given `query`.
@@ -1299,6 +1304,62 @@ defmodule Nebulex.Cache do
 
   """
   @callback stream(query :: term, opts) :: Enum.t()
+
+  @doc """
+  Deletes all entries matching the given `query`.
+
+  It returns the number of deleted entries.
+
+  May raise `Nebulex.QueryError` if query validation fails.
+
+  ## Query values
+
+  There are two types of query values. The ones shared and implemented
+  by all adapters and the ones that are adapter specific.
+
+  ### Shared queries
+
+    * `nil` - If `nil` is given as query value, all entries in cache are
+      deleted.
+
+  ### Adapter-specific queries
+
+  The `query` value depends entirely on the adapter implementation; it could
+  any term. Therefore, it is highly recommended to see adapters' documentation
+  for more information about building queries. For example, the built-in
+  `Nebulex.Adapters.Local` adapter uses `:ets.match_spec()` for queries,
+  as well as other pre-defined ones like `:unexpired` and `:expired`.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation for more options.
+
+  ## Example
+
+  Populate the cache with some entries:
+
+      iex> :ok = Enum.each(1..5, &MyCache.put(&1, &1 * 2))
+
+  Delete all (with default params):
+
+      iex> MyCache.delete_all()
+      5
+
+  Delete all entries that match with the given query assuming we are using
+  `Nebulex.Adapters.Local` adapter:
+
+      iex> query = [{{:_, :"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [true]}]
+      iex> MyCache.delete_all(query)
+
+  Additional built-in queries for `Nebulex.Adapters.Local` adapter:
+
+      iex> unexpired = MyCache.delete_all(:unexpired)
+      iex> expired = MyCache.delete_all(:expired)
+
+  Remember for the local adapter you can use `Ex2ms` to build the match specs
+  much easier.
+  """
+  @callback delete_all(query :: term, opts) :: integer
 
   ## Nebulex.Adapter.Persistence
 

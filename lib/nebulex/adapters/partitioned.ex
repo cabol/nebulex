@@ -536,6 +536,19 @@ defmodule Nebulex.Adapters.Partitioned do
     )
   end
 
+  @impl true
+  def delete_all(%{name: name, task_sup: task_sup} = adapter_meta, query, opts) do
+    task_sup
+    |> RPC.multi_call(
+      Cluster.get_nodes(name),
+      __MODULE__,
+      :with_dynamic_cache,
+      [adapter_meta, :delete_all, [query, opts]],
+      opts
+    )
+    |> handle_rpc_multi_call(:all, &Enum.sum/1)
+  end
+
   ## Nebulex.Adapter.Transaction
 
   @impl true

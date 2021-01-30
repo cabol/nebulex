@@ -74,13 +74,14 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   @type t :: :ets.tid()
   @type server_ref :: pid | atom | :ets.tid()
+  @type opts :: Nebulex.Cache.opts()
 
   ## API
 
   @doc """
   Starts the garbage collector for the build-in local cache adapter.
   """
-  @spec start_link(Nebulex.Cache.opts()) :: GenServer.on_start()
+  @spec start_link(opts) :: GenServer.on_start()
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts)
   end
@@ -101,9 +102,10 @@ defmodule Nebulex.Adapters.Local.Generation do
 
       Nebulex.Adapters.Local.Generation.new(MyCache, reset_timer: false)
   """
-  @spec new(server_ref, Nebulex.Cache.opts()) :: [atom]
+  @spec new(server_ref, opts) :: [atom]
   def new(server_ref, opts \\ []) do
-    do_call(server_ref, {:new_generation, opts})
+    reset_timer? = get_option(opts, :reset_timer, "boolean", &is_boolean/1, true)
+    do_call(server_ref, {:new_generation, reset_timer?})
   end
 
   @doc """
@@ -302,31 +304,21 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   @impl true
-  def handle_call({:new_generation, opts}, _from, state) do
+  def handle_call({:new_generation, reset_timer?}, _from, state) do
     :ok = new_gen(state)
-
-    ref =
-      opts
-      |> get_option(:reset_timer, "boolean", &is_boolean/1, true)
-      |> maybe_reset_timer(state)
-
-    state = %{state | gc_heartbeat_ref: ref}
-    {:reply, :ok, state}
+    {:reply, :ok, %{state | gc_heartbeat_ref: maybe_reset_timer(reset_timer?, state)}}
   end
 
   def handle_call(:flush, _from, %__MODULE__{meta_tab: meta_tab, backend: backend} = state) do
     size = Local.size(%{meta_tab: meta_tab, backend: backend})
+    :ok = new_gen(state)
 
     :ok =
       meta_tab
       |> list()
       |> Enum.each(&backend.delete_all_objects(&1))
 
-    {:reply, size, state}
-  end
-
-  def handle_call({:realloc, mem_size}, _from, state) do
-    {:reply, :ok, %{state | allocated_memory: mem_size}}
+    {:reply, size, %{state | gc_heartbeat_ref: maybe_reset_timer(true, state)}}
   end
 
   def handle_call(
@@ -335,6 +327,10 @@ defmodule Nebulex.Adapters.Local.Generation do
         %__MODULE__{backend: backend, meta_tab: meta_tab, allocated_memory: allocated} = state
       ) do
     {:reply, {memory_info(backend, meta_tab), allocated}, state}
+  end
+
+  def handle_call({:realloc, mem_size}, _from, state) do
+    {:reply, :ok, %{state | allocated_memory: mem_size}}
   end
 
   @impl true

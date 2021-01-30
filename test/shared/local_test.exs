@@ -8,7 +8,7 @@ defmodule Nebulex.LocalTest do
 
     alias Nebulex.{Adapter, Entry}
 
-    describe "local adapter with dynamic cache" do
+    describe "with_dynamic_cache/3" do
       test "ok", %{cache: cache} do
         with_dynamic_cache(cache, fn ->
           :ok = cache.put("foo", "bar")
@@ -17,7 +17,7 @@ defmodule Nebulex.LocalTest do
       end
     end
 
-    describe "local adapter error" do
+    describe "error" do
       test "on init because invalid backend", %{cache: cache} do
         assert {:error, {%RuntimeError{message: msg}, _}} =
                  cache.start_link(name: :invalid_backend, backend: :xyz)
@@ -27,7 +27,7 @@ defmodule Nebulex.LocalTest do
                    "backends [:ets, :shards], got: :xyz"
       end
 
-      test "ArgumentError because cache was stopped", %{cache: cache} do
+      test "because cache is stopped", %{cache: cache} do
         :ok = cache.stop()
 
         msg = ~r"could not lookup Nebulex cache"
@@ -37,7 +37,7 @@ defmodule Nebulex.LocalTest do
       end
     end
 
-    describe "local adapter cache-commands" do
+    describe "entry:" do
       test "get_and_update", %{cache: cache} do
         fun = fn
           nil -> {nil, 1}
@@ -99,7 +99,7 @@ defmodule Nebulex.LocalTest do
       end
     end
 
-    describe "local adapter queryable" do
+    describe "queryable:" do
       test "ETS match_spec queries", %{cache: cache, name: name} do
         values = cache_put(cache, 1..5, &(&1 * 2))
         _ = cache.new_generation(name)
@@ -158,6 +158,39 @@ defmodule Nebulex.LocalTest do
           assert Entry.ttl(entry) > 0
         end
       end
+
+      test "delete all expired and unexpired entries", %{cache: cache} do
+        expired = cache_put(cache, 1..5, & &1, ttl: 1500)
+        unexpired = cache_put(cache, 6..10)
+
+        assert cache.delete_all(:expired) == 0
+
+        :ok = Process.sleep(1600)
+
+        assert cache.delete_all(:expired) == length(expired)
+        assert cache.all() |> Enum.sort() == unexpired
+
+        assert cache.delete_all(:unexpired) == length(unexpired)
+        assert cache.all() |> Enum.sort() == []
+      end
+
+      test "delete all matched entries", %{cache: cache, name: name} do
+        values = cache_put(cache, 1..5)
+        _ = cache.new_generation(name)
+        values = values ++ cache_put(cache, 6..10)
+
+        assert cache.all() |> Enum.sort() == values
+
+        {rem, expected} = Enum.split(values, 4)
+
+        test_ms =
+          fun do
+            {_, _, value, _, _} when value > 4 -> value
+          end
+
+        assert cache.delete_all(test_ms) == length(expected)
+        assert cache.all() |> Enum.sort() == rem
+      end
     end
 
     describe "generation" do
@@ -170,7 +203,7 @@ defmodule Nebulex.LocalTest do
         assert cache.get("foo") == "bar"
       end
 
-      test "creation and/or lifecycle", %{cache: cache, name: name} do
+      test "lifecycle", %{cache: cache, name: name} do
         # should be empty
         refute cache.get(1)
 
