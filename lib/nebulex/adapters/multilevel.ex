@@ -179,7 +179,6 @@ defmodule Nebulex.Adapters.Multilevel do
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Entry
-  @behaviour Nebulex.Adapter.Storage
   @behaviour Nebulex.Adapter.Queryable
   @behaviour Nebulex.Adapter.Stats
 
@@ -375,22 +374,6 @@ defmodule Nebulex.Adapters.Multilevel do
   def touch(%{levels: levels}, key) do
     Enum.reduce(levels, false, fn l_meta, acc ->
       with_dynamic_cache(l_meta, :touch, [key]) or acc
-    end)
-  end
-
-  ## Nebulex.Adapter.Storage
-
-  @impl true
-  def size(%{levels: levels}) do
-    Enum.reduce(levels, 0, fn l_meta, acc ->
-      with_dynamic_cache(l_meta, :size, []) + acc
-    end)
-  end
-
-  @impl true
-  def flush(%{levels: levels}) do
-    Enum.reduce(levels, 0, fn l_meta, acc ->
-      with_dynamic_cache(l_meta, :flush, []) + acc
     end)
   end
 

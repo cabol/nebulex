@@ -102,13 +102,13 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
       end)
     end
 
-    test "size and flush", %{caches: caches} do
+    test "count_all and delete_all", %{caches: caches} do
       for_all_caches(caches, fn cache ->
         :ok = cache.put_all(a: 1, a: 2, a: 2, b: 1, b: 2, c: 1)
 
-        assert cache.size() == 6
-        assert cache.flush() == 6
-        assert cache.size() == 0
+        assert cache.count_all() == 6
+        assert cache.delete_all() == 6
+        assert cache.count_all() == 0
       end)
     end
 

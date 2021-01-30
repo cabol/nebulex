@@ -62,22 +62,30 @@ defmodule Nebulex.Cache.QueryableTest do
     end
 
     describe "delete_all/2" do
-      test "deletes all keys in cache", %{cache: cache} do
-        entries = cache_put(cache, 1..50)
+      test "evicts all entries in the cache", %{cache: cache} do
+        Enum.each(1..2, fn _ ->
+          entries = cache_put(cache, 1..50)
 
-        assert cache.all() |> :lists.usort() |> length() == length(entries)
+          assert cache.all() |> :lists.usort() |> length() == length(entries)
 
-        cached = cache.count_all()
-        assert cache.delete_all() == cached
-        assert cache.count_all() == 0
+          cached = cache.count_all()
+          assert cache.delete_all() == cached
+          assert cache.count_all() == 0
+        end)
       end
     end
 
     describe "count_all/2" do
       test "returns the total number of cached entries", %{cache: cache} do
-        _ = cache_put(cache, 1..50)
+        for x <- 1..100, do: cache.put(x, x)
         total = cache.all() |> length()
         assert cache.count_all() == total
+
+        for x <- 1..50, do: cache.delete(x)
+        total = cache.all() |> length()
+        assert cache.count_all() == total
+
+        for x <- 51..60, do: assert(cache.get(x) == x)
       end
     end
   end

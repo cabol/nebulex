@@ -19,7 +19,7 @@ defmodule Nebulex.Adapters.Local do
 
     * Configurable backend (`ets` or `:shards`).
     * Expiration – A status based on TTL (Time To Live) option. To maintain
-      cache performance, expired entries may not be immediately flushed or
+      cache performance, expired entries may not be immediately removed or
       evicted, they are expired or evicted on-demand, when the key is read.
     * Eviction – [Generational Garbage Collection][gc].
     * Sharding – For intensive workloads, the Cache may also be partitioned
@@ -205,8 +205,8 @@ defmodule Nebulex.Adapters.Local do
       retention period for the cached entries. For example, if `:gc_interval`
       is set to 1 hr, it means you will keep in cache only those entries that
       are retrieved periodically within a 2 hr period; `gc_interval * 2`,
-      being 2 the number of generations. Longer than that, the GC will ensure
-      is always evicted (the oldest generation is always flushed/deleted).
+      being 2 the number of generations. Longer than that, the GC will
+      ensure is always evicted (the oldest generation is always deleted).
       If it is the first time using Nebulex, perhaps you can start with
       `gc_interval: :timer.seconds(43_200)` (12 hrs), so the max retention
       period for the keys will be 1 day; but ensure you also set either the
@@ -291,7 +291,6 @@ defmodule Nebulex.Adapters.Local do
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Entry
-  @behaviour Nebulex.Adapter.Storage
   @behaviour Nebulex.Adapter.Queryable
 
   # Inherit default transaction implementation
@@ -595,10 +594,9 @@ defmodule Nebulex.Adapters.Local do
     |> update_stats(:update, ref)
   end
 
-  ## Nebulex.Adapter.Storage
+  ## Nebulex.Adapter.Queryable
 
-  @impl true
-  def size(%{meta_tab: meta_tab, backend: backend}) do
+  def execute(%{meta_tab: meta_tab, backend: backend}, :count_all, nil, _opts) do
     meta_tab
     |> list_gen()
     |> Enum.reduce(0, fn gen, acc ->
@@ -609,21 +607,10 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def flush(%{meta_tab: meta_tab, stats_counter: ref}) do
+  def execute(%{meta_tab: meta_tab, stats_counter: ref}, :delete_all, nil, _opts) do
     meta_tab
-    |> Generation.flush()
-    |> update_stats(:flush, ref)
-  end
-
-  ## Nebulex.Adapter.Queryable
-
-  @impl true
-  def execute(adapter_meta, :delete_all, nil, _opts) do
-    flush(adapter_meta)
-  end
-
-  def execute(adapter_meta, :count_all, nil, _opts) do
-    size(adapter_meta)
+    |> Generation.delete_all()
+    |> update_stats(:delete_all, ref)
   end
 
   def execute(%{meta_tab: meta_tab, backend: backend}, operation, query, opts) do
@@ -854,7 +841,7 @@ defmodule Nebulex.Adapters.Local do
     value
   end
 
-  defp update_stats(value, :flush, counter_ref) do
+  defp update_stats(value, :delete_all, counter_ref) do
     :ok = Stats.incr(counter_ref, :evictions, value)
     value
   end

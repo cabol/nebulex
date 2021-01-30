@@ -169,10 +169,10 @@ defmodule Nebulex.Adapters.PartitionedTest do
         PartitionedMock.get(1)
       end
 
-      msg = ~r"RPC error executing action: size\n\nErrors:"
+      msg = ~r"RPC error executing action: count_all\n\nErrors:"
 
       assert_raise Nebulex.RPCMultiCallError, msg, fn ->
-        PartitionedMock.size()
+        PartitionedMock.count_all()
       end
     end
   end

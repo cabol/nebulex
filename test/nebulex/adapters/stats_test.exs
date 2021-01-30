@@ -105,7 +105,7 @@ defmodule Nebulex.Adapters.StatsTest do
         l3: [evictions: 2, misses: 1, writes: 10]
       )
 
-      assert Cache.flush() == 24
+      assert Cache.delete_all() == 24
 
       assert_stats_measurements(Cache,
         l1: [evictions: 10, misses: 1, writes: 10],
@@ -201,7 +201,7 @@ defmodule Nebulex.Adapters.StatsTest do
 
     test "updates evictions" do
       :ok = Cache.put_all(a: 1, b: 2, c: 3)
-      assert Cache.size() == 9
+      assert Cache.count_all() == 9
 
       assert_stats_measurements(Cache,
         l1: [evictions: 0, writes: 3],
@@ -210,7 +210,7 @@ defmodule Nebulex.Adapters.StatsTest do
       )
 
       _ = L1.new_generation()
-      assert Cache.size() == 9
+      assert Cache.count_all() == 9
 
       assert_stats_measurements(Cache,
         l1: [evictions: 0, writes: 3],
@@ -219,7 +219,7 @@ defmodule Nebulex.Adapters.StatsTest do
       )
 
       _ = L1.new_generation()
-      assert Cache.size() == 6
+      assert Cache.count_all() == 6
 
       assert_stats_measurements(Cache,
         l1: [evictions: 3, writes: 3],
@@ -229,7 +229,7 @@ defmodule Nebulex.Adapters.StatsTest do
 
       _ = L2Primary.new_generation()
       _ = L2Primary.new_generation()
-      assert Cache.size() == 3
+      assert Cache.count_all() == 3
 
       assert_stats_measurements(Cache,
         l1: [evictions: 3, writes: 3],
@@ -239,7 +239,7 @@ defmodule Nebulex.Adapters.StatsTest do
 
       _ = L3Primary.new_generation()
       _ = L3Primary.new_generation()
-      assert Cache.size() == 0
+      assert Cache.count_all() == 0
 
       assert_stats_measurements(Cache,
         l1: [evictions: 3, writes: 3],

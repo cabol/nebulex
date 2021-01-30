@@ -119,7 +119,7 @@ defmodule Nebulex.TestCache do
     @moduledoc false
     @behaviour Nebulex.Adapter
     @behaviour Nebulex.Adapter.Entry
-    @behaviour Nebulex.Adapter.Storage
+    @behaviour Nebulex.Adapter.Queryable
 
     @impl true
     defmacro __before_compile__(_), do: :ok
@@ -172,18 +172,6 @@ defmodule Nebulex.TestCache do
     def update_counter(_, _, _, _, _, _), do: 1
 
     @impl true
-    def size(_) do
-      _ = Process.exit(self(), :normal)
-      0
-    end
-
-    @impl true
-    def flush(_) do
-      Process.sleep(2000)
-      0
-    end
-
-    @impl true
     def get_all(_, _, _) do
       :ok = Process.sleep(1000)
       %{}
@@ -191,6 +179,20 @@ defmodule Nebulex.TestCache do
 
     @impl true
     def put_all(_, _, _, _, _), do: Process.exit(self(), :normal)
+
+    @impl true
+    def execute(_, :count_all, _, _) do
+      _ = Process.exit(self(), :normal)
+      0
+    end
+
+    def execute(_, :delete_all, _, _) do
+      Process.sleep(2000)
+      0
+    end
+
+    @impl true
+    def stream(_, _, _), do: 1..10
   end
 
   defmodule PartitionedMock do

@@ -333,15 +333,6 @@ nil
 iex> Blog.Cache.take!("nonexistent")
 ```
 
-### Flush
-
-Nebulex also provides a function to flush all cache entries, like so:
-
-```elixir
-iex> Blog.Cache.flush()
-_evicted_entries
-```
-
 ## Info
 
 The last thing we’ll cover in this guide is how to retrieve information about
@@ -357,21 +348,12 @@ iex> Blog.Cache.ttl("nonexistent")
 nil
 ```
 
-### Cache size
-
-To get the total number of cached objects:
-
-```elixir
-iex> Blog.Cache.size()
-_num_cached_entries
-```
-
 ## Query and/or Stream entries
 
-Nebulex provides functions to fetch or stream all entries from cache matching
-the given query.
+Nebulex provides functions to fetch, count, delete, or stream all entries from
+cache matching the given query.
 
-To fetch all entries from cache:
+### Fetch all entries from cache matching the given query
 
 ```elixir
 # by default, returns all keys
@@ -404,7 +386,83 @@ iex> Blog.Cache.all(spec)
 _all_matched
 ```
 
-In the same way, we can stream all entries:
+### Count all entries from cache matching the given query
+
+For example, to get the total number of cached objects (cache size):
+
+```elixir
+iex> Blog.Cache.count_all()
+_num_cached_entries
+```
+
+> By default, since none query is given to `count_all/2`, all entries
+  in cache match.
+
+In the same way as `all/2`, you can pass a query to count only the matched
+entries:
+
+```elixir
+# using Ex2ms
+iex> import Ex2ms
+iex> spec =
+...>   fun do
+...>     {_, value, _, _} when rem(value, 2) == 0 -> true
+...>   end
+iex> Blog.Cache.count_all(spec)
+_num_of_matched_entries
+```
+
+> The previous example assumes you are using the built-in local adapter.
+
+Also, if you are using the built-in local adapter, you can use the queries
+`:expired` and `:unexpired` too, like so:
+
+```elixir
+iex> expired_entries = Blog.Cache.count_all(:expired)
+iex> unexpired_entries = Blog.Cache.count_all(:unexpired)
+```
+
+### Delete all entries from cache matching the given query
+
+Similar to `count_all/2`, Nebulex provides `delete_all/2` to not only count
+the matched entries but also remove them from the cache at once, in one single
+execution.
+
+The first example is flushing the cache, delete all cached entries (which is
+the default behavior when none query is provided):
+
+```elixir
+iex> Blog.Cache.delete_all()
+_num_of_removed_entries
+```
+
+And just like `count_all/2`, you can also provide a custom query to delete only
+the matched entries, or if you are using the built-in local adapter you can also
+use the queries `:expired` and `:unexpired`. For example:
+
+```elixir
+iex> expired_entries = Blog.Cache.delete_all(:expired)
+iex> unexpired_entries = Blog.Cache.delete_all(:unexpired)
+
+# using Ex2ms
+iex> import Ex2ms
+iex> spec =
+...>   fun do
+...>     {_, value, _, _} when rem(value, 2) == 0 -> true
+...>   end
+iex> Blog.Cache.delete_all(spec)
+_num_of_matched_entries
+```
+
+> These examples assumes you are using the built-in local adapter.
+
+### Stream all entries from cache matching the given query
+
+Similar to `all/2` but returns a lazy enumerable that emits all entries from the
+cache matching the provided query.
+
+If the query is `nil`, then all entries in cache match and are returned when the
+stream is evaluated; based on the `:return` option.
 
 ```elixir
 iex> Blog.Cache.stream()

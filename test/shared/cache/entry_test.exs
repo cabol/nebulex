@@ -121,8 +121,8 @@ defmodule Nebulex.Cache.EntryTest do
       test "empty list or map has not any effect", %{cache: cache} do
         assert cache.put_all([])
         assert cache.put_all(%{})
-        assert count = cache.size()
-        assert cache.flush() == count
+        assert count = cache.count_all()
+        assert cache.delete_all() == count
       end
 
       test "puts the given entries using different data types at once", %{cache: cache} do
@@ -201,7 +201,7 @@ defmodule Nebulex.Cache.EntryTest do
       test "returns a map with the given keys", %{cache: cache} do
         assert cache.put_all(a: 1, c: 3)
         assert cache.get_all([:a, :b, :c]) == %{a: 1, c: 3}
-        assert cache.flush() == 2
+        assert cache.delete_all() == 2
       end
 
       test "returns an empty map when none of the given keys is in cache", %{cache: cache} do

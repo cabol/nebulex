@@ -90,18 +90,6 @@ defmodule Nebulex.Adapters.NilTest do
     end
   end
 
-  describe "storage" do
-    test "size", %{cache: cache} do
-      assert cache.put("foo", "bar") == :ok
-      assert cache.size() == 0
-    end
-
-    test "flush", %{cache: cache} do
-      assert cache.put("foo", "bar") == :ok
-      assert cache.flush() == 0
-    end
-  end
-
   describe "queryable" do
     test "all", %{cache: cache} do
       assert cache.put("foo", "bar") == :ok
@@ -111,6 +99,16 @@ defmodule Nebulex.Adapters.NilTest do
     test "stream", %{cache: cache} do
       assert cache.put("foo", "bar") == :ok
       assert cache.stream() |> Enum.to_list() == []
+    end
+
+    test "count_all", %{cache: cache} do
+      assert cache.put("foo", "bar") == :ok
+      assert cache.count_all() == 0
+    end
+
+    test "delete_all", %{cache: cache} do
+      assert cache.put("foo", "bar") == :ok
+      assert cache.delete_all() == 0
     end
   end
 
@@ -141,7 +139,7 @@ defmodule Nebulex.Adapters.NilTest do
 
       assert cache.dump(path) == :ok
       assert cache.load(path) == :ok
-      assert cache.size() == 0
+      assert cache.count_all() == 0
     end
   end
 

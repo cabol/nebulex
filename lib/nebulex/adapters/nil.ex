@@ -12,10 +12,10 @@ defmodule Nebulex.Adapters.Nil do
   cache to avoid issues when running the test, for example, in some test cases,
   when accessing the database you expect no data at all, but you could retrieve
   the data from cache anyway because maybe it was cached in a previous test.
-  Therefore, you have to flush the cache before to run each test to make sure
-  the data is always empty. This is where the Nil adapter comes in, instead of
-  adding code to flush the cache before each test, you could define a test cache
-  using the Nil adapter for the tests.
+  Therefore, you have to delete all entries from the cache before to run each
+  test to make sure the cache is always empty. This is where the Nil adapter
+  comes in, instead of adding code to flush the cache before each test, you
+  could define a test cache using the Nil adapter for the tests.
 
   One one hand, you have defined the cache in your application within
   `lib/my_app/cache.ex`:
@@ -63,7 +63,6 @@ defmodule Nebulex.Adapters.Nil do
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Entry
-  @behaviour Nebulex.Adapter.Storage
   @behaviour Nebulex.Adapter.Queryable
   @behaviour Nebulex.Adapter.Persistence
   @behaviour Nebulex.Adapter.Stats
@@ -116,14 +115,6 @@ defmodule Nebulex.Adapters.Nil do
 
   @impl true
   def update_counter(_, _, amount, _, default, _), do: default + amount
-
-  ## Nebulex.Adapter.Storage
-
-  @impl true
-  def size(_), do: 0
-
-  @impl true
-  def flush(_), do: 0
 
   ## Nebulex.Adapter.Queryable
 

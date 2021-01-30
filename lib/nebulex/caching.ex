@@ -474,7 +474,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
       quote do
         if unquote(all_entries?) do
-          cache.flush()
+          cache.delete_all()
         else
           Enum.each([key | keys], fn k ->
             if k, do: cache.delete(k)

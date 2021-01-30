@@ -210,7 +210,6 @@ defmodule Nebulex.Adapters.Partitioned do
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Entry
-  @behaviour Nebulex.Adapter.Storage
   @behaviour Nebulex.Adapter.Queryable
   @behaviour Nebulex.Adapter.Stats
 
@@ -467,33 +466,6 @@ defmodule Nebulex.Adapters.Partitioned do
     call(adapter_meta, key, :touch, [key])
   end
 
-  ## Nebulex.Adapter.Storage
-
-  @impl true
-  def size(%{name: name, task_sup: task_sup} = adapter_meta) do
-    task_sup
-    |> RPC.multi_call(
-      Cluster.get_nodes(name),
-      __MODULE__,
-      :with_dynamic_cache,
-      [adapter_meta, :size, []]
-    )
-    |> handle_rpc_multi_call(:size, &Enum.sum/1)
-  end
-
-  @impl true
-  def flush(%{name: name, task_sup: task_sup} = adapter_meta) do
-    task_sup
-    |> RPC.multi_call(
-      Cluster.get_nodes(name),
-      __MODULE__,
-      :with_dynamic_cache,
-      [adapter_meta, :flush, []]
-    )
-    |> elem(0)
-    |> Enum.sum()
-  end
-
   ## Nebulex.Adapter.Queryable
 
   @impl true
@@ -512,7 +484,7 @@ defmodule Nebulex.Adapters.Partitioned do
       [adapter_meta, operation, [query, opts]],
       opts
     )
-    |> handle_rpc_multi_call(:all, reducer)
+    |> handle_rpc_multi_call(operation, reducer)
   end
 
   @impl true

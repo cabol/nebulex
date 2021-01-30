@@ -18,7 +18,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   end
 
   setup do
-    _ = Replicated.flush()
+    _ = Replicated.delete_all()
     :ok
   end
 
@@ -86,13 +86,13 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       end
     end
 
-    test "flush" do
+    test "delete_all" do
       assert Replicated.put_all(a: 1, b: 2, c: 3) == :ok
 
       assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})
 
-      assert Replicated.flush() == 3
-      assert Replicated.size() == 0
+      assert Replicated.delete_all() == 3
+      assert Replicated.count_all() == 0
 
       assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{})
     end
@@ -142,8 +142,8 @@ defmodule Nebulex.Adapters.ReplicatedTest do
     end
   end
 
-  describe "global lock" do
-    test "set when flush action runs" do
+  describe "write-like operations locked" do
+    test "when a delete_all command is ongoing" do
       with_dynamic_cache(ReplicatedMock, [name: :replicated_global_mock], fn ->
         true = Process.register(self(), __MODULE__)
         _ = Process.flag(:trap_exit, true)
@@ -151,8 +151,8 @@ defmodule Nebulex.Adapters.ReplicatedTest do
         task1 =
           Task.async(fn ->
             _ = ReplicatedMock.put_dynamic_cache(:replicated_global_mock)
-            _ = ReplicatedMock.flush()
-            send(__MODULE__, :flush)
+            _ = ReplicatedMock.delete_all()
+            send(__MODULE__, :delete_all)
           end)
 
         task2 =
@@ -164,7 +164,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
             send(__MODULE__, :put)
           end)
 
-        assert_receive :flush, 5000
+        assert_receive :delete_all, 5000
         assert_receive :put, 5000
 
         [_, _] = Task.yield_many([task1, task2])
@@ -185,9 +185,9 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       refute_receive {:EXIT, _, :normal}
     end
 
-    test "flush/0" do
+    test "delete_all/2" do
       put_all_and_trap_exits(a: 1, b: 2, c: 3)
-      Replicated.flush()
+      Replicated.delete_all()
       refute_receive {:EXIT, _, :normal}
     end
 
@@ -221,9 +221,9 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       refute_receive {:EXIT, _, :normal}
     end
 
-    test "size/0" do
+    test "count_all/2" do
       put_all_and_trap_exits([])
-      Replicated.size()
+      Replicated.count_all()
       refute_receive {:EXIT, _, :normal}
     end
 

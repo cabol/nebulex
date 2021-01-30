@@ -1,8 +1,8 @@
-defmodule Nebulex.Cache.StorageTest do
+defmodule Nebulex.Cache.DeprecatedTest do
   import Nebulex.CacheCase
 
   deftests do
-    describe "size" do
+    describe "size/0" do
       test "returns the current number of entries in cache", %{cache: cache} do
         for x <- 1..100, do: cache.put(x, x)
         assert cache.size() == 100
@@ -15,7 +15,7 @@ defmodule Nebulex.Cache.StorageTest do
       end
     end
 
-    describe "flush" do
+    describe "flush/0" do
       test "evicts all entries from cache", %{cache: cache} do
         Enum.each(1..2, fn _ ->
           for x <- 1..100, do: cache.put(x, x)

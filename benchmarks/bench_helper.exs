@@ -33,8 +33,8 @@ defmodule BenchHelper do
       "has_key?" => fn input ->
         cache.has_key?(input)
       end,
-      "size" => fn _input ->
-        cache.size()
+      "count_all" => fn _input ->
+        cache.count_all()
       end,
       "ttl" => fn input ->
         cache.ttl(input)

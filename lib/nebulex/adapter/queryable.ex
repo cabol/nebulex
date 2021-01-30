@@ -45,8 +45,8 @@ defmodule Nebulex.Adapter.Queryable do
     * `:delete_all` - Deletes all entries matching the given `query`.
       It returns the number of deleted entries.
 
-  See `c:Nebulex.Cache.all/2`.
-  See `c:Nebulex.Cache.delete_all/2`.
+  It is used on `c:Nebulex.Cache.all/2`, `c:Nebulex.Cache.count_all/2`,
+  and `c:Nebulex.Cache.delete_all/2`.
   """
   @callback execute(
               adapter_meta,

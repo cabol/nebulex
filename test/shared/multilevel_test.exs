@@ -230,36 +230,6 @@ defmodule Nebulex.MultilevelTest do
       end
     end
 
-    describe "storage:" do
-      test "size/0", %{cache: cache} do
-        assert cache.size() == 0
-        for x <- 1..10, do: cache.put(x, x, level: 1)
-        for x <- 11..20, do: cache.put(x, x, level: 2)
-        for x <- 21..30, do: cache.put(x, x, level: 3)
-        assert cache.size() == 30
-
-        for x <- [1, 11, 21], do: cache.delete(x, level: 1)
-        assert cache.size() == 29
-
-        assert cache.delete(1, level: 1) == :ok
-        assert cache.delete(11, level: 2) == :ok
-        assert cache.delete(21, level: 3) == :ok
-        assert cache.size() == 27
-      end
-
-      test "flush/0", %{cache: cache} do
-        for x <- 1..10, do: cache.put(x, x, level: 1)
-        for x <- 11..20, do: cache.put(x, x, level: 2)
-        for x <- 21..30, do: cache.put(x, x, level: 3)
-
-        assert count = cache.size()
-        assert cache.flush() == count
-        :ok = Process.sleep(500)
-
-        for x <- 1..30, do: refute(cache.get(x))
-      end
-    end
-
     describe "queryable:" do
       test "all/2 and stream/2", %{cache: cache} do
         for x <- 1..30, do: cache.put(x, x, level: 1)
@@ -290,8 +260,25 @@ defmodule Nebulex.MultilevelTest do
         for x <- 21..60, do: cache.put(x, x, level: 2)
         for x <- 51..100, do: cache.put(x, x, level: 3)
 
-        assert cache.delete_all() == 120
+        assert count = cache.count_all()
+        assert cache.delete_all() == count
         assert cache.all() == []
+      end
+
+      test "count_all/2", %{cache: cache} do
+        assert cache.count_all() == 0
+        for x <- 1..10, do: cache.put(x, x, level: 1)
+        for x <- 11..20, do: cache.put(x, x, level: 2)
+        for x <- 21..30, do: cache.put(x, x, level: 3)
+        assert cache.count_all() == 30
+
+        for x <- [1, 11, 21], do: cache.delete(x, level: 1)
+        assert cache.count_all() == 29
+
+        assert cache.delete(1, level: 1) == :ok
+        assert cache.delete(11, level: 2) == :ok
+        assert cache.delete(21, level: 3) == :ok
+        assert cache.count_all() == 27
       end
     end
   end

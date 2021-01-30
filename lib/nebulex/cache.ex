@@ -319,18 +319,6 @@ defmodule Nebulex.Cache do
         Entry.touch(get_dynamic_cache(), key)
       end
 
-      ## Storage
-
-      @impl true
-      def size do
-        Storage.size(get_dynamic_cache())
-      end
-
-      @impl true
-      def flush do
-        Storage.flush(get_dynamic_cache())
-      end
-
       ## Queryable
 
       if Nebulex.Adapter.Queryable in behaviours do
@@ -353,6 +341,14 @@ defmodule Nebulex.Cache do
         def stream(query \\ nil, opts \\ []) do
           Queryable.stream(get_dynamic_cache(), query, opts)
         end
+
+        ## Deprecated functions (for backwards compatibility)
+
+        @impl true
+        defdelegate size, to: __MODULE__, as: :count_all
+
+        @impl true
+        defdelegate flush, to: __MODULE__, as: :delete_all
       end
 
       ## Persistence
@@ -1058,7 +1054,7 @@ defmodule Nebulex.Cache do
   """
   @callback touch(key) :: boolean
 
-  ## Nebulex.Adapter.Storage
+  ## Deprecated Callbacks
 
   @doc """
   Returns the total number of cached entries.

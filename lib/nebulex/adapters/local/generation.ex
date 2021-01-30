@@ -109,15 +109,15 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   @doc """
-  Flushes the cache (including all its generations).
+  Removes or flushes all entries from the cache (including all its generations).
 
   ## Example
 
-      Nebulex.Adapters.Local.Generation.flush(MyCache)
+      Nebulex.Adapters.Local.Generation.delete_all(MyCache)
   """
-  @spec flush(server_ref) :: integer
-  def flush(server_ref) do
-    do_call(server_ref, :flush)
+  @spec delete_all(server_ref) :: integer
+  def delete_all(server_ref) do
+    do_call(server_ref, :delete_all)
   end
 
   @doc """
@@ -276,13 +276,8 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   @impl true
-  def handle_call({:new_generation, reset_timer?}, _from, state) do
-    :ok = new_gen(state)
-    {:reply, :ok, %{state | gc_heartbeat_ref: maybe_reset_timer(reset_timer?, state)}}
-  end
-
-  def handle_call(:flush, _from, %__MODULE__{meta_tab: meta_tab, backend: backend} = state) do
-    size = Local.size(%{meta_tab: meta_tab, backend: backend})
+  def handle_call(:delete_all, _from, %__MODULE__{meta_tab: meta_tab, backend: backend} = state) do
+    size = Local.execute(%{meta_tab: meta_tab, backend: backend}, :count_all, nil, [])
     :ok = new_gen(state)
 
     :ok =
@@ -291,6 +286,11 @@ defmodule Nebulex.Adapters.Local.Generation do
       |> Enum.each(&backend.delete_all_objects(&1))
 
     {:reply, size, %{state | gc_heartbeat_ref: maybe_reset_timer(true, state)}}
+  end
+
+  def handle_call({:new_generation, reset_timer?}, _from, state) do
+    :ok = new_gen(state)
+    {:reply, :ok, %{state | gc_heartbeat_ref: maybe_reset_timer(reset_timer?, state)}}
   end
 
   def handle_call(

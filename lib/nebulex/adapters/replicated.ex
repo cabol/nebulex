@@ -6,7 +6,7 @@ defmodule Nebulex.Adapters.Replicated do
 
     * Replicated cache topology.
     * Configurable primary storage adapter.
-    * Cache-level locking when flushing cache or adding new nodes.
+    * Cache-level locking when deleting all entries or adding new nodes.
     * Key-level (or entry-level) locking for key-based write-like operations.
     * Support for transactions via Erlang global name registration facility.
     * Stats support rely on the primary storage adapter.
@@ -159,13 +159,15 @@ defmodule Nebulex.Adapters.Replicated do
       process, which involves copying cached data from any of the existing
       cluster nodes into the new node, and this could be very expensive
       depending on the number of caches entries. For that reason, adding new
-      nodes is something exceptional and expected to happen once in a while.
+      nodes is considered an expensive operation that should happen only from
+      time to time.
 
-    * Flushing cache. When flush action is executed, like in the previous case,
-      all write-like operations across all members of the cluster are blocked
-      until the flush is completed (this implies flushing the cached data from
-      all cluster nodes). Therefore, flushing the cache is also considered an
-      exceptional case that happens only once in while.
+    * Deleting all entries. When `c:Nebulex.Cache.delete_all/2` action is
+      executed, like in the previous case, all write-like operations in all
+      members of the cluster are blocked until the deletion action is completed
+      (this implies deleting all cached data from all cluster nodes). Therefore,
+      deleting all entries from cache is also considered an expensive operation
+      that should happen only from time to time.
 
     * Write-like operations based on a key only block operations related to
       that key across all members of the cluster. This is not as critical as
@@ -175,15 +177,14 @@ defmodule Nebulex.Adapters.Replicated do
 
   Summing up, the replicated cache topology along with this adapter should
   be used mainly when the the reads clearly dominate over the writes (e.g.:
-  Reads 80% and Writes 20% or less) Also, flushing cache and adding new nodes
-  must be exceptional cases happening only once in a while to avoid performance
-  issues.
+  Reads 80% and Writes 20% or less). Besides, operations like deleting all
+  entries from cache or adding new nodes must be executed only once in a while
+  to avoid performance issues, since they are very expensive.
   """
 
   # Provide Cache Implementation
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Entry
-  @behaviour Nebulex.Adapter.Storage
   @behaviour Nebulex.Adapter.Queryable
   @behaviour Nebulex.Adapter.Stats
 
@@ -366,30 +367,22 @@ defmodule Nebulex.Adapters.Replicated do
     with_transaction(adapter_meta, :touch, [key], [key])
   end
 
-  ## Nebulex.Adapter.Storage
+  ## Nebulex.Adapter.Queryable
 
   @impl true
-  def size(adapter_meta) do
-    with_dynamic_cache(adapter_meta, :size, [])
-  end
-
-  @impl true
-  def flush(%{name: name} = adapter_meta) do
-    # This call gets blocked if there are any write operation ongoing.
-    # Once it is executed, all later write-like operations are blocked
-    # until it finishes.
+  def execute(%{name: name} = adapter_meta, :delete_all, query, opts) do
+    # It is blocked until ongoing write operations finish (if there is any).
+    # Similarly, while it is executed, all later write-like operations are
+    # blocked until it finishes.
     :global.trans(
       {name, self()},
       fn ->
-        multi_call(adapter_meta, :flush, [], [])
+        multi_call(adapter_meta, :delete_all, [query, opts], opts)
       end,
       Cluster.get_nodes(name)
     )
   end
 
-  ## Nebulex.Adapter.Queryable
-
-  @impl true
   def execute(adapter_meta, operation, query, opts) do
     with_dynamic_cache(adapter_meta, operation, [query, opts])
   end
@@ -440,7 +433,7 @@ defmodule Nebulex.Adapters.Replicated do
        ) do
     nodes = Cluster.get_nodes(name)
 
-    # Ensure it waits until ongoing flush or sync operations finish,
+    # Ensure it waits until ongoing delete_all or sync operations finish,
     # if there's any.
     :global.trans(
       {name, pid},
