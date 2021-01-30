@@ -10,14 +10,14 @@ defmodule Nebulex.Adapters.Local.Backend do
 
       defp generation_spec(opts) do
         %{
-          id: Module.concat(__MODULE__, Generation),
+          id: Module.concat([__MODULE__, GC]),
           start: {Generation, :start_link, [opts]}
         }
       end
 
       defp sup_spec(children) do
         %{
-          id: Nebulex.Adapters.Local.Supervisor,
+          id: Module.concat([__MODULE__, Supervisor]),
           start: {Supervisor, :start_link, [children, [strategy: :one_for_all]]},
           type: :supervisor
         }

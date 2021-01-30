@@ -72,7 +72,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   alias Nebulex.Adapters.Local
   alias Nebulex.Adapters.Local.{Backend, Metadata}
 
-  @type t :: :ets.tid()
+  @type t :: %__MODULE__{}
   @type server_ref :: pid | atom | :ets.tid()
   @type opts :: Nebulex.Cache.opts()
 
@@ -166,7 +166,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
       Nebulex.Adapters.Local.Generation.list(MyCache)
   """
-  @spec list(server_ref) :: [t]
+  @spec list(server_ref) :: [:ets.tid()]
   def list(server_ref) do
     server_ref
     |> get_meta_tab()
@@ -180,7 +180,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
       Nebulex.Adapters.Local.Generation.newer(MyCache)
   """
-  @spec newer(server_ref) :: t
+  @spec newer(server_ref) :: :ets.tid()
   def newer(server_ref) do
     server_ref
     |> get_meta_tab()
@@ -202,6 +202,16 @@ defmodule Nebulex.Adapters.Local.Generation do
     |> Metadata.fetch!(:gc_pid)
   end
 
+  @doc """
+  A convenience function for retrieving the state.
+  """
+  @spec get_state(server_ref) :: t
+  def get_state(server_ref) do
+    server_ref
+    |> server()
+    |> GenServer.call(:get_state)
+  end
+
   defp get_meta_tab(server_ref) when is_atom(server_ref) or is_pid(server_ref) do
     Adapter.with_meta(server_ref, fn _, %{meta_tab: meta_tab} ->
       meta_tab
@@ -220,6 +230,24 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   @impl true
   def init(opts) do
+    # Initial state
+    state = struct(__MODULE__, parse_opts(opts))
+
+    # Init cleanup timer
+    cleanup_ref =
+      if state.max_size || state.allocated_memory,
+        do: start_timer(state.gc_cleanup_max_timeout, nil, :cleanup)
+
+    # Timer ref
+    {:ok, ref} =
+      if state.gc_interval,
+        do: {new_gen(state), start_timer(state.gc_interval)},
+        else: {new_gen(state), nil}
+
+    {:ok, %{state | gc_cleanup_ref: cleanup_ref, gc_heartbeat_ref: ref}}
+  end
+
+  defp parse_opts(opts) do
     # Add the GC PID to the meta table
     meta_tab = Keyword.fetch!(opts, :meta_tab)
     :ok = Metadata.put(meta_tab, :gc_pid, self())
@@ -228,79 +256,23 @@ defmodule Nebulex.Adapters.Local.Generation do
     backend = Keyword.fetch!(opts, :backend)
     backend_opts = Keyword.get(opts, :backend_opts, [])
 
-    # Max number of entries in cache
-    max_size =
-      get_option(
-        opts,
-        :max_size,
-        "an integer > 0",
-        &((is_integer(&1) and &1 > 0) or is_nil(&1))
-      )
+    # Common validators
+    pos_integer = &(is_integer(&1) and &1 > 0)
+    pos_integer_or_nil = &((is_integer(&1) and &1 > 0) or is_nil(&1))
 
-    # Max allocated memory for the cache
-    allocated_memory =
-      get_option(
-        opts,
-        :allocated_memory,
-        "an integer > 0",
-        &((is_integer(&1) and &1 > 0) or is_nil(&1))
-      )
-
-    # Min backoff to run the cleanup job
-    cleanup_min =
-      get_option(
-        opts,
-        :gc_cleanup_min_timeout,
-        "an integer > 0",
-        &(is_integer(&1) and &1 > 0),
-        10_000
-      )
-
-    # Max backoff to run the cleanup job
-    cleanup_max =
-      get_option(
-        opts,
-        :gc_cleanup_max_timeout,
-        "an integer > 0",
-        &(is_integer(&1) and &1 > 0),
-        600_000
-      )
-
-    # Init cleanup timer
-    gc_cleanup_ref =
-      if max_size || allocated_memory,
-        do: start_timer(cleanup_max, nil, :cleanup)
-
-    # GC interval
-    gc_interval =
-      get_option(
-        opts,
-        :gc_interval,
-        "an integer > 0",
-        &((is_integer(&1) and &1 > 0) or is_nil(&1))
-      )
-
-    # Initial state
-    init_state = %__MODULE__{
+    %{
       meta_tab: meta_tab,
       backend: backend,
       backend_opts: backend_opts,
       stats_counter: opts[:stats_counter],
-      gc_interval: gc_interval,
-      max_size: max_size,
-      allocated_memory: allocated_memory,
-      gc_cleanup_min_timeout: cleanup_min,
-      gc_cleanup_max_timeout: cleanup_max,
-      gc_cleanup_ref: gc_cleanup_ref
+      gc_interval: get_option(opts, :gc_interval, "an integer > 0", pos_integer_or_nil),
+      max_size: get_option(opts, :max_size, "an integer > 0", pos_integer_or_nil),
+      allocated_memory: get_option(opts, :allocated_memory, "an integer > 0", pos_integer_or_nil),
+      gc_cleanup_min_timeout:
+        get_option(opts, :gc_cleanup_min_timeout, "an integer > 0", pos_integer, 10_000),
+      gc_cleanup_max_timeout:
+        get_option(opts, :gc_cleanup_max_timeout, "an integer > 0", pos_integer, 600_000)
     }
-
-    # Timer ref
-    {:ok, ref} =
-      if gc_interval,
-        do: {new_gen(init_state), start_timer(gc_interval)},
-        else: {new_gen(init_state), nil}
-
-    {:ok, %{init_state | gc_heartbeat_ref: ref}}
   end
 
   @impl true
@@ -331,6 +303,10 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   def handle_call({:realloc, mem_size}, _from, state) do
     {:reply, :ok, %{state | allocated_memory: mem_size}}
+  end
+
+  def handle_call(:get_state, _from, state) do
+    {:reply, state, state}
   end
 
   @impl true

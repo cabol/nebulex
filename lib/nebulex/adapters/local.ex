@@ -618,12 +618,30 @@ defmodule Nebulex.Adapters.Local do
   ## Nebulex.Adapter.Queryable
 
   @impl true
-  def all(%{meta_tab: meta_tab, backend: backend}, query, opts) do
-    query = validate_match_spec(query, opts)
+  def execute(adapter_meta, :delete_all, nil, _opts) do
+    flush(adapter_meta)
+  end
 
-    for gen <- list_gen(meta_tab),
-        elems <- backend.select(gen, query),
-        do: elems
+  def execute(adapter_meta, :count_all, nil, _opts) do
+    size(adapter_meta)
+  end
+
+  def execute(%{meta_tab: meta_tab, backend: backend}, operation, query, opts) do
+    query =
+      query
+      |> validate_match_spec(opts)
+      |> maybe_match_spec_return_true(operation)
+
+    {reducer, acc_in} =
+      case operation do
+        :all -> {&(backend.select(&1, query) ++ &2), []}
+        :count_all -> {&(backend.select_count(&1, query) + &2), 0}
+        :delete_all -> {&(backend.select_delete(&1, query) + &2), 0}
+      end
+
+    meta_tab
+    |> list_gen()
+    |> Enum.reduce(acc_in, reducer)
   end
 
   @impl true
@@ -657,20 +675,6 @@ defmodule Nebulex.Adapters.Local do
       end,
       & &1
     )
-  end
-
-  @impl true
-  def delete_all(adapter_meta, nil, _opts) do
-    flush(adapter_meta)
-  end
-
-  def delete_all(%{meta_tab: meta_tab, backend: backend}, query, opts) do
-    [{pattern, conds, _ret}] = validate_match_spec(query, opts)
-    query = [{pattern, conds, [true]}]
-
-    meta_tab
-    |> list_gen()
-    |> Enum.reduce(0, &(backend.select_delete(&1, query) + &2))
   end
 
   ## Nebulex.Adapter.Stats
@@ -792,6 +796,15 @@ defmodule Nebulex.Adapters.Local do
       {:key, :value} -> [{{:"$1", :"$2"}}]
       :entry -> [%Entry{key: :"$1", value: :"$2", touched: :"$3", ttl: :"$4"}]
     end
+  end
+
+  defp maybe_match_spec_return_true([{pattern, conds, _ret}], operation)
+       when operation in [:delete_all, :count_all] do
+    [{pattern, conds, [true]}]
+  end
+
+  defp maybe_match_spec_return_true(match_spec, _operation) do
+    match_spec
   end
 
   ## Internal functions for updating stats

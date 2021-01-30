@@ -390,18 +390,13 @@ defmodule Nebulex.Adapters.Replicated do
   ## Nebulex.Adapter.Queryable
 
   @impl true
-  def all(adapter_meta, query, opts) do
-    with_dynamic_cache(adapter_meta, :all, [query, opts])
+  def execute(adapter_meta, operation, query, opts) do
+    with_dynamic_cache(adapter_meta, operation, [query, opts])
   end
 
   @impl true
   def stream(adapter_meta, query, opts) do
     with_dynamic_cache(adapter_meta, :stream, [query, opts])
-  end
-
-  @impl true
-  def delete_all(adapter_meta, query, opts) do
-    with_dynamic_cache(adapter_meta, :delete_all, [query, opts])
   end
 
   ## Nebulex.Adapter.Transaction

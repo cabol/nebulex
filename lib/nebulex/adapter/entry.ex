@@ -9,11 +9,22 @@ defmodule Nebulex.Adapter.Entry do
   @typedoc "Proxy type to the adapter meta"
   @type adapter_meta :: Nebulex.Adapter.adapter_meta()
 
+  @typedoc "Proxy type to the cache key"
   @type key :: Nebulex.Cache.key()
+
+  @typedoc "Proxy type to the cache value"
   @type value :: Nebulex.Cache.value()
+
+  @typedoc "Proxy type to the cache options"
   @type opts :: Nebulex.Cache.opts()
+
+  @typedoc "Proxy type to the cache entries"
   @type entries :: Nebulex.Cache.entries()
+
+  @typedoc "TTL for a cache entry"
   @type ttl :: timeout
+
+  @typedoc "Write command"
   @type on_write :: :put | :put_new | :replace
 
   @doc """

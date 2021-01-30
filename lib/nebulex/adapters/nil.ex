@@ -128,13 +128,11 @@ defmodule Nebulex.Adapters.Nil do
   ## Nebulex.Adapter.Queryable
 
   @impl true
-  def all(_, _, _), do: []
+  def execute(_, :all, _, _), do: []
+  def execute(_, _, _, _), do: 0
 
   @impl true
   def stream(_, _, _), do: Stream.each([], & &1)
-
-  @impl true
-  def delete_all(_, _, _), do: 0
 
   ## Nebulex.Adapter.Persistence
 

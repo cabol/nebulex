@@ -16,6 +16,84 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
   alias Nebulex.Adapters.Local.GenerationTest.LocalWithSizeLimit
   alias Nebulex.TestCache.Cache
 
+  describe "init" do
+    test "ok: with default options" do
+      assert {:ok, _pid} = LocalWithSizeLimit.start_link()
+
+      assert %Nebulex.Adapters.Local.Generation{
+               allocated_memory: nil,
+               backend: :ets,
+               backend_opts: [
+                 :set,
+                 :public,
+                 {:keypos, 2},
+                 {:read_concurrency, true},
+                 {:write_concurrency, true}
+               ],
+               gc_cleanup_max_timeout: 600_000,
+               gc_cleanup_min_timeout: 10_000,
+               gc_cleanup_ref: nil,
+               gc_heartbeat_ref: nil,
+               gc_interval: nil,
+               max_size: nil,
+               meta_tab: meta_tab,
+               stats_counter: nil
+             } = Generation.get_state(LocalWithSizeLimit)
+
+      assert is_reference(meta_tab)
+
+      :ok = LocalWithSizeLimit.stop()
+    end
+
+    test "ok: with custom options" do
+      assert {:ok, _pid} =
+               LocalWithSizeLimit.start_link(
+                 gc_interval: 10,
+                 max_size: 10,
+                 allocated_memory: 1000
+               )
+
+      assert %Nebulex.Adapters.Local.Generation{
+               allocated_memory: 1000,
+               backend: :ets,
+               backend_opts: [
+                 :set,
+                 :public,
+                 {:keypos, 2},
+                 {:read_concurrency, true},
+                 {:write_concurrency, true}
+               ],
+               gc_cleanup_max_timeout: 600_000,
+               gc_cleanup_min_timeout: 10_000,
+               gc_cleanup_ref: gc_cleanup_ref,
+               gc_heartbeat_ref: gc_heartbeat_ref,
+               gc_interval: 10,
+               max_size: 10,
+               meta_tab: meta_tab,
+               stats_counter: nil
+             } = Generation.get_state(LocalWithSizeLimit)
+
+      assert is_reference(gc_cleanup_ref)
+      assert is_reference(gc_heartbeat_ref)
+      assert is_reference(meta_tab)
+
+      :ok = LocalWithSizeLimit.stop()
+    end
+
+    test "error: invalid gc_cleanup_min_timeout" do
+      _ = Process.flag(:trap_exit, true)
+
+      assert {:error, {:shutdown, {_, _, {:shutdown, {_, _, {%ArgumentError{message: err}, _}}}}}} =
+               LocalWithSizeLimit.start_link(
+                 gc_interval: 3600,
+                 gc_cleanup_min_timeout: -1,
+                 gc_cleanup_max_timeout: -1
+               )
+
+      assert err == "expected gc_cleanup_min_timeout: to be an integer > 0, got: -1"
+    end
+  end
+
   describe "gc" do
     setup_with_dynamic_cache(Cache, :gc_test,
       backend: :shards,
@@ -124,19 +202,6 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       assert generations_len(LocalWithSizeLimit) == 2
 
       :ok = LocalWithSizeLimit.stop()
-    end
-
-    test "default options" do
-      _ = Process.flag(:trap_exit, true)
-
-      assert {:error, {:shutdown, {_, _, {:shutdown, {_, _, {%ArgumentError{message: err}, _}}}}}} =
-               LocalWithSizeLimit.start_link(
-                 gc_interval: :invalid,
-                 gc_cleanup_min_timeout: -1,
-                 gc_cleanup_max_timeout: -1
-               )
-
-      assert err == "expected gc_cleanup_min_timeout: to be an integer > 0, got: -1"
     end
 
     test "cleanup while cache is being used" do

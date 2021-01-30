@@ -9,7 +9,21 @@ defmodule Nebulex.Cache.Queryable do
   Implementation for `c:Nebulex.Cache.all/2`.
   """
   def all(name, query, opts) do
-    Adapter.with_meta(name, & &1.all(&2, query, opts))
+    Adapter.with_meta(name, & &1.execute(&2, :all, query, opts))
+  end
+
+  @doc """
+  Implementation for `c:Nebulex.Cache.count_all/2`.
+  """
+  def count_all(name, query, opts) do
+    Adapter.with_meta(name, & &1.execute(&2, :count_all, query, opts))
+  end
+
+  @doc """
+  Implementation for `c:Nebulex.Cache.delete_all/2`.
+  """
+  def delete_all(name, query, opts) do
+    Adapter.with_meta(name, & &1.execute(&2, :delete_all, query, opts))
   end
 
   @doc """
@@ -18,12 +32,5 @@ defmodule Nebulex.Cache.Queryable do
   def stream(name, query, opts) do
     opts = Keyword.put_new(opts, :page_size, @default_page_size)
     Adapter.with_meta(name, & &1.stream(&2, query, opts))
-  end
-
-  @doc """
-  Implementation for `c:Nebulex.Cache.delete_all/2`.
-  """
-  def delete_all(name, query, opts) do
-    Adapter.with_meta(name, & &1.delete_all(&2, query, opts))
   end
 end

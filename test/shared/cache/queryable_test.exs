@@ -64,13 +64,20 @@ defmodule Nebulex.Cache.QueryableTest do
     describe "delete_all/2" do
       test "deletes all keys in cache", %{cache: cache} do
         entries = cache_put(cache, 1..50)
-        all = cache.all()
 
-        assert all |> :lists.usort() |> length() == length(entries)
+        assert cache.all() |> :lists.usort() |> length() == length(entries)
 
-        assert cache.delete_all() == length(all)
+        cached = cache.count_all()
+        assert cache.delete_all() == cached
+        assert cache.count_all() == 0
+      end
+    end
 
-        assert cache.all() == []
+    describe "count_all/2" do
+      test "returns the total number of cached entries", %{cache: cache} do
+        _ = cache_put(cache, 1..50)
+        total = cache.all() |> length()
+        assert cache.count_all() == total
       end
     end
   end

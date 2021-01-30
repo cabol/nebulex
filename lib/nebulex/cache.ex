@@ -340,13 +340,18 @@ defmodule Nebulex.Cache do
         end
 
         @impl true
-        def stream(query \\ nil, opts \\ []) do
-          Queryable.stream(get_dynamic_cache(), query, opts)
+        def count_all(query \\ nil, opts \\ []) do
+          Queryable.count_all(get_dynamic_cache(), query, opts)
         end
 
         @impl true
         def delete_all(query \\ nil, opts \\ []) do
           Queryable.delete_all(get_dynamic_cache(), query, opts)
+        end
+
+        @impl true
+        def stream(query \\ nil, opts \\ []) do
+          Queryable.stream(get_dynamic_cache(), query, opts)
         end
       end
 
@@ -524,7 +529,7 @@ defmodule Nebulex.Cache do
   @callback get(key, opts) :: value
 
   @doc """
-  Similar to `get/2` but raises `KeyError` if `key` is not found.
+  Similar to `c:get/2` but raises `KeyError` if `key` is not found.
 
   ## Options
 
@@ -663,7 +668,7 @@ defmodule Nebulex.Cache do
   @callback put_new(key, value, opts) :: boolean
 
   @doc """
-  Similar to `put_new/3` but raises `Nebulex.KeyAlreadyExistsError` if the
+  Similar to `c:put_new/3` but raises `Nebulex.KeyAlreadyExistsError` if the
   key already exists.
 
   ## Options
@@ -746,7 +751,7 @@ defmodule Nebulex.Cache do
   @callback replace(key, value, opts) :: boolean
 
   @doc """
-  Similar to `replace/3` but raises `KeyError` if `key` is not found.
+  Similar to `c:replace/3` but raises `KeyError` if `key` is not found.
 
   ## Options
 
@@ -811,7 +816,7 @@ defmodule Nebulex.Cache do
   @callback take(key, opts) :: value
 
   @doc """
-  Similar to `take/2` but raises `KeyError` if `key` is not found.
+  Similar to `c:take/2` but raises `KeyError` if `key` is not found.
 
   ## Options
 
@@ -1069,6 +1074,7 @@ defmodule Nebulex.Cache do
       5
 
   """
+  @doc deprecated: "Use count_all/2 instead"
   @callback size() :: integer
 
   @doc """
@@ -1082,12 +1088,14 @@ defmodule Nebulex.Cache do
 
       iex> MyCache.size()
       0
+
   """
+  @doc deprecated: "Use delete_all/2 instead"
   @callback flush() :: integer
 
   ## Nebulex.Adapter.Queryable
 
-  @optional_callbacks all: 2, stream: 2, delete_all: 2
+  @optional_callbacks all: 2, count_all: 2, delete_all: 2, stream: 2
 
   @doc """
   Fetches all entries from cache matching the given `query`.
@@ -1099,11 +1107,12 @@ defmodule Nebulex.Cache do
   There are two types of query values. The ones shared and implemented
   by all adapters and the ones that are adapter specific.
 
-  ### Shared queries
+  ### Common queries
 
-    * `nil` - If `nil` is given as query value, all entries in cache will match
-      and return based on the `:return` option. Only the `nil` query is shared
-      for all the adapters.
+  The following query values are shared and/or supported for all adapters:
+
+    * `nil` - Returns a list with all cached entries based on the `:return`
+      option.
 
   ### Adapter-specific queries
 
@@ -1182,7 +1191,10 @@ defmodule Nebulex.Cache do
   `{:entry, key, value, version, expire_at}`, then the match spec could be
   something like:
 
-      iex> spec = [{{:entry, :"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [{{:"$1", :"$2"}}]}]
+      iex> spec = [
+      ...>   {{:entry, :"$1", :"$2", :_, :_},
+      ...>   [{:>, :"$2", 5}], [{{:"$1", :"$2"}}]}
+      ...> ]
       iex> MyCache.all(spec)
       [{3, 6}, {4, 8}, {5, 10}]
 
@@ -1203,29 +1215,17 @@ defmodule Nebulex.Cache do
   @callback all(query :: term, opts) :: [any]
 
   @doc """
-  Similar to `all/2` but returns a lazy enumerable that emits all entries
+  Similar to `c:all/2` but returns a lazy enumerable that emits all entries
   from the cache matching the given `query`.
+
+  If `query` is `nil`, then all entries in cache match and are returned
+  when the stream is evaluated; based on the `:return` option.
 
   May raise `Nebulex.QueryError` if query validation fails.
 
   ## Query values
 
-  There are two types of query values. The ones shared and implemented
-  by all adapters and the ones that are adapter specific.
-
-  ### Shared queries
-
-    * `nil` - If `nil` is given as query value, all entries in cache will match
-      and return based on the `:return` option. Only the `nil` query is shared
-      for all the adapters.
-
-  ### Adapter-specific queries
-
-  The `query` value depends entirely on the adapter implementation; it could
-  any term. Therefore, it is highly recommended to see adapters' documentation
-  for more information about building queries. For example, the built-in
-  `Nebulex.Adapters.Local` adapter uses `:ets.match_spec()` for queries,
-  as well as other pre-defined ones like `:unexpired` and `:expired`.
+  See `c:all/2` callback for more information about the query values.
 
   ## Options
 
@@ -1285,7 +1285,10 @@ defmodule Nebulex.Cache do
   `{:entry, key, value, version, expire_at}`, then the match spec could be
   something like:
 
-      iex> spec = [{{:entry, :"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [{{:"$1", :"$2"}}]}]
+      iex> spec = [
+      ...>   {{:entry, :"$1", :"$2", :_, :_},
+      ...>   [{:>, :"$2", 5}], [{{:"$1", :"$2"}}]}
+      ...> ]
       iex> MyCache.stream(spec, page_size: 100) |> Enum.to_list()
       [{3, 6}, {4, 8}, {5, 10}]
 
@@ -1306,7 +1309,8 @@ defmodule Nebulex.Cache do
   @callback stream(query :: term, opts) :: Enum.t()
 
   @doc """
-  Deletes all entries matching the given `query`.
+  Deletes all entries matching the given `query`. If `query` is `nil`,
+  then all entries in the cache are deleted.
 
   It returns the number of deleted entries.
 
@@ -1314,21 +1318,7 @@ defmodule Nebulex.Cache do
 
   ## Query values
 
-  There are two types of query values. The ones shared and implemented
-  by all adapters and the ones that are adapter specific.
-
-  ### Shared queries
-
-    * `nil` - If `nil` is given as query value, all entries in cache are
-      deleted.
-
-  ### Adapter-specific queries
-
-  The `query` value depends entirely on the adapter implementation; it could
-  any term. Therefore, it is highly recommended to see adapters' documentation
-  for more information about building queries. For example, the built-in
-  `Nebulex.Adapters.Local` adapter uses `:ets.match_spec()` for queries,
-  as well as other pre-defined ones like `:unexpired` and `:expired`.
+  See `c:all/2` callback for more information about the query values.
 
   ## Options
 
@@ -1351,15 +1341,58 @@ defmodule Nebulex.Cache do
       iex> query = [{{:_, :"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [true]}]
       iex> MyCache.delete_all(query)
 
+  > For the local adapter you can use [Ex2ms](https://github.com/ericmj/ex2ms)
+    to build the match specs much easier.
+
   Additional built-in queries for `Nebulex.Adapters.Local` adapter:
 
       iex> unexpired = MyCache.delete_all(:unexpired)
       iex> expired = MyCache.delete_all(:expired)
 
-  Remember for the local adapter you can use `Ex2ms` to build the match specs
-  much easier.
   """
   @callback delete_all(query :: term, opts) :: integer
+
+  @doc """
+  Counts all entries in cache matching the given `query`.
+
+  It returns the count of the matched entries.
+
+  If `query` is `nil` (the default), then the total number of
+  cached entries is returned.
+
+  May raise `Nebulex.QueryError` if query validation fails.
+
+  ## Query values
+
+  See `c:all/2` callback for more information about the query values.
+
+  ## Example
+
+  Populate the cache with some entries:
+
+      iex> :ok = Enum.each(1..5, &MyCache.put(&1, &1 * 2))
+
+  Count all entries in cache:
+
+      iex> MyCache.count_all()
+      5
+
+  Count all entries that match with the given query assuming we are using
+  `Nebulex.Adapters.Local` adapter:
+
+      iex> query = [{{:_, :"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [true]}]
+      iex> MyCache.count_all(query)
+
+  > For the local adapter you can use [Ex2ms](https://github.com/ericmj/ex2ms)
+    to build the match specs much easier.
+
+  Additional built-in queries for `Nebulex.Adapters.Local` adapter:
+
+      iex> unexpired = MyCache.count_all(:unexpired)
+      iex> expired = MyCache.count_all(:expired)
+
+  """
+  @callback count_all(query :: term, opts) :: integer
 
   ## Nebulex.Adapter.Persistence
 
@@ -1401,7 +1434,7 @@ defmodule Nebulex.Cache do
 
   ## Options
 
-  Similar to `dump/2`, this operation relies entirely on the adapter
+  Similar to `c:dump/2`, this operation relies entirely on the adapter
   implementation, therefore, it is recommended to review the documentation
   of the adapter to be used. Similarly, the built-in adapters inherit the
   default implementation from `Nebulex.Adapter.Persistence`, hence, review

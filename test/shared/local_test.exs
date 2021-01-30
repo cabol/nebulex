@@ -160,18 +160,21 @@ defmodule Nebulex.LocalTest do
       end
 
       test "delete all expired and unexpired entries", %{cache: cache} do
-        expired = cache_put(cache, 1..5, & &1, ttl: 1500)
-        unexpired = cache_put(cache, 6..10)
+        _ = cache_put(cache, 1..5, & &1, ttl: 1500)
+        _ = cache_put(cache, 6..10)
 
         assert cache.delete_all(:expired) == 0
+        assert cache.count_all(:expired) == 0
 
         :ok = Process.sleep(1600)
 
-        assert cache.delete_all(:expired) == length(expired)
-        assert cache.all() |> Enum.sort() == unexpired
+        assert cache.delete_all(:expired) == 5
+        assert cache.count_all(:expired) == 0
+        assert cache.count_all(:unexpired) == 5
 
-        assert cache.delete_all(:unexpired) == length(unexpired)
-        assert cache.all() |> Enum.sort() == []
+        assert cache.delete_all(:unexpired) == 5
+        assert cache.count_all(:unexpired) == 0
+        assert cache.count_all() == 0
       end
 
       test "delete all matched entries", %{cache: cache, name: name} do
@@ -179,17 +182,21 @@ defmodule Nebulex.LocalTest do
         _ = cache.new_generation(name)
         values = values ++ cache_put(cache, 6..10)
 
-        assert cache.all() |> Enum.sort() == values
-
-        {rem, expected} = Enum.split(values, 4)
+        assert cache.count_all() == 10
 
         test_ms =
           fun do
-            {_, _, value, _, _} when value > 4 -> value
+            {_, _, value, _, _} when rem(value, 2) == 0 -> value
           end
 
-        assert cache.delete_all(test_ms) == length(expected)
-        assert cache.all() |> Enum.sort() == rem
+        {expected, rem} = Enum.split_with(values, &(rem(&1, 2) == 0))
+
+        assert cache.count_all(test_ms) == 5
+        assert cache.all(test_ms) |> Enum.sort() == Enum.sort(expected)
+
+        assert cache.delete_all(test_ms) == 5
+        assert cache.count_all(test_ms) == 0
+        assert cache.all() |> Enum.sort() == Enum.sort(rem)
       end
     end
 

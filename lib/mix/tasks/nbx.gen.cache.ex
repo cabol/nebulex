@@ -48,19 +48,7 @@ defmodule Mix.Tasks.Nbx.Gen.Cache do
     no_umbrella!("nbx.gen.cache")
     {opts, _} = OptionParser.parse!(args, strict: @switches, aliases: @aliases)
 
-    cache =
-      case Keyword.get_values(opts, :cache) do
-        [] -> Mix.raise("nbx.gen.cache expects the cache to be given as -c MyApp.Cache")
-        [cache] -> Module.concat([cache])
-        [_ | _] -> Mix.raise("nbx.gen.cache expects a single cache to be given")
-      end
-
-    adapter =
-      case Keyword.get_values(opts, :adapter) do
-        [] -> Nebulex.Adapters.Local
-        [adapter] -> Module.concat([adapter])
-        [_ | _] -> Mix.raise("nbx.gen.cache expects a single adapter to be given")
-      end
+    {cache, adapter} = get_cache_and_adapter(opts)
 
     config = Project.config()
     underscored = Macro.underscore(inspect(cache))
@@ -98,6 +86,24 @@ defmodule Mix.Tasks.Nbx.Gen.Cache do
     And for more information about configuration options, check
     adapters documentation and Nebulex.Cache shared options.
     """)
+  end
+
+  defp get_cache_and_adapter(opts) do
+    cache =
+      case Keyword.get_values(opts, :cache) do
+        [] -> Mix.raise("nbx.gen.cache expects the cache to be given as -c MyApp.Cache")
+        [cache] -> Module.concat([cache])
+        [_ | _] -> Mix.raise("nbx.gen.cache expects a single cache to be given")
+      end
+
+    adapter =
+      case Keyword.get_values(opts, :adapter) do
+        [] -> Nebulex.Adapters.Local
+        [adapter] -> Module.concat([adapter])
+        [_ | _] -> Mix.raise("nbx.gen.cache expects a single adapter to be given")
+      end
+
+    {cache, adapter}
   end
 
   defp get_first_config_line(true), do: "import Config"

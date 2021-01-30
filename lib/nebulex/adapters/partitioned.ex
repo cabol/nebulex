@@ -497,16 +497,22 @@ defmodule Nebulex.Adapters.Partitioned do
   ## Nebulex.Adapter.Queryable
 
   @impl true
-  def all(%{name: name, task_sup: task_sup} = adapter_meta, query, opts) do
+  def execute(%{name: name, task_sup: task_sup} = adapter_meta, operation, query, opts) do
+    reducer =
+      case operation do
+        :all -> &List.flatten/1
+        _ -> &Enum.sum/1
+      end
+
     task_sup
     |> RPC.multi_call(
       Cluster.get_nodes(name),
       __MODULE__,
       :with_dynamic_cache,
-      [adapter_meta, :all, [query, opts]],
+      [adapter_meta, operation, [query, opts]],
       opts
     )
-    |> handle_rpc_multi_call(:all, &List.flatten/1)
+    |> handle_rpc_multi_call(:all, reducer)
   end
 
   @impl true
@@ -534,19 +540,6 @@ defmodule Nebulex.Adapters.Partitioned do
       end,
       & &1
     )
-  end
-
-  @impl true
-  def delete_all(%{name: name, task_sup: task_sup} = adapter_meta, query, opts) do
-    task_sup
-    |> RPC.multi_call(
-      Cluster.get_nodes(name),
-      __MODULE__,
-      :with_dynamic_cache,
-      [adapter_meta, :delete_all, [query, opts]],
-      opts
-    )
-    |> handle_rpc_multi_call(:all, &Enum.sum/1)
   end
 
   ## Nebulex.Adapter.Transaction

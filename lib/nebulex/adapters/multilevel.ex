@@ -397,10 +397,18 @@ defmodule Nebulex.Adapters.Multilevel do
   ## Nebulex.Adapter.Queryable
 
   @impl true
-  def all(%{levels: levels}, query, opts) do
-    for level <- levels,
-        elems <- with_dynamic_cache(level, :all, [query, opts]),
-        do: elems
+  def execute(%{levels: levels}, operation, query, opts) do
+    {reducer, acc_in} =
+      case operation do
+        :all -> {&(&1 ++ &2), []}
+        _ -> {&(&1 + &2), 0}
+      end
+
+    Enum.reduce(levels, acc_in, fn level, acc ->
+      level
+      |> with_dynamic_cache(operation, [query, opts])
+      |> reducer.(acc)
+    end)
   end
 
   @impl true
@@ -423,11 +431,6 @@ defmodule Nebulex.Adapters.Multilevel do
       end,
       & &1
     )
-  end
-
-  @impl true
-  def delete_all(%{levels: levels}, query, opts) do
-    Enum.reduce(levels, 0, &(with_dynamic_cache(&1, :delete_all, [query, opts]) + &2))
   end
 
   ## Nebulex.Adapter.Transaction
