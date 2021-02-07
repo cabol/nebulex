@@ -188,7 +188,6 @@ defmodule Nebulex.Adapters.Partitioned do
   Retrieving the cluster nodes associated with the given cache `name`:
 
       MyCache.nodes()
-      MyCache.nodes(:cache_name)
 
   Get a cluster node for the cache `name` based on the given `key`:
 
@@ -254,13 +253,15 @@ defmodule Nebulex.Adapters.Partitioned do
       @doc """
       A convenience function for getting the cluster nodes.
       """
-      def nodes(name \\ __MODULE__), do: Cluster.get_nodes(name)
+      def nodes do
+        Cluster.get_nodes(get_dynamic_cache())
+      end
 
       @doc """
       A convenience function to get the node of the given `key`.
       """
-      def get_node(name \\ __MODULE__, key) do
-        Adapter.with_meta(name, fn _adapter, %{keyslot: keyslot} ->
+      def get_node(key) do
+        Adapter.with_meta(get_dynamic_cache(), fn _adapter, %{name: name, keyslot: keyslot} ->
           Cluster.get_node(name, key, keyslot)
         end)
       end

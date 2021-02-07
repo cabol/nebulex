@@ -1,12 +1,6 @@
 defmodule Nebulex.Adapters.StatsTest do
   use ExUnit.Case, async: true
 
-  import Nebulex.CacheCase
-  import Mock
-
-  alias Nebulex.Cache.Stats
-  alias Nebulex.Time
-
   defmodule Cache do
     use Nebulex.Cache,
       otp_app: :nebulex,
@@ -36,6 +30,12 @@ defmodule Nebulex.Adapters.StatsTest do
         adapter: Nebulex.Adapters.Local
     end
   end
+
+  import Nebulex.CacheCase
+  import Mock
+
+  alias Nebulex.Cache.Stats
+  alias Nebulex.Time
 
   @config [
     model: :inclusive,

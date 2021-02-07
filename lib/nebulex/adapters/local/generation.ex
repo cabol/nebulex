@@ -23,7 +23,7 @@ defmodule Nebulex.Adapters.Local.Generation do
       interval time in milliseconds to garbage collection to run, delete the
       oldest generation and create a new one. If this option is not set,
       garbage collection is never executed, so new generations must be
-      created explicitly, e.g.: `MyCache.new_generation(name_or_pid, opts)`.
+      created explicitly, e.g.: `MyCache.new_generation(opts)`.
 
     * `:max_size` - If it is set, an integer > 0 is expected defining the
       max number of cached entries (cache limit). If it is not set (`nil`),
@@ -212,6 +212,12 @@ defmodule Nebulex.Adapters.Local.Generation do
     |> GenServer.call(:get_state)
   end
 
+  defp do_call(tab, message) do
+    tab
+    |> server()
+    |> GenServer.call(message)
+  end
+
   defp get_meta_tab(server_ref) when is_atom(server_ref) or is_pid(server_ref) do
     Adapter.with_meta(server_ref, fn _, %{meta_tab: meta_tab} ->
       meta_tab
@@ -219,12 +225,6 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   defp get_meta_tab(server_ref), do: server_ref
-
-  defp do_call(tab, message) do
-    tab
-    |> server()
-    |> GenServer.call(message)
-  end
 
   ## GenServer Callbacks
 

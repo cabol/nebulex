@@ -2,7 +2,7 @@ defmodule Nebulex.Cache.QueryableTest do
   import Nebulex.CacheCase
 
   deftests do
-    import Nebulex.CacheHelpers
+    import Nebulex.CacheCase
 
     describe "all/2" do
       test "returns all keys in cache", %{cache: cache} do

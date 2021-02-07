@@ -9,7 +9,6 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       gc_interval: Nebulex.Time.expiry_time(1, :hour)
   end
 
-  import Nebulex.CacheHelpers
   import Nebulex.CacheCase
 
   alias Nebulex.Adapters.Local.Generation
@@ -117,7 +116,11 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       assert generations_len(name) == 1
 
       :ok = Process.sleep(800)
-      :ok = cache.new_generation(name)
+
+      cache.with_dynamic_cache(name, fn ->
+        cache.new_generation()
+      end)
+
       assert generations_len(name) == 2
 
       :ok = Process.sleep(500)
@@ -131,7 +134,11 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       assert generations_len(name) == 1
 
       :ok = Process.sleep(800)
-      :ok = cache.new_generation(name, reset_timer: false)
+
+      cache.with_dynamic_cache(name, fn ->
+        cache.new_generation(reset_timer: false)
+      end)
+
       assert generations_len(name) == 2
 
       :ok = Process.sleep(500)
@@ -142,7 +149,10 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       assert generations_len(name) == 1
 
       :ok = Process.sleep(800)
-      :ok = cache.reset_generation_timer(name)
+
+      cache.with_dynamic_cache(name, fn ->
+        cache.reset_generation_timer()
+      end)
 
       :ok = Process.sleep(220)
       assert generations_len(name) == 1

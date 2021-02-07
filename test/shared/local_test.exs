@@ -4,13 +4,12 @@ defmodule Nebulex.LocalTest do
   deftests do
     import Ex2ms
     import Nebulex.CacheCase
-    import Nebulex.CacheHelpers
 
     alias Nebulex.{Adapter, Entry}
 
     describe "with_dynamic_cache/3" do
       test "ok", %{cache: cache} do
-        with_dynamic_cache(cache, fn ->
+        test_with_dynamic_cache(cache, fn ->
           :ok = cache.put("foo", "bar")
           assert cache.get("foo") == "bar"
         end)
@@ -102,7 +101,7 @@ defmodule Nebulex.LocalTest do
     describe "queryable:" do
       test "ETS match_spec queries", %{cache: cache, name: name} do
         values = cache_put(cache, 1..5, &(&1 * 2))
-        _ = cache.new_generation(name)
+        _ = new_generation(cache, name)
         values = values ++ cache_put(cache, 6..10, &(&1 * 2))
 
         assert nil
@@ -179,7 +178,7 @@ defmodule Nebulex.LocalTest do
 
       test "delete all matched entries", %{cache: cache, name: name} do
         values = cache_put(cache, 1..5)
-        _ = cache.new_generation(name)
+        _ = new_generation(cache, name)
         values = values ++ cache_put(cache, 6..10)
 
         assert cache.count_all() == 10
@@ -206,7 +205,7 @@ defmodule Nebulex.LocalTest do
         assert cache.get("foo") == "bar"
         assert cache.ttl("foo") == :infinity
 
-        _ = cache.new_generation(name)
+        _ = new_generation(cache, name)
         assert cache.get("foo") == "bar"
       end
 
@@ -225,7 +224,7 @@ defmodule Nebulex.LocalTest do
         refute cache.get(:non_existent)
 
         # create a new generation
-        _ = cache.new_generation(name)
+        _ = new_generation(cache, name)
 
         # both entries should be in the old generation
         refute get_from_new(cache, name, 1)
@@ -241,7 +240,7 @@ defmodule Nebulex.LocalTest do
         assert get_from_old(cache, name, 2) == 2
 
         # create a new generation, the old generation should be deleted
-        _ = cache.new_generation(name)
+        _ = new_generation(cache, name)
 
         # entry 1 should be into the old generation and entry 2 deleted
         refute get_from_new(cache, name, 1)
@@ -254,7 +253,7 @@ defmodule Nebulex.LocalTest do
         assert cache.put(1, 1, ttl: 1000) == :ok
         assert cache.get(1) == 1
 
-        _ = cache.new_generation(name)
+        _ = new_generation(cache, name)
 
         refute get_from_new(cache, name, 1)
         assert get_from_old(cache, name, 1) == 1
@@ -270,17 +269,24 @@ defmodule Nebulex.LocalTest do
 
     ## Helpers
 
+    defp new_generation(cache, name) do
+      cache.with_dynamic_cache(name, fn ->
+        cache.new_generation()
+      end)
+    end
+
     defp get_from_new(cache, name, key) do
-      name
-      |> cache.newer_generation()
-      |> get_from(name, key)
+      cache.with_dynamic_cache(name, fn ->
+        get_from(cache.newer_generation(), name, key)
+      end)
     end
 
     defp get_from_old(cache, name, key) do
-      name
-      |> cache.generations()
-      |> List.last()
-      |> get_from(name, key)
+      cache.with_dynamic_cache(name, fn ->
+        cache.generations()
+        |> List.last()
+        |> get_from(name, key)
+      end)
     end
 
     defp get_from(gen, name, key) do

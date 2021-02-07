@@ -6,19 +6,29 @@ defmodule Nebulex.Adapters.ReplicatedTest do
 
   alias Nebulex.TestCache.{Replicated, ReplicatedMock}
 
+  @cache_name :replicated_cache
+
   setup_all do
-    node_pid_list = start_caches(cluster_nodes(), [{Replicated, []}])
+    node_pid_list = start_caches(cluster_nodes(), [{Replicated, [name: @cache_name]}])
 
     on_exit(fn ->
       :ok = Process.sleep(100)
       stop_caches(node_pid_list)
     end)
 
-    {:ok, cache: Replicated, name: Replicated}
+    {:ok, cache: Replicated, name: @cache_name}
   end
 
   setup do
+    default_dynamic_cache = Replicated.get_dynamic_cache()
+    _ = Replicated.put_dynamic_cache(@cache_name)
+
     _ = Replicated.delete_all()
+
+    on_exit(fn ->
+      Replicated.put_dynamic_cache(default_dynamic_cache)
+    end)
+
     :ok
   end
 
@@ -35,8 +45,8 @@ defmodule Nebulex.Adapters.ReplicatedTest do
     end
   end
 
-  describe "replicated cache" do
-    test "put" do
+  describe "replicated cache:" do
+    test "put/3" do
       assert Replicated.put(1, 1) == :ok
       assert Replicated.get(1) == 1
 
@@ -47,7 +57,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})
     end
 
-    test "delete" do
+    test "delete/2" do
       assert Replicated.put("foo", "bar") == :ok
       assert Replicated.get("foo") == "bar"
 
@@ -59,7 +69,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       assert_for_all_replicas(Replicated, :get, ["foo"], nil)
     end
 
-    test "take" do
+    test "take/2" do
       assert Replicated.put("foo", "bar") == :ok
       assert Replicated.get("foo") == "bar"
 
@@ -71,14 +81,14 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       assert_for_all_replicas(Replicated, :take, ["foo"], nil)
     end
 
-    test "incr" do
+    test "incr/3" do
       assert Replicated.incr(:counter, 3) == 3
       assert Replicated.incr(:counter) == 4
 
       assert_for_all_replicas(Replicated, :get, [:counter], 4)
     end
 
-    test "incr raises when the counter is not an integer" do
+    test "incr/3 raises when the counter is not an integer" do
       :ok = Replicated.put(:counter, "string")
 
       assert_raise Nebulex.RPCMultiCallError, fn ->
@@ -86,7 +96,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       end
     end
 
-    test "delete_all" do
+    test "delete_all/2" do
       assert Replicated.put_all(a: 1, b: 2, c: 3) == :ok
 
       assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})
@@ -99,8 +109,8 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   end
 
   describe "cluster" do
-    test "rpc error" do
-      with_dynamic_cache(ReplicatedMock, [name: :replicated_mock], fn ->
+    test "error: rpc error" do
+      test_with_dynamic_cache(ReplicatedMock, [name: :replicated_mock], fn ->
         _ = Process.flag(:trap_exit, true)
 
         msg = ~r"RPC error executing action: put_all\n\nErrors:\n\n"
@@ -111,10 +121,10 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       end)
     end
 
-    test "join new cache node" do
+    test "ok: join new cache node" do
       assert Replicated.put_all(a: 1, b: 2) == :ok
       assert Replicated.put(:c, 3, ttl: 5000) == :ok
-      assert :lists.usort(Replicated.nodes()) == :lists.usort(cluster_nodes())
+      assert Replicated.nodes() |> :lists.usort() == :lists.usort(cluster_nodes())
 
       assert_for_all_replicas(
         Replicated,
@@ -124,9 +134,9 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       )
 
       # join new cache node
-      node_pid_list = start_caches([:"node3@127.0.0.1"], [{Replicated, []}])
+      node_pid_list = start_caches([:"node3@127.0.0.1"], [{Replicated, [name: @cache_name]}])
 
-      assert :lists.usort(Replicated.nodes()) ==
+      assert Replicated.nodes() |> :lists.usort() ==
                :lists.usort([:"node3@127.0.0.1" | cluster_nodes()])
 
       wait_until(fn ->
@@ -144,7 +154,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
 
   describe "write-like operations locked" do
     test "when a delete_all command is ongoing" do
-      with_dynamic_cache(ReplicatedMock, [name: :replicated_global_mock], fn ->
+      test_with_dynamic_cache(ReplicatedMock, [name: :replicated_global_mock], fn ->
         true = Process.register(self(), __MODULE__)
         _ = Process.flag(:trap_exit, true)
 
@@ -251,7 +261,14 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   ## Helpers
 
   defp assert_for_all_replicas(cache, action, args, expected) do
-    assert {res_lst, []} = :rpc.multicall(cache.nodes(cache), cache, action, args)
+    assert {res_lst, []} =
+             :rpc.multicall(
+               cache.nodes(),
+               cache,
+               :with_dynamic_cache,
+               [@cache_name, cache, action, args]
+             )
+
     Enum.each(res_lst, fn res -> assert res == expected end)
   end
 

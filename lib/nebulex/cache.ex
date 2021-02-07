@@ -212,6 +212,11 @@ defmodule Nebulex.Cache do
         end
       end
 
+      @impl true
+      def with_dynamic_cache(name, module, fun, args) do
+        with_dynamic_cache(name, fn -> apply(module, fun, args) end)
+      end
+
       ## Entry
 
       @impl true
@@ -487,17 +492,34 @@ defmodule Nebulex.Cache do
   @callback put_dynamic_cache(atom() | pid()) :: atom() | pid()
 
   @doc """
-  Executes the function `fun` for the given dynamic cache.
+  Invokes the given function `fun` for the dynamic cache `name_or_pid`.
 
   ## Example
 
-      MyCache.with_dynamic_cache(:cache_name, fn ->
+      MyCache.with_dynamic_cache(:my_cache, fn ->
         MyCache.put("foo", "var")
       end)
 
   See `c:get_dynamic_cache/0` and `c:put_dynamic_cache/1`.
   """
-  @callback with_dynamic_cache(atom() | pid(), fun) :: term
+  @callback with_dynamic_cache(name_or_pid :: atom() | pid(), fun) :: term
+
+  @doc """
+  For the dynamic cache `name_or_pid`, invokes the given function name `fun`
+  from `module` with the list of arguments `args`.
+
+  ## Example
+
+      MyCache.with_dynamic_cache(:my_cache, Module, :some_fun, ["foo", "bar"])
+
+  See `c:get_dynamic_cache/0` and `c:put_dynamic_cache/1`.
+  """
+  @callback with_dynamic_cache(
+              name_or_pid :: atom() | pid(),
+              module,
+              fun :: atom,
+              args :: [term]
+            ) :: term
 
   ## Nebulex.Adapter.Entry
 

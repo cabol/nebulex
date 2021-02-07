@@ -82,7 +82,7 @@ defmodule Nebulex.CacheCase do
   end
 
   @doc false
-  def with_dynamic_cache(cache, opts \\ [], callback) do
+  def test_with_dynamic_cache(cache, opts \\ [], callback) do
     default_dynamic_cache = cache.get_dynamic_cache()
     {:ok, pid} = cache.start_link(opts)
 
@@ -106,5 +106,14 @@ defmodule Nebulex.CacheCase do
     _ ->
       :ok = Process.sleep(delay)
       wait_until(retries - 1, delay, fun)
+  end
+
+  @doc false
+  def cache_put(cache, lst, fun \\ & &1, opts \\ []) do
+    for key <- lst do
+      value = fun.(key)
+      :ok = cache.put(key, value, opts)
+      value
+    end
   end
 end

@@ -10,6 +10,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
   alias Nebulex.TestCache.{Partitioned, PartitionedMock}
 
   @primary :"primary@127.0.0.1"
+  @cache_name :partitioned_cache
 
   # Set config
   :ok = Application.put_env(:nebulex, Partitioned, primary: [backend: :shards])
@@ -21,22 +22,26 @@ defmodule Nebulex.Adapters.PartitionedTest do
       start_caches(
         [node() | Node.list()],
         [
-          {Partitioned, [stats: true]},
+          {Partitioned, [name: @cache_name, stats: true]},
           {PartitionedMock, []}
         ]
       )
 
+    default_dynamic_cache = Partitioned.get_dynamic_cache()
+    _ = Partitioned.put_dynamic_cache(@cache_name)
+
     on_exit(fn ->
+      _ = Partitioned.put_dynamic_cache(default_dynamic_cache)
       :ok = Process.sleep(100)
       stop_caches(node_pid_list)
     end)
 
-    {:ok, cache: Partitioned, name: Partitioned, cluster: cluster}
+    {:ok, cache: Partitioned, name: @cache_name, cluster: cluster}
   end
 
   describe "c:init/1" do
     test "initializes the primary store metadata" do
-      Adapter.with_meta(Partitioned.__primary__(), fn adapter, meta ->
+      Adapter.with_meta(PartitionedCache.Primary, fn adapter, meta ->
         assert adapter == Nebulex.Adapters.Local
         assert meta.backend == :shards
       end)
@@ -89,7 +94,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
         end
       end
 
-      with_dynamic_cache(Partitioned, [name: :custom_keyslot, keyslot: Keyslot], fn ->
+      test_with_dynamic_cache(Partitioned, [name: :custom_keyslot, keyslot: Keyslot], fn ->
         refute Partitioned.get("foo")
         assert Partitioned.put("foo", "bar") == :ok
         assert Partitioned.get("foo") == "bar"
@@ -116,12 +121,12 @@ defmodule Nebulex.Adapters.PartitionedTest do
   end
 
   describe "cluster" do
-    test "established", %{cluster: cluster} do
+    test "established", %{name: name, cluster: cluster} do
       assert node() == @primary
       assert :lists.usort(Node.list()) == cluster -- [node()]
       assert Partitioned.nodes() == cluster
 
-      :ok = Cluster.leave(Partitioned)
+      :ok = Cluster.leave(name)
       assert Partitioned.nodes() == cluster -- [node()]
     end
 
@@ -181,7 +186,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
 
   defp teardown_cache(key) do
     node = Partitioned.get_node(key)
-    remote_pid = :rpc.call(node, Process, :whereis, [Partitioned])
+    remote_pid = :rpc.call(node, Process, :whereis, [@cache_name])
     :ok = :rpc.call(node, Supervisor, :stop, [remote_pid])
     node
   end

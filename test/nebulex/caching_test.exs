@@ -2,8 +2,6 @@ defmodule Nebulex.CachingTest do
   use ExUnit.Case, async: true
   use Nebulex.Caching
 
-  import Nebulex.CacheCase
-
   defmodule Cache do
     use Nebulex.Cache,
       otp_app: :nebulex,
@@ -13,6 +11,8 @@ defmodule Nebulex.CachingTest do
   defmodule Meta do
     defstruct [:id, :count]
   end
+
+  import Nebulex.CacheCase
 
   alias Nebulex.CachingTest.{Cache, Meta}
 

@@ -64,7 +64,7 @@ defmodule Nebulex.Adapters.Local do
       interval time in milliseconds to garbage collection to run, delete the
       oldest generation and create a new one. If this option is not set,
       garbage collection is never executed, so new generations must be
-      created explicitly, e.g.: `MyCache.new_generation(name_or_pid, opts)`.
+      created explicitly, e.g.: `MyCache.new_generation(opts)`.
 
     * `:max_size` - If it is set, an integer > 0 is expected defining the
       max number of cached entries (cache limit). If it is not set (`nil`),
@@ -274,17 +274,15 @@ defmodule Nebulex.Adapters.Local do
   Creating new generations:
 
       MyCache.new_generation()
-      MyCache.new_generation(:my_cache, [])
+      MyCache.new_generation(reset_timer: false)
 
   Retrieving the current generations:
 
       MyCache.generations()
-      MyCache.generations(:my_cache)
 
   Retrieving the newer generation:
 
       MyCache.newer_generation()
-      MyCache.newer_generation(:my_cache)
 
   """
 
@@ -330,30 +328,30 @@ defmodule Nebulex.Adapters.Local do
       @doc """
       A convenience function for creating new generations.
       """
-      defdelegate new_generation(name_or_pid \\ __MODULE__, opts \\ []),
-        to: Generation,
-        as: :new
+      def new_generation(opts \\ []) do
+        Generation.new(get_dynamic_cache(), opts)
+      end
 
       @doc """
       A convenience function for reset the GC timer.
       """
-      defdelegate reset_generation_timer(name_or_pid \\ __MODULE__),
-        to: Generation,
-        as: :reset_timer
+      def reset_generation_timer do
+        Generation.reset_timer(get_dynamic_cache())
+      end
 
       @doc """
       A convenience function for retrieving the current generations.
       """
-      defdelegate generations(name_or_pid \\ __MODULE__),
-        to: Generation,
-        as: :list
+      def generations do
+        Generation.list(get_dynamic_cache())
+      end
 
       @doc """
       A convenience function for retrieving the newer generation.
       """
-      defdelegate newer_generation(name_or_pid \\ __MODULE__),
-        to: Generation,
-        as: :newer
+      def newer_generation do
+        Generation.newer(get_dynamic_cache())
+      end
     end
   end
 

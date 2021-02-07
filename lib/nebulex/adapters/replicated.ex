@@ -136,7 +136,6 @@ defmodule Nebulex.Adapters.Replicated do
   Retrieving the cluster nodes associated with the given cache name:
 
       MyCache.nodes()
-      MyCache.nodes(:cache_name)
 
   ## Caveats of replicated adapter
 
@@ -225,7 +224,9 @@ defmodule Nebulex.Adapters.Replicated do
       @doc """
       A convenience function for getting the cluster nodes.
       """
-      def nodes(name \\ __MODULE__), do: Cluster.get_nodes(name)
+      def nodes do
+        Cluster.get_nodes(get_dynamic_cache())
+      end
     end
   end
 
@@ -518,7 +519,7 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
   end
 
   @impl true
-  def handle_info(:timeout, %{pid: _} = state) do
+  def handle_info(:timeout, %{pid: pid} = state) when is_pid(pid) do
     # Start synchronization process
     :ok = sync_data(state)
 
@@ -561,7 +562,7 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
   # FIXME: this is because coveralls does not mark this as covered
   # coveralls-ignore-start
 
-  defp sync_data(%{name: name, cache: cache} = meta) do
+  defp sync_data(%{name: name} = adapter_meta) do
     cluster_nodes = Cluster.get_nodes(name)
 
     case cluster_nodes -- [node()] do
@@ -579,28 +580,52 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
         #    of the other cluster nodes.
         # 4. Reset GC timer for ell cluster nodes (making the generation timer
         #    gap among cluster nodes as small as possible).
-        with :ok <- maybe_run_on_nodes(nodes, cache, :new_generation),
-             :ok <- copy_entries_from_nodes(nodes, meta),
-             :ok <- maybe_run_on_nodes([node()], cache, :new_generation),
-             :ok <- maybe_run_on_nodes(nodes, cache, :reset_generation_timer) do
+        with :ok <- maybe_run_on_nodes(adapter_meta, nodes, :new_generation),
+             :ok <- copy_entries_from_nodes(adapter_meta, nodes),
+             :ok <- maybe_run_on_nodes(adapter_meta, [node()], :new_generation),
+             :ok <- maybe_run_on_nodes(adapter_meta, nodes, :reset_generation_timer) do
           :ok
         end
     end
   end
 
-  defp maybe_run_on_nodes(nodes, cache, fun) do
-    _ =
-      if cache.__primary__.__adapter__() == Nebulex.Adapters.Local do
-        {_, []} = :rpc.multicall(nodes, cache.__primary__, fun, [])
-      end
-
-    :ok
+  defp maybe_run_on_nodes(%{cache: cache} = adapter_meta, nodes, fun) do
+    if cache.__primary__.__adapter__() == Nebulex.Adapters.Local do
+      nodes
+      |> :rpc.multicall(Replicated, :with_dynamic_cache, [adapter_meta, fun, []])
+      |> handle_multicall()
+    else
+      :ok
+    end
   end
 
-  defp copy_entries_from_nodes(nodes, %{cache: cache} = meta) do
+  defp handle_multicall({_, [_ | _] = failed_nodes}) do
+    raise "sync-up process failed on nodes: #{inspect(failed_nodes)}"
+  end
+
+  defp handle_multicall({responses, []}) do
+    responses
+    |> Enum.split_with(&(&1 == :ok))
+    |> elem(1)
+    |> case do
+      [] ->
+        :ok
+
+      errors ->
+        raise Nebulex.RPCMultiCallError, action: :sync_data, errors: errors
+    end
+  end
+
+  defp copy_entries_from_nodes(adapter_meta, nodes) do
     nodes
-    |> Enum.reduce_while([], &stream_entries(meta, &1, &2))
-    |> Enum.each(&cache.__primary__.put(&1.key, &1.value, ttl: Entry.ttl(&1)))
+    |> Enum.reduce_while([], &stream_entries(adapter_meta, &1, &2))
+    |> Enum.each(
+      &Replicated.with_dynamic_cache(
+        adapter_meta,
+        :put,
+        [&1.key, &1.value, [ttl: Entry.ttl(&1)]]
+      )
+    )
   end
 
   defp stream_entries(meta, node, acc) do
