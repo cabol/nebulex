@@ -56,7 +56,8 @@ defmodule Nebulex.Cache.Cluster do
     end
 
     defp pg_leave(name, pid) do
-      :ok = :pg.leave(__MODULE__, name, pid)
+      _ = :pg.leave(__MODULE__, name, pid)
+      :ok
     end
 
     defp pg_members(name) do

@@ -1,5 +1,5 @@
 # Set nodes
-nodes = [:"node1@127.0.0.1", :"node2@127.0.0.1", :"node3@127.0.0.1"]
+nodes = [:"node1@127.0.0.1", :"node2@127.0.0.1", :"node3@127.0.0.1", :"node4@127.0.0.1"]
 :ok = Application.put_env(:nebulex, :nodes, nodes)
 
 # Load shared tests

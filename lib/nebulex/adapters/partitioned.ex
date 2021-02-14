@@ -189,13 +189,17 @@ defmodule Nebulex.Adapters.Partitioned do
 
       MyCache.nodes()
 
-  Get a cluster node for the cache `name` based on the given `key`:
+  Get a cluster node based on the given `key`:
 
       MyCache.get_node("mykey")
-      MyCache.get_node(:cache_name, "mykey")
 
-  > If no cache name is passed to the previous functions, the name of the
-    calling cache module is used by default
+  Joining the cache to the cluster:
+
+      MyCache.join_cluster()
+
+  Leaving the cluster (removes the cache from the cluster):
+
+      MyCache.leave_cluster()
 
   ## Caveats of partitioned adapter
 
@@ -264,6 +268,20 @@ defmodule Nebulex.Adapters.Partitioned do
         Adapter.with_meta(get_dynamic_cache(), fn _adapter, %{name: name, keyslot: keyslot} ->
           Cluster.get_node(name, key, keyslot)
         end)
+      end
+
+      @doc """
+      A convenience function for joining the cache to the cluster.
+      """
+      def join_cluster do
+        Cluster.join(get_dynamic_cache())
+      end
+
+      @doc """
+      A convenience function for removing the cache from the cluster.
+      """
+      def leave_cluster do
+        Cluster.leave(get_dynamic_cache())
       end
     end
   end
@@ -620,7 +638,7 @@ defmodule Nebulex.Adapters.Partitioned do
     fun.(res)
   end
 
-  defp handle_rpc_multi_call({_, errors}, action, _) do
-    raise Nebulex.RPCMultiCallError, action: action, errors: errors
+  defp handle_rpc_multi_call({responses, errors}, action, _) do
+    raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
   end
 end

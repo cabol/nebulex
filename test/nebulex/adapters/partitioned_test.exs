@@ -5,8 +5,6 @@ defmodule Nebulex.Adapters.PartitionedTest do
   import Nebulex.CacheCase
 
   alias Nebulex.Adapter
-  alias Nebulex.Cache.Cluster
-
   alias Nebulex.TestCache.{Partitioned, PartitionedMock}
 
   @primary :"primary@127.0.0.1"
@@ -121,13 +119,20 @@ defmodule Nebulex.Adapters.PartitionedTest do
   end
 
   describe "cluster" do
-    test "established", %{name: name, cluster: cluster} do
+    test "node leaves and then rejoins", %{name: name, cluster: cluster} do
       assert node() == @primary
       assert :lists.usort(Node.list()) == cluster -- [node()]
       assert Partitioned.nodes() == cluster
 
-      :ok = Cluster.leave(name)
-      assert Partitioned.nodes() == cluster -- [node()]
+      Partitioned.with_dynamic_cache(name, fn ->
+        :ok = Partitioned.leave_cluster()
+        assert Partitioned.nodes() == cluster -- [node()]
+      end)
+
+      Partitioned.with_dynamic_cache(name, fn ->
+        :ok = Partitioned.join_cluster()
+        assert Partitioned.nodes() == cluster
+      end)
     end
 
     test "teardown cache node", %{cluster: cluster} do
@@ -154,7 +159,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
       assert Partitioned.put_all(for(x <- 1..100_000, do: {x, x}), timeout: 60_000) == :ok
       assert Partitioned.get(1, timeout: 1000) == 1
 
-      msg = ~r"RPC error executing action: all\n\nErrors:"
+      msg = ~r"RPC error executing action: all\n\nResponses:"
 
       assert_raise Nebulex.RPCMultiCallError, msg, fn ->
         Partitioned.all(nil, timeout: 1)
@@ -174,7 +179,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
         PartitionedMock.get(1)
       end
 
-      msg = ~r"RPC error executing action: count_all\n\nErrors:"
+      msg = ~r"RPC error executing action: count_all\n\nResponses:"
 
       assert_raise Nebulex.RPCMultiCallError, msg, fn ->
         PartitionedMock.count_all()

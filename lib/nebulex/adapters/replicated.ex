@@ -137,6 +137,14 @@ defmodule Nebulex.Adapters.Replicated do
 
       MyCache.nodes()
 
+  Joining the cache to the cluster:
+
+      MyCache.join_cluster()
+
+  Leaving the cluster (removes the cache from the cluster):
+
+      MyCache.leave_cluster()
+
   ## Caveats of replicated adapter
 
   As it is explained in the beginning, a replicated topology not only brings
@@ -226,6 +234,20 @@ defmodule Nebulex.Adapters.Replicated do
       """
       def nodes do
         Cluster.get_nodes(get_dynamic_cache())
+      end
+
+      @doc """
+      A convenience function for joining the cache to the cluster.
+      """
+      def join_cluster do
+        Cluster.join(get_dynamic_cache())
+      end
+
+      @doc """
+      A convenience function for removing the cache from the cluster.
+      """
+      def leave_cluster do
+        Cluster.leave(get_dynamic_cache())
       end
     end
   end
@@ -472,8 +494,8 @@ defmodule Nebulex.Adapters.Replicated do
 
   defp handle_rpc_multi_call({res, []}, _action), do: hd(res)
 
-  defp handle_rpc_multi_call({_, errors}, action) do
-    raise Nebulex.RPCMultiCallError, action: action, errors: errors
+  defp handle_rpc_multi_call({responses, errors}, action) do
+    raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
   end
 end
 

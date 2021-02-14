@@ -1,6 +1,6 @@
 defmodule Nebulex.Adapters.ReplicatedTest do
   use Nebulex.NodeCase
-  use Nebulex.CacheTest
+  # use Nebulex.CacheTest
 
   import Nebulex.CacheCase
 
@@ -109,11 +109,26 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   end
 
   describe "cluster" do
+    test "node leaves and then rejoins", %{name: name} do
+      cluster = :lists.usort(cluster_nodes())
+      assert Replicated.nodes() == cluster
+
+      Replicated.with_dynamic_cache(name, fn ->
+        :ok = Replicated.leave_cluster()
+        assert Replicated.nodes() == cluster -- [node()]
+      end)
+
+      Replicated.with_dynamic_cache(name, fn ->
+        :ok = Replicated.join_cluster()
+        assert Replicated.nodes() == cluster
+      end)
+    end
+
     test "error: rpc error" do
       test_with_dynamic_cache(ReplicatedMock, [name: :replicated_mock], fn ->
         _ = Process.flag(:trap_exit, true)
 
-        msg = ~r"RPC error executing action: put_all\n\nErrors:\n\n"
+        msg = ~r"RPC error executing action: put_all\n\nResponses:"
 
         assert_raise Nebulex.RPCMultiCallError, msg, fn ->
           ReplicatedMock.put_all(a: 1, b: 2)
@@ -121,7 +136,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       end)
     end
 
-    test "ok: join new cache node" do
+    test "ok: start/stop cache nodes" do
       assert Replicated.put_all(a: 1, b: 2) == :ok
       assert Replicated.put(:c, 3, ttl: 5000) == :ok
       assert Replicated.nodes() |> :lists.usort() == :lists.usort(cluster_nodes())
@@ -133,11 +148,23 @@ defmodule Nebulex.Adapters.ReplicatedTest do
         %{a: 1, b: 2, c: 3}
       )
 
-      # join new cache node
-      node_pid_list = start_caches([:"node3@127.0.0.1"], [{Replicated, [name: @cache_name]}])
+      # start new cache nodes
+      nodes = [:"node3@127.0.0.1", :"node4@127.0.0.1"]
+      node_pid_list = start_caches(nodes, [{Replicated, [name: @cache_name]}])
 
-      assert Replicated.nodes() |> :lists.usort() ==
-               :lists.usort([:"node3@127.0.0.1" | cluster_nodes()])
+      assert Replicated.nodes() |> :lists.usort() == :lists.usort(nodes ++ cluster_nodes())
+
+      wait_until(fn ->
+        assert_for_all_replicas(
+          Replicated,
+          :get_all,
+          [[:a, :b, :c]],
+          %{a: 1, b: 2, c: 3}
+        )
+      end)
+
+      # start cache node
+      :ok = node_pid_list |> hd() |> List.wrap() |> stop_caches()
 
       wait_until(fn ->
         assert_for_all_replicas(
@@ -167,7 +194,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
 
         task2 =
           Task.async(fn ->
-            :ok = Process.sleep(500)
+            :ok = Process.sleep(1000)
             _ = ReplicatedMock.put_dynamic_cache(:replicated_global_mock)
             :ok = ReplicatedMock.put("foo", "bar")
             :ok = Process.sleep(100)
@@ -273,6 +300,6 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   end
 
   defp cluster_nodes do
-    [node() | Node.list()] -- [:"node3@127.0.0.1"]
+    [node() | Node.list()] -- [:"node3@127.0.0.1", :"node4@127.0.0.1"]
   end
 end

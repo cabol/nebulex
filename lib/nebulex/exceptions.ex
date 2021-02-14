@@ -39,9 +39,14 @@ defmodule Nebulex.RPCMultiCallError do
   def exception(opts) do
     action = Keyword.fetch!(opts, :action)
     errors = Keyword.fetch!(opts, :errors)
+    responses = Keyword.fetch!(opts, :responses)
 
     message = """
     RPC error executing action: #{action}
+
+    Responses:
+
+    #{inspect(responses, pretty: true)}
 
     Errors:
 
