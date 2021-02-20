@@ -82,12 +82,12 @@ makes all dependencies optional. For example:
     [declarative annotation-based caching via decorators][nbx_caching],
     you have to add `:decorator` to the dependency list.
 
-  * For enabling Telemetry events dispatched when using Nebulex stats you have
-    to add `:telemetry` to the dependency list.
+  * For enabling Telemetry events to be dispatched when using Nebulex stats,
+    you have to add `:telemetry` to the dependency list.
     See [telemetry guide][telemetry].
 
-  * If you are using an adapter other than the built-in ones (e.g: Cachex or
-    Redis adapters), you have to add that dependency too.
+  * If you are using an adapter different than the built-in ones (e.g: Cachex
+    or Redis adapter), you have to add the adapter dependency too.
 
 [telemetry]: http://hexdocs.pm/nebulex/telemetry.html
 
@@ -108,8 +108,7 @@ end
 
 ## Quickstart example
 
-Supposing we are using `Ecto` and we want to apply caching declaratively on
-some functions:
+Assuming you are using `Ecto` and you want to use declarative caching:
 
 ```elixir
 # In the config/config.exs file

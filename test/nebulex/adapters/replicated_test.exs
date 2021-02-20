@@ -163,7 +163,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
         )
       end)
 
-      # start cache node
+      # stop cache node
       :ok = node_pid_list |> hd() |> List.wrap() |> stop_caches()
 
       wait_until(fn ->

@@ -10,7 +10,7 @@ v2, just pointing out the areas the new documentation should be consulted on.
 ## Configuration
 
 This is one of the biggest changes. Version 1.x, most of the configuration
-options are resolved in compile-time, but this brings with a lot of limitations.
+options are resolved in compile-time, which has a lot of limitations.
 Since version 2.x, only few arguments are configured in compile-time when
 defining a cache, e.g.: `otp_app:`, `adapter:`, and `primary_storage_adapter:`
 (for partitioned and replicated adapters). The rest of configuration parameters
@@ -26,9 +26,10 @@ There are several changes on the `Nebulex.Cache` API:
   * The `:version` option is not available anymore, so it has to be removed.
   * Callback `set/3` was refactored to `put/3`.
   * Callback `set_many/2` was refactored to `put_all/2`.
+  * Callback `get_many/2` was refactored to `get_all/2`.
   * Callbacks `add/3` and `add!/3` were refactored to `put_new/3` and
     `put_new!/3`.
-  * Callback `update_counter/3` was refactored to `incr/3`.
+  * Callback `update_counter/3` was refactored to `incr/3` and `decr/3`.
   * Callback `add_or_replace/3` was removed.
   * Callback `object_info/2` was removed, and callbacks `ttl/1` and
     `touch/1` were added instead.
@@ -81,8 +82,13 @@ functionality was refactored entirely.
   2. The stats support is optional by implementing the `Nebulex.Adapter.Stats`
      behaviour from the adapter. However, Nebulex provides a default
      implementation using [Erlang counters][https://erlang.org/doc/man/counters.html]
-     which is supported by the built-in adapters. See `Nebulex.Adapter.Stats`
-     for more information about how to implement stats from the adapters in
-     Nebulex 2.x.
+     which is supported by the local built-in adapter.
+     See the [Telemetry guide](http://hexdocs.pm/nebulex/telemetry.html) for
+     more information.
   3. Since Nebulex 2.x on-wards, enabling stats is a matter of setting the
      option `:stats` to `true`. See `Nebulex.Cache` for more information.
+
+## Mix Tasks
+
+  * `mix nebulex.gen.cache` was refactored to `mix nbx.gen.cache`.
+  * `mix nebulex` was refactored to `mix nbx`.

@@ -71,11 +71,11 @@ A disadvantage of using the cache-as-SoR pattern is:
 
  * Less directly visible code-path
 
-But how to get all this out-of-box? This is where the [Decorators][Decorators]
-comes in. It provides a set of macros to abstract most of the logic behind
-**Read-through** and **Write-through** patterns and make the implementation
-extremely easy. But let's go over these patterns more in detail and how to
-implement them using [Nebulex Decorators][Decorators].
+But how to get all this out-of-box? This is where declarative annotation-based
+caching comes in. Nebulex provides a set of annotation to abstract most of the
+logic behind **Read-through** and **Write-through** patterns and make the
+implementation extremely easy. But let's go over these patterns more in detail
+and how to implement them by using [Nebulex annotations][nbx_caching].
 
 ## Read-through
 

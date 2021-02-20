@@ -29,7 +29,7 @@ changing the `deps` definition in that file to this:
 ```elixir
 defp deps do
   [
-    {:nebulex, "2.0.0-rc.2"},
+    {:nebulex, "2.0"},
     {:shards, "~> 1.0"},      #=> When using :shards as backend
     {:decorator, "~> 1.3"},   #=> When using Caching Annotations
     {:telemetry, "~> 0.4"}    #=> When using the Telemetry events (Nebulex stats)
@@ -52,8 +52,8 @@ makes all its dependencies as optional. For example:
     to add `:telemetry` to the dependency list.
     See [telemetry guide][telemetry].
 
-  * If you are using an adapter other than the built-in ones (e.g: Cachex or
-    Redis adapters), you have to add that dependency too.
+  * If you are using an adapter different than the built-in ones (e.g: Cachex
+    or Redis adapter), you have to add the adapter dependency too.
 
 [nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
 [telemetry]: http://hexdocs.pm/nebulex/telemetry.html

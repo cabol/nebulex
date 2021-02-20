@@ -162,11 +162,12 @@ if Code.ensure_loaded?(Decorator.Define) do
         to the invoked cache function (optional).
 
       * `:match` - Match function `(term -> boolean | {true, term})` (optional).
-        This function is for matching and decide whether or not the code-block
+        This function is for matching and decide whether the code-block
         evaluation result is cached or not. If `true` the code-block evaluation
         result is cached as it is (the default). If `{true, value}` is returned,
-        then the `value` is what is cached (useful to control what to cache).
-        Otherwise, none result is stored in the cache.
+        then the `value` is what is cached (useful to control what is meant to
+        be cached). Returning `false` will cause that nothing is stored in the
+        cache.
 
     ## Putting all together
 
