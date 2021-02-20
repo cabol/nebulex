@@ -98,7 +98,7 @@ defmodule MyApp.Example do
 
   alias MyApp.Cache
 
-  @ttl Nebulex.Time.expiry_time(1, :hour)
+  @ttl :timer.hours(1)
 
   @decorate cacheable(cache: Cache, key: name)
   def get_by_name(name) do

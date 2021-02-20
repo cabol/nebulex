@@ -102,11 +102,11 @@ defmodule Nebulex.Adapters.Local do
   environment, usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.LocalCache,
-        gc_interval: :timer.seconds(21_600),
+        gc_interval: :timer.hours(12),
         max_size: 1_000_000,
         allocated_memory: 2_000_000_000,
         gc_cleanup_min_timeout: :timer.seconds(10),
-        gc_cleanup_max_timeout: :timer.seconds(600)
+        gc_cleanup_max_timeout: :timer.minutes(10)
 
   For intensive workloads, the Cache may also be partitioned using `:shards`
   as cache backend (`backend: :shards`) and configuring the desired number of
@@ -114,11 +114,11 @@ defmodule Nebulex.Adapters.Local do
   `System.schedulers_online()`.
 
       config :my_app, MyApp.LocalCache,
-        gc_interval: :timer.seconds(21_600),
+        gc_interval: :timer.hours(12),
         max_size: 1_000_000,
         allocated_memory: 2_000_000_000,
         gc_cleanup_min_timeout: :timer.seconds(10),
-        gc_cleanup_max_timeout: :timer.seconds(600),
+        gc_cleanup_max_timeout: :timer.minutes(10),
         backend: :shards,
         partitions: System.schedulers_online() * 2
 
@@ -208,7 +208,7 @@ defmodule Nebulex.Adapters.Local do
       being 2 the number of generations. Longer than that, the GC will
       ensure is always evicted (the oldest generation is always deleted).
       If it is the first time using Nebulex, perhaps you can start with
-      `gc_interval: :timer.seconds(43_200)` (12 hrs), so the max retention
+      `gc_interval: :timer.hours(12)` (12 hrs), so the max retention
       period for the keys will be 1 day; but ensure you also set either the
       `:max_size` or `:allocated_memory`.
     * It is highly recommended to set either `:max_size` or `:allocated_memory`

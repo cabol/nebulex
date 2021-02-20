@@ -182,7 +182,7 @@ defmodule Mix.Tasks.Nbx.Gen.Cache do
     # When using :shards as backend
     # backend: :shards,
     # GC interval for pushing new generation: 12 hrs
-    gc_interval: :timer.seconds(3600) * 12,
+    gc_interval: :timer.hours(12),
     # Max 1 million entries in cache
     max_size: 1_00_000,
     # Max 2 GB of memory
@@ -190,7 +190,7 @@ defmodule Mix.Tasks.Nbx.Gen.Cache do
     # GC min timeout: 10 sec
     gc_cleanup_min_timeout: :timer.seconds(10),
     # GC min timeout: 10 min
-    gc_cleanup_max_timeout: :timer.seconds(600)
+    gc_cleanup_max_timeout: :timer.minutes(10)
   """)
 
   embed_template(:dist_config, """
@@ -199,7 +199,7 @@ defmodule Mix.Tasks.Nbx.Gen.Cache do
       # When using :shards as backend
       # backend: :shards,
       # GC interval for pushing new generation: 12 hrs
-      gc_interval: :timer.seconds(3600) * 12,
+      gc_interval: :timer.hours(12),
       # Max 1 million entries in cache
       max_size: 1_00_000,
       # Max 2 GB of memory
@@ -207,7 +207,7 @@ defmodule Mix.Tasks.Nbx.Gen.Cache do
       # GC min timeout: 10 sec
       gc_cleanup_min_timeout: :timer.seconds(10),
       # GC min timeout: 10 min
-      gc_cleanup_max_timeout: :timer.seconds(600)
+      gc_cleanup_max_timeout: :timer.minutes(10)
     ]
   """)
 
@@ -219,7 +219,7 @@ defmodule Mix.Tasks.Nbx.Gen.Cache do
       {
         <%= inspect @mod %>.L1,
         # GC interval for pushing new generation: 12 hrs
-        gc_interval: :timer.seconds(3600) * 12,
+        gc_interval: :timer.hours(12),
         # Max 1 million entries in cache
         max_size: 1_00_000
       },
@@ -228,7 +228,7 @@ defmodule Mix.Tasks.Nbx.Gen.Cache do
         <%= inspect @mod %>.L2,
         primary: [
           # GC interval for pushing new generation: 12 hrs
-          gc_interval: :timer.seconds(3600) * 12,
+          gc_interval: :timer.hours(12),
           # Max 1 million entries in cache
           max_size: 1_00_000
         ]

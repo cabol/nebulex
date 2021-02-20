@@ -21,11 +21,11 @@ defmodule Nebulex.Cache do
 
       config :my_app, MyApp.Cache,
         backend: :shards,
-        gc_interval: :timer.seconds(21_600),
+        gc_interval: :timer.hours(12),
         max_size: 1_000_000,
         allocated_memory: 2_000_000_000,
         gc_cleanup_min_timeout: :timer.seconds(10),
-        gc_cleanup_max_timeout: :timer.seconds(600)
+        gc_cleanup_max_timeout: :timer.minutes(10)
 
   Most of the configuration that goes into the `config` is specific
   to the adapter. For this particular example, you can check
@@ -613,16 +613,13 @@ defmodule Nebulex.Cache do
 
   Using Nebulex.Time for TTL:
 
-      iex> import Nebulex.Time
-      Nebulex.Time
-
-      iex> MyCache.put("foo", "bar", ttl: expiry_time(10))
+      iex> MyCache.put("foo", "bar", ttl: :timer.hours(1))
       :ok
 
-      iex> MyCache.put("foo", "bar", ttl: expiry_time(10, :minute))
+      iex> MyCache.put("foo", "bar", ttl: :timer.minutes(1))
       :ok
 
-      iex> MyCache.put("foo", "bar", ttl: expiry_time(1, :hour))
+      iex> MyCache.put("foo", "bar", ttl: :timer.seconds(1))
       :ok
 
   """

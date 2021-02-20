@@ -115,7 +115,7 @@ some functions:
 # In the config/config.exs file
 config :my_app, MyApp.PartitionedCache,
   primary: [
-    gc_interval: :timer.seconds(3600),
+    gc_interval: :timer.hours(12),
     backend: :shards,
     partitions: 2
   ]
@@ -153,7 +153,7 @@ defmodule MyApp.Accounts do
   alias MyApp.PartitionedCache, as: Cache
   alias MyApp.Repo
 
-  @ttl Nebulex.Time.expiry_time(1, :hour)
+  @ttl :timer.hours(1)
 
   @decorate cacheable(cache: Cache, key: {User, id}, opts: [ttl: @ttl])
   def get_user!(id) do

@@ -35,14 +35,13 @@ defmodule Nebulex.Adapters.StatsTest do
   import Mock
 
   alias Nebulex.Cache.Stats
-  alias Nebulex.Time
 
   @config [
     model: :inclusive,
     levels: [
-      {Cache.L1, gc_interval: Time.expiry_time(1, :hour), backend: :shards},
-      {Cache.L2, primary: [gc_interval: Time.expiry_time(1, :hour)]},
-      {Cache.L3, primary: [gc_interval: Time.expiry_time(1, :hour)]}
+      {Cache.L1, gc_interval: :timer.hours(1), backend: :shards},
+      {Cache.L2, primary: [gc_interval: :timer.hours(1)]},
+      {Cache.L3, primary: [gc_interval: :timer.hours(1)]}
     ]
   ]
 
@@ -138,7 +137,7 @@ defmodule Nebulex.Adapters.StatsTest do
         Keyword.update!(
           @config,
           :levels,
-          &(&1 ++ [{Cache.L4, gc_interval: Time.expiry_time(1, :hour), stats: false}])
+          &(&1 ++ [{Cache.L4, gc_interval: :timer.hours(1), stats: false}])
         )
     )
 

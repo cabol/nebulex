@@ -209,7 +209,7 @@ if Code.ensure_loaded?(Decorator.Define) do
           alias MyApp.Accounts.User
           alias MyApp.{Cache, Repo}
 
-          @ttl Nebulex.Time.expiry_time(1, :hour)
+          @ttl :timer.hours(1)
 
           @decorate cacheable(cache: Cache, key: {User, id}, opts: [ttl: @ttl])
           def get_user!(id) do
@@ -272,7 +272,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
           alias MyApp.Cache
 
-          @ttl Nebulex.Time.expiry_time(1, :hour)
+          @ttl :timer.hours(1)
 
           @decorate cacheable(cache: Cache, key: name)
           def get_by_name(name, age) do
@@ -325,7 +325,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
           alias MyApp.Cache
 
-          @ttl Nebulex.Time.expiry_time(1, :hour)
+          @ttl :timer.hours(1)
 
           @decorate cache_put(cache: Cache, key: id, opts: [ttl: @ttl])
           def update!(id, attrs \\ %{}) do

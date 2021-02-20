@@ -11,9 +11,8 @@ defmodule Nebulex.Adapters.MultilevelExclusiveTest do
   alias Nebulex.Cache.Cluster
   alias Nebulex.TestCache.Multilevel
   alias Nebulex.TestCache.Multilevel.{L1, L2, L3}
-  alias Nebulex.Time
 
-  @gc_interval Time.expiry_time(1, :hour)
+  @gc_interval :timer.hours(1)
 
   @levels [
     {

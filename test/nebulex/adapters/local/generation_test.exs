@@ -6,7 +6,7 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local,
-      gc_interval: Nebulex.Time.expiry_time(1, :hour)
+      gc_interval: :timer.hours(1)
   end
 
   import Nebulex.CacheCase

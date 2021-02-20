@@ -81,7 +81,7 @@ config :blog, Blog.Cache,
   # When using :shards as backend
   # backend: :shards,
   # GC interval for pushing new generation: 12 hrs
-  gc_interval: :timer.seconds(3600) * 12,
+  gc_interval: :timer.hours(12),
   # Max 1 million entries in cache
   max_size: 1_00_000,
   # Max 2 GB of memory
@@ -89,7 +89,7 @@ config :blog, Blog.Cache,
   # GC min timeout: 10 sec
   gc_cleanup_min_timeout: :timer.seconds(10),
   # GC min timeout: 10 min
-  gc_cleanup_max_timeout: :timer.seconds(600)
+  gc_cleanup_max_timeout: :timer.minutes(10)
 ```
 
 Assuming we will use `:shards` as backend, can add uncomment the first line in
@@ -100,7 +100,7 @@ config :blog, Blog.Cache,
   # When using :shards as backend
   backend: :shards,
   # GC interval for pushing new generation: 12 hrs
-  gc_interval: :timer.seconds(3600) * 12,
+  gc_interval: :timer.hours(12),
   # Max 1 million entries in cache
   max_size: 1_00_000,
   # Max 2 GB of memory
@@ -108,7 +108,7 @@ config :blog, Blog.Cache,
   # GC min timeout: 10 sec
   gc_cleanup_min_timeout: :timer.seconds(10),
   # GC min timeout: 10 min
-  gc_cleanup_max_timeout: :timer.seconds(600)
+  gc_cleanup_max_timeout: :timer.minutes(10)
 ```
 
 > By default, `partitions:` option is set to `System.schedulers_online()`.
@@ -160,7 +160,7 @@ We can insert a new entries into our blog cache with this code:
 
 ```elixir
 iex> user = %{id: 1, first_name: "Galileo", last_name: "Galilei"}
-iex> Blog.Cache.put(user[:id], user, ttl: Nebulex.Time.expiry_time(1, :hour))
+iex> Blog.Cache.put(user[:id], user, ttl: :timer.hours(1))
 :ok
 ```
 
@@ -518,7 +518,7 @@ config :blog, Blog.PartitionedCache,
     # When using :shards as backend
     backend: :shards,
     # GC interval for pushing new generation: 12 hrs
-    gc_interval: :timer.seconds(3600) * 12,
+    gc_interval: :timer.hours(12),
     # Max 1 million entries in cache
     max_size: 1_00_000,
     # Max 2 GB of memory
@@ -526,7 +526,7 @@ config :blog, Blog.PartitionedCache,
     # GC min timeout: 10 sec
     gc_cleanup_min_timeout: :timer.seconds(10),
     # GC min timeout: 10 min
-    gc_cleanup_max_timeout: :timer.seconds(600)
+    gc_cleanup_max_timeout: :timer.minutes(10)
   ]
 ```
 
@@ -617,7 +617,7 @@ config :blog, Blog.NearCache,
     {
       Blog.NearCache.L1,
       # GC interval for pushing new generation: 12 hrs
-      gc_interval: :timer.seconds(3600) * 12,
+      gc_interval: :timer.hours(12),
       # Max 1 million entries in cache
       max_size: 1_00_000
     },
@@ -626,7 +626,7 @@ config :blog, Blog.NearCache,
       Blog.NearCache.L2,
       primary: [
         # GC interval for pushing new generation: 12 hrs
-        gc_interval: :timer.seconds(3600) * 12,
+        gc_interval: :timer.hours(12),
         # Max 1 million entries in cache
         max_size: 1_00_000
       ]
@@ -653,7 +653,7 @@ def start(_type, _args) do
 Let's try it out!
 
 ```elixir
-iex> Blog.NearCache.put("foo", "bar", ttl: Nebulex.Time.expiry_time(1, :hour))
+iex> Blog.NearCache.put("foo", "bar", ttl: :timer.hours(1))
 "bar"
 
 iex> Blog.NearCache.get("foo")

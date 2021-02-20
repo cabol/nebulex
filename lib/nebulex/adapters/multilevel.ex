@@ -44,13 +44,13 @@ defmodule Nebulex.Adapters.Multilevel do
         levels: [
           {
             MyApp.Multilevel.L1,
-            gc_interval: :timer.seconds(3600) * 12,
+            gc_interval: :timer.hours(12),
             backend: :shards
           },
           {
             MyApp.Multilevel.L2,
             primary: [
-              gc_interval: :timer.seconds(3600) * 12,
+              gc_interval: :timer.hours(12),
               backend: :shards
             ]
           }
