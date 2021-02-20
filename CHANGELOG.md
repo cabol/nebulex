@@ -1,35 +1,60 @@
 # Changelog
 
+## [v2.0.0](https://github.com/cabol/nebulex/tree/v2.0.0) (2021-02-20)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.0.0-rc.2...v2.0.0)
+
+**Added features:**
+
+- Added `delete_all/2` and `count_all/2` functions to the Cache API
+  [#100](https://github.com/cabol/nebulex/issues/100)
+- Added `decr/3` to the Cache API.
+
+**Implemented enhancements:**
+
+- Added `join_cluster` and `leave_cluster` functions to the distributed adapters
+  [#104](https://github.com/cabol/nebulex/issues/104)
+- Removed `Nebulex.Time.expiry_tine/2`; use `:timer.(seconds|minutes|hours)/1`
+  instead.
+
+**Closed issues:**
+
+- Migrating to v2 link is broken
+  [#103](https://github.com/cabol/nebulex/issues/103)
+- Fixed replicated adapter to work properly with dynamic caches
+  [#101](https://github.com/cabol/nebulex/issues/101)
+
 ## [v2.0.0-rc.2](https://github.com/cabol/nebulex/tree/v2.0.0-rc.2) (2021-01-06)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.0.0-rc.1...v2.0.0-rc.2)
 
 **Added features:**
 
-- Adapter `Nebulex.Adapters.Nil` for disabling caching
+- Added adapter `Nebulex.Adapters.Nil` for disabling caching
   [#88](https://github.com/cabol/nebulex/issues/88)
-- Adapter for `whitfin/cachex`
+- Added adapter for `whitfin/cachex`
   [#20](https://github.com/cabol/nebulex/issues/20)
 
 **Implemented enhancements:**
 
-- Improve replicated adapter to ensure better consistency across the nodes
+- Improved replicated adapter to ensure better consistency across the nodes
   [#99](https://github.com/cabol/nebulex/issues/99)
-- Refactor and/or improve Nebulex task for generating caches
+- Refactored Nebulex task for generating caches
   [#97](https://github.com/cabol/nebulex/issues/97)
-- Add `Nebulex.Adapter.Stats` behaviour as optional
+- Added `Nebulex.Adapter.Stats` behaviour as optional
   [#95](https://github.com/cabol/nebulex/issues/95)
-- Add `Nebulex.Adapter.Entry` and `Nebulex.Adapter.Storage` behaviours
+- Added `Nebulex.Adapter.Entry` and `Nebulex.Adapter.Storage` behaviours
   [#93](https://github.com/cabol/nebulex/issues/93)
-- Add `:default` option to the `incr/3` callback
+- Added `:default` option to the `incr/3` callback
   [#92](https://github.com/cabol/nebulex/issues/92)
-- Use `:erpc` when depending on OTP 23 or higher, otherwise use current
-  implementation [#91](https://github.com/cabol/nebulex/issues/91)
+- Fixed `Nebulex.RPC` to use `:erpc` when depending on OTP 23 or higher,
+  otherwise use current implementation
+  [#91](https://github.com/cabol/nebulex/issues/91)
 
 **Fixed bugs:**
 
-- Update evictions stats when a new generation is created and the older is
-  deleted [#98](https://github.com/cabol/nebulex/issues/98)
+- Fixed stats to update evictions when a new generation is created and the
+  older is deleted [#98](https://github.com/cabol/nebulex/issues/98)
 
 **Closed issues:**
 
@@ -57,10 +82,11 @@
 
 **Implemented enhancements:**
 
-- Make the local adapter completely agnostic to the cache name
+- Made the local adapter completely agnostic to the cache name
 - Added documentation in local adapter for eviction settings, caveats and
   recommendations.
-- Support for new `:pg` module since OTP 23 [#84](https://github.com/cabol/nebulex/issues/84)
+- Added support for new `:pg` module since OTP 23
+  [#84](https://github.com/cabol/nebulex/issues/84)
 
 **Closed issues:**
 

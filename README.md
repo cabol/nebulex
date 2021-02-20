@@ -15,10 +15,10 @@ consistent use of various caching solutions with minimal impact on the code.
 Nebulex cache abstraction shields developers from directly dealing with the
 underlying caching implementations, such as [Redis][redis],
 [Memcached][memcached], or even other Elixir cache implementations like
-[Cachex][cachex]. Furthermore, several interesting and useful features like
+[Cachex][cachex]. Additionally, it provides totally out-of-box features such as
 [cache usage patterns][cache_patterns],
 [declarative annotation-based caching][nbx_caching], and
-[distributed cache topologies][cache_topologies] are available out-of-box.
+[distributed cache topologies][cache_topologies], among others.
 
 See the [getting started guide](http://hexdocs.pm/nebulex/getting-started.html)
 and the [online documentation](http://hexdocs.pm/nebulex/Nebulex.html)
@@ -29,7 +29,7 @@ for more information.
 [redis]: https://redis.io/
 [memcached]: https://memcached.org/
 [nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
-[cache_patterns]: https://github.com/ehcache/ehcache3/blob/master/docs/src/docs/asciidoc/user/caching-patterns.adoc
+[cache_patterns]: http://hexdocs.pm/nebulex/cache-usage-patterns.html
 [cache_topologies]: https://docs.oracle.com/middleware/1221/coherence/develop-applications/cache_intro.htm
 
 ## Usage
@@ -63,7 +63,7 @@ For example, if you want to use a built-in cache, add to your `mix.exs` file:
 ```elixir
 def deps do
   [
-    {:nebulex, "2.0.0-rc.2"},
+    {:nebulex, "2.0"},
     {:shards, "~> 1.0"},     #=> When using :shards as backend
     {:decorator, "~> 1.3"},  #=> When using Caching Annotations
     {:telemetry, "~> 0.4"}   #=> When using the Telemetry events (Nebulex stats)
