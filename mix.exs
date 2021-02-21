@@ -40,10 +40,7 @@ defmodule Nebulex.MixProject do
   defp elixirc_paths(_), do: ["lib"]
 
   def application do
-    [
-      extra_applications: [:eex],
-      mod: {Nebulex.Application, []}
-    ]
+    [mod: {Nebulex.Application, []}]
   end
 
   defp deps do
@@ -113,7 +110,7 @@ defmodule Nebulex.MixProject do
 
   defp dialyzer do
     [
-      plt_add_apps: [:shards, :mix, :eex, :telemetry],
+      plt_add_apps: [:shards, :mix, :telemetry],
       plt_file: {:no_warn, "priv/plts/" <> plt_file_name()},
       flags: [
         :unmatched_returns,
