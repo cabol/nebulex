@@ -414,8 +414,13 @@ if Code.ensure_loaded?(Decorator.Define) do
       keys_var = Keyword.get(attrs, :keys, [])
       match_var = Keyword.get(attrs, :match, quote(do: fn _ -> true end))
       opts_var = Keyword.get(attrs, :opts, [])
-      before_logic = Keyword.get(attrs, :before, quote(do: fn _ -> :ok end))
-      after_logic = Keyword.get(attrs, :after, quote(do: fn _ -> :ok end))
+                 |> Keyword.put_new(:func_name, context.name)
+                 |> Keyword.put_new(:module_name, context.module)
+                 |> Keyword.put_new(:cache_name, cache)
+                 |> Keyword.put_new(:action, action)
+
+      before_var = Keyword.get(attrs, :before, quote(do: fn _ -> :ok end))
+      after_var = Keyword.get(attrs, :after, quote(do: fn _ -> :ok end))
 
       action_logic = action_logic(action, block, attrs)
 
@@ -425,10 +430,12 @@ if Code.ensure_loaded?(Decorator.Define) do
         keys = unquote(keys_var)
         opts = unquote(opts_var)
         match = unquote(match_var)
+        before_func = unquote(before_var)
+        after_func = unquote(after_var)
 
-        unquote(before_logic)
+        before_func.(opts)
         result = unquote(action_logic)
-        unquote(after_logic)
+        after_func.(opts)
         result
       end
     end
