@@ -3,11 +3,11 @@ defmodule Nebulex.Adapter.Stats do
   Specifies the stats API required from adapters.
 
   Each adapter is responsible for providing support for stats by implementing
-  this behaviour. However, this module brings with a default implementation
+  this behaviour. However, this module brings a default implementation
   using [Erlang counters][https://erlang.org/doc/man/counters.html], with all
   callbacks overridable, which is supported by the built-in adapters.
 
-  See `Nebulex.Adapters.Local` for more information about how can be used from
+  See `Nebulex.Adapters.Local` for more information about how this can be used from
   the adapter, and also [Nebulex Telemetry Guide][telemetry_guide] to learn how
   to use the Cache with Telemetry.
 
