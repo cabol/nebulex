@@ -414,6 +414,8 @@ if Code.ensure_loaded?(Decorator.Define) do
       keys_var = Keyword.get(attrs, :keys, [])
       match_var = Keyword.get(attrs, :match, quote(do: fn _ -> true end))
       opts_var = Keyword.get(attrs, :opts, [])
+      before_logic = Keyword.get(attrs, :before, quote(do: fn _ -> :ok end))
+      after_logic = Keyword.get(attrs, :after, quote(do: fn _ -> :ok end))
 
       action_logic = action_logic(action, block, attrs)
 
@@ -424,7 +426,10 @@ if Code.ensure_loaded?(Decorator.Define) do
         opts = unquote(opts_var)
         match = unquote(match_var)
 
-        unquote(action_logic)
+        unquote(before_logic)
+        result = unquote(action_logic)
+        unquote(after_logic)
+        result
       end
     end
 
