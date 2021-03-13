@@ -456,6 +456,7 @@ defmodule Nebulex.Adapters.Replicated do
        ) do
     nodes = Cluster.get_nodes(name)
 
+    start_time = System.os_time(:nanosecond)
     # Ensure it waits until ongoing delete_all or sync operations finish,
     # if there's any.
     :global.trans(
@@ -473,6 +474,7 @@ defmodule Nebulex.Adapters.Replicated do
       end,
       nodes
     )
+    |> log_telemetry_event(action, :with_transaction, start_time)
   end
 
   defp multi_call(
@@ -481,6 +483,7 @@ defmodule Nebulex.Adapters.Replicated do
          args,
          opts
        ) do
+    start_time = System.os_time(:nanosecond)
     task_sup
     |> RPC.multi_call(
       Cluster.get_nodes(name),
@@ -490,12 +493,22 @@ defmodule Nebulex.Adapters.Replicated do
       opts
     )
     |> handle_rpc_multi_call(action)
+    |> log_telemetry_event(action, :multi_call, start_time)
   end
 
   defp handle_rpc_multi_call({res, []}, _action), do: hd(res)
 
   defp handle_rpc_multi_call({responses, errors}, action) do
     raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
+  end
+
+  defp log_telemetry_event(value, action, type, start_time) do
+    completion_time = System.os_time(:nanosecond)
+    :telemetry.execute([:nebulex, :done],
+      %{start_time: start_time, completion_time: completion_time},
+      %{action: action, type: type, adapter: :replicated}
+    )
+    value
   end
 end
 
@@ -663,6 +676,7 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
       {:badrpc, _} -> {:cont, acc}
       entries -> {:halt, entries}
     end
+
   end
 
   # coveralls-ignore-stop

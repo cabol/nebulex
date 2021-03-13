@@ -396,11 +396,15 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def get(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, _opts) do
-    meta_tab
-    |> list_gen()
-    |> do_get(key, backend, ref)
-    |> return(:value)
-    |> update_stats(:get, ref)
+    start_time = System.os_time(:nanosecond)
+    result =
+      meta_tab
+      |> list_gen()
+      |> do_get(key, backend, ref)
+      |> return(:value)
+      |> update_stats(:get, ref)
+      |> log_telemetry_event(:get, start_time)
+      result
   end
 
   defp do_get([newer], key, backend, ref) do
@@ -454,21 +458,27 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp do_put(:put, meta_tab, backend, ref, entry) do
+    start_time = System.os_time(:nanosecond)
     meta_tab
     |> put_entries(backend, entry)
     |> update_stats(:put, ref)
+    |> log_telemetry_event(:put, start_time)
   end
 
   defp do_put(:put_new, meta_tab, backend, ref, entry) do
+    start_time = System.os_time(:nanosecond)
     meta_tab
     |> put_new_entries(backend, entry)
     |> update_stats(:put, ref)
+    |> log_telemetry_event(:put, start_time)
   end
 
   defp do_put(:replace, meta_tab, backend, ref, entry(key: key, value: value, ttl: ttl)) do
+    start_time = System.os_time(:nanosecond)
     meta_tab
     |> update_entry(backend, key, [{3, value}, {4, nil}, {5, ttl}])
     |> update_stats(:update, ref)
+    |> log_telemetry_event(:update, start_time)
   end
 
   @impl true
@@ -490,23 +500,29 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp do_put_all(:put, meta_tab, backend, ref, entries) do
+    start_time = System.os_time(:nanosecond)
     meta_tab
     |> put_entries(backend, entries)
     |> update_stats(:put_all, {ref, entries})
+    |> log_telemetry_event(:put_all, start_time)
   end
 
   defp do_put_all(:put_new, meta_tab, backend, ref, entries) do
+    start_time = System.os_time(:nanosecond)
     meta_tab
     |> put_new_entries(backend, entries)
     |> update_stats(:put_all, {ref, entries})
+    |> log_telemetry_event(:put_all, start_time)
   end
 
   @impl true
   def delete(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, _opts) do
+    start_time = System.os_time(:nanosecond)
     meta_tab
     |> list_gen()
     |> Enum.each(&backend.delete(&1, key))
     |> update_stats(:delete, ref)
+    |> log_telemetry_event(:delete, start_time)
   end
 
   @impl true
@@ -700,21 +716,27 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp put_entries(meta_tab, backend, entry_or_entries) do
+    start_time = System.os_time(:nanosecond)
     meta_tab
     |> newer_gen()
     |> backend.insert(entry_or_entries)
+    |> log_telemetry_event(:get, start_time)
   end
 
   defp put_new_entries(meta_tab, backend, entry_or_entries) do
+    start_time = System.os_time(:nanosecond)
     meta_tab
     |> newer_gen()
     |> backend.insert_new(entry_or_entries)
+    |> log_telemetry_event(:get, start_time)
   end
 
   defp update_entry(meta_tab, backend, key, updates) do
+    start_time = System.os_time(:nanosecond)
     meta_tab
     |> newer_gen()
     |> backend.update_element(key, updates)
+    |> log_telemetry_event(:get, start_time)
   end
 
   defp return(entry_or_entries, field \\ nil)
@@ -862,6 +884,15 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp update_stats(value, _action, _counter_ref) do
+    value
+  end
+
+  defp log_telemetry_event(value, action, start_time) do
+    completion_time = System.os_time(:nanosecond)
+    :telemetry.execute([:nebulex, :done],
+      %{start_time: start_time, completion_time: completion_time},
+      %{action: action, adapter: :local}
+    )
     value
   end
 end
