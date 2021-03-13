@@ -399,6 +399,31 @@ if Code.ensure_loaded?(Decorator.Define) do
       caching_action(:cache_evict, attrs, block, context)
     end
 
+
+    @doc """
+    Provides a method to emit a telemetry event after a decorated caching action has transpired.
+    This is automatically invoked after every caching action.
+
+    """
+    def log_telemetry_event(return_value, cache, key, keys, opts, start_time) do
+        completion_time = System.os_time(:nanosecond)
+        func_name = Keyword.get(opts, :func_name)
+        action = Keyword.get(opts, :action)
+
+        metadata = %{
+          desired_key: key,
+          desired_keys: keys,
+          cache_action: action,
+          cache_name: cache,
+          decorated_func_name: func_name
+        }
+
+        :telemetry.execute([:nebulex, :decorate, :done],
+          %{start_time: start_time, completion_time: completion_time},
+          metadata
+        )
+        return_value
+    end
     ## Private Functions
 
     defp caching_action(action, attrs, block, context) do
@@ -419,24 +444,21 @@ if Code.ensure_loaded?(Decorator.Define) do
                  |> Keyword.put_new(:cache_name, cache)
                  |> Keyword.put_new(:action, action)
 
-      before_var = Keyword.get(attrs, :before, quote(do: fn _ -> :ok end))
-      after_var = Keyword.get(attrs, :after, quote(do: fn _ -> :ok end))
-
       action_logic = action_logic(action, block, attrs)
 
       quote do
+        # required so we can call log_telemetry_event/6
+        import Nebulex.Caching, only: [log_telemetry_event: 6]
+
         cache = unquote(cache)
         key = unquote(key_var)
         keys = unquote(keys_var)
         opts = unquote(opts_var)
         match = unquote(match_var)
-        before_func = unquote(before_var)
-        after_func = unquote(after_var)
 
-        before_func.(opts)
+        start_time = System.os_time(:nanosecond)
         result = unquote(action_logic)
-        after_func.(opts)
-        result
+        |> log_telemetry_event(cache, key, keys, opts, start_time)
       end
     end
 
