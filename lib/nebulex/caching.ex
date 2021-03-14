@@ -403,48 +403,90 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     defp caching_action(action, attrs, block, context) do
       cache = attrs[:cache] || raise ArgumentError, "expected cache: to be given as argument"
+      match_var = attrs[:match] || quote(do: fn _ -> true end)
+      opts_var = attrs[:opts] || []
 
-      key_var =
-        Keyword.get(
-          attrs,
-          :key,
-          quote(do: :erlang.phash2({unquote(context.module), unquote(context.name)}))
-        )
-
-      keys_var = Keyword.get(attrs, :keys, [])
-      match_var = Keyword.get(attrs, :match, quote(do: fn _ -> true end))
-      opts_var = Keyword.get(attrs, :opts, [])
-
-      action_logic = action_logic(action, block, attrs)
+      keygen_block = keygen_block(attrs, context)
+      action_block = action_block(action, block, attrs, keygen_block)
 
       quote do
         cache = unquote(cache)
-        key = unquote(key_var)
-        keys = unquote(keys_var)
         opts = unquote(opts_var)
         match = unquote(match_var)
 
-        unquote(action_logic)
+        unquote(action_block)
       end
     end
 
-    defp action_logic(:cacheable, block, _attrs) do
-      quote do
-        if value = cache.get(key, opts) do
-          value
-        else
-          unquote(match_logic(block))
+    defp keygen_block(attrs, ctx) do
+      keygen = attrs[:key_generator] || Nebulex.Caching.SimpleKeyGenerator
+
+      args =
+        for arg <- ctx.args do
+          case arg do
+            {:\\, _, [var, _]} -> var
+            var -> var
+          end
+        end
+
+      if key = Keyword.get(attrs, :key) do
+        quote do
+          unquote(key)
+        end
+      else
+        quote do
+          unquote(keygen).generate(unquote(ctx.module), unquote(ctx.name), unquote(args))
         end
       end
     end
 
-    defp action_logic(:cache_put, block, _attrs) do
-      match_logic(block)
+    defp action_block(:cacheable, block, _attrs, keygen) do
+      quote do
+        key = unquote(keygen)
+
+        if value = cache.get(key, opts) do
+          value
+        else
+          Caching.eval_match(unquote(block), match, cache, key, opts)
+        end
+      end
     end
 
-    defp match_logic(block) do
+    defp action_block(:cache_put, block, _attrs, keygen) do
       quote do
-        Caching.eval_match(unquote(block), match, cache, key, opts)
+        Caching.eval_match(unquote(block), match, cache, unquote(keygen), opts)
+      end
+    end
+
+    defp action_block(:cache_evict, block, attrs, keygen) do
+      keys = Keyword.get(attrs, :keys)
+      all_entries? = attrs[:all_entries] || false
+      before_invocation? = attrs[:before_invocation] || true
+
+      eviction =
+        if is_boolean(all_entries?) && all_entries? do
+          quote do
+            cache.delete_all()
+          end
+        else
+          quote do
+            unquote(keys)
+            |> Kernel.||([unquote(keygen)])
+            |> Enum.each(fn k -> if k, do: cache.delete(k) end)
+          end
+        end
+
+      if is_boolean(before_invocation?) && before_invocation? do
+        quote do
+          unquote(eviction)
+          unquote(block)
+        end
+      else
+        quote do
+          result = unquote(block)
+          unquote(eviction)
+          result
+        end
       end
     end
 
@@ -467,22 +509,6 @@ if Code.ensure_loaded?(Decorator.Define) do
 
         false ->
           result
-      end
-    end
-
-    defp action_logic(:cache_evict, block, attrs) do
-      all_entries? = Keyword.get(attrs, :all_entries, false)
-
-      quote do
-        if unquote(all_entries?) do
-          cache.delete_all()
-        else
-          Enum.each([key | keys], fn k ->
-            if k, do: cache.delete(k)
-          end)
-        end
-
-        unquote(block)
       end
     end
   end
