@@ -261,7 +261,7 @@ defmodule Nebulex.RPC do
     )
   end
 
-  defp log_telemetry_end(value, node_name) do
+  defp log_telemetry_end(value) do
     completion_time = System.os_time(:nanosecond)
     :telemetry.execute([:nebulex, :rpc, :end],
       %{completion_time: completion_time},

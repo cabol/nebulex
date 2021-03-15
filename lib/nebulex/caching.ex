@@ -468,7 +468,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
       quote do
         # required so we can call log_telemetry_event/6
-        import Nebulex.Caching, only: [log_telemetry_event: 5, log_telemetry_event: 7]
+        import Nebulex.Caching, only: [log_telemetry_start: 4, log_telemetry_end: 5]
 
         cache = unquote(cache)
         key = unquote(key_var)
