@@ -405,27 +405,7 @@ if Code.ensure_loaded?(Decorator.Define) do
     This is automatically invoked after every caching action.
 
     """
-    #def log_telemetry_event(return_value, cache, key, keys, opts, start_time) do
-        #completion_time = System.os_time(:nanosecond)
-        #func_name = Keyword.get(opts, :func_name)
-        #action = Keyword.get(opts, :action)
-
-        #metadata = %{
-          #desired_key: key,
-          #desired_keys: keys,
-          #cache_action: action,
-          #cache_name: cache,
-          #decorated_func_name: func_name
-        #}
-
-        #:telemetry.execute([:nebulex, :decorate, :done],
-          #%{start_time: start_time, completion_time: completion_time},
-          #metadata
-        #)
-        #return_value
-    #end
-
-    def log_telemetry_event(:start, cache, key, keys, opts) do
+    def log_telemetry_start(cache, key, keys, opts) do
         start_time = System.os_time(:nanosecond)
         func_name = Keyword.get(opts, :func_name)
         action = Keyword.get(opts, :action)
@@ -445,7 +425,7 @@ if Code.ensure_loaded?(Decorator.Define) do
         :ok
     end
 
-    def log_telemetry_event(return_value, :end, cache, key, keys, opts, start_time) do
+    def log_telemetry_end(return_value, cache, key, keys, opts) do
         completion_time = System.os_time(:nanosecond)
         func_name = Keyword.get(opts, :func_name)
         action = Keyword.get(opts, :action)
@@ -459,7 +439,7 @@ if Code.ensure_loaded?(Decorator.Define) do
         }
 
       :telemetry.execute([:nebulex, :decorate, :end],
-          %{start_time: start_time, completion_time: completion_time},
+          %{completion_time: completion_time},
           metadata
         )
         return_value
@@ -496,10 +476,9 @@ if Code.ensure_loaded?(Decorator.Define) do
         opts = unquote(opts_var)
         match = unquote(match_var)
 
-        start_time = System.os_time(:nanosecond)
-        log_telemetry_event(:start, cache, key, keys, opts)
+        log_telemetry_start(cache, key, keys, opts)
         unquote(action_logic)
-        |> log_telemetry_event(:end, cache, key, keys, opts, start_time)
+        |> log_telemetry_end(cache, key, keys, opts)
       end
     end
 

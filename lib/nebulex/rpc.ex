@@ -135,7 +135,9 @@ defmodule Nebulex.RPC do
     end
 
     defp rpc_call(_supervisor, node, mod, fun, args, timeout) do
+      log_telemetry_start(node, fun, args)
       :erpc.call(node, mod, fun, args, timeout)
+      |> log_telemetry_end()
     rescue
       e in ErlangError ->
         case e.original do
@@ -153,11 +155,13 @@ defmodule Nebulex.RPC do
 
       node_group
       |> Enum.map(fn {node, {mod, fun, args}} = group ->
+        log_telemetry_start(node, fun, args)
         {:erpc.send_request(node, mod, fun, args), group}
       end)
       |> Enum.reduce(reducer_acc, fn {req_id, group}, acc ->
         try do
           res = :erpc.receive_response(req_id, timeout)
+          |> log_telemetry_end()
           reducer_fun.({:ok, res}, group, acc)
         rescue
           exception ->
@@ -247,5 +251,22 @@ defmodule Nebulex.RPC do
           {ok, [{error, node_callback} | err]}
       end
     }
+  end
+
+  defp log_telemetry_start(node_name, func, args) do
+    start_time = System.os_time(:nanosecond)
+    :telemetry.execute([:nebulex, :rpc, :start],
+      %{start_time: start_time},
+      %{action: :rpc_call, remote_func: func, remote_args: args, node_name: node_name, adapter: :rpc}
+    )
+  end
+
+  defp log_telemetry_end(value, node_name) do
+    completion_time = System.os_time(:nanosecond)
+    :telemetry.execute([:nebulex, :rpc, :end],
+      %{completion_time: completion_time},
+      %{action: :rpc_call, adapter: :rpc}
+    )
+    value
   end
 end
