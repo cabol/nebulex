@@ -405,7 +405,47 @@ if Code.ensure_loaded?(Decorator.Define) do
     This is automatically invoked after every caching action.
 
     """
-    def log_telemetry_event(return_value, cache, key, keys, opts, start_time) do
+    #def log_telemetry_event(return_value, cache, key, keys, opts, start_time) do
+        #completion_time = System.os_time(:nanosecond)
+        #func_name = Keyword.get(opts, :func_name)
+        #action = Keyword.get(opts, :action)
+
+        #metadata = %{
+          #desired_key: key,
+          #desired_keys: keys,
+          #cache_action: action,
+          #cache_name: cache,
+          #decorated_func_name: func_name
+        #}
+
+        #:telemetry.execute([:nebulex, :decorate, :done],
+          #%{start_time: start_time, completion_time: completion_time},
+          #metadata
+        #)
+        #return_value
+    #end
+
+    def log_telemetry_event(:start, cache, key, keys, opts) do
+        start_time = System.os_time(:nanosecond)
+        func_name = Keyword.get(opts, :func_name)
+        action = Keyword.get(opts, :action)
+
+        metadata = %{
+          desired_key: key,
+          desired_keys: keys,
+          cache_action: action,
+          cache_name: cache,
+          decorated_func_name: func_name
+        }
+
+        :telemetry.execute([:nebulex, :decorate, :start],
+          %{start_time: start_time},
+          metadata
+        )
+        :ok
+    end
+
+    def log_telemetry_event(return_value, :end, cache, key, keys, opts, start_time) do
         completion_time = System.os_time(:nanosecond)
         func_name = Keyword.get(opts, :func_name)
         action = Keyword.get(opts, :action)
@@ -418,7 +458,7 @@ if Code.ensure_loaded?(Decorator.Define) do
           decorated_func_name: func_name
         }
 
-        :telemetry.execute([:nebulex, :decorate, :done],
+      :telemetry.execute([:nebulex, :decorate, :end],
           %{start_time: start_time, completion_time: completion_time},
           metadata
         )
@@ -448,7 +488,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
       quote do
         # required so we can call log_telemetry_event/6
-        import Nebulex.Caching, only: [log_telemetry_event: 6]
+        import Nebulex.Caching, only: [log_telemetry_event: 5, log_telemetry_event: 7]
 
         cache = unquote(cache)
         key = unquote(key_var)
@@ -457,8 +497,9 @@ if Code.ensure_loaded?(Decorator.Define) do
         match = unquote(match_var)
 
         start_time = System.os_time(:nanosecond)
-        result = unquote(action_logic)
-        |> log_telemetry_event(cache, key, keys, opts, start_time)
+        log_telemetry_event(:start, cache, key, keys, opts)
+        unquote(action_logic)
+        |> log_telemetry_event(:end, cache, key, keys, opts, start_time)
       end
     end
 
