@@ -397,6 +397,7 @@ defmodule Nebulex.Adapters.Local do
   @impl true
   def get(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, _opts) do
     log_telemetry_start(:get)
+
     result =
       meta_tab
       |> list_gen()
@@ -404,7 +405,8 @@ defmodule Nebulex.Adapters.Local do
       |> return(:value)
       |> update_stats(:get, ref)
       |> log_telemetry_end(:get)
-      result
+
+    result
   end
 
   defp do_get([newer], key, backend, ref) do
@@ -459,6 +461,7 @@ defmodule Nebulex.Adapters.Local do
 
   defp do_put(:put, meta_tab, backend, ref, entry) do
     log_telemetry_start(:put)
+
     meta_tab
     |> put_entries(backend, entry)
     |> update_stats(:put, ref)
@@ -467,6 +470,7 @@ defmodule Nebulex.Adapters.Local do
 
   defp do_put(:put_new, meta_tab, backend, ref, entry) do
     log_telemetry_start(:put_new)
+
     meta_tab
     |> put_new_entries(backend, entry)
     |> update_stats(:put, ref)
@@ -475,6 +479,7 @@ defmodule Nebulex.Adapters.Local do
 
   defp do_put(:replace, meta_tab, backend, ref, entry(key: key, value: value, ttl: ttl)) do
     log_telemetry_start(:update)
+
     meta_tab
     |> update_entry(backend, key, [{3, value}, {4, nil}, {5, ttl}])
     |> update_stats(:update, ref)
@@ -501,6 +506,7 @@ defmodule Nebulex.Adapters.Local do
 
   defp do_put_all(:put, meta_tab, backend, ref, entries) do
     log_telemetry_start(:put_all)
+
     meta_tab
     |> put_entries(backend, entries)
     |> update_stats(:put_all, {ref, entries})
@@ -509,6 +515,7 @@ defmodule Nebulex.Adapters.Local do
 
   defp do_put_all(:put_new, meta_tab, backend, ref, entries) do
     log_telemetry_start(:put_all)
+
     meta_tab
     |> put_new_entries(backend, entries)
     |> update_stats(:put_all, {ref, entries})
@@ -518,6 +525,7 @@ defmodule Nebulex.Adapters.Local do
   @impl true
   def delete(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, _opts) do
     log_telemetry_start(:delete)
+
     meta_tab
     |> list_gen()
     |> Enum.each(&backend.delete(&1, key))
@@ -717,6 +725,7 @@ defmodule Nebulex.Adapters.Local do
 
   defp put_entries(meta_tab, backend, entry_or_entries) do
     log_telemetry_start(:put_all)
+
     meta_tab
     |> newer_gen()
     |> backend.insert(entry_or_entries)
@@ -725,6 +734,7 @@ defmodule Nebulex.Adapters.Local do
 
   defp put_new_entries(meta_tab, backend, entry_or_entries) do
     log_telemetry_start(:put_new)
+
     meta_tab
     |> newer_gen()
     |> backend.insert_new(entry_or_entries)
@@ -733,6 +743,7 @@ defmodule Nebulex.Adapters.Local do
 
   defp update_entry(meta_tab, backend, key, updates) do
     log_telemetry_start(:update)
+
     meta_tab
     |> newer_gen()
     |> backend.update_element(key, updates)
@@ -889,7 +900,9 @@ defmodule Nebulex.Adapters.Local do
 
   defp log_telemetry_start(action) do
     start_time = System.os_time(:nanosecond)
-    :telemetry.execute([:nebulex, :start],
+
+    :telemetry.execute(
+      [:nebulex, :start],
       %{start_time: start_time},
       %{action: action, adapter: :local}
     )
@@ -897,10 +910,13 @@ defmodule Nebulex.Adapters.Local do
 
   defp log_telemetry_end(value, action) do
     completion_time = System.os_time(:nanosecond)
-    :telemetry.execute([:nebulex, :end],
+
+    :telemetry.execute(
+      [:nebulex, :end],
       %{completion_time: completion_time},
       %{action: action, adapter: :local}
     )
+
     value
   end
 end

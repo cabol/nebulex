@@ -399,51 +399,55 @@ if Code.ensure_loaded?(Decorator.Define) do
       caching_action(:cache_evict, attrs, block, context)
     end
 
-
     @doc """
     Provides a method to emit a telemetry event after a decorated caching action has transpired.
     This is automatically invoked after every caching action.
 
     """
     def log_telemetry_start(cache, key, keys, opts) do
-        start_time = System.os_time(:nanosecond)
-        func_name = Keyword.get(opts, :func_name)
-        action = Keyword.get(opts, :action)
+      start_time = System.os_time(:nanosecond)
+      func_name = Keyword.get(opts, :func_name)
+      action = Keyword.get(opts, :action)
 
-        metadata = %{
-          desired_key: key,
-          desired_keys: keys,
-          cache_action: action,
-          cache_name: cache,
-          decorated_func_name: func_name
-        }
+      metadata = %{
+        desired_key: key,
+        desired_keys: keys,
+        cache_action: action,
+        cache_name: cache,
+        decorated_func_name: func_name
+      }
 
-        :telemetry.execute([:nebulex, :decorate, :start],
-          %{start_time: start_time},
-          metadata
-        )
-        :ok
+      :telemetry.execute(
+        [:nebulex, :decorate, :start],
+        %{start_time: start_time},
+        metadata
+      )
+
+      :ok
     end
 
     def log_telemetry_end(return_value, cache, key, keys, opts) do
-        completion_time = System.os_time(:nanosecond)
-        func_name = Keyword.get(opts, :func_name)
-        action = Keyword.get(opts, :action)
+      completion_time = System.os_time(:nanosecond)
+      func_name = Keyword.get(opts, :func_name)
+      action = Keyword.get(opts, :action)
 
-        metadata = %{
-          desired_key: key,
-          desired_keys: keys,
-          cache_action: action,
-          cache_name: cache,
-          decorated_func_name: func_name
-        }
+      metadata = %{
+        desired_key: key,
+        desired_keys: keys,
+        cache_action: action,
+        cache_name: cache,
+        decorated_func_name: func_name
+      }
 
-      :telemetry.execute([:nebulex, :decorate, :end],
-          %{completion_time: completion_time},
-          metadata
-        )
-        return_value
+      :telemetry.execute(
+        [:nebulex, :decorate, :end],
+        %{completion_time: completion_time},
+        metadata
+      )
+
+      return_value
     end
+
     ## Private Functions
 
     defp caching_action(action, attrs, block, context) do
@@ -458,11 +462,13 @@ if Code.ensure_loaded?(Decorator.Define) do
 
       keys_var = Keyword.get(attrs, :keys, [])
       match_var = Keyword.get(attrs, :match, quote(do: fn _ -> true end))
-      opts_var = Keyword.get(attrs, :opts, [])
-                 |> Keyword.put_new(:func_name, context.name)
-                 |> Keyword.put_new(:module_name, context.module)
-                 |> Keyword.put_new(:cache_name, cache)
-                 |> Keyword.put_new(:action, action)
+
+      opts_var =
+        Keyword.get(attrs, :opts, [])
+        |> Keyword.put_new(:func_name, context.name)
+        |> Keyword.put_new(:module_name, context.module)
+        |> Keyword.put_new(:cache_name, cache)
+        |> Keyword.put_new(:action, action)
 
       action_logic = action_logic(action, block, attrs)
 
@@ -477,6 +483,7 @@ if Code.ensure_loaded?(Decorator.Define) do
         match = unquote(match_var)
 
         log_telemetry_start(cache, key, keys, opts)
+
         unquote(action_logic)
         |> log_telemetry_end(cache, key, keys, opts)
       end

@@ -436,14 +436,16 @@ defmodule Nebulex.Adapters.Replicated do
   when needed.
   """
   def with_dynamic_cache(%{cache: cache, primary_name: nil}, action, args) do
-      log_telemetry_start(action, :with_dynamic_cache)
+    log_telemetry_start(action, :with_dynamic_cache)
+
     apply(cache.__primary__, action, args)
-      |> log_telemetry_end(action, :with_dynamic_cache)
+    |> log_telemetry_end(action, :with_dynamic_cache)
   end
 
   def with_dynamic_cache(%{cache: cache, primary_name: primary_name}, action, args) do
     cache.__primary__.with_dynamic_cache(primary_name, fn ->
       log_telemetry_start(action, :with_dynamic_cache)
+
       apply(cache.__primary__, action, args)
       |> log_telemetry_end(action, :with_dynamic_cache)
     end)
@@ -488,6 +490,7 @@ defmodule Nebulex.Adapters.Replicated do
          opts
        ) do
     log_telemetry_start(action, :multi_call)
+
     task_sup
     |> RPC.multi_call(
       Cluster.get_nodes(name),
@@ -508,7 +511,9 @@ defmodule Nebulex.Adapters.Replicated do
 
   defp log_telemetry_start(action, type) do
     start_time = System.os_time(:nanosecond)
-    :telemetry.execute([:nebulex, :start],
+
+    :telemetry.execute(
+      [:nebulex, :start],
       %{start_time: start_time},
       %{action: action, type: type, adapter: :replicated}
     )
@@ -516,10 +521,13 @@ defmodule Nebulex.Adapters.Replicated do
 
   defp log_telemetry_end(value, action, type) do
     completion_time = System.os_time(:nanosecond)
-    :telemetry.execute([:nebulex, :end],
+
+    :telemetry.execute(
+      [:nebulex, :end],
       %{completion_time: completion_time},
       %{action: action, type: type, adapter: :replicated}
     )
+
     value
   end
 end
@@ -688,7 +696,6 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
       {:badrpc, _} -> {:cont, acc}
       entries -> {:halt, entries}
     end
-
   end
 
   # coveralls-ignore-stop
