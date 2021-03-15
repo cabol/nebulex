@@ -460,7 +460,7 @@ defmodule Nebulex.Adapters.Replicated do
        ) do
     nodes = Cluster.get_nodes(name)
 
-    log_telemetry_start(action, :multi_call)
+    log_telemetry_start(action, :with_transaction)
     # Ensure it waits until ongoing delete_all or sync operations finish,
     # if there's any.
     :global.trans(
