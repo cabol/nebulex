@@ -43,7 +43,9 @@ defmodule Nebulex.RPC do
   """
   @spec call(task_sup, node, module, atom, [term], timeout) :: term | {:badrpc, term}
   def call(supervisor, node, mod, fun, args, timeout \\ 5000) do
+      log_telemetry_start(node, fun, args)
     rpc_call(supervisor, node, mod, fun, args, timeout)
+      |> log_telemetry_end()
   end
 
   @doc """
@@ -131,7 +133,9 @@ defmodule Nebulex.RPC do
 
   if Code.ensure_loaded?(:erpc) do
     defp rpc_call(_supervisor, node, mod, fun, args, _timeout) when node == node() do
+      log_telemetry_start(node, fun, args)
       apply(mod, fun, args)
+      |> log_telemetry_end()
     end
 
     defp rpc_call(_supervisor, node, mod, fun, args, timeout) do
@@ -155,13 +159,13 @@ defmodule Nebulex.RPC do
 
       node_group
       |> Enum.map(fn {node, {mod, fun, args}} = group ->
-        log_telemetry_start(node, fun, args)
+        log_telemetry_start(node, fun, args, :erpc_send_request)
         {:erpc.send_request(node, mod, fun, args), group}
       end)
       |> Enum.reduce(reducer_acc, fn {req_id, group}, acc ->
         try do
           res = :erpc.receive_response(req_id, timeout)
-          |> log_telemetry_end()
+          |> log_telemetry_end(:erpc_send_request)
           reducer_fun.({:ok, res}, group, acc)
         rescue
           exception ->
@@ -176,8 +180,10 @@ defmodule Nebulex.RPC do
     def rpc_multi_call(_supervisor, nodes, mod, fun, args, opts) do
       {reducer_acc, reducer_fun} = opts[:reducer] || default_reducer()
 
+      log_telemetry_start(nodes, fun, args, :erpc_multicall)
       nodes
       |> :erpc.multicall(mod, fun, args, opts[:timeout] || 5000)
+      |> log_telemetry_end(:erpc_multicall)
       |> :lists.zip(nodes)
       |> Enum.reduce(reducer_acc, fn {res, node}, acc ->
         reducer_fun.(res, node, acc)
@@ -189,7 +195,9 @@ defmodule Nebulex.RPC do
     #       almost by 3x.
 
     defp rpc_call(_supervisor, node, mod, fun, args, _timeout) when node == node() do
+      log_telemetry_start(node, fun, args)
       apply(mod, fun, args)
+      |> log_telemetry_end()
     rescue
       # FIXME: this is because coveralls does not check this as covered
       # coveralls-ignore-start
@@ -199,6 +207,7 @@ defmodule Nebulex.RPC do
     end
 
     defp rpc_call(supervisor, node, mod, fun, args, timeout) do
+      log_telemetry_start(node, fun, args)
       {supervisor, node}
       |> Task.Supervisor.async_nolink(
         __MODULE__,
@@ -206,11 +215,13 @@ defmodule Nebulex.RPC do
         [supervisor, node, mod, fun, args, timeout]
       )
       |> Task.await(timeout)
+      |> log_telemetry_end()
     end
 
     defp rpc_multi_call(supervisor, node_group, opts) do
       node_group
       |> Enum.map(fn {node, {mod, fun, args}} ->
+        log_telemetry_start(node, fun, args)
         Task.Supervisor.async_nolink({supervisor, node}, mod, fun, args)
       end)
       |> handle_multi_call(node_group, opts)
@@ -228,12 +239,15 @@ defmodule Nebulex.RPC do
       |> :lists.zip(node_group)
       |> Enum.reduce(reducer_acc, fn
         {{_task, {:ok, res}}, group}, acc ->
+          log_telemetry_end(:ok)
           reducer_fun.({:ok, res}, group, acc)
 
         {{_task, {:exit, reason}}, group}, acc ->
+          log_telemetry_end(:ok)
           reducer_fun.({:error, {:exit, reason}}, group, acc)
 
         {{task, nil}, group}, acc ->
+          log_telemetry_end(:ok)
           _ = Task.shutdown(task, :brutal_kill)
           reducer_fun.({:error, :timeout}, group, acc)
       end)
@@ -253,19 +267,28 @@ defmodule Nebulex.RPC do
     }
   end
 
-  defp log_telemetry_start(node_name, func, args) do
+  defp log_telemetry_start(nodes_or_node_name, func, args, action \\ :rpc_call)
+  defp log_telemetry_start(node_name, func, args, action) when is_binary(node_name) do
     start_time = System.os_time(:nanosecond)
     :telemetry.execute([:nebulex, :rpc, :start],
       %{start_time: start_time},
-      %{action: :rpc_call, remote_func: func, remote_args: args, node_name: node_name, adapter: :rpc}
+      %{action: action, remote_func: func, remote_args: args, node_name: node_name, adapter: :rpc}
     )
   end
 
-  defp log_telemetry_end(value) do
+  defp log_telemetry_start(nodes, func, args, action) do
+    start_time = System.os_time(:nanosecond)
+    :telemetry.execute([:nebulex, :rpc, :start],
+      %{start_time: start_time},
+      %{action: action, remote_func: func, remote_args: args, nodes: nodes, adapter: :rpc}
+    )
+  end
+
+  defp log_telemetry_end(value, action \\ :rpc_call) do
     completion_time = System.os_time(:nanosecond)
     :telemetry.execute([:nebulex, :rpc, :end],
       %{completion_time: completion_time},
-      %{action: :rpc_call, adapter: :rpc}
+      %{action: action, adapter: :rpc}
     )
     value
   end

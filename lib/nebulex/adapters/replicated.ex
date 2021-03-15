@@ -436,12 +436,16 @@ defmodule Nebulex.Adapters.Replicated do
   when needed.
   """
   def with_dynamic_cache(%{cache: cache, primary_name: nil}, action, args) do
+      log_telemetry_start(action, :with_dynamic_cache)
     apply(cache.__primary__, action, args)
+      |> log_telemetry_end(action, :with_dynamic_cache)
   end
 
   def with_dynamic_cache(%{cache: cache, primary_name: primary_name}, action, args) do
     cache.__primary__.with_dynamic_cache(primary_name, fn ->
+      log_telemetry_start(action, :with_dynamic_cache)
       apply(cache.__primary__, action, args)
+      |> log_telemetry_end(action, :with_dynamic_cache)
     end)
   end
 
