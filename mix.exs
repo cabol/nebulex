@@ -46,7 +46,7 @@ defmodule Nebulex.MixProject do
   defp deps do
     [
       {:shards, "~> 1.0", optional: true},
-      {:decorator, "~> 1.3", optional: true},
+      {:decorator, "~> 1.4", optional: true},
       {:telemetry, "~> 0.4", optional: true},
 
       # Test & Code Analysis

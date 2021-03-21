@@ -10,6 +10,20 @@ defmodule Nebulex.CachingTest do
 
   defmodule Meta do
     defstruct [:id, :count]
+    @type t :: %__MODULE__{}
+  end
+
+  defmodule TestKeyGenerator do
+    @behaviour Nebulex.Caching.KeyGenerator
+
+    @impl true
+    def generate(_, :put_with_keygen, [arg1, _arg2]) do
+      arg1
+    end
+
+    def generate(mod, fun, args) do
+      :erlang.phash2({mod, fun, args})
+    end
   end
 
   import Nebulex.CacheCase
@@ -41,13 +55,13 @@ defmodule Nebulex.CachingTest do
       refute get_by_x("nil")
       refute Cache.get("nil")
 
-      refute Cache.get({"x", "y"})
-      assert get_by_xy("x", "y") == {"x", "y"}
-      assert Cache.get({"x", "y"}) == {"x", "y"}
+      refute Cache.get({2, 2})
+      assert get_by_xy(2, 2) == {2, 4}
+      assert Cache.get({2, 2}) == {2, 4}
 
       :ok = Process.sleep(1100)
       assert Cache.get("x") == {"x", "y"}
-      assert Cache.get({"x", "y"}) == {"x", "y"}
+      assert Cache.get({2, 2}) == {2, 4}
     end
 
     test "with opts" do
@@ -82,13 +96,10 @@ defmodule Nebulex.CachingTest do
     end
 
     test "with default key" do
-      key = :erlang.phash2({__MODULE__, :get_with_default_key})
-
-      refute Cache.get(key)
       assert get_with_default_key(123, {:foo, "bar"}) == :ok
-      assert Cache.get(key) == :ok
+      assert [123, {:foo, "bar"}] |> :erlang.phash2() |> Cache.get() == :ok
       assert get_with_default_key(:foo, "bar") == :ok
-      assert Cache.get(key) == :ok
+      assert [:foo, "bar"] |> :erlang.phash2() |> Cache.get() == :ok
     end
 
     test "defining keys using structs and maps" do
@@ -99,6 +110,22 @@ defmodule Nebulex.CachingTest do
       refute Cache.get("y")
       assert get_map(%{id: 1}) == %{id: 1}
       assert Cache.get(1) == %{id: 1}
+    end
+
+    test "with multiple clauses" do
+      refute Cache.get(2)
+      assert multiple_clauses(2, 2) == 4
+      assert Cache.get(2) == 4
+
+      refute Cache.get("foo")
+      assert multiple_clauses("foo", "bar") == {"foo", "bar"}
+      assert Cache.get("foo") == {"foo", "bar"}
+    end
+
+    test "without args" do
+      refute Cache.get(0)
+      assert get_without_args() == "hello"
+      assert Cache.get(0) == "hello"
     end
   end
 
@@ -135,6 +162,12 @@ defmodule Nebulex.CachingTest do
       assert Cache.get(true) == {:ok, "true"}
       refute Cache.get({:z, 1})
     end
+
+    test "without args" do
+      refute Cache.get(0)
+      assert update_without_args() == "hello"
+      assert Cache.get(0) == "hello"
+    end
   end
 
   describe "cache_evict" do
@@ -167,9 +200,54 @@ defmodule Nebulex.CachingTest do
       refute Cache.get(:y)
       refute Cache.get(:z)
     end
+
+    test "without args" do
+      refute Cache.get(0)
+      assert get_without_args() == "hello"
+      assert Cache.get(0) == "hello"
+
+      assert evict_without_args() == "hello"
+      refute Cache.get(0)
+    end
   end
 
-  ## Caching Functions
+  describe "key generator" do
+    test "cacheable annotation" do
+      key = TestKeyGenerator.generate(__MODULE__, :get_with_keygen, [1, 2])
+
+      refute Cache.get(key)
+      assert get_with_keygen(1, 2) == {1, 2}
+      assert Cache.get(key) == {1, 2}
+    end
+
+    test "cache_evict annotation" do
+      key = TestKeyGenerator.generate(__MODULE__, :evict_with_keygen, ["foo", "bar"])
+
+      :ok = Cache.put(key, {"foo", "bar"})
+      assert Cache.get(key) == {"foo", "bar"}
+
+      assert evict_with_keygen("foo", "bar") == {"foo", "bar"}
+      refute Cache.get(key)
+    end
+
+    test "cache_put annotation" do
+      assert multiple_clauses(2, 2) == 4
+      assert Cache.get(2) == 4
+
+      assert put_with_keygen(2, 4) == 8
+      assert multiple_clauses(2, 2) == 8
+      assert Cache.get(2) == 8
+
+      assert put_with_keygen(2, 8) == 16
+      assert multiple_clauses(2, 2) == 16
+      assert Cache.get(2) == 16
+    end
+  end
+
+  ## Annotated Functions
+
+  @decorate cacheable(cache: Cache)
+  def get_without_args, do: "hello"
 
   @decorate cacheable(cache: Cache, key: x)
   def get_by_x(x, y \\ "y") do
@@ -179,17 +257,17 @@ defmodule Nebulex.CachingTest do
     end
   end
 
-  @decorate cacheable(cache: Cache, key: x, opts: [ttl: 1000])
+  @decorate cacheable(cache: Cache, opts: [ttl: 1000])
   def get_with_opts(x) do
     x
   end
 
-  @decorate cacheable(cache: Cache, key: x, match: fn x -> x != :x end)
+  @decorate cacheable(cache: Cache, match: fn x -> x != :x end)
   def get_with_match(x) do
     x
   end
 
-  @decorate cacheable(cache: Cache, key: x, match: &match_fun/1)
+  @decorate cacheable(cache: Cache, match: &match_fun/1)
   def get_with_match_fun(x) do
     {:ok, to_string(x)}
   rescue
@@ -198,7 +276,7 @@ defmodule Nebulex.CachingTest do
 
   @decorate cacheable(cache: Cache, key: {x, y})
   def get_by_xy(x, y) do
-    {x, y}
+    {x, y * 2}
   end
 
   @decorate cacheable(cache: Cache)
@@ -217,20 +295,8 @@ defmodule Nebulex.CachingTest do
     map
   end
 
-  @decorate cache_evict(cache: Cache, key: x)
-  def evict_fun(x) do
-    x
-  end
-
-  @decorate cache_evict(cache: Cache, keys: [x, y])
-  def evict_keys_fun(x, y) do
-    {x, y}
-  end
-
-  @decorate cache_evict(cache: Cache, all_entries: true)
-  def evict_all_fun(x) do
-    x
-  end
+  @decorate cache_put(cache: Cache)
+  def update_without_args, do: "hello"
 
   @decorate cache_put(cache: Cache, key: x)
   def update_fun(x) do
@@ -247,6 +313,50 @@ defmodule Nebulex.CachingTest do
     {:ok, to_string(x)}
   rescue
     _ -> :error
+  end
+
+  @decorate cache_evict(cache: Cache)
+  def evict_without_args, do: "hello"
+
+  @decorate cache_evict(cache: Cache, key: x)
+  def evict_fun(x) do
+    x
+  end
+
+  @decorate cache_evict(cache: Cache, keys: [x, y])
+  def evict_keys_fun(x, y) do
+    {x, y}
+  end
+
+  @decorate cache_evict(cache: Cache, all_entries: true, before_invocation: true)
+  def evict_all_fun(x) do
+    x
+  end
+
+  @decorate cacheable(cache: Cache, key: x)
+  def multiple_clauses(x, y \\ 0)
+
+  def multiple_clauses(x, y) when is_integer(x) and is_integer(y) do
+    x * y
+  end
+
+  def multiple_clauses(x, y) do
+    {x, y}
+  end
+
+  @decorate cacheable(cache: Cache, key_generator: TestKeyGenerator)
+  def get_with_keygen(x, y) do
+    {x, y}
+  end
+
+  @decorate cache_evict(cache: Cache, key_generator: TestKeyGenerator)
+  def evict_with_keygen(x, y) do
+    {x, y}
+  end
+
+  @decorate cache_put(cache: Cache, key_generator: TestKeyGenerator)
+  def put_with_keygen(x, y) do
+    x * y
   end
 
   ## Private Functions
