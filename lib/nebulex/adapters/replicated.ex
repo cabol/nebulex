@@ -634,7 +634,7 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
         :ok
 
       errors ->
-        raise Nebulex.RPCMultiCallError, action: :sync_data, errors: errors
+        raise Nebulex.RPCMultiCallError, action: :sync_data, errors: errors, responses: responses
     end
   end
 
