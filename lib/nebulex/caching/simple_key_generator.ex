@@ -1,6 +1,6 @@
 defmodule Nebulex.Caching.SimpleKeyGenerator do
   @moduledoc """
-  KeyGenerator Implementation.
+  KeyGenerator implementation.
   """
   @behaviour Nebulex.Caching.KeyGenerator
 
