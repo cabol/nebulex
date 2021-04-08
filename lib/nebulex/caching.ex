@@ -478,10 +478,9 @@ if Code.ensure_loaded?(Decorator.Define) do
       quote do
         key = unquote(keygen)
 
-        if value = cache.get(key, opts) do
-          value
-        else
-          Caching.eval_match(unquote(block), match, cache, key, opts)
+        case cache.get(key, opts) do
+          nil -> Caching.eval_match(unquote(block), match, cache, key, opts)
+          value -> value
         end
       end
     end
