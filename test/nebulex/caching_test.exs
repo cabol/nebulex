@@ -128,7 +128,7 @@ defmodule Nebulex.CachingTest do
       assert Cache.get(0) == "hello"
     end
 
-    test "with side effects and returning false (issue #)" do
+    test "with side effects and returning false (issue #111)" do
       refute Cache.get("side-effect")
       assert get_false_with_side_effect(false) == false
       assert Cache.get("side-effect") == 1
