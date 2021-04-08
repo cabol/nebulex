@@ -127,6 +127,14 @@ defmodule Nebulex.CachingTest do
       assert get_without_args() == "hello"
       assert Cache.get(0) == "hello"
     end
+
+    test "with side effects and returning false (issue #111)" do
+      refute Cache.get("side-effect")
+      assert get_false_with_side_effect(false) == false
+      assert Cache.get("side-effect") == 1
+      assert get_false_with_side_effect(false) == false
+      assert Cache.get("side-effect") == 1
+    end
   end
 
   describe "cache_put" do
@@ -260,6 +268,12 @@ defmodule Nebulex.CachingTest do
   @decorate cacheable(cache: Cache, opts: [ttl: 1000])
   def get_with_opts(x) do
     x
+  end
+
+  @decorate cacheable(cache: Cache)
+  def get_false_with_side_effect(v) do
+    Cache.update("side-effect", 1, &(&1 + 1))
+    v
   end
 
   @decorate cacheable(cache: Cache, match: fn x -> x != :x end)
