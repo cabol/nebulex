@@ -480,7 +480,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
         case cache.get(key, opts) do
           nil -> Caching.eval_match(unquote(block), match, cache, key, opts)
-          value -> value
+          val -> val
         end
       end
     end

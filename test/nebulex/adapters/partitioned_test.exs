@@ -136,15 +136,18 @@ defmodule Nebulex.Adapters.PartitionedTest do
     end
 
     test "teardown cache node", %{cluster: cluster} do
-      assert Partitioned.put(4, 4) == :ok
-      assert Partitioned.get(4) == 4
-
       assert Partitioned.nodes() == cluster
 
-      node = teardown_cache(1)
-      :ok = Process.sleep(1000)
+      assert Partitioned.put(1, 1) == :ok
+      assert Partitioned.get(1) == 1
 
-      assert Partitioned.nodes() == cluster -- [node]
+      node = teardown_cache(1)
+
+      wait_until(fn ->
+        assert Partitioned.nodes() == cluster -- [node]
+      end)
+
+      refute Partitioned.get(1)
 
       assert :ok == Partitioned.put_all([{4, 44}, {2, 2}, {1, 1}])
 

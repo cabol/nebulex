@@ -19,10 +19,7 @@ defmodule Nebulex.Cache.Registry do
   def lookup(name) when is_atom(name) do
     name
     |> GenServer.whereis()
-    |> Kernel.||(
-      raise "could not lookup Nebulex cache #{inspect(name)} because it was " <>
-              "not started or it does not exist"
-    )
+    |> Kernel.||(raise Nebulex.RegistryLookupError, name: name)
     |> lookup()
   end
 
