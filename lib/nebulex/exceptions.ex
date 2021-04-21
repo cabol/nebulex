@@ -1,3 +1,20 @@
+defmodule Nebulex.RegistryLookupError do
+  @moduledoc """
+  Raised at runtime when the cache was not started or it does not exist.
+  """
+  defexception [:message, :name]
+
+  def exception(opts) do
+    name = Keyword.fetch!(opts, :name)
+
+    msg =
+      "could not lookup Nebulex cache #{inspect(name)} because it was " <>
+        "not started or it does not exist"
+
+    %__MODULE__{message: msg, name: name}
+  end
+end
+
 defmodule Nebulex.KeyAlreadyExistsError do
   @moduledoc """
   Raised at runtime when a key already exists in cache.
