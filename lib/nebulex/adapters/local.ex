@@ -898,25 +898,30 @@ defmodule Nebulex.Adapters.Local do
     value
   end
 
-  defp log_telemetry_start(action) do
-    start_time = System.os_time(:nanosecond)
+  if Code.ensure_loaded?(:telemetry) do
+    defp log_telemetry_start(action) do
+      start_time = System.os_time(:nanosecond)
 
-    :telemetry.execute(
-      [:nebulex, :start],
-      %{start_time: start_time},
-      %{action: action, adapter: :local}
-    )
-  end
+      :telemetry.execute(
+        [:nebulex, :start],
+        %{start_time: start_time},
+        %{action: action, adapter: :local}
+      )
+    end
 
-  defp log_telemetry_end(value, action) do
-    completion_time = System.os_time(:nanosecond)
+    defp log_telemetry_end(value, action) do
+      completion_time = System.os_time(:nanosecond)
 
-    :telemetry.execute(
-      [:nebulex, :end],
-      %{completion_time: completion_time},
-      %{action: action, adapter: :local}
-    )
+      :telemetry.execute(
+        [:nebulex, :end],
+        %{completion_time: completion_time},
+        %{action: action, adapter: :local}
+      )
 
-    value
+      value
+    end
+  else
+    defp log_telemetry_start(_action), do: :ok
+    defp log_telemetry_end(_value, _action), do: :ok
   end
 end

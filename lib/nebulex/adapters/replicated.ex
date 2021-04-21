@@ -536,26 +536,31 @@ defmodule Nebulex.Adapters.Replicated do
     |> :logger.error([])
   end
 
-  defp log_telemetry_start(action, type) do
-    start_time = System.os_time(:nanosecond)
+  if Code.ensure_loaded?(:telemetry) do
+    defp log_telemetry_start(action, type) do
+      start_time = System.os_time(:nanosecond)
 
-    :telemetry.execute(
-      [:nebulex, :start],
-      %{start_time: start_time},
-      %{action: action, type: type, adapter: :replicated}
-    )
-  end
+      :telemetry.execute(
+        [:nebulex, :start],
+        %{start_time: start_time},
+        %{action: action, type: type, adapter: :replicated}
+      )
+    end
 
-  defp log_telemetry_end(value, action, type) do
-    completion_time = System.os_time(:nanosecond)
+    defp log_telemetry_end(value, action, type) do
+      completion_time = System.os_time(:nanosecond)
 
-    :telemetry.execute(
-      [:nebulex, :end],
-      %{completion_time: completion_time},
-      %{action: action, type: type, adapter: :replicated}
-    )
+      :telemetry.execute(
+        [:nebulex, :end],
+        %{completion_time: completion_time},
+        %{action: action, type: type, adapter: :replicated}
+      )
 
-    value
+      value
+    end
+  else
+    defp log_telemetry_start(_action, _type), do: :ok
+    defp log_telemetry_end(_value, _action, _type), do: :ok
   end
 end
 

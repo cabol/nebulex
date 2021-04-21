@@ -275,37 +275,48 @@ defmodule Nebulex.RPC do
     }
   end
 
-  defp log_telemetry_start(nodes_or_node_name, func, args, action \\ :rpc_call)
+  if Code.ensure_loaded?(:telemetry) do
+    defp log_telemetry_start(nodes_or_node_name, func, args, action \\ :rpc_call)
 
-  defp log_telemetry_start(node_name, func, args, action) when is_binary(node_name) do
-    start_time = System.os_time(:nanosecond)
+    defp log_telemetry_start(node_name, func, args, action) when is_binary(node_name) do
+      start_time = System.os_time(:nanosecond)
 
-    :telemetry.execute(
-      [:nebulex, :rpc, :start],
-      %{start_time: start_time},
-      %{action: action, remote_func: func, remote_args: args, node_name: node_name, adapter: :rpc}
-    )
-  end
+      :telemetry.execute(
+        [:nebulex, :rpc, :start],
+        %{start_time: start_time},
+        %{
+          action: action,
+          remote_func: func,
+          remote_args: args,
+          node_name: node_name,
+          adapter: :rpc
+        }
+      )
+    end
 
-  defp log_telemetry_start(nodes, func, args, action) do
-    start_time = System.os_time(:nanosecond)
+    defp log_telemetry_start(nodes, func, args, action) do
+      start_time = System.os_time(:nanosecond)
 
-    :telemetry.execute(
-      [:nebulex, :rpc, :start],
-      %{start_time: start_time},
-      %{action: action, remote_func: func, remote_args: args, nodes: nodes, adapter: :rpc}
-    )
-  end
+      :telemetry.execute(
+        [:nebulex, :rpc, :start],
+        %{start_time: start_time},
+        %{action: action, remote_func: func, remote_args: args, nodes: nodes, adapter: :rpc}
+      )
+    end
 
-  defp log_telemetry_end(value, action \\ :rpc_call) do
-    completion_time = System.os_time(:nanosecond)
+    defp log_telemetry_end(value, action \\ :rpc_call) do
+      completion_time = System.os_time(:nanosecond)
 
-    :telemetry.execute(
-      [:nebulex, :rpc, :end],
-      %{completion_time: completion_time},
-      %{action: action, adapter: :rpc}
-    )
+      :telemetry.execute(
+        [:nebulex, :rpc, :end],
+        %{completion_time: completion_time},
+        %{action: action, adapter: :rpc}
+      )
 
-    value
+      value
+    end
+  else
+    defp log_telemetry_start(_nodes, _func, _args, _action), do: :ok
+    defp log_telemetry_end(_value, _action), do: :ok
   end
 end

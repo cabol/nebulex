@@ -433,6 +433,7 @@ if Code.ensure_loaded?(Decorator.Define) do
       caching_action(:cache_evict, attrs, block, context)
     end
 
+  if Code.ensure_loaded?(:telemetry) do
     @doc """
     Provides a method to emit a telemetry event after a decorated caching action has transpired.
     This is automatically invoked after every caching action.
@@ -481,6 +482,14 @@ if Code.ensure_loaded?(Decorator.Define) do
 
       return_value
     end
+  else
+    @doc """
+    Provides a method to emit a telemetry event after a decorated caching action has transpired.
+    This is automatically invoked after every caching action.
+    """
+    def log_telemetry_start(_cache, _key, _keys, _opts), do: :ok
+    def log_telemetry_end(_return_value, _cache, _key, _keys, _opts), do: :ok
+  end
 
     ## Private Functions
 
@@ -493,6 +502,8 @@ if Code.ensure_loaded?(Decorator.Define) do
         |> Keyword.put_new(:module_name, context.module)
         |> Keyword.put_new(:cache_name, cache)
         |> Keyword.put_new(:action, action)
+      key_var = attrs[:keys] || []
+      keys_var = attrs[:key] || nil
 
       keygen_block = keygen_block(attrs, context)
       action_block = action_block(action, block, attrs, keygen_block)
@@ -504,10 +515,12 @@ if Code.ensure_loaded?(Decorator.Define) do
         cache = unquote(cache)
         opts = unquote(opts_var)
         match = unquote(match_var)
+        key = unquote(key_var)
+        keys = unquote(keys_var)
 
         log_telemetry_start(cache, key, keys, opts)
 
-        unquote(action_logic)
+        unquote(action_block)
         |> log_telemetry_end(cache, key, keys, opts)
       end
     end
