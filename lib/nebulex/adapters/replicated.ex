@@ -280,6 +280,7 @@ defmodule Nebulex.Adapters.Replicated do
     # Maybe task supervisor for distributed tasks
     {task_sup_name, children} = sup_child_spec(name, opts)
 
+    # Prepare metadata
     meta = %{
       name: name,
       primary_name: primary_opts[:name],
@@ -291,15 +292,12 @@ defmodule Nebulex.Adapters.Replicated do
       Nebulex.Adapters.Supervisor.child_spec(
         name: normalize_module_name([name, Supervisor]),
         strategy: :rest_for_one,
-        children:
-          [
-            {cache.__primary__, primary_opts},
-            {Nebulex.Adapters.Replicated.Bootstrap, Map.put(meta, :cache, cache)}
-          ] ++ children
+        children: [
+          {cache.__primary__, primary_opts},
+          {__MODULE__.Bootstrap, Map.put(meta, :cache, cache)}
+          | children
+        ]
       )
-
-    # Join the cache to the cluster
-    :ok = Cluster.join(name)
 
     {:ok, child_spec, meta}
   end
@@ -504,9 +502,38 @@ defmodule Nebulex.Adapters.Replicated do
   end
 
   defp handle_rpc_multi_call({res, []}, _action), do: hd(res)
+  defp handle_rpc_multi_call({res, {:sanitized, []}}, _action), do: hd(res)
+
+  defp handle_rpc_multi_call({responses, {:sanitized, errors}}, action) do
+    raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
+  end
 
   defp handle_rpc_multi_call({responses, errors}, action) do
-    raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
+    handle_rpc_multi_call({responses, {:sanitized, sanitize_errors(errors)}}, action)
+  end
+
+  defp sanitize_errors(errors) do
+    Enum.filter(errors, fn
+      {{:error, {:exception, %Nebulex.RegistryLookupError{message: message}, _}}, node} ->
+        # The cache was not found in the node, maybe it was stopped and
+        # "Process Groups" is not updated yet, then ignore the error
+        :ok = log_error(message, node)
+        false
+
+      {{:error, {:erpc, :noconnection}}, node} ->
+        # Remote node is down and maybe the "Process Groups" is not updated yet
+        :ok = log_error(:noconnection, node)
+        false
+
+      _ ->
+        true
+    end)
+  end
+
+  defp log_error(message, node) do
+    "RPC failed on node #{node}: #{message}"
+    |> String.to_charlist()
+    |> :logger.error([])
   end
 
   defp log_telemetry_start(action, type) do
@@ -562,6 +589,12 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
 
   @impl true
   def init(adapter_meta) do
+    # Trap exit signals to run cleanup job
+    _ = Process.flag(:trap_exit, true)
+
+    # Ensure joining the cluster only when the cache supervision tree is started
+    :ok = Cluster.join(adapter_meta.name)
+
     # Set a global lock to stop any write operation
     # until the synchronization process finishes
     :ok = lock(adapter_meta.name)
@@ -598,6 +631,12 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
     # coveralls-ignore-start
     {:stop, :normal, state}
     # coveralls-ignore-stop
+  end
+
+  @impl true
+  def terminate(_reason, state) do
+    # Ensure leaving the cluster when the cache stops
+    :ok = Cluster.leave(state.name)
   end
 
   ## Helpers
@@ -667,7 +706,7 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
         :ok
 
       errors ->
-        raise Nebulex.RPCMultiCallError, action: :sync_data, errors: errors
+        raise Nebulex.RPCMultiCallError, action: :sync_data, errors: errors, responses: responses
     end
   end
 

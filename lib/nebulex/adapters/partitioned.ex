@@ -320,13 +320,7 @@ defmodule Nebulex.Adapters.Partitioned do
     # Maybe task supervisor for distributed tasks
     {task_sup_name, children} = sup_child_spec(name, opts)
 
-    child_spec =
-      Nebulex.Adapters.Supervisor.child_spec(
-        name: normalize_module_name([name, Supervisor]),
-        strategy: :rest_for_one,
-        children: [{cache.__primary__, primary_opts}] ++ children
-      )
-
+    # Prepare metadata
     meta = %{
       name: name,
       primary_name: primary_opts[:name],
@@ -335,8 +329,17 @@ defmodule Nebulex.Adapters.Partitioned do
       stats: stats
     }
 
-    # Join the cache to the cluster
-    :ok = Cluster.join(name)
+    child_spec =
+      Nebulex.Adapters.Supervisor.child_spec(
+        name: normalize_module_name([name, Supervisor]),
+        strategy: :rest_for_one,
+        # children: [{cache.__primary__, primary_opts}] ++ children,
+        children: [
+          {cache.__primary__, primary_opts},
+          {__MODULE__.Bootstrap, Map.put(meta, :cache, cache)}
+          | children
+        ]
+      )
 
     {:ok, child_spec, meta}
   end
@@ -640,5 +643,45 @@ defmodule Nebulex.Adapters.Partitioned do
 
   defp handle_rpc_multi_call({responses, errors}, action, _) do
     raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
+  end
+end
+
+defmodule Nebulex.Adapters.Partitioned.Bootstrap do
+  @moduledoc false
+  use GenServer
+
+  import Nebulex.Helpers
+
+  alias Nebulex.Cache.Cluster
+
+  ## API
+
+  @doc false
+  def start_link(%{name: name} = adapter_meta) do
+    GenServer.start_link(
+      __MODULE__,
+      adapter_meta,
+      name: normalize_module_name([name, Bootstrap])
+    )
+  end
+
+  ## GenServer Callbacks
+
+  @impl true
+  def init(adapter_meta) do
+    # Trap exit signals to run cleanup job
+    _ = Process.flag(:trap_exit, true)
+
+    # Ensure joining the cluster only when the cache supervision tree is started
+    :ok = Cluster.join(adapter_meta.name)
+
+    # Start bootstrap process
+    {:ok, adapter_meta}
+  end
+
+  @impl true
+  def terminate(_reason, adapter_meta) do
+    # Ensure leaving the cluster when the cache stops
+    :ok = Cluster.leave(adapter_meta.name)
   end
 end

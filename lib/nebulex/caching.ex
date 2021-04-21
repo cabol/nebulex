@@ -35,7 +35,26 @@ if Code.ensure_loaded?(Decorator.Define) do
     Since caches are essentially key-value stores, each invocation of a cached
     function needs to be translated into a suitable key for cache access.
     Out of the box, the caching abstraction uses a simple key-generator
-    based on the following algorithm: `:erlang.phash2({module, func_name})`.
+    based on the following algorithm:
+
+      * If no params are given, return `0`.
+      * If only one param is given, return that param as key.
+      * If more than one param is given, return a key computed from the hashes
+        of all parameters (`:erlang.phash2(args)`).
+
+    See `Nebulex.Caching.SimpleKeyGenerator` for more information about the
+    default key generation.
+
+    To provide a different default key generator, one needs to implement the
+    `Nebulex.Caching.KeyGenerator` behaviour. Then, it can be configured by
+    the option `:key_generator` for the desired declarations. For example:
+
+        @decorate cache_put(cache: Cache, key_generator: MyKeyGenerator)
+        def update_account(account) do
+          # the logic for updating the account ...
+        end
+
+    > The `:key_generator` option is available for all caching annotations.
 
     ### Custom Key Generation Declaration
 
@@ -168,6 +187,11 @@ if Code.ensure_loaded?(Decorator.Define) do
         then the `value` is what is cached (useful to control what is meant to
         be cached). Returning `false` will cause that nothing is stored in the
         cache.
+
+      * `:key_generator` - The custom key generator module that implements the
+        `Nebulex.Caching.KeyGenerator` behaviour. In case `key:` or `keys:`
+        (in case of `cache_evict`) argument are not given,
+        `Nebulex.Caching.SimpleKeyGenerator` is used as default key generator.
 
     ## Putting all together
 
@@ -364,6 +388,16 @@ if Code.ensure_loaded?(Decorator.Define) do
       * `:all_entries` - Defines if all entries must be removed on function
         completion. Defaults to `false`.
 
+      * `:before_invocation` - Boolean to indicate whether the eviction should
+        occur after (the default) or before the function executes. The former
+        provides the same semantics as the rest of the annotations; once the
+        function completes successfully, an action (in this case eviction)
+        on the cache is executed. If the function does not execute (as it might
+        be cached) or an exception is raised, the eviction does not occur.
+        The latter (`before_invocation: true`) causes the eviction to occur
+        always, before the function is invoked; this is useful in cases where
+        the eviction does not need to be tied to the function outcome.
+
     See the "Shared options" section at the module documentation.
 
     ## Examples
@@ -452,17 +486,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     defp caching_action(action, attrs, block, context) do
       cache = attrs[:cache] || raise ArgumentError, "expected cache: to be given as argument"
-
-      key_var =
-        Keyword.get(
-          attrs,
-          :key,
-          quote(do: :erlang.phash2({unquote(context.module), unquote(context.name)}))
-        )
-
-      keys_var = Keyword.get(attrs, :keys, [])
-      match_var = Keyword.get(attrs, :match, quote(do: fn _ -> true end))
-
+      match_var = attrs[:match] || quote(do: fn _ -> true end)
       opts_var =
         Keyword.get(attrs, :opts, [])
         |> Keyword.put_new(:func_name, context.name)
@@ -470,15 +494,14 @@ if Code.ensure_loaded?(Decorator.Define) do
         |> Keyword.put_new(:cache_name, cache)
         |> Keyword.put_new(:action, action)
 
-      action_logic = action_logic(action, block, attrs)
+      keygen_block = keygen_block(attrs, context)
+      action_block = action_block(action, block, attrs, keygen_block)
 
       quote do
         # required so we can call log_telemetry_event/6
         import Nebulex.Caching, only: [log_telemetry_start: 4, log_telemetry_end: 5]
 
         cache = unquote(cache)
-        key = unquote(key_var)
-        keys = unquote(keys_var)
         opts = unquote(opts_var)
         match = unquote(match_var)
 
@@ -489,31 +512,91 @@ if Code.ensure_loaded?(Decorator.Define) do
       end
     end
 
-    defp action_logic(:cacheable, block, _attrs) do
-      quote do
-        if value = cache.get(key, opts) do
-          value
-        else
-          unquote(match_logic(block))
+    defp keygen_block(attrs, ctx) do
+      keygen = attrs[:key_generator] || Nebulex.Caching.SimpleKeyGenerator
+
+      args =
+        for arg <- ctx.args do
+          case arg do
+            {:\\, _, [var, _]} -> var
+            var -> var
+          end
+        end
+
+      if key = Keyword.get(attrs, :key) do
+        quote do
+          unquote(key)
+        end
+      else
+        quote do
+          unquote(keygen).generate(unquote(ctx.module), unquote(ctx.name), unquote(args))
         end
       end
     end
 
-    defp action_logic(:cache_put, block, _attrs) do
-      match_logic(block)
+    defp action_block(:cacheable, block, _attrs, keygen) do
+      quote do
+        key = unquote(keygen)
+
+        case cache.get(key, opts) do
+          nil -> Caching.eval_match(unquote(block), match, cache, key, opts)
+          val -> val
+        end
+      end
     end
 
-    defp match_logic(block) do
+    defp action_block(:cache_put, block, _attrs, keygen) do
       quote do
-        Caching.eval_match(unquote(block), match, cache, key, opts)
+        Caching.eval_match(unquote(block), match, cache, unquote(keygen), opts)
+      end
+    end
+
+    defp action_block(:cache_evict, block, attrs, keygen) do
+      before_invocation? = attrs[:before_invocation] || false
+
+      eviction = eviction_block(attrs, keygen)
+
+      if is_boolean(before_invocation?) && before_invocation? do
+        quote do
+          unquote(eviction)
+          unquote(block)
+        end
+      else
+        quote do
+          result = unquote(block)
+          unquote(eviction)
+          result
+        end
+      end
+    end
+
+    defp eviction_block(attrs, keygen) do
+      keys = Keyword.get(attrs, :keys)
+      all_entries? = attrs[:all_entries] || false
+
+      cond do
+        is_boolean(all_entries?) && all_entries? ->
+          quote(do: cache.delete_all())
+
+        is_list(keys) and length(keys) > 0 ->
+          delete_keys_block(keys)
+
+        true ->
+          quote(do: cache.delete(unquote(keygen)))
+      end
+    end
+
+    defp delete_keys_block(keys) do
+      quote do
+        Enum.each(unquote(keys), fn k -> if k, do: cache.delete(k) end)
       end
     end
 
     @doc """
     This function is for internal purposes.
 
-    > **NOTE:** Workaround to avoid dialyzer warnings when using declarative
-      annotation-based caching via decorators.
+    **NOTE:** Workaround to avoid dialyzer warnings when using declarative
+    annotation-based caching via decorators.
     """
     @spec eval_match(term, (term -> boolean | {true, term}), module, term, Keyword.t()) :: term
     def eval_match(result, match, cache, key, opts) do
@@ -528,22 +611,6 @@ if Code.ensure_loaded?(Decorator.Define) do
 
         false ->
           result
-      end
-    end
-
-    defp action_logic(:cache_evict, block, attrs) do
-      all_entries? = Keyword.get(attrs, :all_entries, false)
-
-      quote do
-        if unquote(all_entries?) do
-          cache.delete_all()
-        else
-          Enum.each([key | keys], fn k ->
-            if k, do: cache.delete(k)
-          end)
-        end
-
-        unquote(block)
       end
     end
   end

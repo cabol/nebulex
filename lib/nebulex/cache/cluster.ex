@@ -34,18 +34,24 @@ defmodule Nebulex.Cache.Cluster do
   def get_nodes(name) do
     name
     |> pg_members()
-    |> Enum.map(&node(&1))
+    |> Enum.map(&node/1)
     |> :lists.usort()
   end
 
   @doc """
   Selects one node based on the computation of the `key` slot.
   """
-  @spec get_node(name :: atom, Nebulex.Cache.key(), keyslot :: module) :: node
-  def get_node(name, key, keyslot) do
-    nodes = get_nodes(name)
-    index = keyslot.hash_slot(key, length(nodes))
-    Enum.at(nodes, index)
+  @spec get_node(name_or_nodes :: atom | [node], Nebulex.Cache.key(), keyslot :: module) :: node
+  def get_node(name_or_nodes, key, keyslot)
+
+  def get_node(name, key, keyslot) when is_atom(name) do
+    name
+    |> get_nodes()
+    |> get_node(key, keyslot)
+  end
+
+  def get_node(nodes, key, keyslot) when is_list(nodes) do
+    Enum.at(nodes, keyslot.hash_slot(key, length(nodes)))
   end
 
   ## PG

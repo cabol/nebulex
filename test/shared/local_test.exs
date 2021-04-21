@@ -30,9 +30,9 @@ defmodule Nebulex.LocalTest do
         :ok = cache.stop()
 
         msg = ~r"could not lookup Nebulex cache"
-        assert_raise RuntimeError, msg, fn -> cache.put(1, 13) end
-        assert_raise RuntimeError, msg, fn -> cache.get(1) end
-        assert_raise RuntimeError, msg, fn -> cache.delete(1) end
+        assert_raise Nebulex.RegistryLookupError, msg, fn -> cache.put(1, 13) end
+        assert_raise Nebulex.RegistryLookupError, msg, fn -> cache.get(1) end
+        assert_raise Nebulex.RegistryLookupError, msg, fn -> cache.delete(1) end
       end
     end
 
