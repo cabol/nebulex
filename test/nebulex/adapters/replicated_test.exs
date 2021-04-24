@@ -1,7 +1,6 @@
 defmodule Nebulex.Adapters.ReplicatedTest do
   use Nebulex.NodeCase
-
-  # use Nebulex.CacheTest
+  use Nebulex.CacheTest
 
   import Mock
   import Nebulex.CacheCase

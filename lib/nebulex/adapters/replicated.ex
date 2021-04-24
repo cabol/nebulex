@@ -487,31 +487,31 @@ defmodule Nebulex.Adapters.Replicated do
       [meta, action, args],
       opts
     )
-    |> handle_rpc_multi_call(action)
+    |> handle_rpc_multi_call(action, meta)
   end
 
-  defp handle_rpc_multi_call({res, []}, _action), do: hd(res)
-  defp handle_rpc_multi_call({res, {:sanitized, []}}, _action), do: hd(res)
+  defp handle_rpc_multi_call({res, []}, _action, _meta), do: hd(res)
+  defp handle_rpc_multi_call({res, {:sanitized, []}}, _action, _meta), do: hd(res)
 
-  defp handle_rpc_multi_call({responses, {:sanitized, errors}}, action) do
+  defp handle_rpc_multi_call({responses, {:sanitized, errors}}, action, _meta) do
     raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
   end
 
-  defp handle_rpc_multi_call({responses, errors}, action) do
-    handle_rpc_multi_call({responses, {:sanitized, sanitize_errors(errors)}}, action)
+  defp handle_rpc_multi_call({responses, errors}, action, meta) do
+    handle_rpc_multi_call({responses, {:sanitized, sanitize_errors(errors, meta)}}, action, meta)
   end
 
-  defp sanitize_errors(errors) do
+  defp sanitize_errors(errors, meta) do
     Enum.filter(errors, fn
-      {{:error, {:exception, %Nebulex.RegistryLookupError{message: message}, _}}, node} ->
+      {{:error, {:exception, %Nebulex.RegistryLookupError{} = error, _}}, node} ->
         # The cache was not found in the node, maybe it was stopped and
         # "Process Groups" is not updated yet, then ignore the error
-        :ok = log_error(message, node)
+        :ok = log_error(error, node, meta)
         false
 
       {{:error, {:erpc, :noconnection}}, node} ->
         # Remote node is down and maybe the "Process Groups" is not updated yet
-        :ok = log_error(:noconnection, node)
+        :ok = log_error(:noconnection, node, meta)
         false
 
       _ ->
@@ -519,10 +519,16 @@ defmodule Nebulex.Adapters.Replicated do
     end)
   end
 
-  defp log_error(message, node) do
-    "RPC failed on node #{node}: #{message}"
-    |> String.to_charlist()
-    |> :logger.error([])
+  if Code.ensure_loaded?(:telemetry) do
+    defp log_error(error, node, %{name: name}) do
+      :telemetry.execute(
+        [:nebulex, :adapters, :replicated, :error],
+        %{count: 1},
+        %{cache: name, error: error, node: node}
+      )
+    end
+  else
+    defp log_error(_error, _node, _meta), do: :ok
   end
 end
 

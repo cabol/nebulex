@@ -19,5 +19,8 @@ end
 # For mix tests
 Mix.shell(Mix.Shell.Process)
 
+# Start Telemetry
+:ok = Application.start(:telemetry)
+
 # Start ExUnit
 ExUnit.start()
