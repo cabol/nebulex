@@ -235,6 +235,7 @@ defmodule Nebulex.Adapters.Replicated do
   # Inherit default persistence implementation
   use Nebulex.Adapter.Persistence
 
+  import Nebulex.Adapter
   import Nebulex.Helpers
 
   alias Nebulex.Cache.Cluster
@@ -358,74 +359,107 @@ defmodule Nebulex.Adapters.Replicated do
 
   @impl true
   def get(adapter_meta, key, opts) do
-    with_dynamic_cache(adapter_meta, :get, [key, opts])
+    with_span(adapter_meta, :get, fn ->
+      with_dynamic_cache(adapter_meta, :get, [key, opts])
+    end)
   end
 
   @impl true
   def get_all(adapter_meta, keys, opts) do
-    with_dynamic_cache(adapter_meta, :get_all, [keys, opts])
+    with_span(adapter_meta, :get_all, fn ->
+      with_dynamic_cache(adapter_meta, :get_all, [keys, opts])
+    end)
   end
 
   @impl true
   def put(adapter_meta, key, value, _ttl, :put, opts) do
-    :ok = with_transaction(adapter_meta, :put, [key], [key, value, opts], opts)
-    true
+    with_span(adapter_meta, :put, fn ->
+      :ok = with_transaction(adapter_meta, :put, [key], [key, value, opts], opts)
+      true
+    end)
   end
 
   def put(adapter_meta, key, value, _ttl, :put_new, opts) do
-    with_transaction(adapter_meta, :put_new, [key], [key, value, opts], opts)
+    with_span(adapter_meta, :put_new, fn ->
+      with_transaction(adapter_meta, :put_new, [key], [key, value, opts], opts)
+    end)
   end
 
   def put(adapter_meta, key, value, _ttl, :replace, opts) do
-    with_transaction(adapter_meta, :replace, [key], [key, value, opts], opts)
+    with_span(adapter_meta, :replace, fn ->
+      with_transaction(adapter_meta, :replace, [key], [key, value, opts], opts)
+    end)
   end
 
   @impl true
   def put_all(adapter_meta, entries, _ttl, on_write, opts) do
-    keys = for {k, _} <- entries, do: k
     action = if on_write == :put_new, do: :put_new_all, else: :put_all
-    with_transaction(adapter_meta, action, keys, [entries, opts], opts) || action == :put_all
+
+    with_span(adapter_meta, action, fn ->
+      keys = for {k, _} <- entries, do: k
+      with_transaction(adapter_meta, action, keys, [entries, opts], opts) || action == :put_all
+    end)
   end
 
   @impl true
   def delete(adapter_meta, key, opts) do
-    with_transaction(adapter_meta, :delete, [key], [key, opts], opts)
+    with_span(adapter_meta, :delete, fn ->
+      with_transaction(adapter_meta, :delete, [key], [key, opts], opts)
+    end)
   end
 
   @impl true
   def take(adapter_meta, key, opts) do
-    with_transaction(adapter_meta, :take, [key], [key, opts], opts)
+    with_span(adapter_meta, :take, fn ->
+      with_transaction(adapter_meta, :take, [key], [key, opts], opts)
+    end)
   end
 
   @impl true
   def update_counter(adapter_meta, key, amount, _ttl, _default, opts) do
-    with_transaction(adapter_meta, :incr, [key], [key, amount, opts], opts)
+    with_span(adapter_meta, :incr, fn ->
+      with_transaction(adapter_meta, :incr, [key], [key, amount, opts], opts)
+    end)
   end
 
   @impl true
   def has_key?(adapter_meta, key) do
-    with_dynamic_cache(adapter_meta, :has_key?, [key])
+    with_span(adapter_meta, :has_key?, fn ->
+      with_dynamic_cache(adapter_meta, :has_key?, [key])
+    end)
   end
 
   @impl true
   def ttl(adapter_meta, key) do
-    with_dynamic_cache(adapter_meta, :ttl, [key])
+    with_span(adapter_meta, :ttl, fn ->
+      with_dynamic_cache(adapter_meta, :ttl, [key])
+    end)
   end
 
   @impl true
   def expire(adapter_meta, key, ttl) do
-    with_transaction(adapter_meta, :expire, [key], [key, ttl])
+    with_span(adapter_meta, :expire, fn ->
+      with_transaction(adapter_meta, :expire, [key], [key, ttl])
+    end)
   end
 
   @impl true
   def touch(adapter_meta, key) do
-    with_transaction(adapter_meta, :touch, [key], [key])
+    with_span(adapter_meta, :touch, fn ->
+      with_transaction(adapter_meta, :touch, [key], [key])
+    end)
   end
 
   ## Nebulex.Adapter.Queryable
 
   @impl true
-  def execute(%{name: name} = adapter_meta, :delete_all, query, opts) do
+  def execute(adapter_meta, operation, query, opts) do
+    with_span(adapter_meta, operation, fn ->
+      do_execute(adapter_meta, operation, query, opts)
+    end)
+  end
+
+  defp do_execute(%{name: name} = adapter_meta, :delete_all, query, opts) do
     # It is blocked until ongoing write operations finish (if there is any).
     # Similarly, while it is executed, all later write-like operations are
     # blocked until it finishes.
@@ -438,27 +472,56 @@ defmodule Nebulex.Adapters.Replicated do
     )
   end
 
-  def execute(adapter_meta, operation, query, opts) do
+  defp do_execute(adapter_meta, operation, query, opts) do
     with_dynamic_cache(adapter_meta, operation, [query, opts])
   end
 
   @impl true
   def stream(adapter_meta, query, opts) do
-    with_dynamic_cache(adapter_meta, :stream, [query, opts])
+    with_span(adapter_meta, :stream, fn ->
+      with_dynamic_cache(adapter_meta, :stream, [query, opts])
+    end)
+  end
+
+  ## Nebulex.Adapter.Persistence
+
+  @impl true
+  def dump(adapter_meta, path, opts) do
+    with_span(adapter_meta, :dump, fn ->
+      super(adapter_meta, path, opts)
+    end)
+  end
+
+  @impl true
+  def load(adapter_meta, path, opts) do
+    with_span(adapter_meta, :load, fn ->
+      super(adapter_meta, path, opts)
+    end)
   end
 
   ## Nebulex.Adapter.Transaction
 
   @impl true
   def transaction(%{name: name} = adapter_meta, opts, fun) do
-    super(adapter_meta, Keyword.put(opts, :nodes, Cluster.get_nodes(name)), fun)
+    with_span(adapter_meta, :transaction, fn ->
+      super(adapter_meta, Keyword.put(opts, :nodes, Cluster.get_nodes(name)), fun)
+    end)
+  end
+
+  @impl true
+  def in_transaction?(adapter_meta) do
+    with_span(adapter_meta, :in_transaction?, fn ->
+      super(adapter_meta)
+    end)
   end
 
   ## Nebulex.Adapter.Stats
 
   @impl true
   def stats(adapter_meta) do
-    with_dynamic_cache(adapter_meta, :stats, [])
+    with_span(adapter_meta, :stats, fn ->
+      with_dynamic_cache(adapter_meta, :stats, [])
+    end)
   end
 
   ## Helpers
