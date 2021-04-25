@@ -45,18 +45,18 @@ defmodule Nebulex.Adapter do
   Helper function for the adapters so they can execute a cache command
   given by `fun` with Telemetry span events.
   """
-  @spec with_span([atom], adapter_meta, atom, fun) :: {term, %{optional(atom) => term}} | term
-  def with_span(event \\ [:command], adapter_meta, action, fun)
+  @spec with_span(adapter_meta, atom, fun) :: {term, %{optional(atom) => term}} | term
+  def with_span(adapter_meta, action, fun)
 
-  def with_span(_event, %{telemetry_prefix: nil}, _action, fun) do
+  def with_span(%{telemetry_prefix: nil}, _action, fun) do
     fun.()
   end
 
-  def with_span(event, adapter_meta, action, fun) do
+  def with_span(adapter_meta, action, fun) do
     cache = adapter_meta[:name] || adapter_meta.cache
 
     Telemetry.span(
-      adapter_meta.telemetry_prefix ++ event,
+      adapter_meta.telemetry_prefix ++ [:command],
       %{cache: cache, action: action},
       fn ->
         result = fun.()

@@ -85,6 +85,8 @@ defmodule Nebulex.Adapter.Persistence do
         |> handle_response()
       end
 
+      defoverridable dump: 3, load: 3
+
       ## Helpers
 
       defp handle_response({:ok, _}), do: :ok

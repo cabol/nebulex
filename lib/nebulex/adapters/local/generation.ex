@@ -50,6 +50,8 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   # State
   defstruct [
+    :cache,
+    :telemetry_prefix,
     :meta_tab,
     :backend,
     :backend_opts,
@@ -248,23 +250,19 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   defp parse_opts(opts) do
-    # Add the GC PID to the meta table
-    meta_tab = Keyword.fetch!(opts, :meta_tab)
-    :ok = Metadata.put(meta_tab, :gc_pid, self())
+    # Get adapter metadata
+    adapter_meta = Keyword.fetch!(opts, :adapter_meta)
 
-    # Backend for creating new tables
-    backend = Keyword.fetch!(opts, :backend)
-    backend_opts = Keyword.get(opts, :backend_opts, [])
+    # Add the GC PID to the meta table
+    meta_tab = Map.fetch!(adapter_meta, :meta_tab)
+    :ok = Metadata.put(meta_tab, :gc_pid, self())
 
     # Common validators
     pos_integer = &(is_integer(&1) and &1 > 0)
     pos_integer_or_nil = &((is_integer(&1) and &1 > 0) or is_nil(&1))
 
-    %{
-      meta_tab: meta_tab,
-      backend: backend,
-      backend_opts: backend_opts,
-      stats_counter: opts[:stats_counter],
+    Map.merge(adapter_meta, %{
+      backend_opts: Keyword.get(opts, :backend_opts, []),
       gc_interval: get_option(opts, :gc_interval, "an integer > 0", pos_integer_or_nil),
       max_size: get_option(opts, :max_size, "an integer > 0", pos_integer_or_nil),
       allocated_memory: get_option(opts, :allocated_memory, "an integer > 0", pos_integer_or_nil),
@@ -272,18 +270,22 @@ defmodule Nebulex.Adapters.Local.Generation do
         get_option(opts, :gc_cleanup_min_timeout, "an integer > 0", pos_integer, 10_000),
       gc_cleanup_max_timeout:
         get_option(opts, :gc_cleanup_max_timeout, "an integer > 0", pos_integer, 600_000)
-    }
+    })
   end
 
   @impl true
-  def handle_call(:delete_all, _from, %__MODULE__{meta_tab: meta_tab, backend: backend} = state) do
-    size = Local.execute(%{meta_tab: meta_tab, backend: backend}, :count_all, nil, [])
+  def handle_call(:delete_all, _from, %__MODULE__{} = state) do
+    size =
+      state
+      |> Map.from_struct()
+      |> Local.execute(:count_all, nil, [])
+
     :ok = new_gen(state)
 
     :ok =
-      meta_tab
+      state.meta_tab
       |> list()
-      |> Enum.each(&backend.delete_all_objects(&1))
+      |> Enum.each(&state.backend.delete_all_objects(&1))
 
     {:reply, size, %{state | gc_heartbeat_ref: maybe_reset_timer(true, state)}}
   end

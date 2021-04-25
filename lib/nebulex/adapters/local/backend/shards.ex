@@ -41,8 +41,13 @@ if Code.ensure_loaded?(:shards) do
           System.schedulers_online()
         )
 
+      meta_tab =
+        opts
+        |> Keyword.fetch!(:adapter_meta)
+        |> Map.fetch!(:meta_tab)
+
       sup_spec([
-        {__MODULE__.DynamicSupervisor, Keyword.fetch!(opts, :meta_tab)},
+        {__MODULE__.DynamicSupervisor, meta_tab},
         generation_spec(parse_opts(opts, partitions: partitions))
       ])
     end
