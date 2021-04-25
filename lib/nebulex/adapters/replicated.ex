@@ -798,7 +798,7 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
   defp log_error(error, adapter_meta, ext_meta) do
     if adapter_meta.telemetry_prefix do
       Telemetry.execute(
-        adapter_meta.telemetry ++ [:bootstrap, error],
+        adapter_meta.telemetry_prefix ++ [:bootstrap, error],
         %{count: 1},
         adapter_meta |> Map.take([:cache, :name]) |> Map.merge(ext_meta)
       )

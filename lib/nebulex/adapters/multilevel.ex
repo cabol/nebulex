@@ -185,9 +185,9 @@ defmodule Nebulex.Adapters.Multilevel do
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
 
+  import Nebulex.Adapter
   import Nebulex.Helpers
 
-  alias Nebulex.Adapter
   alias Nebulex.Cache.Cluster
 
   # Multi-level Cache Models
@@ -202,7 +202,7 @@ defmodule Nebulex.Adapters.Multilevel do
       A convenience function to get the cache model.
       """
       def model(name \\ __MODULE__) do
-        Adapter.with_meta(name, fn _adapter, %{model: model} ->
+        with_meta(name, fn _adapter, %{model: model} ->
           model
         end)
       end
@@ -266,7 +266,13 @@ defmodule Nebulex.Adapters.Multilevel do
   ## Nebulex.Adapter.Entry
 
   @impl true
-  def get(%{levels: levels, model: model}, key, opts) do
+  def get(adapter_meta, key, opts) do
+    with_span(adapter_meta, :get, fn ->
+      do_get(adapter_meta, key, opts)
+    end)
+  end
+
+  defp do_get(%{levels: levels, model: model}, key, opts) do
     fun = fn level, {default, prev} ->
       if value = with_dynamic_cache(level, :get, [key, opts]) do
         {:halt, {value, [level | prev]}}
@@ -283,6 +289,12 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   def get_all(adapter_meta, keys, _opts) do
+    with_span(adapter_meta, :get_all, fn ->
+      do_get_all(adapter_meta, keys)
+    end)
+  end
+
+  defp do_get_all(adapter_meta, keys) do
     Enum.reduce(keys, %{}, fn key, acc ->
       if obj = get(adapter_meta, key, []),
         do: Map.put(acc, key, obj),
@@ -292,25 +304,29 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   def put(adapter_meta, key, value, _ttl, :put, opts) do
-    :ok = eval(adapter_meta, :put, [key, value, opts], opts)
-    true
+    with_span(adapter_meta, :put, fn ->
+      :ok = eval(adapter_meta, :put, [key, value, opts], opts)
+      true
+    end)
   end
 
   def put(adapter_meta, key, value, _ttl, :put_new, opts) do
-    eval(adapter_meta, :put_new, [key, value, opts], opts)
+    with_span(adapter_meta, :put_new, fn ->
+      eval(adapter_meta, :put_new, [key, value, opts], opts)
+    end)
   end
 
   def put(adapter_meta, key, value, _ttl, :replace, opts) do
-    eval(adapter_meta, :replace, [key, value, opts], opts)
+    with_span(adapter_meta, :replace, fn ->
+      eval(adapter_meta, :replace, [key, value, opts], opts)
+    end)
   end
 
   @impl true
-  def put_all(%{levels: levels}, entries, _ttl, on_write, opts) do
+  def put_all(%{levels: levels} = adapter_meta, entries, _ttl, on_write, opts) do
     action = if on_write == :put_new, do: :put_new_all, else: :put_all
 
-    opts
-    |> levels(levels)
-    |> Enum.reduce_while({true, []}, fn level, {_, level_acc} ->
+    reducer = fn level, {_, level_acc} ->
       case with_dynamic_cache(level, action, [entries, opts]) do
         :ok ->
           {:cont, {true, [level | level_acc]}}
@@ -322,20 +338,30 @@ defmodule Nebulex.Adapters.Multilevel do
           _ = delete_from_levels(level_acc, entries)
           {:halt, {on_write == :put, level_acc}}
       end
+    end
+
+    with_span(adapter_meta, action, fn ->
+      opts
+      |> levels(levels)
+      |> Enum.reduce_while({true, []}, reducer)
+      |> elem(0)
     end)
-    |> elem(0)
   end
 
   @impl true
   def delete(adapter_meta, key, opts) do
-    eval(adapter_meta, :delete, [key, opts], opts)
+    with_span(adapter_meta, :delete, fn ->
+      eval(adapter_meta, :delete, [key, opts], opts)
+    end)
   end
 
   @impl true
-  def take(%{levels: levels}, key, opts) do
-    opts
-    |> levels(levels)
-    |> do_take(nil, key, opts)
+  def take(%{levels: levels} = adapter_meta, key, opts) do
+    with_span(adapter_meta, :take, fn ->
+      opts
+      |> levels(levels)
+      |> do_take(nil, key, opts)
+    end)
   end
 
   defp do_take([], result, _key, _opts), do: result
@@ -352,108 +378,133 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   def has_key?(adapter_meta, key) do
-    eval_while(adapter_meta, :has_key?, [key], false)
-  end
-
-  @impl true
-  def update_counter(adapter_meta, key, amount, _ttl, _default, opts) do
-    eval(adapter_meta, :incr, [key, amount, opts], opts)
-  end
-
-  @impl true
-  def ttl(adapter_meta, key) do
-    eval_while(adapter_meta, :ttl, [key], nil)
-  end
-
-  @impl true
-  def expire(%{levels: levels}, key, ttl) do
-    Enum.reduce(levels, false, fn l_meta, acc ->
-      with_dynamic_cache(l_meta, :expire, [key, ttl]) or acc
+    with_span(adapter_meta, :has_key?, fn ->
+      eval_while(adapter_meta, :has_key?, [key], false)
     end)
   end
 
   @impl true
-  def touch(%{levels: levels}, key) do
-    Enum.reduce(levels, false, fn l_meta, acc ->
-      with_dynamic_cache(l_meta, :touch, [key]) or acc
+  def update_counter(adapter_meta, key, amount, _ttl, _default, opts) do
+    with_span(adapter_meta, :incr, fn ->
+      eval(adapter_meta, :incr, [key, amount, opts], opts)
+    end)
+  end
+
+  @impl true
+  def ttl(adapter_meta, key) do
+    with_span(adapter_meta, :ttl, fn ->
+      eval_while(adapter_meta, :ttl, [key], nil)
+    end)
+  end
+
+  @impl true
+  def expire(%{levels: levels} = adapter_meta, key, ttl) do
+    with_span(adapter_meta, :expire, fn ->
+      Enum.reduce(levels, false, fn l_meta, acc ->
+        with_dynamic_cache(l_meta, :expire, [key, ttl]) or acc
+      end)
+    end)
+  end
+
+  @impl true
+  def touch(%{levels: levels} = adapter_meta, key) do
+    with_span(adapter_meta, :touch, fn ->
+      Enum.reduce(levels, false, fn l_meta, acc ->
+        with_dynamic_cache(l_meta, :touch, [key]) or acc
+      end)
     end)
   end
 
   ## Nebulex.Adapter.Queryable
 
   @impl true
-  def execute(%{levels: levels}, operation, query, opts) do
+  def execute(%{levels: levels} = adapter_meta, operation, query, opts) do
     {reducer, acc_in} =
       case operation do
         :all -> {&(&1 ++ &2), []}
         _ -> {&(&1 + &2), 0}
       end
 
-    Enum.reduce(levels, acc_in, fn level, acc ->
-      level
-      |> with_dynamic_cache(operation, [query, opts])
-      |> reducer.(acc)
+    with_span(adapter_meta, operation, fn ->
+      Enum.reduce(levels, acc_in, fn level, acc ->
+        level
+        |> with_dynamic_cache(operation, [query, opts])
+        |> reducer.(acc)
+      end)
     end)
   end
 
   @impl true
-  def stream(%{levels: levels}, query, opts) do
-    Stream.resource(
-      fn ->
-        levels
-      end,
-      fn
-        [] ->
-          {:halt, []}
+  def stream(%{levels: levels} = adapter_meta, query, opts) do
+    with_span(adapter_meta, :stream, fn ->
+      Stream.resource(
+        fn ->
+          levels
+        end,
+        fn
+          [] ->
+            {:halt, []}
 
-        [level | levels] ->
-          elements =
-            level
-            |> with_dynamic_cache(:stream, [query, opts])
-            |> Enum.to_list()
+          [level | levels] ->
+            elements =
+              level
+              |> with_dynamic_cache(:stream, [query, opts])
+              |> Enum.to_list()
 
-          {elements, levels}
-      end,
-      & &1
-    )
+            {elements, levels}
+        end,
+        & &1
+      )
+    end)
   end
 
   ## Nebulex.Adapter.Transaction
 
   @impl true
   def transaction(%{levels: levels} = adapter_meta, opts, fun) do
-    # Perhaps one of the levels is a distributed adapter,
-    # then ensure the lock on the right cluster nodes.
-    nodes =
-      levels
-      |> Enum.reduce([node()], fn %{name: name, cache: cache}, acc ->
-        if cache.__adapter__ in [Nebulex.Adapters.Partitioned, Nebulex.Adapters.Replicated] do
-          Cluster.get_nodes(name || cache) ++ acc
-        else
-          acc
-        end
-      end)
-      |> Enum.uniq()
+    with_span(adapter_meta, :transaction, fn ->
+      # Perhaps one of the levels is a distributed adapter,
+      # then ensure the lock on the right cluster nodes.
+      nodes =
+        levels
+        |> Enum.reduce([node()], fn %{name: name, cache: cache}, acc ->
+          if cache.__adapter__ in [Nebulex.Adapters.Partitioned, Nebulex.Adapters.Replicated] do
+            Cluster.get_nodes(name || cache) ++ acc
+          else
+            acc
+          end
+        end)
+        |> Enum.uniq()
 
-    super(adapter_meta, Keyword.put(opts, :nodes, nodes), fun)
+      super(adapter_meta, Keyword.put(opts, :nodes, nodes), fun)
+    end)
+  end
+
+  @impl true
+  def in_transaction?(adapter_meta) do
+    with_span(adapter_meta, :in_transaction?, fn ->
+      super(adapter_meta)
+    end)
   end
 
   ## Nebulex.Adapter.Stats
 
   @impl true
   def stats(adapter_meta) do
-    if adapter_meta.stats do
-      init_acc = %Nebulex.Stats{
-        metadata: %{
-          cache: adapter_meta.name || adapter_meta.cache,
-          started_at: adapter_meta.started_at
+    with_span(adapter_meta, :stats, fn ->
+      if adapter_meta.stats do
+        init_acc = %Nebulex.Stats{
+          metadata: %{
+            cache: adapter_meta.name || adapter_meta.cache,
+            started_at: adapter_meta.started_at
+          }
         }
-      }
 
-      adapter_meta.levels
-      |> Enum.with_index(1)
-      |> Enum.reduce(init_acc, &update_stats/2)
-    end
+        adapter_meta.levels
+        |> Enum.with_index(1)
+        |> Enum.reduce(init_acc, &update_stats/2)
+      end
+    end)
   end
 
   # We can safely disable this warning since the atom created dynamically is
