@@ -211,16 +211,13 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   def init(opts) do
-    # Required cache name
+    # Required options
+    telemetry_prefix = Keyword.fetch!(opts, :telemetry_prefix)
     cache = Keyword.fetch!(opts, :cache)
     name = opts[:name] || cache
 
     # Maybe use stats
-    stats = Keyword.get(opts, :stats, false)
-
-    unless is_boolean(stats) do
-      raise ArgumentError, "expected stats: to be boolean, got: #{inspect(stats)}"
-    end
+    stats = get_boolean_option(opts, :stats)
 
     # Get cache levels
     levels =
@@ -238,8 +235,12 @@ defmodule Nebulex.Adapters.Multilevel do
       levels
       |> Enum.reverse()
       |> Enum.reduce({[], []}, fn {l_cache, l_opts}, {child_acc, meta_acc} ->
+        l_opts =
+          l_opts
+          |> Keyword.put(:telemetry_prefix, telemetry_prefix)
+          |> Keyword.put_new(:stats, stats)
+
         meta = %{cache: l_cache, name: l_opts[:name]}
-        l_opts = Keyword.put_new(l_opts, :stats, stats)
         {[{l_cache, l_opts} | child_acc], [meta | meta_acc]}
       end)
 
@@ -251,6 +252,7 @@ defmodule Nebulex.Adapters.Multilevel do
       )
 
     meta = %{
+      telemetry_prefix: telemetry_prefix,
       name: name,
       levels: meta_list,
       model: model,

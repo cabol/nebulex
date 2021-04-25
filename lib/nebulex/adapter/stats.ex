@@ -7,9 +7,9 @@ defmodule Nebulex.Adapter.Stats do
   using [Erlang counters][https://erlang.org/doc/man/counters.html], with all
   callbacks overridable, which is supported by the built-in adapters.
 
-  See `Nebulex.Adapters.Local` for more information about how can be used from
-  the adapter, and also [Nebulex Telemetry Guide][telemetry_guide] to learn how
-  to use the Cache with Telemetry.
+  See `Nebulex.Adapters.Local` for more information about how this can be used
+  from the adapter, and also [Nebulex Telemetry Guide][telemetry_guide] to learn
+  how to use the Cache with Telemetry.
 
   [telemetry_guide]: http://hexdocs.pm/nebulex/telemetry.html
   """
@@ -54,6 +54,8 @@ defmodule Nebulex.Adapter.Stats do
     end
   end
 
+  import Nebulex.Helpers
+
   @doc """
   Initializes the Erlang's counter to be used by the adapter. See the module
   documentation for more information about the stats default implementation.
@@ -73,10 +75,9 @@ defmodule Nebulex.Adapter.Stats do
   """
   @spec init(Keyword.t()) :: :counters.counters_ref() | nil
   def init(opts) do
-    case Keyword.get(opts, :stats, false) do
+    case get_boolean_option(opts, :stats, false) do
       true -> :counters.new(6, [:write_concurrency])
       false -> nil
-      other -> raise ArgumentError, "expected stats: to be boolean, got: #{inspect(other)}"
     end
   end
 

@@ -3,6 +3,8 @@ defmodule Nebulex.Adapter do
   Specifies the minimal API required from adapters.
   """
 
+  alias Nebulex.Telemetry
+
   @type t :: module
 
   @typedoc """
@@ -28,7 +30,7 @@ defmodule Nebulex.Adapter do
   @callback init(config :: Keyword.t()) :: {:ok, :supervisor.child_spec(), adapter_meta}
 
   @doc """
-  RExecutes the function `fun` passing as parameters the adapter and metadata
+  Executes the function `fun` passing as parameters the adapter and metadata
   (from the `c:init/1` callback) associated with the given cache `name_or_pid`.
 
   It expects a name or a PID representing the cache.
@@ -37,5 +39,29 @@ defmodule Nebulex.Adapter do
   def with_meta(name_or_pid, fun) do
     {adapter, adapter_meta} = Nebulex.Cache.Registry.lookup(name_or_pid)
     fun.(adapter, adapter_meta)
+  end
+
+  @doc """
+  Helper function for the adapters so they can execute a cache command
+  given by `fun` with Telemetry span events.
+  """
+  @spec with_span([atom], adapter_meta, atom, fun) :: {term, %{optional(atom) => term}} | term
+  def with_span(event \\ [:command], adapter_meta, action, fun)
+
+  def with_span(_event, %{telemetry_prefix: nil}, _action, fun) do
+    fun.()
+  end
+
+  def with_span(event, adapter_meta, action, fun) do
+    cache = adapter_meta[:name] || adapter_meta.cache
+
+    Telemetry.span(
+      adapter_meta.telemetry_prefix ++ event,
+      %{cache: cache, action: action},
+      fn ->
+        result = fun.()
+        {result, %{cache: cache, action: action, result: result}}
+      end
+    )
   end
 end

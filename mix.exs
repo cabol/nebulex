@@ -40,7 +40,10 @@ defmodule Nebulex.MixProject do
   defp elixirc_paths(_), do: ["lib"]
 
   def application do
-    [mod: {Nebulex.Application, []}]
+    [
+      extra_applications: [:eex],
+      mod: {Nebulex.Application, []}
+    ]
   end
 
   defp deps do

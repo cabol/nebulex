@@ -14,6 +14,10 @@ defmodule Nebulex.Cache.SupervisorTest do
     end
   end
 
+  import Nebulex.CacheCase
+
+  alias Nebulex.TestCache.Cache
+
   test "fails on init because :ignore is returned" do
     assert MyCache.start_link(ignore: true) == :ignore
   end
@@ -70,5 +74,21 @@ defmodule Nebulex.Cache.SupervisorTest do
 
     assert_receive {:EXIT, _pid, ^error}
     assert CustomCache.stop() == :ok
+  end
+
+  test "emits telemetry event upon cache start" do
+    with_telemetry_handler([[:nebulex, :cache, :init]], fn ->
+      {:ok, _} = Cache.start_link(name: :telemetry_test)
+
+      assert_receive {[:nebulex, :cache, :init], _, %{cache: Cache, opts: opts}}
+      assert opts[:telemetry_prefix] == [:nebulex, :test_cache, :cache]
+      assert opts[:name] == :telemetry_test
+    end)
+  end
+
+  ## Helpers
+
+  def handle_event(event, measurements, metadata, %{pid: pid}) do
+    send(pid, {event, measurements, metadata})
   end
 end

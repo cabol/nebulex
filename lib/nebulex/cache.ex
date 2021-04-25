@@ -40,6 +40,17 @@ defmodule Nebulex.Cache do
       implementing `Nebulex.Adapter.Stats` behaviour. See the "Stats" section
       below.
 
+    * `:telemetry_prefix` - It is recommend for adapters to publish events
+      using the `Telemetry` library. By default, the telemetry prefix is based
+      on the module name, so if your module is called `MyApp.Cache`, the prefix
+      will be `[:my_app, :cache]`. See the "Telemetry events" section to see
+      what events recommended for the  adapters to publish.. Note that if you
+      have multiple caches, you should keep the `:telemetry_prefix` consistent
+      for each of them and use the `:cache` and/or `:name` (in case of a named
+      or dynamic cache) properties in the event metadata for distinguishing
+      between caches. If it is set to `nil`, Telemetry events are disabled for
+      that cache.
+
   ## Stats
 
   Stats support depends on the adapter entirely, it should implement the
@@ -60,7 +71,7 @@ defmodule Nebulex.Cache do
 
   See `c:Nebulex.Cache.stats/0` for more information.
 
-  ## Telemetry events
+  ## Dispatching stats via Telemetry
 
   It is possible to emit Telemetry events for the current stats via
   `c:Nebulex.Cache.dispatch_stats/1`, but it has to be called explicitly,
@@ -103,6 +114,131 @@ defmodule Nebulex.Cache do
 
   See [Nebulex Telemetry Guide](http://hexdocs.pm/nebulex/telemetry.html)
   for more information.
+
+  ## Telemetry events
+
+  There are two types of telemetry events, the ones emitted by Nebulex and the
+  adapter specific ones.
+
+  ### Nebulex telemetry events
+
+  The following events are emitted by all Nebulex caches:
+
+    * `[:nebulex, :cache, :init]` - it is dispatched whenever a cache starts.
+      The measurement is a single `system_time` entry in native unit. The
+      metadata is the `:cache` and all initialization options under `:opts`.
+
+  ### Adapter-specific events
+
+  It is recommend the adapters to publish certain `Telemetry` events listed
+  below. Those events will use the `:telemetry_prefix` outlined above which
+  defaults to `[:my_app, :cache]`.
+
+  For instance, to receive all events published by a cache called `MyApp.Cache`,
+  one could define a module:
+
+      defmodule MyApp.Telemetry do
+        def handle_event([:my_app, :cache, :command, event], measurements, metadata, config) do
+          case event do
+            :start ->
+              # Handle start event ...
+
+            :stop ->
+              # Handle stop event ...
+
+            :exception ->
+              # Handle exception event ...
+          end
+        end
+      end
+
+  Then, in the `Application.start/2` callback, attach the handler to this event
+  using a unique handler id:
+
+      :telemetry.attach(
+        "my-app-handler-id",
+        [:my_app, :cache, :command],
+        &MyApp.Telemetry.handle_event/4,
+        %{}
+      )
+
+  See [the telemetry documentation](https://hexdocs.pm/telemetry/)
+  for more information.
+
+  The following are the events you should expect from Nebulex. All examples
+  below consider a cache named `MyApp.Cache`:
+
+  #### `[:my_app, :cache, :command, :start]`
+
+  This event should be invoked on every cache call sent to the adapter before
+  the command logic is executed.
+
+  The `:measurements` map will include the following:
+
+    * `:system_time` - The current system time in native units from calling:
+      `System.system_time()`.
+    * `:count` - A convenience measurement to be able to count the number
+      of cache calls by command. Adapters should add `%{count: 1}` to the
+      measurements.
+
+  A Telemetry `:metadata` map including the following fields. Each cache adapter
+  may emit different information here. For built-in adapters, it will contain:
+
+    * `:action` - An atom indicating the called cache command or action.
+    * `:cache` - The Nebulex cache.
+
+  #### `[:my_app, :cache, :command, :stop]`
+
+  This event should be invoked on every cache call sent to the adapter after
+  the command logic is executed.
+
+  The `:measurements` map will include the following:
+
+    * `:system_time` - The current system time in native units from calling:
+      `System.system_time()`.
+    * `:duration` - The time spent executing the cache command. The measurement
+      is given in the `:native` time unit. You can read more about it in the
+      docs for `System.convert_time_unit/3`.
+    * `:count` - A convenience measurement to be able to count the number
+      of cache calls by command. Adapters should add `%{count: 1}` to the
+      measurements.
+
+  A Telemetry `:metadata` map including the following fields. Each cache adapter
+  may emit different information here. For built-in adapters, it will contain:
+
+    * `:action` - An atom indicating the called cache command or action.
+    * `:cache` - The Nebulex cache.
+    * `:result` - The command result.
+
+  #### `[:my_app, :cache, :command, :exception]`
+
+  This event should be invoked when an error or exception occurs while executing
+  the cache command.
+
+  The `:measurements` map will include the following:
+
+    * `:system_time` - The current system time in native units from calling:
+      `System.system_time()`.
+    * `:duration` - The time spent executing the cache command. The measurement
+      is given in the `:native` time unit. You can read more about it in the
+      docs for `System.convert_time_unit/3`.
+    * `:count` - A convenience measurement to be able to count the number
+      of errors for a cache. Adapters should add `%{count: 1}` to the
+      measurements.
+
+  A Telemetry `:metadata` map including the following fields. Each cache adapter
+  may emit different information here. For built-in adapters, it will contain:
+
+    * `:action` - An atom indicating the called cache command or action.
+    * `:cache` - The Nebulex cache.
+    * `:kind` - The type of the error: `:error`, `:exit`, or `:throw`.
+    * `:reason` - The reason of the error.
+    * `:stacktrace` - The stacktrace.
+
+  **NOTE:** The events outlined above are the recommended for the adapters
+  to dispatch. However, it is highly recommended to review the used adapter
+  documentation to ensure it is fullly compatible with these events, perhaps
+  differences, or perhaps also additional events.
 
   ## Distributed topologies
 

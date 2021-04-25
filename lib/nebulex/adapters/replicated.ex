@@ -145,6 +145,40 @@ defmodule Nebulex.Adapters.Replicated do
 
       MyCache.leave_cluster()
 
+  ## Telemetry events
+
+  This adapter exposes following Telemetry events:
+
+    * `telemetry_prefix ++ [:replication_error]` - Dispatched by the adapter
+      when a replication error occurs due to a write-like operation
+      under-the-hood.
+
+      * Measurement: `%{count: 1}`
+      * Metadata:
+
+        ```
+        %{action: atom,
+          cache: module,
+          error: term,
+          name: atom,
+          node: node
+        }
+        ```
+
+    * `telemetry_prefix ++ [:bootstrap, :failed_nodes]` - Dispatched by the
+      adapter at start time when there are failed nodes while synching up with
+      the cluster nodes.
+
+      * Measurement: `%{count: 1}`
+      * Metadata: `%{cache: module, failed_nodes: [node], name: atom}`
+
+    * `telemetry_prefix ++ [:bootstrap, :remote_error]` - Dispatched by the
+      adapter at start time when a remote node replies with an error while
+      synching up with the cluster nodes.
+
+      * Measurement: `%{count: 1}`
+      * Metadata: `%{cache: module, name: atom, remote_errors: [term]}`
+
   ## Caveats of replicated adapter
 
   As it is explained in the beginning, a replicated topology not only brings
@@ -204,7 +238,7 @@ defmodule Nebulex.Adapters.Replicated do
   import Nebulex.Helpers
 
   alias Nebulex.Cache.Cluster
-  alias Nebulex.RPC
+  alias Nebulex.{RPC, Telemetry}
 
   ## Nebulex.Adapter
 
@@ -254,21 +288,19 @@ defmodule Nebulex.Adapters.Replicated do
 
   @impl true
   def init(opts) do
-    # Required cache name
+    # Required options
+    telemetry_prefix = Keyword.fetch!(opts, :telemetry_prefix)
     cache = Keyword.fetch!(opts, :cache)
     name = opts[:name] || cache
 
     # Maybe use stats
-    stats = Keyword.get(opts, :stats, false)
-
-    unless is_boolean(stats) do
-      raise ArgumentError, "expected stats: to be boolean, got: #{inspect(stats)}"
-    end
+    stats = get_boolean_option(opts, :stats)
 
     # Primary cache options
     primary_opts =
       opts
       |> Keyword.get(:primary, [])
+      |> Keyword.put(:telemetry_prefix, telemetry_prefix)
       |> Keyword.put_new(:stats, stats)
 
     # Maybe put a name to primary storage
@@ -282,12 +314,14 @@ defmodule Nebulex.Adapters.Replicated do
 
     # Prepare metadata
     meta = %{
+      telemetry_prefix: telemetry_prefix,
       name: name,
       primary_name: primary_opts[:name],
       task_sup: task_sup_name,
       stats: stats
     }
 
+    # Prepare child_spec
     child_spec =
       Nebulex.Adapters.Supervisor.child_spec(
         name: normalize_module_name([name, Supervisor]),
@@ -473,12 +507,7 @@ defmodule Nebulex.Adapters.Replicated do
     )
   end
 
-  defp multi_call(
-         %{name: name, task_sup: task_sup} = meta,
-         action,
-         args,
-         opts
-       ) do
+  defp multi_call(%{name: name, task_sup: task_sup} = meta, action, args, opts) do
     task_sup
     |> RPC.multi_call(
       Cluster.get_nodes(name),
@@ -487,18 +516,18 @@ defmodule Nebulex.Adapters.Replicated do
       [meta, action, args],
       opts
     )
-    |> handle_rpc_multi_call(action, meta)
+    |> handle_rpc_multi_call(Map.put(meta, :action, action))
   end
 
-  defp handle_rpc_multi_call({res, []}, _action, _meta), do: hd(res)
-  defp handle_rpc_multi_call({res, {:sanitized, []}}, _action, _meta), do: hd(res)
+  defp handle_rpc_multi_call({res, []}, _meta), do: hd(res)
+  defp handle_rpc_multi_call({res, {:sanitized, []}}, _meta), do: hd(res)
 
-  defp handle_rpc_multi_call({responses, {:sanitized, errors}}, action, _meta) do
+  defp handle_rpc_multi_call({responses, {:sanitized, errors}}, %{action: action}) do
     raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
   end
 
-  defp handle_rpc_multi_call({responses, errors}, action, meta) do
-    handle_rpc_multi_call({responses, {:sanitized, sanitize_errors(errors, meta)}}, action, meta)
+  defp handle_rpc_multi_call({responses, errors}, meta) do
+    handle_rpc_multi_call({responses, {:sanitized, sanitize_errors(errors, meta)}}, meta)
   end
 
   defp sanitize_errors(errors, meta) do
@@ -506,12 +535,12 @@ defmodule Nebulex.Adapters.Replicated do
       {{:error, {:exception, %Nebulex.RegistryLookupError{} = error, _}}, node} ->
         # The cache was not found in the node, maybe it was stopped and
         # "Process Groups" is not updated yet, then ignore the error
-        :ok = log_error(error, node, meta)
+        log_replication_error(meta, %{error: error, node: node})
         false
 
       {{:error, {:erpc, :noconnection}}, node} ->
         # Remote node is down and maybe the "Process Groups" is not updated yet
-        :ok = log_error(:noconnection, node, meta)
+        log_replication_error(meta, %{error: :noconnection, node: node})
         false
 
       _ ->
@@ -519,16 +548,14 @@ defmodule Nebulex.Adapters.Replicated do
     end)
   end
 
-  if Code.ensure_loaded?(:telemetry) do
-    defp log_error(error, node, %{name: name}) do
-      :telemetry.execute(
-        [:nebulex, :adapters, :replicated, :error],
+  defp log_replication_error(meta, ext_meta) do
+    if meta.telemetry_prefix do
+      Telemetry.execute(
+        meta.telemetry_prefix ++ [:replication_error],
         %{count: 1},
-        %{cache: name, error: error, node: node}
+        meta |> Map.take([:cache, :name]) |> Map.merge(ext_meta)
       )
     end
-  else
-    defp log_error(_error, _node, _meta), do: :ok
   end
 end
 
@@ -538,10 +565,9 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
 
   import Nebulex.Helpers
 
-  alias Nebulex.Adapter
+  alias Nebulex.{Adapter, Entry, Telemetry}
   alias Nebulex.Adapters.Replicated
   alias Nebulex.Cache.Cluster
-  alias Nebulex.Entry
 
   # Max retries in intervals of 1 ms (5 seconds).
   # If in 5 seconds the cache has not started, stop the server.
@@ -660,27 +686,23 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
     if cache.__primary__.__adapter__() == Nebulex.Adapters.Local do
       nodes
       |> :rpc.multicall(Replicated, :with_dynamic_cache, [adapter_meta, fun, []])
-      |> handle_multicall()
+      |> handle_multicall(adapter_meta)
     else
       :ok
     end
   end
 
-  defp handle_multicall({_, [_ | _] = failed_nodes}) do
-    raise "sync-up process failed on nodes: #{inspect(failed_nodes)}"
-  end
+  defp handle_multicall({responses, failed_nodes}, adapter_meta) do
+    if length(failed_nodes) > 0 do
+      # Emit Telemetry event for failed nodes
+      log_error(:failed_nodes, adapter_meta, %{failed_nodes: failed_nodes})
+    end
 
-  defp handle_multicall({responses, []}) do
     responses
     |> Enum.split_with(&(&1 == :ok))
     |> elem(1)
-    |> case do
-      [] ->
-        :ok
-
-      errors ->
-        raise Nebulex.RPCMultiCallError, action: :sync_data, errors: errors, responses: responses
-    end
+    # Emit Telemetry event for remote errors
+    |> Enum.each(&log_error(:remote_error, adapter_meta, %{remote_errors: &1}))
   end
 
   defp copy_entries_from_nodes(adapter_meta, nodes) do
@@ -707,6 +729,16 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
     case :rpc.call(node, Kernel, :apply, [stream_fun, []]) do
       {:badrpc, _} -> {:cont, acc}
       entries -> {:halt, entries}
+    end
+  end
+
+  defp log_error(error, adapter_meta, ext_meta) do
+    if adapter_meta.telemetry_prefix do
+      Telemetry.execute(
+        adapter_meta.telemetry ++ [:bootstrap, error],
+        %{count: 1},
+        adapter_meta |> Map.take([:cache, :name]) |> Map.merge(ext_meta)
+      )
     end
   end
 

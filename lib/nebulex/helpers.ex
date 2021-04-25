@@ -5,13 +5,26 @@ defmodule Nebulex.Helpers do
   ## API
 
   @spec get_option(Keyword.t(), atom, String.t(), (any -> boolean), term) :: term
-  def get_option(opts, key, expected, valid?, default \\ nil) do
+  def get_option(opts, key, expected, valid?, default \\ nil)
+      when is_list(opts) and is_atom(key) do
     value = Keyword.get(opts, key, default)
 
     if valid?.(value) do
       value
     else
       raise ArgumentError, "expected #{key}: to be #{expected}, got: #{inspect(value)}"
+    end
+  end
+
+  @spec get_boolean_option(Keyword.t(), atom, boolean) :: term
+  def get_boolean_option(opts, key, default \\ false)
+      when is_list(opts) and is_atom(key) and is_boolean(default) do
+    value = Keyword.get(opts, key, default)
+
+    if is_boolean(value) do
+      value
+    else
+      raise ArgumentError, "expected #{key}: to be boolean, got: #{inspect(value)}"
     end
   end
 

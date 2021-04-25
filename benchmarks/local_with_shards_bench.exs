@@ -1,5 +1,6 @@
 ## Benchmarks
 
+:ok = Application.start(:telemetry)
 Code.require_file("bench_helper.exs", __DIR__)
 
 defmodule Cache do

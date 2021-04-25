@@ -383,6 +383,7 @@ defmodule Nebulex.Adapters.Local do
       )
 
     meta = %{
+      telemetry_prefix: Keyword.fetch!(opts, :telemetry_prefix),
       meta_tab: meta_tab,
       stats_counter: stats_counter,
       backend: backend,
@@ -395,12 +396,12 @@ defmodule Nebulex.Adapters.Local do
   ## Nebulex.Adapter.Entry
 
   @impl true
-  def get(%{meta_tab: meta_tab, backend: backend, stats_counter: ref}, key, _opts) do
-    meta_tab
+  def get(adapter_meta, key, _opts) do
+    adapter_meta.meta_tab
     |> list_gen()
-    |> do_get(key, backend, ref)
+    |> do_get(key, adapter_meta.backend, adapter_meta.stats_counter)
     |> return(:value)
-    |> update_stats(:get, ref)
+    |> update_stats(:get, adapter_meta.stats_counter)
   end
 
   defp do_get([newer], key, backend, ref) do

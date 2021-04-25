@@ -116,4 +116,24 @@ defmodule Nebulex.CacheCase do
       value
     end
   end
+
+  @doc false
+  def with_telemetry_handler(handler_id \\ :nbx_telemetry_test, events, fun) do
+    :ok =
+      :telemetry.attach_many(
+        handler_id,
+        events,
+        &__MODULE__.handle_event/4,
+        %{pid: self()}
+      )
+
+    fun.()
+  after
+    :telemetry.detach(handler_id)
+  end
+
+  @doc false
+  def handle_event(event, measurements, metadata, %{pid: pid}) do
+    send(pid, {event, measurements, metadata})
+  end
 end

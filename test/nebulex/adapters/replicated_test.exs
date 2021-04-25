@@ -138,59 +138,69 @@ defmodule Nebulex.Adapters.ReplicatedTest do
     end
 
     test "ok: start/stop cache nodes" do
-      assert Replicated.nodes() |> :lists.usort() == :lists.usort(cluster_nodes())
+      event = [:nebulex, :test_cache, :replicated, :replication_error]
 
-      assert Replicated.put_all(a: 1, b: 2) == :ok
-      assert Replicated.put(:c, 3, ttl: 5000) == :ok
+      with_telemetry_handler(__MODULE__, [event], fn ->
+        assert Replicated.nodes() |> :lists.usort() == :lists.usort(cluster_nodes())
 
-      assert_for_all_replicas(
-        Replicated,
-        :get_all,
-        [[:a, :b, :c]],
-        %{a: 1, b: 2, c: 3}
-      )
+        assert Replicated.put_all(a: 1, b: 2) == :ok
+        assert Replicated.put(:c, 3, ttl: 5000) == :ok
 
-      # start new cache nodes
-      nodes = [:"node3@127.0.0.1", :"node4@127.0.0.1"]
-      node_pid_list = start_caches(nodes, [{Replicated, [name: @cache_name]}])
-
-      wait_until(fn ->
-        assert Replicated.nodes() |> :lists.usort() == :lists.usort(nodes ++ cluster_nodes())
-      end)
-
-      wait_until(10, 1000, fn ->
         assert_for_all_replicas(
           Replicated,
           :get_all,
           [[:a, :b, :c]],
           %{a: 1, b: 2, c: 3}
         )
-      end)
 
-      # stop cache node
-      :ok = node_pid_list |> hd() |> List.wrap() |> stop_caches()
+        # start new cache nodes
+        nodes = [:"node3@127.0.0.1", :"node4@127.0.0.1"]
+        node_pid_list = start_caches(nodes, [{Replicated, [name: @cache_name]}])
 
-      if Code.ensure_loaded?(:pg) do
-        # errors on failed nodes should be ignored
-        with_mock Nebulex.Cache.Cluster, [:passthrough],
-          get_nodes: fn _ -> [:"node5@127.0.0.1"] ++ nodes end do
-          assert Replicated.put(:foo, :bar) == :ok
+        wait_until(fn ->
+          assert Replicated.nodes() |> :lists.usort() == :lists.usort(nodes ++ cluster_nodes())
+        end)
+
+        wait_until(10, 1000, fn ->
+          assert_for_all_replicas(
+            Replicated,
+            :get_all,
+            [[:a, :b, :c]],
+            %{a: 1, b: 2, c: 3}
+          )
+        end)
+
+        # stop cache node
+        :ok = node_pid_list |> hd() |> List.wrap() |> stop_caches()
+
+        if Code.ensure_loaded?(:pg) do
+          # errors on failed nodes should be ignored
+          with_mock Nebulex.Cache.Cluster, [:passthrough],
+            get_nodes: fn _ -> [:"node5@127.0.0.1"] ++ nodes end do
+            assert Replicated.put(:foo, :bar) == :ok
+
+            assert_receive {^event, %{count: 1}, meta}
+            assert meta[:cache] == Replicated
+            assert meta[:name] == :replicated_cache
+            assert meta[:node] == :"node3@127.0.0.1"
+            assert %Nebulex.RegistryLookupError{} = meta[:error]
+          end
         end
-      end
 
-      wait_until(10, 1000, fn ->
-        assert Replicated.nodes() |> :lists.usort() ==
-                 :lists.usort(cluster_nodes() ++ [:"node4@127.0.0.1"])
+        wait_until(10, 1000, fn ->
+          assert Replicated.nodes() |> :lists.usort() ==
+                   :lists.usort(cluster_nodes() ++ [:"node4@127.0.0.1"])
+        end)
+
+        assert_for_all_replicas(
+          Replicated,
+          :get_all,
+          [[:a, :b, :c]],
+          %{a: 1, b: 2, c: 3}
+        )
+
+        :ok = stop_caches(node_pid_list)
       end)
-
-      assert_for_all_replicas(
-        Replicated,
-        :get_all,
-        [[:a, :b, :c]],
-        %{a: 1, b: 2, c: 3}
-      )
-
-      :ok = stop_caches(node_pid_list)
     end
   end
 

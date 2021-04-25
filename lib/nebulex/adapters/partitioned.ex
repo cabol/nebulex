@@ -288,21 +288,19 @@ defmodule Nebulex.Adapters.Partitioned do
 
   @impl true
   def init(opts) do
-    # Required cache name
+    # Required options
+    telemetry_prefix = Keyword.fetch!(opts, :telemetry_prefix)
     cache = Keyword.fetch!(opts, :cache)
     name = opts[:name] || cache
 
     # Maybe use stats
-    stats = Keyword.get(opts, :stats, false)
-
-    unless is_boolean(stats) do
-      raise ArgumentError, "expected stats: to be boolean, got: #{inspect(stats)}"
-    end
+    stats = get_boolean_option(opts, :stats)
 
     # Primary cache options
     primary_opts =
       opts
       |> Keyword.get(:primary, [])
+      |> Keyword.put(:telemetry_prefix, telemetry_prefix)
       |> Keyword.put_new(:stats, stats)
 
     # Maybe put a name to primary storage
@@ -322,6 +320,7 @@ defmodule Nebulex.Adapters.Partitioned do
 
     # Prepare metadata
     meta = %{
+      telemetry_prefix: telemetry_prefix,
       name: name,
       primary_name: primary_opts[:name],
       task_sup: task_sup_name,
@@ -329,6 +328,7 @@ defmodule Nebulex.Adapters.Partitioned do
       stats: stats
     }
 
+    # Prepare child_spec
     child_spec =
       Nebulex.Adapters.Supervisor.child_spec(
         name: normalize_module_name([name, Supervisor]),
