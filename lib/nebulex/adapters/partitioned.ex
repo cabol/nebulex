@@ -622,11 +622,11 @@ defmodule Nebulex.Adapters.Partitioned do
     Cluster.get_node(name, key, keyslot)
   end
 
-  defp call(adapter_meta, key, fun, args, opts \\ []) do
-    with_span(adapter_meta, fun, fn ->
+  defp call(adapter_meta, key, action, args, opts \\ []) do
+    with_span(adapter_meta, action, fn ->
       adapter_meta
       |> get_node(key)
-      |> rpc_call(adapter_meta, fun, args, opts)
+      |> rpc_call(adapter_meta, action, args, opts)
     end)
   end
 

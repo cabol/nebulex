@@ -96,8 +96,8 @@ defmodule Nebulex.Cache.Supervisor do
   end
 
   # sobelow_skip ["DOS.StringToAtom"]
-  defp telemetry_prefix(repo) do
-    repo
+  defp telemetry_prefix(cache) do
+    cache
     |> Module.split()
     |> Enum.map(&(&1 |> Macro.underscore() |> String.to_atom()))
   end

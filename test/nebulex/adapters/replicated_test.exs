@@ -112,15 +112,24 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   describe "cluster" do
     test "node leaves and then rejoins", %{name: name} do
       cluster = :lists.usort(cluster_nodes())
-      assert Replicated.nodes() == cluster
+
+      wait_until(fn ->
+        assert Replicated.nodes() == cluster
+      end)
 
       Replicated.with_dynamic_cache(name, fn ->
         :ok = Replicated.leave_cluster()
+      end)
+
+      wait_until(fn ->
         assert Replicated.nodes() == cluster -- [node()]
       end)
 
       Replicated.with_dynamic_cache(name, fn ->
         :ok = Replicated.join_cluster()
+      end)
+
+      wait_until(fn ->
         assert Replicated.nodes() == cluster
       end)
     end
@@ -138,7 +147,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
     end
 
     test "ok: start/stop cache nodes" do
-      event = [:nebulex, :test_cache, :replicated, :replication_error]
+      event = [:nebulex, :test_cache, :replicated, :replication]
 
       with_telemetry_handler(__MODULE__, [event], fn ->
         assert Replicated.nodes() |> :lists.usort() == :lists.usort(cluster_nodes())
@@ -179,11 +188,15 @@ defmodule Nebulex.Adapters.ReplicatedTest do
             get_nodes: fn _ -> [:"node5@127.0.0.1"] ++ nodes end do
             assert Replicated.put(:foo, :bar) == :ok
 
-            assert_receive {^event, %{count: 1}, meta}
+            assert_receive {^event, %{rpc_errors: 2}, meta}
             assert meta[:cache] == Replicated
             assert meta[:name] == :replicated_cache
-            assert meta[:node] == :"node3@127.0.0.1"
-            assert %Nebulex.RegistryLookupError{} = meta[:error]
+            assert meta[:action] == :put
+
+            assert [
+                     "node5@127.0.0.1": :noconnection,
+                     "node3@127.0.0.1": %Nebulex.RegistryLookupError{}
+                   ] = meta[:rpc_errors]
           end
         end
 

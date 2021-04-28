@@ -117,10 +117,10 @@ defmodule Nebulex.Cache do
 
   ## Telemetry events
 
-  There are two types of telemetry events, the ones emitted by Nebulex and the
-  adapter specific ones.
+  Similar to Ecto or Phoenix, Nebulex also provides built-in Telemetry events
+  applied to all caches, and cache adapter-specific events.
 
-  ### Nebulex telemetry events
+  ### Nebulex built-in events
 
   The following events are emitted by all Nebulex caches:
 
@@ -177,9 +177,6 @@ defmodule Nebulex.Cache do
 
     * `:system_time` - The current system time in native units from calling:
       `System.system_time()`.
-    * `:count` - A convenience measurement to be able to count the number
-      of cache calls by command. Adapters should add `%{count: 1}` to the
-      measurements.
 
   A Telemetry `:metadata` map including the following fields. Each cache adapter
   may emit different information here. For built-in adapters, it will contain:
@@ -194,14 +191,9 @@ defmodule Nebulex.Cache do
 
   The `:measurements` map will include the following:
 
-    * `:system_time` - The current system time in native units from calling:
-      `System.system_time()`.
     * `:duration` - The time spent executing the cache command. The measurement
       is given in the `:native` time unit. You can read more about it in the
       docs for `System.convert_time_unit/3`.
-    * `:count` - A convenience measurement to be able to count the number
-      of cache calls by command. Adapters should add `%{count: 1}` to the
-      measurements.
 
   A Telemetry `:metadata` map including the following fields. Each cache adapter
   may emit different information here. For built-in adapters, it will contain:
@@ -217,14 +209,9 @@ defmodule Nebulex.Cache do
 
   The `:measurements` map will include the following:
 
-    * `:system_time` - The current system time in native units from calling:
-      `System.system_time()`.
     * `:duration` - The time spent executing the cache command. The measurement
       is given in the `:native` time unit. You can read more about it in the
       docs for `System.convert_time_unit/3`.
-    * `:count` - A convenience measurement to be able to count the number
-      of errors for a cache. Adapters should add `%{count: 1}` to the
-      measurements.
 
   A Telemetry `:metadata` map including the following fields. Each cache adapter
   may emit different information here. For built-in adapters, it will contain:

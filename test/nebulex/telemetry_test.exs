@@ -13,6 +13,11 @@ defmodule Nebulex.TelemetryTest do
   end
 
   describe "span/3" do
+    @event_prefix [:nebulex, :telemetry_test, :cache, :command]
+    @start @event_prefix ++ [:start]
+    @stop @event_prefix ++ [:stop]
+    @exception @event_prefix ++ [:exception]
+
     setup do
       {:ok, pid} = Cache.start_link()
       {adapter, adapter_meta} = Nebulex.Cache.Registry.lookup(pid)
@@ -25,25 +30,18 @@ defmodule Nebulex.TelemetryTest do
       {:ok, adapter: adapter, adapter_meta: adapter_meta}
     end
 
-    @start [:nebulex, :telemetry_test, :cache, :command, :start]
-    @stop [:nebulex, :telemetry_test, :cache, :command, :stop]
-    @exception [:nebulex, :telemetry_test, :cache, :command, :exception]
-
     test "ok: emits start and stop events", %{adapter_meta: adapter_meta} do
       with_telemetry_handler(__MODULE__, [@start, @stop], fn ->
         assert with_span(adapter_meta, :test, fn -> "test" end) == "test"
 
         assert_receive {@start, measurements, metadata}
-        assert measurements[:count] == 1
-        assert measurements[:system_time] > 0
+        assert measurements[:system_time] |> DateTime.from_unix!(:native)
         assert metadata[:action] == :test
         assert metadata[:cache] == Cache
         assert metadata[:telemetry_span_context] |> is_reference()
 
         assert_receive {@stop, measurements, metadata}
-        assert measurements[:count] == 1
         assert measurements[:duration] > 0
-        assert measurements[:system_time] > 0
         assert metadata[:action] == :test
         assert metadata[:cache] == Cache
         assert metadata[:result] == "test"
@@ -60,14 +58,11 @@ defmodule Nebulex.TelemetryTest do
         end)
 
         assert_receive {@start, measurements, metadata}
-        assert measurements[:count] == 1
-        assert measurements[:system_time] > 0
+        assert measurements[:system_time] |> DateTime.from_unix!(:native)
         assert metadata[:telemetry_span_context] == 1
 
         assert_receive {@stop, measurements, metadata}
-        assert measurements[:count] == 1
         assert measurements[:duration] > 0
-        assert measurements[:system_time] > 0
         assert metadata[:telemetry_span_context] == 1
       end)
     end
@@ -79,16 +74,13 @@ defmodule Nebulex.TelemetryTest do
         end
 
         assert_receive {@start, measurements, metadata}
-        assert measurements[:count] == 1
-        assert measurements[:system_time] > 0
+        assert measurements[:system_time] |> DateTime.from_unix!(:native)
         assert metadata[:action] == :test
         assert metadata[:cache] == Cache
         assert metadata[:telemetry_span_context] |> is_reference()
 
         assert_receive {@exception, measurements, metadata}
-        assert measurements[:count] == 1
         assert measurements[:duration] > 0
-        assert measurements[:system_time] > 0
         assert metadata[:action] == :test
         assert metadata[:cache] == Cache
         assert metadata[:kind] == :error
@@ -103,16 +95,13 @@ defmodule Nebulex.TelemetryTest do
         assert catch_exit(with_span(adapter_meta, :test, fn -> exit("test") end)) == "test"
 
         assert_receive {@start, measurements, metadata}
-        assert measurements[:count] == 1
-        assert measurements[:system_time] > 0
+        assert measurements[:system_time] |> DateTime.from_unix!(:native)
         assert metadata[:action] == :test
         assert metadata[:cache] == Cache
         assert metadata[:telemetry_span_context] |> is_reference()
 
         assert_receive {@exception, measurements, metadata}
-        assert measurements[:count] == 1
         assert measurements[:duration] > 0
-        assert measurements[:system_time] > 0
         assert metadata[:action] == :test
         assert metadata[:cache] == Cache
         assert metadata[:kind] == :exit
