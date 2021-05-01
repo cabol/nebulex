@@ -145,7 +145,7 @@ defmodule Nebulex.Adapters.Replicated do
 
       MyCache.leave_cluster()
 
-  ## Telemetry events
+  ## Adapter-specific telemetry events
 
   This adapter exposes following Telemetry events:
 
@@ -158,9 +158,7 @@ defmodule Nebulex.Adapters.Replicated do
 
         ```
         %{
-          action: atom,
-          cache: module,
-          name: atom,
+          adapter_meta: %{optional(atom) => term},
           rpc_errors: [{node, error :: term}]
         }
         ```
@@ -181,8 +179,7 @@ defmodule Nebulex.Adapters.Replicated do
 
         ```
         %{
-          cache: module,
-          name: atom,
+          adapter_meta: %{optional(atom) => term},
           failed_nodes: [node],
           remote_errors: [term]
         }
@@ -300,6 +297,7 @@ defmodule Nebulex.Adapters.Replicated do
   def init(opts) do
     # Required options
     telemetry_prefix = Keyword.fetch!(opts, :telemetry_prefix)
+    telemetry = Keyword.fetch!(opts, :telemetry)
     cache = Keyword.fetch!(opts, :cache)
     name = opts[:name] || cache
 
@@ -308,10 +306,10 @@ defmodule Nebulex.Adapters.Replicated do
 
     # Primary cache options
     primary_opts =
-      opts
-      |> Keyword.get(:primary, [])
-      |> Keyword.put(:telemetry_prefix, telemetry_prefix)
-      |> Keyword.put_new(:stats, stats)
+      Keyword.merge(
+        [telemetry_prefix: telemetry_prefix ++ [:primary], telemetry: telemetry, stats: stats],
+        Keyword.get(opts, :primary, [])
+      )
 
     # Maybe put a name to primary storage
     primary_opts =
@@ -323,8 +321,9 @@ defmodule Nebulex.Adapters.Replicated do
     {task_sup_name, children} = sup_child_spec(name, opts)
 
     # Prepare metadata
-    meta = %{
+    adapter_meta = %{
       telemetry_prefix: telemetry_prefix,
+      telemetry: telemetry,
       name: name,
       primary_name: primary_opts[:name],
       task_sup: task_sup_name,
@@ -338,12 +337,12 @@ defmodule Nebulex.Adapters.Replicated do
         strategy: :rest_for_one,
         children: [
           {cache.__primary__, primary_opts},
-          {__MODULE__.Bootstrap, Map.put(meta, :cache, cache)}
+          {__MODULE__.Bootstrap, Map.put(adapter_meta, :cache, cache)}
           | children
         ]
       )
 
-    {:ok, child_spec, meta}
+    {:ok, child_spec, adapter_meta}
   end
 
   if Code.ensure_loaded?(:erpc) do
@@ -367,35 +366,25 @@ defmodule Nebulex.Adapters.Replicated do
   ## Nebulex.Adapter.Entry
 
   @impl true
-  def get(adapter_meta, key, opts) do
-    with_span(adapter_meta, :get, fn ->
-      with_dynamic_cache(adapter_meta, :get, [key, opts])
-    end)
+  defspan get(adapter_meta, key, opts) do
+    with_dynamic_cache(adapter_meta, :get, [key, opts])
   end
 
   @impl true
-  def get_all(adapter_meta, keys, opts) do
-    with_span(adapter_meta, :get_all, fn ->
-      with_dynamic_cache(adapter_meta, :get_all, [keys, opts])
-    end)
+  defspan get_all(adapter_meta, keys, opts) do
+    with_dynamic_cache(adapter_meta, :get_all, [keys, opts])
   end
 
   @impl true
-  def put(adapter_meta, key, value, _ttl, :put, opts) do
-    :ok = with_transaction(adapter_meta, :put, [key], [key, value, opts], opts)
-    true
-  end
-
-  def put(adapter_meta, key, value, _ttl, :put_new, opts) do
-    with_transaction(adapter_meta, :put_new, [key], [key, value, opts], opts)
-  end
-
-  def put(adapter_meta, key, value, _ttl, :replace, opts) do
-    with_transaction(adapter_meta, :replace, [key], [key, value, opts], opts)
+  defspan put(adapter_meta, key, value, _ttl, on_write, opts) do
+    case with_transaction(adapter_meta, on_write, [key], [key, value, opts], opts) do
+      :ok -> true
+      bool -> bool
+    end
   end
 
   @impl true
-  def put_all(adapter_meta, entries, _ttl, on_write, opts) do
+  defspan put_all(adapter_meta, entries, _ttl, on_write, opts) do
     action = if on_write == :put_new, do: :put_new_all, else: :put_all
     keys = for {k, _} <- entries, do: k
 
@@ -403,49 +392,45 @@ defmodule Nebulex.Adapters.Replicated do
   end
 
   @impl true
-  def delete(adapter_meta, key, opts) do
+  defspan delete(adapter_meta, key, opts) do
     with_transaction(adapter_meta, :delete, [key], [key, opts], opts)
   end
 
   @impl true
-  def take(adapter_meta, key, opts) do
+  defspan take(adapter_meta, key, opts) do
     with_transaction(adapter_meta, :take, [key], [key, opts], opts)
   end
 
   @impl true
-  def update_counter(adapter_meta, key, amount, _ttl, _default, opts) do
+  defspan update_counter(adapter_meta, key, amount, _ttl, _default, opts) do
     with_transaction(adapter_meta, :incr, [key], [key, amount, opts], opts)
   end
 
   @impl true
-  def has_key?(adapter_meta, key) do
+  defspan has_key?(adapter_meta, key) do
     with_dynamic_cache(adapter_meta, :has_key?, [key])
   end
 
   @impl true
-  def ttl(adapter_meta, key) do
-    with_span(adapter_meta, :ttl, fn ->
-      with_dynamic_cache(adapter_meta, :ttl, [key])
-    end)
+  defspan ttl(adapter_meta, key) do
+    with_dynamic_cache(adapter_meta, :ttl, [key])
   end
 
   @impl true
-  def expire(adapter_meta, key, ttl) do
+  defspan expire(adapter_meta, key, ttl) do
     with_transaction(adapter_meta, :expire, [key], [key, ttl])
   end
 
   @impl true
-  def touch(adapter_meta, key) do
+  defspan touch(adapter_meta, key) do
     with_transaction(adapter_meta, :touch, [key], [key])
   end
 
   ## Nebulex.Adapter.Queryable
 
   @impl true
-  def execute(adapter_meta, operation, query, opts) do
-    with_span(adapter_meta, operation, fn ->
-      do_execute(adapter_meta, operation, query, opts)
-    end)
+  defspan execute(adapter_meta, operation, query, opts) do
+    do_execute(adapter_meta, operation, query, opts)
   end
 
   defp do_execute(%{name: name} = adapter_meta, :delete_all, query, opts) do
@@ -466,51 +451,39 @@ defmodule Nebulex.Adapters.Replicated do
   end
 
   @impl true
-  def stream(adapter_meta, query, opts) do
-    with_span(adapter_meta, :stream, fn ->
-      with_dynamic_cache(adapter_meta, :stream, [query, opts])
-    end)
+  defspan stream(adapter_meta, query, opts) do
+    with_dynamic_cache(adapter_meta, :stream, [query, opts])
   end
 
   ## Nebulex.Adapter.Persistence
 
   @impl true
-  def dump(adapter_meta, path, opts) do
-    with_span(adapter_meta, :dump, fn ->
-      super(adapter_meta, path, opts)
-    end)
+  defspan dump(adapter_meta, path, opts) do
+    super(adapter_meta, path, opts)
   end
 
   @impl true
-  def load(adapter_meta, path, opts) do
-    with_span(adapter_meta, :load, fn ->
-      super(adapter_meta, path, opts)
-    end)
+  defspan load(adapter_meta, path, opts) do
+    super(adapter_meta, path, opts)
   end
 
   ## Nebulex.Adapter.Transaction
 
   @impl true
-  def transaction(%{name: name} = adapter_meta, opts, fun) do
-    with_span(adapter_meta, :transaction, fn ->
-      super(adapter_meta, Keyword.put(opts, :nodes, Cluster.get_nodes(name)), fun)
-    end)
+  defspan transaction(adapter_meta, opts, fun) do
+    super(adapter_meta, Keyword.put(opts, :nodes, Cluster.get_nodes(adapter_meta.name)), fun)
   end
 
   @impl true
-  def in_transaction?(adapter_meta) do
-    with_span(adapter_meta, :in_transaction?, fn ->
-      super(adapter_meta)
-    end)
+  defspan in_transaction?(adapter_meta) do
+    super(adapter_meta)
   end
 
   ## Nebulex.Adapter.Stats
 
   @impl true
-  def stats(adapter_meta) do
-    with_span(adapter_meta, :stats, fn ->
-      with_dynamic_cache(adapter_meta, :stats, [])
-    end)
+  defspan stats(adapter_meta) do
+    with_dynamic_cache(adapter_meta, :stats, [])
   end
 
   ## Helpers
@@ -538,23 +511,21 @@ defmodule Nebulex.Adapters.Replicated do
          args,
          opts \\ []
        ) do
-    multi_call = fn -> multi_call(adapter_meta, action, args, opts) end
+    nodes = Cluster.get_nodes(name)
 
-    with_span(adapter_meta, action, fn ->
-      nodes = Cluster.get_nodes(name)
-
-      # Ensure it waits until ongoing delete_all or sync operations finish,
-      # if there's any.
-      :global.trans(
-        {name, pid},
-        fn ->
-          # Write-like operation must be wrapped within a transaction
-          # to ensure proper replication
-          transaction(adapter_meta, [keys: keys, nodes: nodes], multi_call)
-        end,
-        nodes
-      )
-    end)
+    # Ensure it waits until ongoing delete_all or sync operations finish,
+    # if there's any.
+    :global.trans(
+      {name, pid},
+      fn ->
+        # Write-like operation must be wrapped within a transaction
+        # to ensure proper replication
+        transaction(adapter_meta, [keys: keys, nodes: nodes], fn ->
+          multi_call(adapter_meta, action, args, opts)
+        end)
+      end,
+      nodes
+    )
   end
 
   defp multi_call(%{name: name, task_sup: task_sup} = meta, action, args, opts) do
@@ -566,26 +537,23 @@ defmodule Nebulex.Adapters.Replicated do
       [meta, action, args],
       opts
     )
-    |> handle_rpc_multi_call(Map.put(meta, :action, action))
+    |> handle_rpc_multi_call(meta, action)
   end
 
-  defp handle_rpc_multi_call({res, []}, _meta), do: hd(res)
+  defp handle_rpc_multi_call({res, []}, _meta, _action), do: hd(res)
 
-  defp handle_rpc_multi_call({res, {:sanitized, {[], rep_errors}}}, meta) do
-    dispatch_replication_error(meta, rep_errors)
+  defp handle_rpc_multi_call({res, {:sanitized, {[], rpc_errors}}}, meta, action) do
+    _ = dispatch_replication_error(meta, action, rpc_errors)
     hd(res)
   end
 
-  defp handle_rpc_multi_call(
-         {responses, {:sanitized, {errors, rep_errors}}},
-         %{action: action} = meta
-       ) do
-    dispatch_replication_error(meta, rep_errors)
+  defp handle_rpc_multi_call({responses, {:sanitized, {errors, rpc_errors}}}, meta, action) do
+    _ = dispatch_replication_error(meta, action, rpc_errors)
     raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
   end
 
-  defp handle_rpc_multi_call({responses, errors}, meta) do
-    handle_rpc_multi_call({responses, {:sanitized, sanitize_errors(errors)}}, meta)
+  defp handle_rpc_multi_call({responses, errors}, meta, action) do
+    handle_rpc_multi_call({responses, {:sanitized, sanitize_errors(errors)}}, meta, action)
   end
 
   defp sanitize_errors(errors) do
@@ -604,12 +572,12 @@ defmodule Nebulex.Adapters.Replicated do
     end)
   end
 
-  defp dispatch_replication_error(meta, rep_errors) do
-    if meta.telemetry_prefix do
+  defp dispatch_replication_error(adapter_meta, action, rpc_errors) do
+    if adapter_meta.telemetry or Map.get(adapter_meta, :in_span?, false) do
       Telemetry.execute(
-        meta.telemetry_prefix ++ [:replication],
-        %{rpc_errors: length(rep_errors)},
-        meta |> Map.take([:cache, :name, :action]) |> Map.put(:rpc_errors, rep_errors)
+        adapter_meta.telemetry_prefix ++ [:replication],
+        %{rpc_errors: length(rpc_errors)},
+        %{adapter_meta: adapter_meta, function_name: action, rpc_errors: rpc_errors}
       )
     end
   end
@@ -786,11 +754,11 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
   end
 
   defp dispatch_bootstrap_error(adapter_meta, measurements, metadata) do
-    if adapter_meta.telemetry_prefix do
+    if adapter_meta.telemetry or Map.get(adapter_meta, :in_span?, false) do
       Telemetry.execute(
         adapter_meta.telemetry_prefix ++ [:bootstrap],
         measurements,
-        adapter_meta |> Map.take([:cache, :name]) |> Map.merge(metadata)
+        Map.put(metadata, :adapter_meta, adapter_meta)
       )
     end
   end

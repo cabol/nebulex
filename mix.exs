@@ -55,18 +55,18 @@ defmodule Nebulex.MixProject do
       # Test & Code Analysis
       {:ex2ms, "~> 1.6", only: :test},
       {:mock, "~> 0.3", only: :test},
-      {:excoveralls, "~> 0.13", only: :test},
+      {:excoveralls, "~> 0.14", only: :test},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.1", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.11", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 0.5", only: [:dev, :test]},
 
       # Benchmark Test
-      {:benchee, "~> 1.0", only: :test},
-      {:benchee_html, "~> 1.0", only: :test},
+      {:benchee, "~> 1.0", only: [:dev, :test]},
+      {:benchee_html, "~> 1.0", only: [:dev, :test]},
 
       # Docs
-      {:ex_doc, "~> 0.23", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.24", only: [:dev, :test], runtime: false},
       {:inch_ex, "~> 2.0", only: :docs}
     ]
   end

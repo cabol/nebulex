@@ -35,11 +35,6 @@ defmodule Nebulex.Cache do
 
     * `:name` - The name of the Cache supervisor process.
 
-    * `:stats` - Boolean to define whether or not the cache will provide stats.
-      Defaults to `false`. Each adapter is responsible for providing stats by
-      implementing `Nebulex.Adapter.Stats` behaviour. See the "Stats" section
-      below.
-
     * `:telemetry_prefix` - It is recommend for adapters to publish events
       using the `Telemetry` library. By default, the telemetry prefix is based
       on the module name, so if your module is called `MyApp.Cache`, the prefix
@@ -48,72 +43,15 @@ defmodule Nebulex.Cache do
       have multiple caches, you should keep the `:telemetry_prefix` consistent
       for each of them and use the `:cache` and/or `:name` (in case of a named
       or dynamic cache) properties in the event metadata for distinguishing
-      between caches. If it is set to `nil`, Telemetry events are disabled for
-      that cache.
+      between caches.
 
-  ## Stats
+    * `:telemetry` - An optional flag to tell the adapters whether Telemetry
+      events should be emitted or not. Defaults to `true`.
 
-  Stats support depends on the adapter entirely, it should implement the
-  optional behaviour `Nebulex.Adapter.Stats` to support so. Nevertheless,
-  the behaviour `Nebulex.Adapter.Stats` brings with a default implementation
-  using [Erlang counters][https://erlang.org/doc/man/counters.html], which is
-  used by the local built-in adapter (`Nebulex.Adapters.Local`).
-
-  To use stats it is a matter to set the option `:stats` to `true` into the
-  Cache options. For example, you can do it in the configuration file:
-
-      config :my_app, MyApp.Cache,
-        stats: true,
-        ...
-
-  > Remember to check if the underlying adapter implements the
-    `Nebulex.Adapter.Stats` behaviour.
-
-  See `c:Nebulex.Cache.stats/0` for more information.
-
-  ## Dispatching stats via Telemetry
-
-  It is possible to emit Telemetry events for the current stats via
-  `c:Nebulex.Cache.dispatch_stats/1`, but it has to be called explicitly,
-  Nebulex does not emit Telemetry events on its own. But it is pretty easy
-  to emit this event using [`:telemetry_poller`][telemetry_poller].
-
-  [telemetry_poller]: https://github.com/beam-telemetry/telemetry_poller
-
-  For example, we can define a custom pollable measurement:
-
-      :telemetry_poller.start_link(
-        measurements: [
-          {MyApp.Cache, :dispatch_stats, []},
-        ],
-        # configure sampling period - default is :timer.seconds(5)
-        period: :timer.seconds(30),
-        name: :my_cache_stats_poller
-      )
-
-  Or you can also start the `:telemetry_poller` process along with your
-  application supervision tree, like so:
-
-      def start(_type, _args) do
-        my_cache_stats_poller_opts = [
-          measurements: [
-            {MyApp.Cache, :dispatch_stats, []},
-          ],
-          period: :timer.seconds(30),
-          name: :my_cache_stats_poller
-        ]
-
-        children = [
-          {MyApp.Cache, []},
-          {:telemetry_poller, my_cache_stats_poller_opts}
-        ]
-
-        opts = [strategy: :one_for_one, name: MyApp.Supervisor]
-        Supervisor.start_link(children, opts)
-      end
-
-  See [Nebulex Telemetry Guide](http://hexdocs.pm/nebulex/telemetry.html)
-  for more information.
+    * `:stats` - Boolean to define whether or not the cache will provide stats.
+      Defaults to `false`. Each adapter is responsible for providing stats by
+      implementing `Nebulex.Adapter.Stats` behaviour. See the "Stats" section
+      below.
 
   ## Telemetry events
 
@@ -181,8 +119,11 @@ defmodule Nebulex.Cache do
   A Telemetry `:metadata` map including the following fields. Each cache adapter
   may emit different information here. For built-in adapters, it will contain:
 
-    * `:action` - An atom indicating the called cache command or action.
-    * `:cache` - The Nebulex cache.
+    * `:adapter_meta` - The adapter metadata.
+    * `:function_name` - The name of the invoked adapter function.
+    * `:args` - The arguments of the invoked adapter function, omitting the
+      first argument, since it is the adapter metadata already included into
+      the event's metadata.
 
   #### `[:my_app, :cache, :command, :stop]`
 
@@ -198,8 +139,11 @@ defmodule Nebulex.Cache do
   A Telemetry `:metadata` map including the following fields. Each cache adapter
   may emit different information here. For built-in adapters, it will contain:
 
-    * `:action` - An atom indicating the called cache command or action.
-    * `:cache` - The Nebulex cache.
+    * `:adapter_meta` - The adapter metadata.
+    * `:function_name` - The name of the invoked adapter function.
+    * `:args` - The arguments of the invoked adapter function, omitting the
+      first argument, since it is the adapter metadata already included into
+      the event's metadata.
     * `:result` - The command result.
 
   #### `[:my_app, :cache, :command, :exception]`
@@ -216,8 +160,11 @@ defmodule Nebulex.Cache do
   A Telemetry `:metadata` map including the following fields. Each cache adapter
   may emit different information here. For built-in adapters, it will contain:
 
-    * `:action` - An atom indicating the called cache command or action.
-    * `:cache` - The Nebulex cache.
+    * `:adapter_meta` - The adapter metadata.
+    * `:function_name` - The name of the invoked adapter function.
+    * `:args` - The arguments of the invoked adapter function, omitting the
+      first argument, since it is the adapter metadata already included into
+      the event's metadata.
     * `:kind` - The type of the error: `:error`, `:exit`, or `:throw`.
     * `:reason` - The reason of the error.
     * `:stacktrace` - The stacktrace.
@@ -226,6 +173,72 @@ defmodule Nebulex.Cache do
   to dispatch. However, it is highly recommended to review the used adapter
   documentation to ensure it is fullly compatible with these events, perhaps
   differences, or perhaps also additional events.
+
+  ## Stats
+
+  Stats are provided by the adapters by implementing the optional behaviour
+  `Nebulex.Adapter.Stats`. This behaviour exposes a callback to return the
+  current cache stats.  Nevertheless, the behaviour brings with a default
+  implementation using [Erlang counters][counters], which is used by the
+  local built-in adapter (`Nebulex.Adapters.Local`).
+
+  [counters]: https://erlang.org/doc/man/counters.html
+
+  One can enable the stats by setting the option `:stats` to `true`.
+  For example, in the configuration file:
+
+      config :my_app, MyApp.Cache,
+        stats: true,
+        ...
+
+  > Remember to check if the underlying adapter implements the
+    `Nebulex.Adapter.Stats` behaviour.
+
+  See `c:Nebulex.Cache.stats/0` for more information.
+
+  ## Dispatching stats via Telemetry
+
+  It is possible to emit Telemetry events for the current stats via
+  `c:Nebulex.Cache.dispatch_stats/1`, but it has to be invoked explicitly;
+  Nebulex does not emit this Telemetry event automatically. But it is very
+  easy to emit this event using [`:telemetry_poller`][telemetry_poller].
+
+  [telemetry_poller]: https://github.com/beam-telemetry/telemetry_poller
+
+  For example, one can define a custom pollable measurement:
+
+      :telemetry_poller.start_link(
+        measurements: [
+          {MyApp.Cache, :dispatch_stats, []},
+        ],
+        # configure sampling period - default is :timer.seconds(5)
+        period: :timer.seconds(30),
+        name: :my_cache_stats_poller
+      )
+
+  Or you can also start the `:telemetry_poller` process along with your
+  application supervision tree:
+
+      def start(_type, _args) do
+        my_cache_stats_poller_opts = [
+          measurements: [
+            {MyApp.Cache, :dispatch_stats, []},
+          ],
+          period: :timer.seconds(30),
+          name: :my_cache_stats_poller
+        ]
+
+        children = [
+          {MyApp.Cache, []},
+          {:telemetry_poller, my_cache_stats_poller_opts}
+        ]
+
+        opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+        Supervisor.start_link(children, opts)
+      end
+
+  See [Nebulex Telemetry Guide](http://hexdocs.pm/nebulex/telemetry.html)
+  for more information.
 
   ## Distributed topologies
 

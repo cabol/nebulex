@@ -48,12 +48,12 @@ makes all its dependencies as optional. For example:
     [declarative annotation-based caching via decorators][nbx_caching],
     you have to add `:decorator` to the dependency list.
 
-  * For enabling Telemetry events dispatched when using Nebulex stats you have
-    to add `:telemetry` to the dependency list.
+  * For enabling Telemetry events to be dispatched when using Nebulex,
+    you have to add `:telemetry` to the dependency list.
     See [telemetry guide][telemetry].
 
-  * If you are using an adapter different than the built-in ones (e.g: Cachex
-    or Redis adapter), you have to add the adapter dependency too.
+  * If you want to use an external adapter (e.g: Cachex or Redis adapter), you
+    have to add the adapter dependency too.
 
 [nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
 [telemetry]: http://hexdocs.pm/nebulex/telemetry.html
@@ -153,6 +153,12 @@ the cache at all!
 
 We've now configured our application so that it's able to execute commands
 against our cache.
+
+**IMPORTANT:** Make sure the cache is put in first place within the children
+list, or at least before the process or processes using it. Otherwise, there
+could be race conditions causing `Nebulex.RegistryLookupError` errors;
+processes attempting to use the cache and this one hasn't been even
+started.
 
 ## Inserting entries
 

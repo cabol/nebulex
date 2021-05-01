@@ -189,9 +189,9 @@ defmodule Nebulex.Adapters.ReplicatedTest do
             assert Replicated.put(:foo, :bar) == :ok
 
             assert_receive {^event, %{rpc_errors: 2}, meta}
-            assert meta[:cache] == Replicated
-            assert meta[:name] == :replicated_cache
-            assert meta[:action] == :put
+            assert meta[:adapter_meta][:cache] == Replicated
+            assert meta[:adapter_meta][:name] == :replicated_cache
+            assert meta[:function_name] == :put
 
             assert [
                      "node5@127.0.0.1": :noconnection,

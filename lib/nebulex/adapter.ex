@@ -5,7 +5,11 @@ defmodule Nebulex.Adapter do
 
   alias Nebulex.Telemetry
 
+  @typedoc "Adapter"
   @type t :: module
+
+  @typedoc "Metadata type"
+  @type metadata :: %{optional(atom) => term}
 
   @typedoc """
   The metadata returned by the adapter `c:init/1`.
@@ -17,7 +21,7 @@ defmodule Nebulex.Adapter do
     * `:pid` - The PID returned by the child spec returned in `c:init/1`
 
   """
-  @type adapter_meta :: %{optional(atom) => term}
+  @type adapter_meta :: metadata
 
   @doc """
   The callback invoked in case the adapter needs to inject code.
@@ -41,27 +45,75 @@ defmodule Nebulex.Adapter do
     fun.(adapter, adapter_meta)
   end
 
+  # FIXME: ExCoveralls does not mark most of this section as covered
+  # coveralls-ignore-start
+
   @doc """
-  Helper function for the adapters so they can execute a cache command
-  given by `fun` with Telemetry span events.
+  Helper macro for the adapters so they can add the logic for emitting the
+  recommended Telemetry events.
+
+  See the built-in adapters for more information on how to use this macro.
   """
-  @spec with_span(adapter_meta, atom, fun) :: {term, %{optional(atom) => term}} | term
-  def with_span(adapter_meta, action, fun)
+  defmacro defspan(fun, opts \\ [], do: block) do
+    {name, [adapter_meta | args_tl], as, [_ | as_args_tl] = as_args} = build_defspan(fun, opts)
 
-  def with_span(%{telemetry_prefix: nil}, _action, fun) do
-    fun.()
-  end
+    quote do
+      def unquote(name)(unquote_splicing(as_args))
 
-  def with_span(adapter_meta, action, fun) do
-    cache = adapter_meta[:name] || adapter_meta.cache
-
-    Telemetry.span(
-      adapter_meta.telemetry_prefix ++ [:command],
-      %{cache: cache, action: action},
-      fn ->
-        result = fun.()
-        {result, %{cache: cache, action: action, result: result}}
+      def unquote(name)(%{telemetry: false} = unquote(adapter_meta), unquote_splicing(args_tl)) do
+        unquote(block)
       end
-    )
+
+      def unquote(name)(unquote_splicing(as_args)) do
+        metadata = %{
+          adapter_meta: unquote(adapter_meta),
+          function_name: unquote(as),
+          args: unquote(as_args_tl)
+        }
+
+        Telemetry.span(
+          unquote(adapter_meta).telemetry_prefix ++ [:command],
+          metadata,
+          fn ->
+            result =
+              unquote(name)(
+                Map.merge(unquote(adapter_meta), %{telemetry: false, in_span?: true}),
+                unquote_splicing(as_args_tl)
+              )
+
+            {result, Map.put(metadata, :result, result)}
+          end
+        )
+      end
+    end
   end
+
+  ## Private Functions
+
+  defp build_defspan(fun, opts) when is_list(opts) do
+    {name, args} =
+      case Macro.decompose_call(fun) do
+        {_, _} = pair -> pair
+        _ -> raise ArgumentError, "invalid syntax in defspan #{Macro.to_string(fun)}"
+      end
+
+    as = Keyword.get(opts, :as, name)
+    as_args = build_as_args(args)
+
+    {name, args, as, as_args}
+  end
+
+  defp build_as_args(args) do
+    for {arg, idx} <- Enum.with_index(args) do
+      arg
+      |> Macro.to_string()
+      |> build_as_arg({arg, idx})
+    end
+  end
+
+  # sobelow_skip ["DOS.BinToAtom"]
+  defp build_as_arg("_" <> _, {{_e1, e2, e3}, idx}), do: {:"var#{idx}", e2, e3}
+  defp build_as_arg(_, {arg, _idx}), do: arg
+
+  # coveralls-ignore-stop
 end

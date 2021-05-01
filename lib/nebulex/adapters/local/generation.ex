@@ -51,6 +51,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   # State
   defstruct [
     :cache,
+    :telemetry,
     :telemetry_prefix,
     :meta_tab,
     :backend,

@@ -11,7 +11,7 @@ defmodule Cache do
 end
 
 # start local cache
-{:ok, local} = Cache.start_link()
+{:ok, local} = Cache.start_link(telemetry: false)
 
 Cache
 |> BenchHelper.benchmarks()

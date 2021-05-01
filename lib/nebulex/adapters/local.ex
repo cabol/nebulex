@@ -226,7 +226,12 @@ defmodule Nebulex.Adapters.Local do
   ## Stats
 
   This adapter does support stats by using the default implementation
-  provided by `Nebulex.Adapter.Stats`.
+  provided by `Nebulex.Adapter.Stats`. The adapter also uses the
+  `Nebulex.Telemetry.StatsHandler` to aggregate the stats and keep
+  them updated. Therefore, it requires the Telemetry events are emitted
+  by the adapter (the `:telemetry` option should not be set to `false`
+  so the Telemetry events can be dispatched), otherwise, stats won't
+  work properly.
 
   ## Queryable API
 
@@ -305,7 +310,8 @@ defmodule Nebulex.Adapters.Local do
 
   alias Nebulex.Adapter.Stats
   alias Nebulex.Adapters.Local.{Backend, Generation, Metadata}
-  alias Nebulex.{Entry, Time}
+  alias Nebulex.{Entry, Telemetry, Time}
+  alias Nebulex.Telemetry.StatsHandler
 
   # Cache Entry
   defrecord(:entry,
@@ -360,6 +366,7 @@ defmodule Nebulex.Adapters.Local do
   def init(opts) do
     # Required options
     cache = Keyword.fetch!(opts, :cache)
+    telemetry = Keyword.fetch!(opts, :telemetry)
     telemetry_prefix = Keyword.fetch!(opts, :telemetry_prefix)
 
     # Init internal metadata table
@@ -381,8 +388,10 @@ defmodule Nebulex.Adapters.Local do
                   "#{inspect(@backends)}, got: #{inspect(val)}"
       end
 
+    # Build adapter metadata
     adapter_meta = %{
       cache: cache,
+      telemetry: telemetry,
       telemetry_prefix: telemetry_prefix,
       meta_tab: meta_tab,
       stats_counter: stats_counter,
@@ -390,50 +399,64 @@ defmodule Nebulex.Adapters.Local do
       started_at: DateTime.utc_now()
     }
 
+    # Build adapter child_spec
     child_spec = Backend.child_spec(backend, [adapter_meta: adapter_meta] ++ opts)
 
+    # Maybe attach Telemetry stats handler
+    _ = attach_telemetry_stats_handler(adapter_meta)
+
     {:ok, child_spec, adapter_meta}
+  end
+
+  defp attach_telemetry_stats_handler(%{stats_counter: nil, cache: cache}) do
+    Telemetry.detach("#{cache}.Handler")
+  end
+
+  defp attach_telemetry_stats_handler(adapter_meta) do
+    Telemetry.attach_many(
+      "#{adapter_meta.cache}.Handler",
+      [adapter_meta.telemetry_prefix ++ [:command, :stop]],
+      &StatsHandler.handle_event/4,
+      %{}
+    )
   end
 
   ## Nebulex.Adapter.Entry
 
   @impl true
   def get(adapter_meta, key, _opts) do
-    with_span(adapter_meta, :get, fn ->
-      adapter_meta.meta_tab
-      |> list_gen()
-      |> do_get(key, adapter_meta.backend, adapter_meta.stats_counter)
-      |> return(:value)
-      |> update_stats(:get, adapter_meta.stats_counter)
-    end)
+    adapter_meta
+    |> get_(key)
+    |> handle_expired()
   end
 
-  defp do_get([newer], key, backend, ref) do
-    gen_fetch(newer, key, backend, ref)
+  defspan get_(adapter_meta, key), as: :get do
+    adapter_meta.meta_tab
+    |> list_gen()
+    |> do_get(key, adapter_meta.backend)
+    |> return(:value)
   end
 
-  defp do_get([newer, older], key, backend, ref) do
-    with nil <- gen_fetch(newer, key, backend, ref),
-         entry(key: ^key) = cached <- gen_fetch(older, key, backend, ref, &pop_entry/4) do
+  defp do_get([newer], key, backend) do
+    gen_fetch(newer, key, backend)
+  end
+
+  defp do_get([newer, older], key, backend) do
+    with nil <- gen_fetch(newer, key, backend),
+         entry(key: ^key) = cached <- gen_fetch(older, key, backend, &pop_entry/4) do
       true = backend.insert(newer, cached)
       cached
     end
   end
 
-  defp gen_fetch(gen, key, backend, ref, fun \\ &get_entry/4) do
+  defp gen_fetch(gen, key, backend, fun \\ &get_entry/4) do
     gen
     |> fun.(key, nil, backend)
-    |> validate_ttl(gen, backend, ref)
+    |> validate_ttl(gen, backend)
   end
 
   @impl true
-  def get_all(adapter_meta, keys, _opts) do
-    with_span(adapter_meta, :get_all, fn ->
-      do_get_all(adapter_meta, keys)
-    end)
-  end
-
-  defp do_get_all(adapter_meta, keys) do
+  defspan get_all(adapter_meta, keys, _opts) do
     Enum.reduce(keys, %{}, fn key, acc ->
       if obj = get(adapter_meta, key, []),
         do: Map.put(acc, key, obj),
@@ -442,153 +465,118 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def put(adapter_meta, key, value, ttl, on_write, _opts) do
-    with_span(adapter_meta, on_write, fn ->
-      do_put(
-        on_write,
-        adapter_meta.meta_tab,
-        adapter_meta.backend,
-        adapter_meta.stats_counter,
-        entry(
-          key: key,
-          value: value,
-          touched: Time.now(),
-          ttl: ttl
-        )
+  defspan put(adapter_meta, key, value, ttl, on_write, _opts) do
+    do_put(
+      on_write,
+      adapter_meta.meta_tab,
+      adapter_meta.backend,
+      entry(
+        key: key,
+        value: value,
+        touched: Time.now(),
+        ttl: ttl
       )
-    end)
+    )
   end
 
-  defp do_put(:put, meta_tab, backend, ref, entry) do
-    meta_tab
-    |> put_entries(backend, entry)
-    |> update_stats(:put, ref)
+  defp do_put(:put, meta_tab, backend, entry) do
+    put_entries(meta_tab, backend, entry)
   end
 
-  defp do_put(:put_new, meta_tab, backend, ref, entry) do
-    meta_tab
-    |> put_new_entries(backend, entry)
-    |> update_stats(:put, ref)
+  defp do_put(:put_new, meta_tab, backend, entry) do
+    put_new_entries(meta_tab, backend, entry)
   end
 
-  defp do_put(:replace, meta_tab, backend, ref, entry(key: key, value: value, ttl: ttl)) do
-    meta_tab
-    |> update_entry(backend, key, [{3, value}, {4, nil}, {5, ttl}])
-    |> update_stats(:update, ref)
+  defp do_put(:replace, meta_tab, backend, entry(key: key, value: value, ttl: ttl)) do
+    update_entry(meta_tab, backend, key, [{3, value}, {4, nil}, {5, ttl}])
   end
 
   @impl true
-  def put_all(adapter_meta, entries, ttl, on_write, _opts) do
-    action =
-      case on_write do
-        :put -> :put_all
-        :put_new -> :put_new_all
+  defspan put_all(adapter_meta, entries, ttl, on_write, _opts) do
+    entries =
+      for {key, value} <- entries, value != nil do
+        entry(key: key, value: value, touched: Time.now(), ttl: ttl)
       end
 
-    with_span(adapter_meta, action, fn ->
-      touched = Time.now()
-
-      entries =
-        for {key, value} <- entries, value != nil do
-          entry(key: key, value: value, touched: touched, ttl: ttl)
-        end
-
-      do_put_all(
-        on_write,
-        adapter_meta.meta_tab,
-        adapter_meta.backend,
-        adapter_meta.stats_counter,
-        entries
-      )
-    end)
+    do_put_all(
+      on_write,
+      adapter_meta.meta_tab,
+      adapter_meta.backend,
+      entries
+    )
   end
 
-  defp do_put_all(:put, meta_tab, backend, ref, entries) do
-    meta_tab
-    |> put_entries(backend, entries)
-    |> update_stats(:put_all, {ref, entries})
+  defp do_put_all(:put, meta_tab, backend, entries) do
+    put_entries(meta_tab, backend, entries)
   end
 
-  defp do_put_all(:put_new, meta_tab, backend, ref, entries) do
-    meta_tab
-    |> put_new_entries(backend, entries)
-    |> update_stats(:put_all, {ref, entries})
+  defp do_put_all(:put_new, meta_tab, backend, entries) do
+    put_new_entries(meta_tab, backend, entries)
   end
 
   @impl true
-  def delete(adapter_meta, key, _opts) do
-    with_span(adapter_meta, :delete, fn ->
-      adapter_meta.meta_tab
-      |> list_gen()
-      |> Enum.each(&adapter_meta.backend.delete(&1, key))
-      |> update_stats(:delete, adapter_meta.stats_counter)
-    end)
+  defspan delete(adapter_meta, key, _opts) do
+    adapter_meta.meta_tab
+    |> list_gen()
+    |> Enum.each(&adapter_meta.backend.delete(&1, key))
   end
 
   @impl true
-  def take(adapter_meta, key, opts) do
-    with_span(adapter_meta, :take, fn ->
-      do_take(adapter_meta, key, opts)
-    end)
+  def take(adapter_meta, key, _opts) do
+    adapter_meta
+    |> take_(key)
+    |> handle_expired()
   end
 
-  defp do_take(%{backend: backend, stats_counter: ref} = adapter_meta, key, _opts) do
+  defspan take_(adapter_meta, key), as: :take do
     adapter_meta.meta_tab
     |> list_gen()
     |> Enum.reduce_while(nil, fn gen, acc ->
-      case pop_entry(gen, key, nil, backend) do
+      case pop_entry(gen, key, nil, adapter_meta.backend) do
         nil ->
           {:cont, acc}
 
         res ->
           value =
             res
-            |> validate_ttl(gen, backend, ref)
+            |> validate_ttl(gen, adapter_meta.backend)
             |> return(:value)
 
           {:halt, value}
       end
     end)
-    |> update_stats(:take, ref)
   end
 
   @impl true
-  def update_counter(adapter_meta, key, amount, ttl, default, _opts) do
-    with_span(adapter_meta, :incr, fn ->
-      adapter_meta.meta_tab
-      |> newer_gen()
-      |> adapter_meta.backend.update_counter(
-        key,
-        {3, amount},
-        entry(key: key, value: default, touched: Time.now(), ttl: ttl)
-      )
-      |> update_stats({:update, amount, default}, adapter_meta.stats_counter)
-    end)
+  defspan update_counter(adapter_meta, key, amount, ttl, default, _opts) do
+    adapter_meta.meta_tab
+    |> newer_gen()
+    |> adapter_meta.backend.update_counter(
+      key,
+      {3, amount},
+      entry(key: key, value: default, touched: Time.now(), ttl: ttl)
+    )
   end
 
   @impl true
   def has_key?(adapter_meta, key) do
-    with_span(adapter_meta, :has_key?, fn ->
-      case get(adapter_meta, key, []) do
-        nil -> false
-        _ -> true
-      end
-    end)
+    case get(adapter_meta, key, []) do
+      nil -> false
+      _ -> true
+    end
   end
 
   @impl true
-  def ttl(%{stats_counter: stats_counter} = adapter_meta, key) do
-    with_span(adapter_meta, :ttl, fn ->
-      adapter_meta.meta_tab
-      |> list_gen()
-      |> do_get(key, adapter_meta.backend, stats_counter)
-      |> return()
-      |> entry_ttl()
-      |> update_stats(:get, stats_counter)
-    end)
+  defspan ttl(adapter_meta, key) do
+    adapter_meta.meta_tab
+    |> list_gen()
+    |> do_get(key, adapter_meta.backend)
+    |> return()
+    |> entry_ttl()
   end
 
   defp entry_ttl(nil), do: nil
+  defp entry_ttl(:"$expired"), do: nil
   defp entry_ttl(entry(ttl: :infinity)), do: :infinity
 
   defp entry_ttl(entry(ttl: ttl, touched: touched)) do
@@ -600,30 +588,20 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def expire(adapter_meta, key, ttl) do
-    with_span(adapter_meta, :expire, fn ->
-      adapter_meta.meta_tab
-      |> update_entry(adapter_meta.backend, key, [{4, Time.now()}, {5, ttl}])
-      |> update_stats(:update, adapter_meta.stats_counter)
-    end)
+  defspan expire(adapter_meta, key, ttl) do
+    update_entry(adapter_meta.meta_tab, adapter_meta.backend, key, [{4, Time.now()}, {5, ttl}])
   end
 
   @impl true
-  def touch(adapter_meta, key) do
-    with_span(adapter_meta, :touch, fn ->
-      adapter_meta.meta_tab
-      |> update_entry(adapter_meta.backend, key, [{4, Time.now()}])
-      |> update_stats(:update, adapter_meta.stats_counter)
-    end)
+  defspan touch(adapter_meta, key) do
+    update_entry(adapter_meta.meta_tab, adapter_meta.backend, key, [{4, Time.now()}])
   end
 
   ## Nebulex.Adapter.Queryable
 
   @impl true
-  def execute(adapter_meta, operation, query, opts) do
-    with_span(adapter_meta, operation, fn ->
-      do_execute(adapter_meta, operation, query, opts)
-    end)
+  defspan execute(adapter_meta, operation, query, opts) do
+    do_execute(adapter_meta, operation, query, opts)
   end
 
   defp do_execute(%{meta_tab: meta_tab, backend: backend}, :count_all, nil, _opts) do
@@ -636,10 +614,8 @@ defmodule Nebulex.Adapters.Local do
     end)
   end
 
-  defp do_execute(%{meta_tab: meta_tab, stats_counter: ref}, :delete_all, nil, _opts) do
-    meta_tab
-    |> Generation.delete_all()
-    |> update_stats(:delete_all, ref)
+  defp do_execute(%{meta_tab: meta_tab}, :delete_all, nil, _opts) do
+    Generation.delete_all(meta_tab)
   end
 
   defp do_execute(%{meta_tab: meta_tab, backend: backend}, operation, query, opts) do
@@ -661,12 +637,10 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def stream(adapter_meta, query, opts) do
-    with_span(adapter_meta, :stream, fn ->
-      query
-      |> validate_match_spec(opts)
-      |> do_stream(adapter_meta, Keyword.get(opts, :page_size, 20))
-    end)
+  defspan stream(adapter_meta, query, opts) do
+    query
+    |> validate_match_spec(opts)
+    |> do_stream(adapter_meta, Keyword.get(opts, :page_size, 20))
   end
 
   defp do_stream(match_spec, %{meta_tab: meta_tab, backend: backend}, page_size) do
@@ -698,44 +672,34 @@ defmodule Nebulex.Adapters.Local do
   ## Nebulex.Adapter.Persistence
 
   @impl true
-  def dump(adapter_meta, path, opts) do
-    with_span(adapter_meta, :dump, fn ->
-      super(adapter_meta, path, opts)
-    end)
+  defspan dump(adapter_meta, path, opts) do
+    super(adapter_meta, path, opts)
   end
 
   @impl true
-  def load(adapter_meta, path, opts) do
-    with_span(adapter_meta, :load, fn ->
-      super(adapter_meta, path, opts)
-    end)
+  defspan load(adapter_meta, path, opts) do
+    super(adapter_meta, path, opts)
   end
 
   ## Nebulex.Adapter.Transaction
 
   @impl true
-  def transaction(adapter_meta, opts, fun) do
-    with_span(adapter_meta, :transaction, fn ->
-      super(adapter_meta, opts, fun)
-    end)
+  defspan transaction(adapter_meta, opts, fun) do
+    super(adapter_meta, opts, fun)
   end
 
   @impl true
-  def in_transaction?(adapter_meta) do
-    with_span(adapter_meta, :in_transaction?, fn ->
-      super(adapter_meta)
-    end)
+  defspan in_transaction?(adapter_meta) do
+    super(adapter_meta)
   end
 
   ## Nebulex.Adapter.Stats
 
   @impl true
-  def stats(%{started_at: started_at} = adapter_meta) do
-    with_span(adapter_meta, :stats, fn ->
-      if stats = super(adapter_meta) do
-        %{stats | metadata: Map.put(stats.metadata, :started_at, started_at)}
-      end
-    end)
+  defspan stats(adapter_meta) do
+    if stats = super(adapter_meta) do
+      %{stats | metadata: Map.put(stats.metadata, :started_at, adapter_meta.started_at)}
+    end
   end
 
   ## Helpers
@@ -787,6 +751,7 @@ defmodule Nebulex.Adapters.Local do
   defp return(entry_or_entries, field \\ nil)
 
   defp return(nil, _field), do: nil
+  defp return(:"$expired", _field), do: :"$expired"
   defp return(entry(value: value), :value), do: value
   defp return(entry(key: _) = entry, _field), do: entry
 
@@ -794,23 +759,26 @@ defmodule Nebulex.Adapters.Local do
     for entry <- entries, do: return(entry, field)
   end
 
-  defp validate_ttl(nil, _, _, _), do: nil
-  defp validate_ttl(entry(ttl: :infinity) = entry, _, _, _), do: entry
+  defp validate_ttl(nil, _, _), do: nil
+  defp validate_ttl(entry(ttl: :infinity) = entry, _, _), do: entry
 
-  defp validate_ttl(entry(key: key, touched: touched, ttl: ttl) = entry, gen, backend, ref) do
+  defp validate_ttl(entry(key: key, touched: touched, ttl: ttl) = entry, gen, backend) do
     if Time.now() - touched >= ttl do
       true = backend.delete(gen, key)
-      update_stats(nil, :expired, ref)
+      :"$expired"
     else
       entry
     end
   end
 
-  defp validate_ttl(entries, gen, backend, ref) when is_list(entries) do
+  defp validate_ttl(entries, gen, backend) when is_list(entries) do
     Enum.filter(entries, fn entry ->
-      not is_nil(validate_ttl(entry, gen, backend, ref))
+      not is_nil(validate_ttl(entry, gen, backend))
     end)
   end
+
+  defp handle_expired(:"$expired"), do: nil
+  defp handle_expired(result), do: result
 
   defp validate_match_spec(spec, opts) when spec in [nil, :unexpired, :expired] do
     [
@@ -857,78 +825,5 @@ defmodule Nebulex.Adapters.Local do
 
   defp maybe_match_spec_return_true(match_spec, _operation) do
     match_spec
-  end
-
-  ## Internal functions for updating stats
-
-  defp update_stats(value, _action, nil), do: value
-  defp update_stats(value, _action, {nil, _}), do: value
-
-  defp update_stats(nil, :get, counter_ref) do
-    :ok = Stats.incr(counter_ref, :misses)
-    nil
-  end
-
-  defp update_stats(value, :get, counter_ref) do
-    :ok = Stats.incr(counter_ref, :hits)
-    value
-  end
-
-  defp update_stats(value, :expired, counter_ref) do
-    :ok = Stats.incr(counter_ref, :evictions)
-    :ok = Stats.incr(counter_ref, :expirations)
-    value
-  end
-
-  defp update_stats(true, :put, counter_ref) do
-    :ok = Stats.incr(counter_ref, :writes)
-    true
-  end
-
-  defp update_stats(true, :put_all, {counter_ref, entries}) do
-    :ok = Stats.incr(counter_ref, :writes, length(entries))
-    true
-  end
-
-  defp update_stats(value, :delete, counter_ref) do
-    :ok = Stats.incr(counter_ref, :evictions)
-    value
-  end
-
-  defp update_stats(nil, :take, counter_ref) do
-    :ok = Stats.incr(counter_ref, :misses)
-    nil
-  end
-
-  defp update_stats(value, :take, counter_ref) do
-    :ok = Stats.incr(counter_ref, :hits)
-    :ok = Stats.incr(counter_ref, :evictions)
-    value
-  end
-
-  defp update_stats(value, :delete_all, counter_ref) do
-    :ok = Stats.incr(counter_ref, :evictions, value)
-    value
-  end
-
-  defp update_stats(true, :update, counter_ref) do
-    :ok = Stats.incr(counter_ref, :updates)
-    true
-  end
-
-  defp update_stats(value, {:update, amount, default}, counter_ref) do
-    offset = if amount >= 0, do: -1, else: 1
-
-    if value + amount * offset === default do
-      :ok = Stats.incr(counter_ref, :writes)
-    else
-      :ok = Stats.incr(counter_ref, :updates)
-    end
-
-    value
-  end
-
-  defp update_stats(value, _action, _counter_ref) do
-    value
   end
 end

@@ -2,7 +2,7 @@ defmodule Nebulex.Cache.EntryExpirationTest do
   import Nebulex.CacheCase
 
   deftests do
-    describe "entries expire when ttl option is given to" do
+    describe "ttl option is given to" do
       test "put", %{cache: cache} do
         assert cache.put("foo", "bar", ttl: 500) == :ok
         assert cache.has_key?("foo")

@@ -1,44 +1,148 @@
 # Telemetry
 
-This guide aims to show you how to instrument and report on `:telemetry` events
-in your application for cache statistics.
+This guide is not focused on explaining `:telemetry` itself, how it works, how
+to configure it, and so on. Instead, we will show you how to instrument and
+report on Cache Telemetry events in your application when using Nebulex.
 
-This guide is not focused on explaining `:telemetry`, how it works, configure
-it, and so on. Instead, it is focused on how we can use `:telemetry` for
-reporting cache stats. For more information about `:telemetry` you can check
-the docs, or the [Phoenix Telemetry](https://hexdocs.pm/phoenix/telemetry.html)
+For more information about `:telemetry`, you can check the
+[documentation][telemetry], or the [Phoenix Telemetry][phx_telemetry]
 guide is also recommended.
 
-## Instrumenting Nebulex Caches
+[telemetry]: https://github.com/beam-telemetry/telemetry
+[phx_telemetry]: https://hexdocs.pm/phoenix/telemetry.html
+
+## Telemetry Events
+
+Many Elixir libraries (including Nebulex) are already using the `:telemetry`
+package as a way to give users more insight into the behavior of their
+applications, by emitting events at key moments in the application lifecycle.
+
+### Nebulex built-in events
+
+The following events are emitted by all Nebulex caches:
+
+  * `[:nebulex, :cache, :init]` - it is dispatched whenever a cache starts.
+
+    * Measurement: `%{system_time: System.monotonic_time()}`
+    * Metadata: `%{cache: atom, opts: [term]}`
+
+### Adapter-specific events
+
+Nebulex currently suggests the adapters to dispatch the following Telemetry
+events:
+
+  * `[:my_app, :cache, :command, :start]` - Dispatched by the underlying cache
+    adapter before an adapter callback is executed.
+
+    * Measurement: `%{system_time: System.monotonic_time()}`
+    * Metadata: `%{adapter_meta: map, function_name: atom, args: [term]}`
+
+  * `[:my_app, :cache, :command, :stop]` - Dispatched by the underlying cache
+    adapter after an adapter callback has been successfully executed.
+
+    * Measurement: `%{duration: native_time}`
+    * Metadata:
+
+      ```elixir
+      %{
+        adapter_meta: map,
+        function_name: atom,
+        args: [term],
+        result: term
+      }
+      ```
+
+  * `[:my_app, :cache, :command, :exception]` - Dispatched by the underlying
+    cache adapter when an exception is raised while the adapter callback is
+    executed.
+
+    * Measurement: `%{duration: native_time}`
+    * Metadata:
+
+      ```elixir
+      %{
+        adapter_meta: map,
+        function_name: atom,
+        args: [term],
+        kind: :error | :exit | :throw,
+        reason: term,
+        stacktrace: term
+      }
+      ```
+
+## Nebulex Metrics
+
+Assuming you have defined the cache `MyApp.Cache` with the default
+`:telemetry_prefix`, using `Telemetry.Metrics`, you can define a
+counter metric, which counts how many cache commands were completed:
+
+```elixir
+Telemetry.Metrics.counter("my_app.cache.command.stop.duration")
+```
+
+or you could use a distribution metric to see how many commands were completed
+in particular time buckets:
+
+```elixir
+Telemetry.Metrics.distribution(
+  "my_app.cache.command.stop.duration",
+  buckets: [100, 200, 300]
+)
+```
+
+So far, these metrics are only helpful to be able to see just the total number
+of executed cache commands. What if you wanted to see the average command
+duration, minimum and maximum, or percentiles, but aggregated per command
+or callback name? In this case, one could define a summary metric like so:
+
+```elixir
+Telemetry.Metrics.summary(
+  "my_app.cache.command.stop.duration",
+  unit: {:native, :millisecond},
+  tags: [:function_name]
+)
+```
+
+As it is described above in the **"Adapter-specific events"** section, the event
+includes the invoked callback name into the metadata as `:function_name`, then
+we can add it to the metric's tags.
+
+### Extracting tag values from adapter's metadata
+
+Let's add another metric for the command event, this time to group by cache and
+function name (invoked adapter's callback name):
+
+```elixir
+Telemetry.Metrics.summary(
+  "my_app.cache.command.stop.duration",
+  unit: {:native, :millisecond},
+  tags: [:cache, :function_name],
+  tag_values: &Map.put(&1, :cache, &1.adapter_meta.cache)
+)
+```
+
+We've introduced the `:tag_values` option here, because we need to perform a
+transformation on the event metadata in order to get to the values we need.
+
+## Cache Stats
 
 Each adapter is responsible for providing stats by implementing
-`Nebulex.Adapter.Stats` behaviour. Nevertheless, Nebulex provides a default
-implementation using [Erlang counters][erl_counters], which is supported by
-the built-in adapters (with all callbacks overridable).
-See `Nebulex.Adapter.Stats` for more information.
+`Nebulex.Adapter.Stats` behaviour. However, Nebulex provides a simple default
+implementation using [Erlang counters][erl_counters], which is used by
+the built-in local adapter. The local adapter uses
+`Nebulex.Telemetry.StatsHandler` to aggregate the stats and keep
+them updated, therefore, it requires the Telemetry events are dispatched
+by the adapter, otherwise, it won't work properly.
 
 [erl_counters]: https://erlang.org/doc/man/counters.html
 
 Furthermore, when the `:stats` option is enabled, we can use Telemetry for
 emitting the current stat values.
 
-First of all, let's configure the dependencies adding `:telemetry_metrics`
-and `:telemetry_poller` packages:
+First of all, make sure you have added `:telemetry`, `:telemetry_metrics`, and
+`:telemetry_poller` packages as dependencies to your `mix.exs` file.
 
-```elixir
-def deps do
-  [
-    {:nebulex, "~> 2.0"},
-    {:shards, "~> 1.0"},
-    {:decorator, "~> 1.3"},
-    {:telemetry, "~> 0.4"},
-    {:telemetry_metrics, "~> 0.6"},
-    {:telemetry_poller, "~> 0.5"}
-  ]
-end
-```
-
-Then define the cache and add the configuration:
+Let's define out cache module:
 
 ```elixir
 defmodule MyApp.Cache do
@@ -48,16 +152,17 @@ defmodule MyApp.Cache do
 end
 ```
 
-Could be configured:
+Make sure the `:stats` option is set to `true`, for example in the
+configuration:
 
 ```elixir
 config :my_app, MyApp.Cache,
   stats: true,
   backend: :shards,
-  gc_interval: 86_400_000,
+  gc_interval: :timer.hours(12),
   max_size: 1_000_000,
-  gc_cleanup_min_timeout: 10_000,
-  gc_cleanup_max_timeout: 900_000
+  gc_cleanup_min_timeout: :timer.seconds(10),
+  gc_cleanup_max_timeout: :timer.minutes(10)
 ```
 
 Create your Telemetry supervisor at `lib/my_app/telemetry.ex`:
@@ -88,18 +193,12 @@ defmodule MyApp.Telemetry do
   defp metrics do
     [
       # Nebulex Stats Metrics
-      last_value("nebulex.cache.stats.hits", tags: [:cache]),
-      last_value("nebulex.cache.stats.misses", tags: [:cache]),
-      last_value("nebulex.cache.stats.writes", tags: [:cache]),
-      last_value("nebulex.cache.stats.updates", tags: [:cache]),
-      last_value("nebulex.cache.stats.evictions", tags: [:cache]),
-      last_value("nebulex.cache.stats.expirations", tags: [:cache]),
-
-      # VM Metrics
-      summary("vm.memory.total", unit: {:byte, :kilobyte}),
-      summary("vm.total_run_queue_lengths.total"),
-      summary("vm.total_run_queue_lengths.cpu"),
-      summary("vm.total_run_queue_lengths.io")
+      last_value("my_app.cache.stats.hits", tags: [:cache]),
+      last_value("my_app.cache.stats.misses", tags: [:cache]),
+      last_value("my_app.cache.stats.writes", tags: [:cache]),
+      last_value("my_app.cache.stats.updates", tags: [:cache]),
+      last_value("my_app.cache.stats.evictions", tags: [:cache]),
+      last_value("my_app.cache.stats.expirations", tags: [:cache])
     ]
   end
 
@@ -110,8 +209,6 @@ defmodule MyApp.Telemetry do
   end
 end
 ```
-
-> Make sure to replace `MyApp` by your actual application name.
 
 Then add to your main application's supervision tree
 (usually in `lib/my_app/application.ex`):
@@ -149,7 +246,7 @@ and you should see something like the following output:
 
 ```
 [Telemetry.Metrics.ConsoleReporter] Got new event!
-Event name: nebulex.cache.stats
+Event name: my_app.cache.stats
 All measurements: %{evictions: 2, expirations: 1, hits: 1, misses: 2, updates: 1, writes: 2}
 All metadata: %{cache: MyApp.Cache}
 
@@ -178,12 +275,10 @@ With value: 1
 Tag values: %{cache: MyApp.Cache}
 ```
 
-## Adding other custom metrics
+### Custom metrics
 
-In the same way, you can, for instance, add another periodic measurement for
-reporting the cache size.
-
-Using our previous cache:
+In the same way, for instance, you can add another periodic measurement for
+reporting the cache size:
 
 ```elixir
 defmodule MyApp.Cache do
@@ -193,7 +288,7 @@ defmodule MyApp.Cache do
 
   def dispatch_cache_size do
     :telemetry.execute(
-      [:nebulex, :cache, :size],
+      [:my_app, :cache, :size],
       %{value: size()},
       %{cache: __MODULE__, node: node()}
     )
@@ -201,8 +296,8 @@ defmodule MyApp.Cache do
 end
 ```
 
-And add it to the list of periodic measurements in our previously defined
-supervisor:
+Now let's add a new periodic measurement to invoke `dispatch_cache_size()`
+through `:telemetry_poller`:
 
 ```elixir
 defp periodic_measurements do
@@ -213,8 +308,8 @@ defp periodic_measurements do
 end
 ```
 
-> **NOTE:** Notice we added in the metadata the node name so that we can use it
-  in the tags of the metrics.
+> Notice the node name was added to the metadata so we can use it in the
+  metric's tags.
 
 Metrics:
 
@@ -222,21 +317,15 @@ Metrics:
 defp metrics do
   [
     # Nebulex Stats Metrics
-    last_value("nebulex.cache.stats.hits", tags: [:cache, :node]),
-    last_value("nebulex.cache.stats.misses", tags: [:cache, :node]),
-    last_value("nebulex.cache.stats.writes", tags: [:cache, :node]),
-    last_value("nebulex.cache.stats.updates", tags: [:cache, :node]),
-    last_value("nebulex.cache.stats.evictions", tags: [:cache, :node]),
-    last_value("nebulex.cache.stats.expirations", tags: [:cache, :node]),
+    last_value("my_app.cache.stats.hits", tags: [:cache, :node]),
+    last_value("my_app.cache.stats.misses", tags: [:cache, :node]),
+    last_value("my_app.cache.stats.writes", tags: [:cache, :node]),
+    last_value("my_app.cache.stats.updates", tags: [:cache, :node]),
+    last_value("my_app.cache.stats.evictions", tags: [:cache, :node]),
+    last_value("my_app.cache.stats.expirations", tags: [:cache, :node]),
 
     # Nebulex custom Metrics
-    last_value("nebulex.cache.size.value", tags: [:cache, :node]),
-
-    # VM Metrics
-    summary("vm.memory.total", unit: {:byte, :kilobyte}),
-    summary("vm.total_run_queue_lengths.total"),
-    summary("vm.total_run_queue_lengths.cpu"),
-    summary("vm.total_run_queue_lengths.io")
+    last_value("my_app.cache.size.value", tags: [:cache, :node])
   ]
 end
 ```
@@ -245,7 +334,7 @@ If you start an IEx session like previously, you should see the new metric too:
 
 ```
 [Telemetry.Metrics.ConsoleReporter] Got new event!
-Event name: nebulex.cache.stats
+Event name: my_app.cache.stats
 All measurements: %{evictions: 0, expirations: 0, hits: 0, misses: 0, updates: 0, writes: 0}
 All metadata: %{cache: MyApp.Cache, node: :nonode@nohost}
 
@@ -274,7 +363,7 @@ With value: 0
 Tag values: %{cache: MyApp.Cache, node: :nonode@nohost}
 
 [Telemetry.Metrics.ConsoleReporter] Got new event!
-Event name: nebulex.cache.size
+Event name: my_app.cache.size
 All measurements: %{value: 0}
 All metadata: %{cache: MyApp.Cache, node: :nonode@nohost}
 
@@ -283,7 +372,7 @@ With value: 0
 Tag values: %{cache: MyApp.Cache, node: :nonode@nohost}
 ```
 
-## Instrumenting Multi-level caches
+## Multi-level Cache Stats
 
 When using the multi-level adapter the returned stats measurements may look
 a bit different, because the multi-level adapter works as a wrapper for the
@@ -342,40 +431,40 @@ metrics in this way:
 ```elixir
 [
   # L1 metrics
-  last_value("nebulex.cache.stats.l1.hits",
-    event_name: "nebulex.cache.stats",
+  last_value("my_app.cache.stats.l1.hits",
+    event_name: "my_app.cache.stats",
     measurement: &get_in(&1, [:l1, :hits]),
     tags: [:cache]
   ),
-  last_value("nebulex.cache.stats.l1.misses",
-    event_name: "nebulex.cache.stats",
+  last_value("my_app.cache.stats.l1.misses",
+    event_name: "my_app.cache.stats",
     measurement: &get_in(&1, [:l1, :misses]),
     tags: [:cache]
   ),
-  last_value("nebulex.cache.stats.l1.writes",
-    event_name: "nebulex.cache.stats",
+  last_value("my_app.cache.stats.l1.writes",
+    event_name: "my_app.cache.stats",
     measurement: &get_in(&1, [:l1, :writes]),
     tags: [:cache]
   ),
-  last_value("nebulex.cache.stats.l1.updates",
-    event_name: "nebulex.cache.stats",
+  last_value("my_app.cache.stats.l1.updates",
+    event_name: "my_app.cache.stats",
     measurement: &get_in(&1, [:l1, :updates]),
     tags: [:cache]
   ),
-  last_value("nebulex.cache.stats.l1.evictions",
-    event_name: "nebulex.cache.stats",
+  last_value("my_app.cache.stats.l1.evictions",
+    event_name: "my_app.cache.stats",
     measurement: &get_in(&1, [:l1, :evictions]),
     tags: [:cache]
   ),
-  last_value("nebulex.cache.stats.l1.expirations",
-    event_name: "nebulex.cache.stats",
+  last_value("my_app.cache.stats.l1.expirations",
+    event_name: "my_app.cache.stats",
     measurement: &get_in(&1, [:l1, :expirations]),
     tags: [:cache]
   ),
 
   # L2 metrics
-  last_value("nebulex.cache.stats.l2.hits",
-    event_name: "nebulex.cache.stats",
+  last_value("my_app.cache.stats.l2.hits",
+    event_name: "my_app.cache.stats",
     measurement: &get_in(&1, [:l2, :hits]),
     tags: [:cache]
   ),

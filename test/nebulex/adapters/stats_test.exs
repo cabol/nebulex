@@ -1,7 +1,11 @@
 defmodule Nebulex.Adapters.StatsTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case
 
   import Nebulex.CacheCase
+
+  alias Nebulex.Cache.Stats
+
+  ## Shared cache
 
   defmodule Cache do
     use Nebulex.Cache,
@@ -33,9 +37,7 @@ defmodule Nebulex.Adapters.StatsTest do
     end
   end
 
-  import Nebulex.CacheCase
-
-  alias Nebulex.Cache.Stats
+  ## Shared constants
 
   @config [
     model: :inclusive,
@@ -47,6 +49,8 @@ defmodule Nebulex.Adapters.StatsTest do
   ]
 
   @event [:nebulex, :adapters, :stats_test, :cache, :stats]
+
+  ## Tests
 
   describe "stats/0" do
     setup_with_cache(Cache, [stats: true] ++ @config)
