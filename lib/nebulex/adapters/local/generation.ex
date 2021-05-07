@@ -420,8 +420,11 @@ defmodule Nebulex.Adapters.Local.Generation do
         # Since the older generation is deleted, update evictions count
         :ok = Stats.incr(stats_counter, :evictions, backend.info(older, :size))
 
-        # Delete older generation
-        _ = Backend.delete(backend, meta_tab, older)
+        # Process the older generation:
+        # - Delete previously stored deprecated generation
+        # - Flush the older generation
+        # - Deprecate it (mark it for deletion)
+        :ok = process_older_gen(meta_tab, backend, older)
 
         # Update generations
         Metadata.put(meta_tab, :generations, [gen_tab, newer])
@@ -434,6 +437,24 @@ defmodule Nebulex.Adapters.Local.Generation do
         # update generations
         Metadata.put(meta_tab, :generations, [gen_tab])
     end
+  end
+
+  # The older generation cannot be removed immediately because there may be
+  # ongoing operations using it, then it may cause race-condition errors.
+  # Hence, the idea is to keep it alive till a new generation is pushed, but
+  # flushing its data before so that we release memory space. By the time a new
+  # generation is pushed, then it is safe to delete it completely.
+  defp process_older_gen(meta_tab, backend, older) do
+    if deprecated = Metadata.get(meta_tab, :deprecated) do
+      # Delete deprecated generation if it does exist
+      _ = Backend.delete(backend, meta_tab, deprecated)
+    end
+
+    # Flush older generation to release space so it can be marked for deletion
+    true = backend.delete_all_objects(older)
+
+    # Keep alive older generation reference into the metadata
+    Metadata.put(meta_tab, :deprecated, older)
   end
 
   defp start_timer(time, ref \\ nil, event \\ :heartbeat) do
