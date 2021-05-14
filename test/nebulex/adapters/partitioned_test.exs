@@ -20,7 +20,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
       start_caches(
         [node() | Node.list()],
         [
-          {Partitioned, [name: @cache_name, stats: true]},
+          {Partitioned, [name: @cache_name]},
           {PartitionedMock, []}
         ]
       )

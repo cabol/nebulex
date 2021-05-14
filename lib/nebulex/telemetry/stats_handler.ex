@@ -12,11 +12,13 @@ defmodule Nebulex.Telemetry.StatsHandler do
   ## Handler
 
   @doc false
-  def handle_event(_event, _measurements, metadata, _config) do
+  def handle_event(_event, _measurements, %{adapter_meta: %{stats_counter: ref}} = metadata, ref) do
     update_stats(metadata)
   end
 
-  defp update_stats(%{stats_counter: nil}), do: :ok
+  def handle_event(_event, _measurements, _metadata, _ref) do
+    :ok
+  end
 
   defp update_stats(%{
          function_name: action,

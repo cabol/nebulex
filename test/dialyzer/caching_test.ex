@@ -1,4 +1,4 @@
-defmodule Nebulex.DialyzerCachingTest do
+defmodule Nebulex.Dialyzer.CachingTest do
   @moduledoc false
   use Nebulex.Caching
 
@@ -32,5 +32,11 @@ defmodule Nebulex.DialyzerCachingTest do
   @decorate cache_evict(cache: Cache, keys: [{Account, acct.id}, {Account, acct.username}])
   def delete_account(acct) do
     acct
+  end
+
+  @spec delete_all_accounts(term) :: :ok
+  @decorate cache_evict(cache: Cache, all_entries: true)
+  def delete_all_accounts(filter) do
+    filter
   end
 end

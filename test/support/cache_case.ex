@@ -1,6 +1,8 @@
 defmodule Nebulex.CacheCase do
   @moduledoc false
 
+  alias Nebulex.Telemetry
+
   @doc false
   defmacro deftests(do: block) do
     quote do
@@ -120,7 +122,7 @@ defmodule Nebulex.CacheCase do
   @doc false
   def with_telemetry_handler(handler_id \\ :nbx_telemetry_test, events, fun) do
     :ok =
-      :telemetry.attach_many(
+      Telemetry.attach_many(
         handler_id,
         events,
         &__MODULE__.handle_event/4,
@@ -129,7 +131,7 @@ defmodule Nebulex.CacheCase do
 
     fun.()
   after
-    :telemetry.detach(handler_id)
+    Telemetry.detach(handler_id)
   end
 
   @doc false

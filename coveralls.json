@@ -4,6 +4,7 @@
   },
 
   "skip_files": [
-    "test/support/*"
+    "test/support/*",
+    "test/dialyzer/*"
   ]
 }

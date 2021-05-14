@@ -74,6 +74,8 @@ defmodule Nebulex.Adapters.Local.Generation do
   alias Nebulex.Adapter.Stats
   alias Nebulex.Adapters.Local
   alias Nebulex.Adapters.Local.{Backend, Metadata}
+  alias Nebulex.Telemetry
+  alias Nebulex.Telemetry.StatsHandler
 
   @type t :: %__MODULE__{}
   @type server_ref :: pid | atom | :ets.tid()
@@ -233,6 +235,9 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   @impl true
   def init(opts) do
+    # Trap exit signals to run cleanup process
+    _ = Process.flag(:trap_exit, true)
+
     # Initial state
     state = struct(__MODULE__, parse_opts(opts))
 
@@ -247,7 +252,10 @@ defmodule Nebulex.Adapters.Local.Generation do
         do: {new_gen(state), start_timer(state.gc_interval)},
         else: {new_gen(state), nil}
 
-    {:ok, %{state | gc_cleanup_ref: cleanup_ref, gc_heartbeat_ref: ref}}
+    # Update state
+    state = %{state | gc_cleanup_ref: cleanup_ref, gc_heartbeat_ref: ref}
+
+    {:ok, state, {:continue, :attach_stats_handler}}
   end
 
   defp parse_opts(opts) do
@@ -272,6 +280,28 @@ defmodule Nebulex.Adapters.Local.Generation do
       gc_cleanup_max_timeout:
         get_option(opts, :gc_cleanup_max_timeout, "an integer > 0", pos_integer, 600_000)
     })
+  end
+
+  @impl true
+  def handle_continue(:attach_stats_handler, %__MODULE__{stats_counter: nil} = state) do
+    {:noreply, state}
+  end
+
+  def handle_continue(:attach_stats_handler, %__MODULE__{stats_counter: stats_counter} = state) do
+    _ =
+      Telemetry.attach_many(
+        stats_counter,
+        [state.telemetry_prefix ++ [:command, :stop]],
+        &StatsHandler.handle_event/4,
+        stats_counter
+      )
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def terminate(_reason, state) do
+    if ref = state.stats_counter, do: Telemetry.detach(ref)
   end
 
   @impl true

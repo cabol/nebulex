@@ -1,5 +1,5 @@
 # Start Telemetry
-:ok = Application.start(:telemetry)
+_ = Application.start(:telemetry)
 
 # Set nodes
 nodes = [:"node1@127.0.0.1", :"node2@127.0.0.1", :"node3@127.0.0.1", :"node4@127.0.0.1"]

@@ -310,8 +310,7 @@ defmodule Nebulex.Adapters.Local do
 
   alias Nebulex.Adapter.Stats
   alias Nebulex.Adapters.Local.{Backend, Generation, Metadata}
-  alias Nebulex.{Entry, Telemetry, Time}
-  alias Nebulex.Telemetry.StatsHandler
+  alias Nebulex.{Entry, Time}
 
   # Cache Entry
   defrecord(:entry,
@@ -402,23 +401,7 @@ defmodule Nebulex.Adapters.Local do
     # Build adapter child_spec
     child_spec = Backend.child_spec(backend, [adapter_meta: adapter_meta] ++ opts)
 
-    # Maybe attach Telemetry stats handler
-    _ = attach_telemetry_stats_handler(adapter_meta)
-
     {:ok, child_spec, adapter_meta}
-  end
-
-  defp attach_telemetry_stats_handler(%{stats_counter: nil, cache: cache}) do
-    Telemetry.detach("#{cache}.Handler")
-  end
-
-  defp attach_telemetry_stats_handler(adapter_meta) do
-    Telemetry.attach_many(
-      "#{adapter_meta.cache}.Handler",
-      [adapter_meta.telemetry_prefix ++ [:command, :stop]],
-      &StatsHandler.handle_event/4,
-      %{}
-    )
   end
 
   ## Nebulex.Adapter.Entry

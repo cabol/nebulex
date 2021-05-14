@@ -1,5 +1,9 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [v2.0.0](https://github.com/cabol/nebulex/tree/v2.0.0) (2021-02-20)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.0.0-rc.2...v2.0.0)

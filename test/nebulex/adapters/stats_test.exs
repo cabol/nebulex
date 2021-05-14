@@ -90,11 +90,13 @@ defmodule Nebulex.Adapters.StatsTest do
       :ok = Process.sleep(1100)
       refute Cache.get(:a)
 
-      assert_stats_measurements(Cache,
-        l1: [expirations: 1, misses: 1, writes: 8, updates: 4],
-        l2: [expirations: 1, misses: 1, writes: 8, updates: 4],
-        l3: [expirations: 1, misses: 1, writes: 8, updates: 4]
-      )
+      wait_until(fn ->
+        assert_stats_measurements(Cache,
+          l1: [expirations: 1, misses: 1, writes: 8, updates: 4],
+          l2: [expirations: 1, misses: 1, writes: 8, updates: 4],
+          l3: [expirations: 1, misses: 1, writes: 8, updates: 4]
+        )
+      end)
     end
 
     test "evictions" do
@@ -129,11 +131,13 @@ defmodule Nebulex.Adapters.StatsTest do
       :ok = Process.sleep(1100)
       assert Cache.get_all([:a, :b, :c, :d]) == %{a: 1, b: 2}
 
-      assert_stats_measurements(Cache,
-        l1: [evictions: 2, expirations: 2, hits: 6, misses: 2, writes: 4],
-        l2: [evictions: 2, expirations: 2, hits: 0, misses: 2, writes: 4],
-        l3: [evictions: 2, expirations: 2, hits: 0, misses: 2, writes: 4]
-      )
+      wait_until(fn ->
+        assert_stats_measurements(Cache,
+          l1: [evictions: 2, expirations: 2, hits: 6, misses: 2, writes: 4],
+          l2: [evictions: 2, expirations: 2, hits: 0, misses: 2, writes: 4],
+          l3: [evictions: 2, expirations: 2, hits: 0, misses: 2, writes: 4]
+        )
+      end)
     end
   end
 
