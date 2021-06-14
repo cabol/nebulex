@@ -536,7 +536,7 @@ config :blog, Blog.PartitionedCache,
   ]
 ```
 
-And remember to add the new cache `Blog.PartitionedCache` to ypur application's
+And remember to add the new cache `Blog.PartitionedCache` to your application's
 supervision tree (such as we did it previously):
 
 ```elixir
