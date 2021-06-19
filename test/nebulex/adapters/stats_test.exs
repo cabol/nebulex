@@ -52,7 +52,7 @@ defmodule Nebulex.Adapters.StatsTest do
 
   ## Tests
 
-  describe "stats/0" do
+  describe "(multilevel) stats/0" do
     setup_with_cache(Cache, [stats: true] ++ @config)
 
     test "hits and misses" do
@@ -64,10 +64,12 @@ defmodule Nebulex.Adapters.StatsTest do
       refute Cache.get(:c)
       refute Cache.get(:d)
 
+      assert Cache.get_all([:a, :b, :c, :d]) == %{a: 1, b: 2}
+
       assert_stats_measurements(Cache,
-        l1: [hits: 3, misses: 2, writes: 2],
-        l2: [hits: 0, misses: 2, writes: 2],
-        l3: [hits: 0, misses: 2, writes: 2]
+        l1: [hits: 5, misses: 4, writes: 2],
+        l2: [hits: 0, misses: 4, writes: 2],
+        l3: [hits: 0, misses: 4, writes: 2]
       )
     end
 
@@ -138,6 +140,40 @@ defmodule Nebulex.Adapters.StatsTest do
           l3: [evictions: 2, expirations: 2, hits: 0, misses: 2, writes: 4]
         )
       end)
+    end
+  end
+
+  describe "(replicated) stats/0" do
+    alias Cache.L2, as: Replicated
+
+    setup_with_cache(Replicated, [stats: true] ++ @config)
+
+    test "hits and misses" do
+      :ok = Replicated.put_all(a: 1, b: 2)
+
+      assert Replicated.get(:a) == 1
+      assert Replicated.get_all([:a, :b, :c, :d]) == %{a: 1, b: 2}
+
+      assert %Nebulex.Stats{measurements: measurements} = Replicated.stats()
+      assert measurements.hits == 3
+      assert measurements.misses == 2
+    end
+  end
+
+  describe "(partitioned) stats/0" do
+    alias Cache.L3, as: Partitioned
+
+    setup_with_cache(Partitioned, [stats: true] ++ @config)
+
+    test "hits and misses" do
+      :ok = Partitioned.put_all(a: 1, b: 2)
+
+      assert Partitioned.get(:a) == 1
+      assert Partitioned.get_all([:a, :b, :c, :d]) == %{a: 1, b: 2}
+
+      assert %Nebulex.Stats{measurements: measurements} = Partitioned.stats()
+      assert measurements.hits == 3
+      assert measurements.misses == 2
     end
   end
 

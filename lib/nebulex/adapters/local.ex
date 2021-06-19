@@ -440,6 +440,8 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   defspan get_all(adapter_meta, keys, _opts) do
+    adapter_meta = %{adapter_meta | telemetry: Map.get(adapter_meta, :in_span?, false)}
+
     Enum.reduce(keys, %{}, fn key, acc ->
       if obj = get(adapter_meta, key, []),
         do: Map.put(acc, key, obj),

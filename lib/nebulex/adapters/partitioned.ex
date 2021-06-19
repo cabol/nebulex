@@ -335,7 +335,6 @@ defmodule Nebulex.Adapters.Partitioned do
       Nebulex.Adapters.Supervisor.child_spec(
         name: normalize_module_name([name, Supervisor]),
         strategy: :rest_for_one,
-        # children: [{cache.__primary__, primary_opts}] ++ children,
         children: [
           {cache.__primary__, primary_opts},
           {__MODULE__.Bootstrap, Map.put(adapter_meta, :cache, cache)}
