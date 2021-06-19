@@ -16,14 +16,13 @@ jobs:
     strategy:
       matrix:
         include:
-          - elixir: 1.11.x
-            otp: 23.x
+          - elixir: 1.12.x
+            otp: 24.x
             coverage: true
             dialyzer: true
-          - elixir: 1.10.x
+          - elixir: 1.11.x
             otp: 23.x
-          - elixir: 1.10.x
-            otp: 22.x
+            inch-report: true
           - elixir: 1.9.x
             otp: 22.x
 
@@ -101,3 +100,4 @@ jobs:
 
       - name: Doc Coverage Report
         run: MIX_ENV=docs mix inch.report
+        if: ${{matrix.inch-report}}

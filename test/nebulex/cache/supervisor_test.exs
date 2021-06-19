@@ -6,6 +6,7 @@ defmodule Nebulex.Cache.SupervisorTest do
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local
 
+    @impl true
     def init(opts) do
       case Keyword.get(opts, :ignore) do
         true -> :ignore
