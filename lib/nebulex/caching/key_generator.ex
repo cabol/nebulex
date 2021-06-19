@@ -7,6 +7,9 @@ defmodule Nebulex.Caching.KeyGenerator do
   See the default implementation `Nebulex.Caching.SimpleKeyGenerator`.
   """
 
+  @typedoc "KeyGenerator"
+  @type t :: module
+
   @doc """
   Generates a key for the given `module`, `function_name`, and its `args`.
   """

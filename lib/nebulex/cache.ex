@@ -290,6 +290,7 @@ defmodule Nebulex.Cache do
       @adapter adapter
       @opts opts
       @default_dynamic_cache opts[:default_dynamic_cache] || __MODULE__
+      @default_key_generator opts[:default_key_generator] || Nebulex.Caching.SimpleKeyGenerator
       @before_compile adapter
 
       ## Config and metadata
@@ -302,6 +303,9 @@ defmodule Nebulex.Cache do
 
       @impl true
       def __adapter__, do: @adapter
+
+      @impl true
+      def __default_key_generator__, do: @default_key_generator
 
       ## Process lifecycle
 
@@ -551,6 +555,21 @@ defmodule Nebulex.Cache do
   Returns the adapter tied to the cache.
   """
   @callback __adapter__ :: Nebulex.Adapter.t()
+
+  @doc """
+  Returns the default key generator applied only when using
+  **"declarative annotation-based caching"** via `Nebulex.Caching`.
+
+  Sometimes you may want to set a different key generator when using
+  declarative caching. By default, the key generator is set to
+  `Nebulex.Caching.SimpleKeyGenerator`. You can change the default
+  key generator at compile time with:
+
+      use Nebulex.Cache, default_key_generator: MyKeyGenerator
+
+  See `Nebulex.Caching` and `Nebulex.Caching.KeyGenerator` for more information.
+  """
+  @callback __default_key_generator__ :: Nebulex.Caching.KeyGenerator.t()
 
   @doc """
   Returns the adapter configuration stored in the `:otp_app` environment.
