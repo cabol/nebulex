@@ -9,8 +9,9 @@ defmodule Nebulex.Caching.SimpleKeyGenerator do
     * If more than one param is given, return a key computed from the hashes
       of all parameters (`:erlang.phash2(args)`).
 
-  Based on the [default key generation in Spring Cache Abstraction](https://docs.spring.io/spring-framework/docs/3.2.x/spring-framework-reference/html/cache.html#cache-annotations-cacheable-default-key).
+  > Based on the [default key generation in Spring Cache Abstraction](https://docs.spring.io/spring-framework/docs/3.2.x/spring-framework-reference/html/cache.html#cache-annotations-cacheable-default-key).
   """
+
   @behaviour Nebulex.Caching.KeyGenerator
 
   @impl true

@@ -42,6 +42,11 @@ if Code.ensure_loaded?(Decorator.Define) do
       * If more than one param is given, return a key computed from the hashes
         of all parameters (`:erlang.phash2(args)`).
 
+    > **IMPORTANT:** Since Nebulex v2.1.0, the default key generation implements
+      the algorithm described above, breaking backward compatibility with older
+      versions. Therefore, you may need to change your code in case of using the
+      default key generation.
+
     The default key generator is provided by the cache via the callback
     `c:Nebulex.Cache.__default_key_generator__/0` and it is applied only
     if the option `key:` or `keys:` is not configured. By default it is

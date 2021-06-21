@@ -20,8 +20,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   [#116](https://github.com/cabol/nebulex/issues/116)
 - Instrument the local adapter with the recommended Telemetry events
   [#115](https://github.com/cabol/nebulex/issues/115)
-- Custom key generator support by implementing `Nebulex.Caching.KeyGenerator`
-  behaviour [#109](https://github.com/cabol/nebulex/issues/109)
+- Add custom key generator support by implementing
+  `Nebulex.Caching.KeyGenerator` behaviour
+  [#109](https://github.com/cabol/nebulex/issues/109)
+- Add default key generator `Nebulex.Caching.SimpleKeyGenerator`
 
 **Implemented enhancements:**
 

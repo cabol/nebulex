@@ -4,8 +4,7 @@ defmodule Nebulex.MultilevelTest do
   deftests do
     describe "c:init/1" do
       test "fails because missing levels config", %{cache: cache} do
-        assert {:error, {%ArgumentError{message: msg}, _}} =
-                 cache.start_link(name: :missing_levels)
+        assert {:error, {%ArgumentError{message: msg}, _}} = cache.start_link(name: :missing_levels)
 
         assert Regex.match?(
                  ~r"expected levels: to be a list with at least one level definition",
