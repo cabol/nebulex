@@ -362,10 +362,6 @@ defmodule Nebulex.Adapters.Local.Generation do
     {:noreply, state}
   end
 
-  def handle_info(_message, state) do
-    {:noreply, state}
-  end
-
   defp check_size(
          %__MODULE__{
            meta_tab: meta_tab,
