@@ -1,5 +1,5 @@
 defmodule Nebulex.Caching.KeyGenerator do
-  @moduledoc ~S"""
+  @moduledoc """
   Cache key generator. Used for creating a key based on the given module,
   function name and its arguments (the module and function name are used
   as context).

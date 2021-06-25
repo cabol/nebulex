@@ -1,6 +1,6 @@
 if Code.ensure_loaded?(Decorator.Define) do
   defmodule Nebulex.Caching do
-    @moduledoc ~S"""
+    @moduledoc """
     Declarative annotation-based caching via function
     [decorators](https://github.com/arjan/decorator).
 
@@ -51,18 +51,23 @@ if Code.ensure_loaded?(Decorator.Define) do
     `c:Nebulex.Cache.__default_key_generator__/0` and it is applied only
     if the option `key:` or `keys:` is not configured. By default it is
     `Nebulex.Caching.SimpleKeyGenerator`. But you can change the default
-    key generator at compile time with the option `:default_key_generator`,
-    like so:
+    key generator at compile time with the option `:default_key_generator`.
+    For example, one can define a cache with a default key generator like so:
 
         defmodule MyApp.Cache do
           use Nebulex.Cache,
             otp_app: :my_app,
             adapter: Nebulex.Adapters.Local,
-            default_key_generator: MyApp.Cache.CustomKeyGenerator
+            default_key_generator: __MODULE__
+
+          @behaviour Nebulex.Caching.KeyGenerator
+
+          @impl true
+          def generate(mod, fun, args), do: :erlang.phash2({mod, fun, args})
         end
 
-    The given key generator `MyApp.Cache.CustomKeyGenerator` must implement
-    the `Nebulex.Caching.KeyGenerator` behaviour.
+    The given key generator must implement the `Nebulex.Caching.KeyGenerator`
+    behaviour.
 
     Also, you can provide a different key generator at any time
     (overriding the default one) when using any caching annotation
@@ -122,7 +127,7 @@ if Code.ensure_loaded?(Decorator.Define) do
     decorator on that head, like so:
 
         @decorate cacheable(cache: Cache, key: email)
-        def get_account(email \\ nil)
+        def get_account(email \\\\ nil)
 
         def get_account(nil), do: nil
 
@@ -284,7 +289,7 @@ if Code.ensure_loaded?(Decorator.Define) do
             Repo.delete(usr)
           end
 
-          def create_user(attrs \\ %{}) do
+          def create_user(attrs \\\\ %{}) do
             %User{}
             |> User.changeset(attrs)
             |> Repo.insert()

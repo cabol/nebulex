@@ -1,5 +1,5 @@
 defmodule Nebulex.Adapter.Transaction do
-  @moduledoc ~S"""
+  @moduledoc """
   Specifies the adapter transactions API.
 
   ## Default implementation

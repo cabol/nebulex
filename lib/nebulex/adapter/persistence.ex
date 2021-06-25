@@ -1,5 +1,5 @@
 defmodule Nebulex.Adapter.Persistence do
-  @moduledoc ~S"""
+  @moduledoc """
   Specifies the adapter persistence API.
 
   ## Default implementation

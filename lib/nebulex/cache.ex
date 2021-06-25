@@ -1,5 +1,5 @@
 defmodule Nebulex.Cache do
-  @moduledoc ~S"""
+  @moduledoc """
   Cache's main interface; defines the cache abstraction layer which is
   highly inspired by [Ecto](https://github.com/elixir-ecto/ecto).
 

@@ -1,6 +1,6 @@
 if Code.ensure_loaded?(Decorator.Define) do
   defmodule Nebulex.Hook do
-    @moduledoc ~S"""
+    @moduledoc """
     Pre/Post Hooks
 
     Since `v2.0.0`, pre/post hooks are not supported and/or handled by `Nebulex`
@@ -63,7 +63,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
           ## API
 
-          def start_link(opts \\ []) do
+          def start_link(opts \\\\ []) do
             GenServer.start_link(__MODULE__, opts, name: __MODULE__)
           end
 
@@ -87,7 +87,7 @@ if Code.ensure_loaded?(Decorator.Define) do
           @impl true
           def handle_cast({:track, %Hook{acc: start} = hook}, state) do
             diff = System.system_time(:microsecond) - start
-            Logger.info("#=> #{hook.module}.#{hook.name}/#{hook.arity}, Duration: #{diff}")
+            Logger.info("#=> #\{hook.module}.#\{hook.name}/#\{hook.arity}, Duration: #\{diff}")
             {:noreply, state}
           end
         end
