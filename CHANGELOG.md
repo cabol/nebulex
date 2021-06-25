@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.1](https://github.com/cabol/nebulex/tree/v2.1.1) (2021-06-25)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.1.0...v2.1.1)
+
+**Implemented enhancements:**
+
+- Add cache option `:default_key_generator` to change the key generator at
+  compile-time [#126](https://github.com/cabol/nebulex/issues/126)
+
+**Closed issues:**
+
+- Hits/Misses statistics not updated when using `get_all`
+  [#125](https://github.com/cabol/nebulex/issues/125)
+- Compilation fails in file lib/nebulex/rpc.ex
+  [#123](https://github.com/cabol/nebulex/issues/123)
+- Nebulex.Caching.SimpleKeyGenerator should produce a unique key
+  [#122](https://github.com/cabol/nebulex/issues/122)
+
+**Merged pull requests:**
+
+- Fix typo in `getting-started.md` guide
+  [#124](https://github.com/cabol/nebulex/pull/124)
+  ([RudolfMan](https://github.com/RudolfMan))
+
 ## [v2.1.0](https://github.com/cabol/nebulex/tree/v2.1.0) (2021-05-15)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.0.0...v2.1.0)
