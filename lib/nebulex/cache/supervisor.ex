@@ -18,10 +18,6 @@ defmodule Nebulex.Cache.Supervisor do
   Retrieves the runtime configuration.
   """
   def runtime_config(cache, otp_app, opts) do
-    # config = Application.get_env(otp_app, cache, [])
-    # config = [otp_app: otp_app] ++ Keyword.merge(config, opts)
-    # config = Keyword.put_new_lazy(config, :telemetry_prefix, fn -> telemetry_prefix(cache) end)
-
     config =
       otp_app
       |> Application.get_env(cache, [])

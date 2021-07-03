@@ -117,8 +117,7 @@ defmodule Nebulex.Adapters.Multilevel do
       %Nebulex.Stats{
         measurements: %{
           l1: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0},
-          l2: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0},
-          l3: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0}
+          l2: %{evictions: 0, expirations: 0, hits: 0, misses: 0, writes: 0}
         },
         metadata: %{
           l1: %{
