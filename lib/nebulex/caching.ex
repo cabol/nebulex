@@ -111,7 +111,11 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     It is also possible passing options to the cache, like so:
 
-        @decorate cacheable(cache: Cache, key: {Account, email}, opts: [ttl: 300_000])
+        @decorate cacheable(
+                    cache: Cache,
+                    key: {Account, email},
+                    opts: [ttl: 300_000]
+                  )
         def get_account(email, include_users?) do
           # the logic for retrieving the account ...
         end
@@ -173,7 +177,10 @@ if Code.ensure_loaded?(Decorator.Define) do
           # the logic for deleting the account ...
         end
 
-        @decorate cacheable(cache: Cache, keys: [{Account, acct.id}, {Account, acct.email}])
+        @decorate cacheable(
+                    cache: Cache,
+                    keys: [{Account, acct.id}, {Account, acct.email}]
+                  )
         def delete_account(%Account{} = acct) do
           # the logic for deleting the account ...
         end
@@ -265,7 +272,11 @@ if Code.ensure_loaded?(Decorator.Define) do
             Repo.get!(User, id)
           end
 
-          @decorate cacheable(cache: Cache, key: {User, username}, opts: [ttl: @ttl])
+          @decorate cacheable(
+                      cache: Cache,
+                      key: {User, username},
+                      opts: [ttl: @ttl]
+                    )
           def get_user_by_username(username) do
             Repo.get_by(User, [username: username])
           end
@@ -284,7 +295,10 @@ if Code.ensure_loaded?(Decorator.Define) do
           defp match_update({:ok, usr}), do: {true, usr}
           defp match_update({:error, _}), do: false
 
-          @decorate cache_evict(cache: Cache, keys: [{User, usr.id}, {User, usr.username}])
+          @decorate cache_evict(
+                      cache: Cache,
+                      keys: [{User, usr.id}, {User, usr.username}]
+                    )
           def delete_user(%User{} = usr) do
             Repo.delete(usr)
           end
@@ -300,6 +314,8 @@ if Code.ensure_loaded?(Decorator.Define) do
     """
 
     use Decorator.Define, cacheable: 1, cache_evict: 1, cache_put: 1
+
+    import Nebulex.Helpers
 
     alias Nebulex.Caching
 
@@ -365,6 +381,10 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     ## Options
 
+      * `:keys` - The set of cached keys to be updated with the returned value
+        on function completion. It overrides `:key` and `:key_generator`
+        options.
+
     See the "Shared options" section at the module documentation.
 
     ## Examples
@@ -377,12 +397,27 @@ if Code.ensure_loaded?(Decorator.Define) do
           @ttl :timer.hours(1)
 
           @decorate cache_put(cache: Cache, key: id, opts: [ttl: @ttl])
-          def update!(id, attrs \\ %{}) do
+          def update!(id, attrs \\\\ %{}) do
             # your logic (maybe write data to the SoR)
           end
 
-          @decorate cache_put(cache: Cache, key: id, match: &match_fun/1, opts: [ttl: @ttl])
-          def update(id, attrs \\ %{}) do
+          @decorate cache_put(
+                      cache: Cache,
+                      key: id,
+                      match: &match_fun/1,
+                      opts: [ttl: @ttl]
+                    )
+          def update(id, attrs \\\\ %{}) do
+            # your logic (maybe write data to the SoR)
+          end
+
+          @decorate cache_put(
+                      cache: Cache,
+                      keys: [object.name, object.id],
+                      match: &match_fun/1,
+                      opts: [ttl: @ttl]
+                    )
+          def update_object(object) do
             # your logic (maybe write data to the SoR)
           end
 
@@ -407,7 +442,7 @@ if Code.ensure_loaded?(Decorator.Define) do
     ## Options
 
       * `:keys` - Defines the set of keys to be evicted from cache on function
-        completion. It overrides the `:key_generator` option.
+        completion. It overrides `:key` and `:key_generator` options.
 
       * `:all_entries` - Defines if all entries must be removed on function
         completion. Defaults to `false`.
@@ -516,9 +551,16 @@ if Code.ensure_loaded?(Decorator.Define) do
       end
     end
 
-    defp action_block(:cache_put, block, _attrs, keygen) do
+    defp action_block(:cache_put, block, attrs, keygen) do
+      keys = get_keys(attrs)
+
+      key =
+        if is_list(keys) and length(keys) > 0,
+          do: {:"$keys", keys},
+          else: keygen
+
       quote do
-        Caching.eval_match(unquote(block), match, cache, unquote(keygen), opts)
+        Caching.eval_match(unquote(block), match, cache, unquote(key), opts)
       end
     end
 
@@ -542,7 +584,7 @@ if Code.ensure_loaded?(Decorator.Define) do
     end
 
     defp eviction_block(attrs, keygen) do
-      keys = Keyword.get(attrs, :keys)
+      keys = get_keys(attrs)
       all_entries? = attrs[:all_entries] || false
 
       cond do
@@ -563,8 +605,17 @@ if Code.ensure_loaded?(Decorator.Define) do
       end
     end
 
+    defp get_keys(attrs) do
+      get_option(
+        attrs,
+        :keys,
+        "a list with at least one element",
+        &((is_list(&1) and length(&1) > 0) or is_nil(&1))
+      )
+    end
+
     @doc """
-    This function is for internal purposes.
+    This function is for internal purposes only.
 
     **NOTE:** Workaround to avoid dialyzer warnings when using declarative
     annotation-based caching via decorators.
@@ -573,16 +624,33 @@ if Code.ensure_loaded?(Decorator.Define) do
     def eval_match(result, match, cache, key, opts) do
       case match.(result) do
         {true, value} ->
-          :ok = cache.put(key, value, opts)
+          :ok = Caching.cache_put(cache, key, value, opts)
           result
 
         true ->
-          :ok = cache.put(key, result, opts)
+          :ok = Caching.cache_put(cache, key, result, opts)
           result
 
         false ->
           result
       end
+    end
+
+    @doc """
+    Convenience function for cache_put annotation.
+
+    **NOTE:** Internal purposes only.
+    """
+    @spec cache_put(module, {:"$keys", term} | term, term, Keyword.t()) :: :ok
+    def cache_put(cache, key, value, opts)
+
+    def cache_put(cache, {:"$keys", keys}, value, opts) do
+      entries = for k <- keys, do: {k, value}
+      cache.put_all(entries, opts)
+    end
+
+    def cache_put(cache, key, value, opts) do
+      cache.put(key, value, opts)
     end
   end
 end

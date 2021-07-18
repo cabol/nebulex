@@ -66,7 +66,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
       assert Regex.match?(~r"keyslot UnloadedKeyslot was not compiled", msg)
     end
 
-    test "fails because invalid keyslot module" do
+    test "fails because keyslot module does not implement expected behaviour" do
       assert {:error, {%ArgumentError{message: msg}, _}} =
                Partitioned.start_link(
                  name: :invalid_keyslot,
@@ -76,6 +76,16 @@ defmodule Nebulex.Adapters.PartitionedTest do
       mod = inspect(__MODULE__)
       behaviour = "Nebulex.Adapter.Keyslot"
       assert Regex.match?(~r"expected #{mod} to implement the behaviour #{behaviour}", msg)
+    end
+
+    test "fails because invalid keyslot option" do
+      assert {:error, {%ArgumentError{message: msg}, _}} =
+               Partitioned.start_link(
+                 name: :invalid_keyslot,
+                 keyslot: "invalid"
+               )
+
+      assert Regex.match?(~r"expected keyslot: to be an atom, got: \"invalid\"", msg)
     end
   end
 

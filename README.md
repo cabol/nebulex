@@ -166,21 +166,22 @@ defmodule MyApp.Accounts do
 
   @decorate cache_put(
               cache: Cache,
-              keys: [{User, usr.id}, {User, usr.username}],
-              match: &match_update/1
+              keys: [{User, user.id}, {User, user.username}],
+              match: &match_update/1,
+              opts: [ttl: @ttl]
             )
-  def update_user(%User{} = usr, attrs) do
-    usr
+  def update_user(%User{} = user, attrs) do
+    user
     |> User.changeset(attrs)
     |> Repo.update()
   end
 
-  defp match_update({:ok, usr}), do: {true, usr}
-  defp match_update({:error, _}), do: false
-
-  @decorate cache_evict(cache: Cache, keys: [{User, usr.id}, {User, usr.username}])
-  def delete_user(%User{} = usr) do
-    Repo.delete(usr)
+  @decorate cache_evict(
+              cache: Cache,
+              keys: [{User, user.id}, {User, user.username}]
+            )
+  def delete_user(%User{} = user) do
+    Repo.delete(user)
   end
 
   def create_user(attrs \\ %{}) do
@@ -188,6 +189,9 @@ defmodule MyApp.Accounts do
     |> User.changeset(attrs)
     |> Repo.insert()
   end
+
+  defp match_update({:ok, value}), do: {true, value}
+  defp match_update({:error, _}), do: false
 end
 ```
 

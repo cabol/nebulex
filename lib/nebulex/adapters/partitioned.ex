@@ -313,7 +313,7 @@ defmodule Nebulex.Adapters.Partitioned do
     # Keyslot module for selecting nodes
     keyslot =
       opts
-      |> Keyword.get(:keyslot, __MODULE__)
+      |> get_option(:keyslot, "an atom", &is_atom/1, __MODULE__)
       |> assert_behaviour(Nebulex.Adapter.Keyslot, "keyslot")
 
     # Maybe task supervisor for distributed tasks

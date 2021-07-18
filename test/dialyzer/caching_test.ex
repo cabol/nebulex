@@ -8,6 +8,8 @@ defmodule Nebulex.Dialyzer.CachingTest do
     @type t :: %__MODULE__{}
   end
 
+  @ttl :timer.seconds(3600)
+
   ## Annotated Functions
 
   @spec get_account(integer) :: Account.t()
@@ -16,21 +18,32 @@ defmodule Nebulex.Dialyzer.CachingTest do
     %Account{id: id}
   end
 
-  @spec get_account_by_username(String.t()) :: Account.t()
-  @decorate cacheable(cache: Cache, key: {Account, username})
+  @spec get_account_by_username(binary) :: Account.t()
+  @decorate cacheable(cache: Cache, key: {Account, username}, opts: [ttl: @ttl])
   def get_account_by_username(username) do
     %Account{username: username}
   end
 
   @spec update_account(Account.t()) :: Account.t()
-  @decorate cache_put(cache: Cache, key: {Account, acct.id})
-  def update_account(acct) do
-    acct
+  @decorate cache_put(
+              cache: Cache,
+              keys: [{Account, acct.id}, {Account, acct.username}],
+              match: &match/1,
+              opts: [ttl: @ttl]
+            )
+  def update_account(%Account{} = acct) do
+    {:ok, acct}
+  end
+
+  @spec update_account_by_id(binary, %{optional(atom) => term}) :: Account.t()
+  @decorate cache_put(cache: Cache, key: {Account, id}, match: &match/1, opts: [ttl: @ttl])
+  def update_account_by_id(id, attrs) do
+    {:ok, struct(Account, Map.put(attrs, :id, id))}
   end
 
   @spec delete_account(Account.t()) :: Account.t()
   @decorate cache_evict(cache: Cache, keys: [{Account, acct.id}, {Account, acct.username}])
-  def delete_account(acct) do
+  def delete_account(%Account{} = acct) do
     acct
   end
 
@@ -39,4 +52,7 @@ defmodule Nebulex.Dialyzer.CachingTest do
   def delete_all_accounts(filter) do
     filter
   end
+
+  defp match({:ok, updated}), do: {true, updated}
+  defp match({:error, _}), do: false
 end

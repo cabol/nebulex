@@ -188,6 +188,20 @@ defmodule Nebulex.CachingTest do
       assert update_without_args() == "hello"
       assert Cache.get(0) == "hello"
     end
+
+    test "with multiple keys and ttl" do
+      assert set_keys(x: 1, y: 2, z: 3) == :ok
+
+      assert update_with_multiple_keys(:x, :y) == {:ok, {"x", "y"}}
+      assert Cache.get(:x) == {"x", "y"}
+      assert Cache.get(:y) == {"x", "y"}
+      assert Cache.get(:z) == 3
+
+      :ok = Process.sleep(1100)
+      refute Cache.get(:x)
+      refute Cache.get(:y)
+      assert Cache.get(:z) == 3
+    end
   end
 
   describe "cache_evict" do
@@ -359,6 +373,13 @@ defmodule Nebulex.CachingTest do
   @decorate cache_put(cache: Cache, key: x, match: &match_fun/1)
   def update_with_match(x) do
     {:ok, to_string(x)}
+  rescue
+    _ -> :error
+  end
+
+  @decorate cache_put(cache: Cache, keys: [x, y], match: &match_fun/1, opts: [ttl: 1000])
+  def update_with_multiple_keys(x, y) do
+    {:ok, {to_string(x), to_string(y)}}
   rescue
     _ -> :error
   end
