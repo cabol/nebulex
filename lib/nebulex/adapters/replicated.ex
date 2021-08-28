@@ -118,6 +118,31 @@ defmodule Nebulex.Adapters.Replicated do
       the task is shut down but the current process doesn't exit, only the
       result associated with that task is skipped in the reduce phase.
 
+  ## Telemetry events
+
+  This adapter emits all recommended Telemetry events, and documented
+  in `Nebulex.Cache` module (see **"Adapter-specific events"** section).
+
+  Since the replicated adapter depends on the configured primary storage
+  adapter (local cache adapter), this one may also emit Telemetry events.
+  Therefore, there will be events emitted by the replicated adapter as well
+  as the primary storage adapter. For example, for the cache defined before
+  `MyApp.ReplicatedCache`, these would be the emitted events:
+
+    * `[:my_app, :replicated_cache, :command, :start]`
+    * `[:my_app, :replicated_cache, :primary, :command, :start]`
+    * `[:my_app, :replicated_cache, :command, :stop]`
+    * `[:my_app, :replicated_cache, :primary, :command, :stop]`
+    * `[:my_app, :replicated_cache, :command, :exception]`
+    * `[:my_app, :replicated_cache, :primary, :command, :exception]`
+
+  As you may notice, the telemetry prefix by default for the replicated cache
+  is `[:my_app, :replicated_cache]`, and the prefix for its primary storage
+  `[:my_app, :replicated_cache, :primary]`.
+
+  See also the [Telemetry guide](http://hexdocs.pm/nebulex/telemetry.html)
+  for more information and examples.
+
   ## Stats
 
   This adapter depends on the primary storage adapter for the stats support.

@@ -109,15 +109,19 @@ we can add it to the metric's tags.
 
 ### Extracting tag values from adapter's metadata
 
-Let's add another metric for the command event, this time to group by cache and
-function name (invoked adapter's callback name):
+Let's add another metric for the command event, this time to group by **cache**,
+**adapter**, and **function_name** (adapter's callback):
 
 ```elixir
 Telemetry.Metrics.summary(
   "my_app.cache.command.stop.duration",
   unit: {:native, :millisecond},
-  tags: [:cache, :function_name],
-  tag_values: &Map.put(&1, :cache, &1.adapter_meta.cache)
+  tags: [:cache, :adapter, :function_name],
+  tag_values:
+    &Map.merge(&1, %{
+      cache: &1.adapter_meta.cache,
+      adapter: &1.adapter_meta.cache.__adapter__()
+    })
 )
 ```
 

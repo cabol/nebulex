@@ -103,6 +103,38 @@ defmodule Nebulex.Adapters.Multilevel do
       level where the operation will take place. By default, the evaluation
       is performed throughout the whole cache hierarchy (all levels).
 
+  ## Telemetry events
+
+  This adapter emits all recommended Telemetry events, and documented
+  in `Nebulex.Cache` module (see **"Adapter-specific events"** section).
+
+  Since the multi-level adapter is a layer/wrapper on top of other existing
+  adapters, each cache level may Telemetry emit events independently.
+  For example, for the cache defined before `MyApp.Multilevel`, the next
+  events will be emitted for the main multi-level cache:
+
+    * `[:my_app, :multilevel, :command, :start]`
+    * `[:my_app, :multilevel, :command, :stop]`
+    * `[:my_app, :multilevel, :command, :exception]`
+
+  For the L1 (configured with the local adapter):
+
+    * `[:my_app, :multilevel, :l1, :command, :start]`
+    * `[:my_app, :multilevel, :l1, :command, :stop]`
+    * `[:my_app, :multilevel, :l1, :command, :exception]`
+
+  For the L2 (configured with the partitioned adapter):
+
+    * `[:my_app, :multilevel, :l2, :command, :start]`
+    * `[:my_app, :multilevel, :l2, :primary, :command, :start]`
+    * `[:my_app, :multilevel, :l2, :command, :stop]`
+    * `[:my_app, :multilevel, :l2, :primary, :command, :stop]`
+    * `[:my_app, :multilevel, :l2, :command, :exception]`
+    * `[:my_app, :multilevel, :l2, :primary, :command, :exception]`
+
+  See also the [Telemetry guide](http://hexdocs.pm/nebulex/telemetry.html)
+  for more information and examples.
+
   ## Stats
 
   Since the multi-level adapter works as a wrapper for the configured cache
