@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.2.0](https://github.com/cabol/nebulex/tree/v2.2.0) (2021-09-10)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.1.1...v2.2.0)
+
+**Implemented enhancements:**
+
+- Improve the Telemetry documentation for the partitioned, replicated,
+  and multi-level adapters. [#130](https://github.com/cabol/nebulex/issues/130)
+- Make `:keys` option available for `cache_put` annotation
+  [#128](https://github.com/cabol/nebulex/issues/128)
+
+**Closed issues:**
+
+- `cache_put` does not work when passing a list of keys
+  [#127](https://github.com/cabol/nebulex/issues/127)
+
 ## [v2.1.1](https://github.com/cabol/nebulex/tree/v2.1.1) (2021-06-25)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.1.0...v2.1.1)
