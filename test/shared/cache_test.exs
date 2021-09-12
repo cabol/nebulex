@@ -12,7 +12,6 @@ defmodule Nebulex.CacheTest do
       use Nebulex.Cache.TransactionTest
       use Nebulex.Cache.PersistenceTest
       use Nebulex.Cache.PersistenceErrorTest
-      use Nebulex.Cache.DeprecatedTest
     end
   end
 end

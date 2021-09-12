@@ -107,15 +107,15 @@ defmodule Nebulex.MultilevelTest do
         refute cache.get(3, level: 3)
       end
 
-      test "has_key?/1", %{cache: cache} do
+      test "exists?/1", %{cache: cache} do
         assert cache.put(1, 1) == :ok
         assert cache.put(2, 2, level: 2) == :ok
         assert cache.put(3, 3, level: 3) == :ok
 
-        assert cache.has_key?(1)
-        assert cache.has_key?(2)
-        assert cache.has_key?(3)
-        refute cache.has_key?(4)
+        assert cache.exists?(1)
+        assert cache.exists?(2)
+        assert cache.exists?(3)
+        refute cache.exists?(4)
       end
 
       test "ttl/1", %{cache: cache} do
@@ -171,20 +171,20 @@ defmodule Nebulex.MultilevelTest do
         assert cache.put(1, 1, level: 1) == :ok
         assert cache.put(2, 2) == :ok
 
-        assert cache.get_and_update(1, &{&1, &1 * 2}, level: 1) == {1, 2}
+        assert cache.get_and_update!(1, &{&1, &1 * 2}, level: 1) == {1, 2}
         assert cache.get(1, level: 1) == 2
         refute cache.get(1, level: 3)
         refute cache.get(1, level: 3)
 
-        assert cache.get_and_update(2, &{&1, &1 * 2}) == {2, 4}
+        assert cache.get_and_update!(2, &{&1, &1 * 2}) == {2, 4}
         assert cache.get(2, level: 1) == 4
         assert cache.get(2, level: 2) == 4
         assert cache.get(2, level: 3) == 4
 
-        assert cache.get_and_update(1, fn _ -> :pop end, level: 1) == {2, nil}
+        assert cache.get_and_update!(1, fn _ -> :pop end, level: 1) == {2, nil}
         refute cache.get(1, level: 1)
 
-        assert cache.get_and_update(2, fn _ -> :pop end) == {4, nil}
+        assert cache.get_and_update!(2, fn _ -> :pop end) == {4, nil}
         refute cache.get(2, level: 1)
         refute cache.get(2, level: 2)
         refute cache.get(2, level: 3)
@@ -194,12 +194,12 @@ defmodule Nebulex.MultilevelTest do
         assert cache.put(1, 1, level: 1) == :ok
         assert cache.put(2, 2) == :ok
 
-        assert cache.update(1, 1, &(&1 * 2), level: 1) == 2
+        assert cache.update!(1, 1, &(&1 * 2), level: 1) == 2
         assert cache.get(1, level: 1) == 2
         refute cache.get(1, level: 2)
         refute cache.get(1, level: 3)
 
-        assert cache.update(2, 1, &(&1 * 2)) == 4
+        assert cache.update!(2, 1, &(&1 * 2)) == 4
         assert cache.get(2, level: 1) == 4
         assert cache.get(2, level: 2) == 4
         assert cache.get(2, level: 3) == 4

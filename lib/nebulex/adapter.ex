@@ -39,10 +39,11 @@ defmodule Nebulex.Adapter do
 
   It expects a name or a PID representing the cache.
   """
-  @spec with_meta(atom | pid, (module, adapter_meta -> term)) :: term
+  @spec with_meta(atom | pid, (module, adapter_meta -> term)) :: term | {:error, Nebulex.Error.t()}
   def with_meta(name_or_pid, fun) do
-    {adapter, adapter_meta} = Nebulex.Cache.Registry.lookup(name_or_pid)
-    fun.(adapter, adapter_meta)
+    with {:ok, {adapter, adapter_meta}} <- Nebulex.Cache.Registry.lookup(name_or_pid) do
+      fun.(adapter, adapter_meta)
+    end
   end
 
   # FIXME: ExCoveralls does not mark most of this section as covered

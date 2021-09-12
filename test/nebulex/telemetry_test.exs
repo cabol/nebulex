@@ -172,7 +172,7 @@ defmodule Nebulex.TelemetryTest do
           get_all: [["foo", "foo foo"]],
           delete: ["unknown"],
           take: ["foo foo"],
-          has_key?: ["foo foo"],
+          exists?: ["foo foo"],
           incr: [:counter],
           ttl: ["foo"],
           expire: ["foo", 60_000],

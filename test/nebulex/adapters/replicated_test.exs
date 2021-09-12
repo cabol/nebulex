@@ -142,7 +142,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
 
         msg = ~r"RPC error while executing action :put_all\n\nSuccessful responses:"
 
-        assert_raise Nebulex.RPCMultiCallError, msg, fn ->
+        assert_raise Nebulex.RPCMulticallError, msg, fn ->
           ReplicatedMock.put_all(a: 1, b: 2)
         end
       after

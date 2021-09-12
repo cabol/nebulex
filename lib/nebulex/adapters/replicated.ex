@@ -432,8 +432,8 @@ defmodule Nebulex.Adapters.Replicated do
   end
 
   @impl true
-  defspan has_key?(adapter_meta, key) do
-    with_dynamic_cache(adapter_meta, :has_key?, [key])
+  defspan exists?(adapter_meta, key) do
+    with_dynamic_cache(adapter_meta, :exists?, [key])
   end
 
   @impl true
@@ -582,7 +582,7 @@ defmodule Nebulex.Adapters.Replicated do
   defp handle_rpc_multi_call({responses, {:sanitized, {errors, rpc_errors}}}, meta, action) do
     _ = dispatch_replication_error(meta, action, rpc_errors)
 
-    raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
+    raise Nebulex.RPCMulticallError, action: action, responses: responses, errors: errors
   end
 
   defp handle_rpc_multi_call({responses, errors}, meta, action) do

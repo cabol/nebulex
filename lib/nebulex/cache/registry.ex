@@ -3,6 +3,8 @@ defmodule Nebulex.Cache.Registry do
 
   use GenServer
 
+  import Nebulex.Helpers
+
   ## API
 
   @spec start_link(Keyword.t()) :: GenServer.on_start()
@@ -15,17 +17,22 @@ defmodule Nebulex.Cache.Registry do
     GenServer.call(__MODULE__, {:register, pid, value})
   end
 
-  @spec lookup(atom | pid) :: term
+  @spec lookup(atom | pid) :: {:ok, term} | {:error, Nebulex.Error.t()}
+  def lookup(name_or_pid)
+
   def lookup(name) when is_atom(name) do
-    name
-    |> GenServer.whereis()
-    |> Kernel.||(raise Nebulex.RegistryLookupError, name: name)
-    |> lookup()
+    if pid = GenServer.whereis(name) do
+      lookup(pid)
+    else
+      wrap_error Nebulex.Error, reason: {:registry_error, name}
+    end
   end
 
   def lookup(pid) when is_pid(pid) do
-    {_ref, value} = :persistent_term.get({__MODULE__, pid})
-    value
+    case :persistent_term.get({__MODULE__, pid}, nil) do
+      {_ref, value} -> {:ok, value}
+      nil -> wrap_error Nebulex.Error, reason: {:registry_error, pid}
+    end
   end
 
   ## GenServer Callbacks

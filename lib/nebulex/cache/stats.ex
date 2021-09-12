@@ -1,6 +1,8 @@
 defmodule Nebulex.Cache.Stats do
   @moduledoc false
 
+  import Nebulex.Helpers
+
   alias Nebulex.Adapter
 
   ## API
@@ -12,6 +14,13 @@ defmodule Nebulex.Cache.Stats do
     Adapter.with_meta(name, & &1.stats(&2))
   end
 
+  @doc """
+  Implementation for `c:Nebulex.Cache.stats!/0`.
+  """
+  def stats!(name) do
+    unwrap_or_raise stats(name)
+  end
+
   if Code.ensure_loaded?(:telemetry) do
     @doc """
     Implementation for `c:Nebulex.Cache.dispatch_stats/1`.
@@ -19,14 +28,15 @@ defmodule Nebulex.Cache.Stats do
     def dispatch_stats(name, opts \\ []) do
       Adapter.with_meta(name, fn adapter, meta ->
         with true <- is_list(meta.telemetry_prefix),
-             %Nebulex.Stats{} = info <- adapter.stats(meta) do
+             {:ok, %Nebulex.Stats{} = info} <- adapter.stats(meta) do
           :telemetry.execute(
             meta.telemetry_prefix ++ [:stats],
             info.measurements,
             Map.merge(info.metadata, opts[:metadata] || %{})
           )
         else
-          _ -> :ok
+          false -> :ok
+          error -> error
         end
       end)
     end

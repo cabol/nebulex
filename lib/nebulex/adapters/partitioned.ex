@@ -453,29 +453,19 @@ defmodule Nebulex.Adapters.Partitioned do
   ## Nebulex.Adapter.Entry
 
   @impl true
-  defspan get(adapter_meta, key, opts) do
-    call(adapter_meta, key, :get, [key, opts], opts)
+  defspan fetch(adapter_meta, key, opts) do
+    call(adapter_meta, key, :fetch, [key, opts], opts)
   end
 
   @impl true
   defspan get_all(adapter_meta, keys, opts) do
-    map_reduce(
-      keys,
-      adapter_meta,
-      :get_all,
-      [opts],
-      Keyword.get(opts, :timeout),
-      {
-        %{},
-        fn
-          {:ok, res}, _, acc when is_map(res) ->
-            Map.merge(acc, res)
+    case map_reduce(keys, adapter_meta, :get_all, [opts], Keyword.get(opts, :timeout)) do
+      {res, []} ->
+        {:ok, Enum.reduce(res, %{}, &Map.merge(&2, &1))}
 
-          _, _, acc ->
-            acc
-        end
-      }
-    )
+      {ok, errors} ->
+        wrap_error Nebulex.RPCMulticallError, action: :get_all, responses: ok, errors: errors
+    end
   end
 
   @impl true
@@ -483,7 +473,7 @@ defmodule Nebulex.Adapters.Partitioned do
     case on_write do
       :put ->
         :ok = call(adapter_meta, key, :put, [key, value, opts], opts)
-        true
+        {:ok, true}
 
       :put_new ->
         call(adapter_meta, key, :put_new, [key, value, opts], opts)
@@ -505,38 +495,15 @@ defmodule Nebulex.Adapters.Partitioned do
   end
 
   def do_put_all(action, adapter_meta, entries, opts) do
-    reducer = {
-      {true, []},
-      fn
-        {:ok, :ok}, {_, {_, _, [_, _, [kv, _]]}}, {bool, acc} ->
-          {bool, Enum.reduce(kv, acc, &[elem(&1, 0) | &2])}
+    case {action, map_reduce(entries, adapter_meta, action, [opts], Keyword.get(opts, :timeout))} do
+      {:put_all, {_res, []}} ->
+        {:ok, true}
 
-        {:ok, true}, {_, {_, _, [_, _, [kv, _]]}}, {bool, acc} ->
-          {bool, Enum.reduce(kv, acc, &[elem(&1, 0) | &2])}
+      {:put_new_all, {res, []}} ->
+        {:ok, Enum.reduce(res, true, &(&1 and &2))}
 
-        {:ok, false}, _, {_, acc} ->
-          {false, acc}
-
-        {:error, _}, _, {_, acc} ->
-          {false, acc}
-      end
-    }
-
-    entries
-    |> map_reduce(
-      adapter_meta,
-      action,
-      [opts],
-      Keyword.get(opts, :timeout),
-      reducer
-    )
-    |> case do
-      {true, _} ->
-        true
-
-      {false, keys} ->
-        :ok = Enum.each(keys, &delete(adapter_meta, &1, []))
-        action == :put_all
+      {_, {ok, errors}} ->
+        wrap_error Nebulex.RPCMulticallError, action: action, responses: ok, errors: errors
     end
   end
 
@@ -551,8 +518,8 @@ defmodule Nebulex.Adapters.Partitioned do
   end
 
   @impl true
-  defspan has_key?(adapter_meta, key) do
-    call(adapter_meta, key, :has_key?, [key])
+  defspan exists?(adapter_meta, key) do
+    call(adapter_meta, key, :exists?, [key])
   end
 
   @impl true
@@ -585,15 +552,15 @@ defmodule Nebulex.Adapters.Partitioned do
         _ -> &Enum.sum/1
       end
 
-    adapter_meta.task_sup
-    |> RPC.multi_call(
-      Cluster.get_nodes(adapter_meta.name),
+    adapter_meta.name
+    |> Cluster.get_nodes()
+    |> RPC.multicall(
       __MODULE__,
       :with_dynamic_cache,
       [adapter_meta, operation, [query, opts]],
       opts
     )
-    |> handle_rpc_multi_call(operation, reducer)
+    |> handle_rpc_multicall(operation, reducer)
   end
 
   @impl true
@@ -608,19 +575,20 @@ defmodule Nebulex.Adapters.Partitioned do
 
         [node | nodes] ->
           elements =
-            rpc_call(
-              adapter_meta.task_sup,
-              node,
-              __MODULE__,
-              :eval_stream,
-              [adapter_meta, query, opts],
-              opts
-            )
+            unwrap_or_raise rpc_call(
+                              adapter_meta.task_sup,
+                              node,
+                              __MODULE__,
+                              :eval_stream,
+                              [adapter_meta, query, opts],
+                              opts
+                            )
 
           {elements, nodes}
       end,
       & &1
     )
+    |> wrap_ok()
   end
 
   ## Nebulex.Adapter.Persistence
@@ -674,9 +642,9 @@ defmodule Nebulex.Adapters.Partitioned do
   Helper to perform `stream/3` locally.
   """
   def eval_stream(meta, query, opts) do
-    meta
-    |> with_dynamic_cache(:stream, [query, opts])
-    |> Enum.to_list()
+    with {:ok, stream} <- with_dynamic_cache(meta, :stream, [query, opts]) do
+      {:ok, Enum.to_list(stream)}
+    end
   end
 
   ## Private Functions
@@ -695,20 +663,8 @@ defmodule Nebulex.Adapters.Partitioned do
     rpc_call(task_sup, node, __MODULE__, :with_dynamic_cache, [meta, fun, args], opts)
   end
 
-  if Code.ensure_loaded?(:erpc) do
-    defp rpc_call(supervisor, node, mod, fun, args, opts) do
-      RPC.call(supervisor, node, mod, fun, args, opts[:timeout] || 5000)
-    end
-  else
-    defp rpc_call(supervisor, node, mod, fun, args, opts) do
-      case RPC.call(supervisor, node, mod, fun, args, opts[:timeout] || 5000) do
-        {:badrpc, remote_ex} ->
-          raise remote_ex
-
-        response ->
-          response
-      end
-    end
+  defp rpc_call(_supervisor, node, mod, fun, args, opts) do
+    RPC.call(node, mod, fun, args, opts[:timeout] || 5000)
   end
 
   defp group_keys_by_node(enum, adapter_meta) do
@@ -723,31 +679,42 @@ defmodule Nebulex.Adapters.Partitioned do
     end)
   end
 
-  defp map_reduce(
-         enum,
-         %{task_sup: task_sup} = meta,
-         action,
-         args,
-         timeout,
-         reducer
-       ) do
-    groups =
-      enum
-      |> group_keys_by_node(meta)
-      |> Enum.map(fn {node, group} ->
-        {node, {__MODULE__, :with_dynamic_cache, [meta, action, [group | args]]}}
-      end)
-
-    RPC.multi_call(task_sup, groups, timeout: timeout, reducer: reducer)
+  defp map_reduce(enum, meta, action, args, timeout) do
+    enum
+    |> group_keys_by_node(meta)
+    |> Enum.map(fn {node, group} ->
+      {node, {__MODULE__, :with_dynamic_cache, [meta, action, [group | args]]}}
+    end)
+    |> RPC.multicall(timeout: timeout)
   end
 
-  defp handle_rpc_multi_call({res, []}, _action, fun) do
-    fun.(res)
+  defp handle_rpc_multicall({res, []}, _action, fun) do
+    {:ok, fun.(res)}
   end
 
-  defp handle_rpc_multi_call({responses, errors}, action, _) do
-    raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
+  defp handle_rpc_multicall({ok, errors}, action, _) do
+    wrap_error Nebulex.RPCMulticallError, action: action, responses: ok, errors: errors
   end
+
+  # defp handle_rpc_multicall({:ok, res}, init_acc, fun, nodes, _action) do
+  #   res
+  #   |> :lists.zip(nodes)
+  #   |> Enum.reduce_while({:ok, init_acc}, fn
+  #     {{:ok, val}, _node}, {:ok, acc} ->
+  #       {:cont, {:ok, fun.(val, acc)}}
+
+  #     {{:error, _} = error, _node}, _acc ->
+  #       {:halt, error}
+
+  #     {{:badrpc, reason}, node}, _acc ->
+  #       error = wrap_error Nebulex.RPCError, reason: reason, node: node
+  #       {:halt, error}
+  #   end)
+  # end
+
+  # defp handle_rpc_multicall({:error, %Nebulex.RPCMulticallError{} = reason}, _, _, _, action) do
+  #   {:error, %{reason | action: action}}
+  # end
 end
 
 defmodule Nebulex.Adapters.Partitioned.Bootstrap do

@@ -59,7 +59,7 @@ defmodule Nebulex.Adapters.StatsTest do
       :ok = Cache.put_all(a: 1, b: 2)
 
       assert Cache.get(:a) == 1
-      assert Cache.has_key?(:a)
+      assert Cache.exists?(:a)
       assert Cache.ttl(:b) == :infinity
       refute Cache.get(:c)
       refute Cache.get(:d)
@@ -115,7 +115,7 @@ defmodule Nebulex.Adapters.StatsTest do
         l3: [evictions: 2, misses: 1, writes: 10]
       )
 
-      assert Cache.delete_all() == 24
+      assert Cache.delete_all!() == 24
 
       assert_stats_measurements(Cache,
         l1: [evictions: 10, misses: 1, writes: 10],

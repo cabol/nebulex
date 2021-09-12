@@ -273,31 +273,72 @@ defmodule Nebulex.Cache do
   @typedoc "Cache action options"
   @type opts :: Keyword.t()
 
+  @typedoc "Common error reasons"
+  @type error_reason ::
+          Nebulex.Error.t()
+          | Nebulex.RPCError.t()
+          | Exception.t()
+
+  @typedoc "Fetch error reasons"
+  @type fetch_error_reason :: Nebulex.KeyError.t() | error_reason
+
+  @typedoc "Query error reasons"
+  @type query_error_reason :: Nebulex.QueryError.t() | error_reason
+
+  @typedoc "Error tuple with common reasons"
+  @type error :: error(error_reason)
+
+  @typedoc "Error tuple type"
+  @type error(reason) :: {:error, reason}
+
+  @typedoc "Ok/Error tuple with default error reasons"
+  @type ok_error_tuple(ok) :: ok_error_tuple(ok, error_reason)
+
+  @typedoc "Ok/Error tuple type"
+  @type ok_error_tuple(ok, error) :: {:ok, ok} | {:error, error}
+
   @doc false
   defmacro __using__(opts) do
-    quote bind_quoted: [opts: opts] do
+    quote do
+      unquote(prelude(opts))
+      unquote(base_defs())
+      unquote(entry_defs())
+
+      if Nebulex.Adapter.Queryable in behaviours do
+        unquote(queryable_defs())
+      end
+
+      if Nebulex.Adapter.Persistence in behaviours do
+        unquote(persistence_defs())
+      end
+
+      if Nebulex.Adapter.Transaction in behaviours do
+        unquote(transaction_defs())
+      end
+
+      if Nebulex.Adapter.Stats in behaviours do
+        unquote(stats_defs())
+      end
+    end
+  end
+
+  defp prelude(opts) do
+    quote do
       @behaviour Nebulex.Cache
 
-      alias Nebulex.Cache.{
-        Entry,
-        Persistence,
-        Queryable,
-        Stats,
-        Storage,
-        Transaction
-      }
-
-      alias Nebulex.Hook
-
-      {otp_app, adapter, behaviours} = Nebulex.Cache.Supervisor.compile_config(opts)
+      {otp_app, adapter, behaviours} = Nebulex.Cache.Supervisor.compile_config(unquote(opts))
 
       @otp_app otp_app
       @adapter adapter
-      @opts opts
-      @default_dynamic_cache opts[:default_dynamic_cache] || __MODULE__
-      @default_key_generator opts[:default_key_generator] || Nebulex.Caching.SimpleKeyGenerator
+      @opts unquote(opts)
+      @default_dynamic_cache @opts[:default_dynamic_cache] || __MODULE__
+      @default_key_generator @opts[:default_key_generator] || Nebulex.Caching.SimpleKeyGenerator
       @before_compile adapter
+    end
+  end
 
+  defp base_defs do
+    quote do
       ## Config and metadata
 
       @impl true
@@ -361,17 +402,31 @@ defmodule Nebulex.Cache do
       def with_dynamic_cache(name, module, fun, args) do
         with_dynamic_cache(name, fn -> apply(module, fun, args) end)
       end
+    end
+  end
 
-      ## Entry
+  defp entry_defs do
+    quote do
+      alias Nebulex.Cache.Entry
 
       @impl true
-      def get(key, opts \\ []) do
-        Entry.get(get_dynamic_cache(), key, opts)
+      def fetch(key, opts \\ []) do
+        Entry.fetch(get_dynamic_cache(), key, opts)
       end
 
       @impl true
-      def get!(key, opts \\ []) do
-        Entry.get!(get_dynamic_cache(), key, opts)
+      def fetch!(key, opts \\ []) do
+        Entry.fetch!(get_dynamic_cache(), key, opts)
+      end
+
+      @impl true
+      def get(key, default \\ nil, opts \\ []) do
+        Entry.get(get_dynamic_cache(), key, default, opts)
+      end
+
+      @impl true
+      def get!(key, default \\ nil, opts \\ []) do
+        Entry.get!(get_dynamic_cache(), key, default, opts)
       end
 
       @impl true
@@ -380,8 +435,18 @@ defmodule Nebulex.Cache do
       end
 
       @impl true
+      def get_all!(keys, opts \\ []) do
+        Entry.get_all!(get_dynamic_cache(), keys, opts)
+      end
+
+      @impl true
       def put(key, value, opts \\ []) do
         Entry.put(get_dynamic_cache(), key, value, opts)
+      end
+
+      @impl true
+      def put!(key, value, opts \\ []) do
+        Entry.put!(get_dynamic_cache(), key, value, opts)
       end
 
       @impl true
@@ -410,13 +475,28 @@ defmodule Nebulex.Cache do
       end
 
       @impl true
+      def put_all!(entries, opts \\ []) do
+        Entry.put_all!(get_dynamic_cache(), entries, opts)
+      end
+
+      @impl true
       def put_new_all(entries, opts \\ []) do
         Entry.put_new_all(get_dynamic_cache(), entries, opts)
       end
 
       @impl true
+      def put_new_all!(entries, opts \\ []) do
+        Entry.put_new_all!(get_dynamic_cache(), entries, opts)
+      end
+
+      @impl true
       def delete(key, opts \\ []) do
         Entry.delete(get_dynamic_cache(), key, opts)
+      end
+
+      @impl true
+      def delete!(key, opts \\ []) do
+        Entry.delete!(get_dynamic_cache(), key, opts)
       end
 
       @impl true
@@ -430,8 +510,8 @@ defmodule Nebulex.Cache do
       end
 
       @impl true
-      def has_key?(key) do
-        Entry.has_key?(get_dynamic_cache(), key)
+      def exists?(key) do
+        Entry.exists?(get_dynamic_cache(), key)
       end
 
       @impl true
@@ -440,8 +520,18 @@ defmodule Nebulex.Cache do
       end
 
       @impl true
+      def get_and_update!(key, fun, opts \\ []) do
+        Entry.get_and_update!(get_dynamic_cache(), key, fun, opts)
+      end
+
+      @impl true
       def update(key, initial, fun, opts \\ []) do
         Entry.update(get_dynamic_cache(), key, initial, fun, opts)
+      end
+
+      @impl true
+      def update!(key, initial, fun, opts \\ []) do
+        Entry.update!(get_dynamic_cache(), key, initial, fun, opts)
       end
 
       @impl true
@@ -450,8 +540,18 @@ defmodule Nebulex.Cache do
       end
 
       @impl true
+      def incr!(key, amount \\ 1, opts \\ []) do
+        Entry.incr!(get_dynamic_cache(), key, amount, opts)
+      end
+
+      @impl true
       def decr(key, amount \\ 1, opts \\ []) do
         Entry.decr(get_dynamic_cache(), key, amount, opts)
+      end
+
+      @impl true
+      def decr!(key, amount \\ 1, opts \\ []) do
+        Entry.decr!(get_dynamic_cache(), key, amount, opts)
       end
 
       @impl true
@@ -460,8 +560,18 @@ defmodule Nebulex.Cache do
       end
 
       @impl true
+      def ttl!(key) do
+        Entry.ttl!(get_dynamic_cache(), key)
+      end
+
+      @impl true
       def expire(key, ttl) do
         Entry.expire(get_dynamic_cache(), key, ttl)
+      end
+
+      @impl true
+      def expire!(key, ttl) do
+        Entry.expire!(get_dynamic_cache(), key, ttl)
       end
 
       @impl true
@@ -469,78 +579,118 @@ defmodule Nebulex.Cache do
         Entry.touch(get_dynamic_cache(), key)
       end
 
-      ## Queryable
+      @impl true
+      def touch!(key) do
+        Entry.touch!(get_dynamic_cache(), key)
+      end
+    end
+  end
 
-      if Nebulex.Adapter.Queryable in behaviours do
-        @impl true
-        def all(query \\ nil, opts \\ []) do
-          Queryable.all(get_dynamic_cache(), query, opts)
-        end
+  defp queryable_defs do
+    quote do
+      alias Nebulex.Cache.Queryable
 
-        @impl true
-        def count_all(query \\ nil, opts \\ []) do
-          Queryable.count_all(get_dynamic_cache(), query, opts)
-        end
-
-        @impl true
-        def delete_all(query \\ nil, opts \\ []) do
-          Queryable.delete_all(get_dynamic_cache(), query, opts)
-        end
-
-        @impl true
-        def stream(query \\ nil, opts \\ []) do
-          Queryable.stream(get_dynamic_cache(), query, opts)
-        end
-
-        ## Deprecated functions (for backwards compatibility)
-
-        @impl true
-        defdelegate size, to: __MODULE__, as: :count_all
-
-        @impl true
-        defdelegate flush, to: __MODULE__, as: :delete_all
+      @impl true
+      def all(query \\ nil, opts \\ []) do
+        Queryable.all(get_dynamic_cache(), query, opts)
       end
 
-      ## Persistence
-
-      if Nebulex.Adapter.Persistence in behaviours do
-        @impl true
-        def dump(path, opts \\ []) do
-          Persistence.dump(get_dynamic_cache(), path, opts)
-        end
-
-        @impl true
-        def load(path, opts \\ []) do
-          Persistence.load(get_dynamic_cache(), path, opts)
-        end
+      @impl true
+      def all!(query \\ nil, opts \\ []) do
+        Queryable.all!(get_dynamic_cache(), query, opts)
       end
 
-      ## Transactions
-
-      if Nebulex.Adapter.Transaction in behaviours do
-        @impl true
-        def transaction(opts \\ [], fun) do
-          Transaction.transaction(get_dynamic_cache(), opts, fun)
-        end
-
-        @impl true
-        def in_transaction? do
-          Transaction.in_transaction?(get_dynamic_cache())
-        end
+      @impl true
+      def count_all(query \\ nil, opts \\ []) do
+        Queryable.count_all(get_dynamic_cache(), query, opts)
       end
 
-      ## Stats
+      @impl true
+      def count_all!(query \\ nil, opts \\ []) do
+        Queryable.count_all!(get_dynamic_cache(), query, opts)
+      end
 
-      if Nebulex.Adapter.Stats in behaviours do
-        @impl true
-        def stats do
-          Stats.stats(get_dynamic_cache())
-        end
+      @impl true
+      def delete_all(query \\ nil, opts \\ []) do
+        Queryable.delete_all(get_dynamic_cache(), query, opts)
+      end
 
-        @impl true
-        def dispatch_stats(opts \\ []) do
-          Stats.dispatch_stats(get_dynamic_cache(), opts)
-        end
+      @impl true
+      def delete_all!(query \\ nil, opts \\ []) do
+        Queryable.delete_all!(get_dynamic_cache(), query, opts)
+      end
+
+      @impl true
+      def stream(query \\ nil, opts \\ []) do
+        Queryable.stream(get_dynamic_cache(), query, opts)
+      end
+
+      @impl true
+      def stream!(query \\ nil, opts \\ []) do
+        Queryable.stream!(get_dynamic_cache(), query, opts)
+      end
+    end
+  end
+
+  defp persistence_defs do
+    quote do
+      alias Nebulex.Cache.Persistence
+
+      @impl true
+      def dump(path, opts \\ []) do
+        Persistence.dump(get_dynamic_cache(), path, opts)
+      end
+
+      @impl true
+      def dump!(path, opts \\ []) do
+        Persistence.dump!(get_dynamic_cache(), path, opts)
+      end
+
+      @impl true
+      def load(path, opts \\ []) do
+        Persistence.load(get_dynamic_cache(), path, opts)
+      end
+
+      @impl true
+      def load!(path, opts \\ []) do
+        Persistence.load!(get_dynamic_cache(), path, opts)
+      end
+    end
+  end
+
+  defp transaction_defs do
+    quote do
+      alias Nebulex.Cache.Transaction
+
+      @impl true
+      def transaction(opts \\ [], fun) do
+        Transaction.transaction(get_dynamic_cache(), opts, fun)
+      end
+
+      @impl true
+      def in_transaction? do
+        Transaction.in_transaction?(get_dynamic_cache())
+      end
+    end
+  end
+
+  defp stats_defs do
+    quote do
+      alias Nebulex.Cache.Stats
+
+      @impl true
+      def stats do
+        Stats.stats(get_dynamic_cache())
+      end
+
+      @impl true
+      def stats! do
+        Stats.stats!(get_dynamic_cache())
+      end
+
+      @impl true
+      def dispatch_stats(opts \\ []) do
+        Stats.dispatch_stats(get_dynamic_cache(), opts)
       end
     end
   end
@@ -684,9 +834,56 @@ defmodule Nebulex.Cache do
   ## Nebulex.Adapter.Entry
 
   @doc """
-  Gets a value from Cache where the key matches the given `key`.
+  Fetches the value for a specific `key` in the cache.
 
-  Returns `nil` if no result was found.
+  This function returns:
+
+    * `{:ok, value}` - the cache contains the given `key`, then its `value`
+      is returned.
+
+    * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:error_reason/0`.
+
+  ## Options
+
+  See the "Shared options" section at the module documentation for more options.
+
+  ## Example
+
+      iex> MyCache.put("foo", "bar")
+      :ok
+
+      iex>  MyCache.fetch("foo")
+      {:ok, "bar"}
+
+      iex> {:error, %Nebulex.KeyError{key: "bar"}} = MyCache.fetch("bar")
+      _error
+
+  """
+  @callback fetch(key, opts) :: ok_error_tuple(value, fetch_error_reason)
+
+  @doc """
+  Same as `c:fetch/2` but raises `Nebulex.KeyError` if the cache doesn't
+  contain `key`, or `t:error_reason/0` if another error occurs while
+  executing the command.
+  """
+  @callback fetch!(key, opts) :: value
+
+  @doc """
+  Gets a value from cache where the key matches the given `key`.
+
+  This function returns:
+
+    * `{:ok, value}` - the `key` is present in the cache,
+      then its `value` is returned.
+
+    * `{:ok, default}` - the `key` was not found in the cache,
+      then the `default` is returned.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -698,33 +895,29 @@ defmodule Nebulex.Cache do
       :ok
 
       iex>  MyCache.get("foo")
-      "bar"
+      {:ok, "bar"}
 
-      iex> MyCache.get(:non_existent_key)
-      nil
+      iex> MyCache.get(:inexistent)
+      {:ok, nil}
 
-  """
-  @callback get(key, opts) :: value
-
-  @doc """
-  Similar to `c:get/2` but raises `KeyError` if `key` is not found.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation for more options.
-
-  ## Example
-
-      MyCache.get!(:a)
+      iex> MyCache.get(:inexistent, :default)
+      {:ok, :default}
 
   """
-  @callback get!(key, opts) :: value
+  @callback get(key, default :: value, opts) :: ok_error_tuple(value, error_reason)
 
   @doc """
-  Returns a `map` with all the key-value pairs in the Cache where the key
-  is in `keys`.
+  Same as `c:get/3` but raises an exception if an error occurs.
+  """
+  @callback get!(key, default :: value, opts) :: value
 
-  If `keys` contains keys that are not in the Cache, they're simply ignored.
+  @doc """
+  Returns a map in the shape of `{:ok, map}` with the key-value pairs of all
+  specified `keys`. For every key that does not hold a value or does not exist,
+  it is ignored and not added into the returned map.
+
+  Returns `{:error, reason}` if an error occurs while executing the command.
+  The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -736,10 +929,15 @@ defmodule Nebulex.Cache do
       :ok
 
       iex> MyCache.get_all([:a, :b, :c])
-      %{a: 1, c: 3}
+      {:ok, %{a: 1, c: 3}}
 
   """
-  @callback get_all(keys :: [key], opts) :: map
+  @callback get_all(keys :: [key], opts) :: ok_error_tuple(map)
+
+  @doc """
+  Same as `c:get_all/2` but raises an exception if an error occurs.
+  """
+  @callback get_all!(keys :: [key], opts) :: map
 
   @doc """
   Puts the given `value` under `key` into the Cache.
@@ -747,6 +945,9 @@ defmodule Nebulex.Cache do
   If `key` already holds an entry, it is overwritten. Any previous
   time to live associated with the key is discarded on successful
   `put` operation.
+
+  Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
+  The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -761,17 +962,10 @@ defmodule Nebulex.Cache do
       iex> MyCache.put("foo", "bar")
       :ok
 
-  If the value is nil, then it is not stored (operation is skipped):
-
-      iex> MyCache.put("foo", nil)
-      :ok
-
-  Put key with time-to-live:
+  Putting entries with specific time-to-live:
 
       iex> MyCache.put("foo", "bar", ttl: 10_000)
       :ok
-
-  Using Nebulex.Time for TTL:
 
       iex> MyCache.put("foo", "bar", ttl: :timer.hours(1))
       :ok
@@ -783,11 +977,19 @@ defmodule Nebulex.Cache do
       :ok
 
   """
-  @callback put(key, value, opts) :: :ok
+  @callback put(key, value, opts) :: :ok | error
 
   @doc """
-  Puts the given `entries` (key/value pairs) into the Cache. It replaces
+  Same as `c:put/3` but raises an exception if an error occurs.
+  """
+  @callback put!(key, value, opts) :: :ok
+
+  @doc """
+  Puts the given `entries` (key/value pairs) into the cache. It replaces
   existing values with new values (just as regular `put`).
+
+  Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
+  The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -810,13 +1012,22 @@ defmodule Nebulex.Cache do
   internally by the adapter. Hence, it is recommended to review the adapter's
   documentation.
   """
-  @callback put_all(entries, opts) :: :ok
+  @callback put_all(entries, opts) :: :ok | error
+
+  @doc """
+  Same as `c:put_all/2` but raises an exception if an error occurs.
+  """
+  @callback put_all!(entries, opts) :: :ok
 
   @doc """
   Puts the given `value` under `key` into the cache, only if it does not
   already exist.
 
-  Returns `true` if a value was set, otherwise, `false` is returned.
+  Returns `{:ok, true}` if a value was set, otherwise, `{:ok, false}`
+  is returned.
+
+  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
+  `t:error_reason/0`.
 
   ## Options
 
@@ -829,45 +1040,28 @@ defmodule Nebulex.Cache do
   ## Example
 
       iex> MyCache.put_new("foo", "bar")
-      true
+      {:ok, true}
 
       iex> MyCache.put_new("foo", "bar")
-      false
-
-  If the value is nil, it is not stored (operation is skipped):
-
-      iex> MyCache.put_new("other", nil)
-      true
+      {:ok, false}
 
   """
-  @callback put_new(key, value, opts) :: boolean
+  @callback put_new(key, value, opts) :: ok_error_tuple(boolean)
 
   @doc """
-  Similar to `c:put_new/3` but raises `Nebulex.KeyAlreadyExistsError` if the
-  key already exists.
-
-  ## Options
-
-    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
-      (or expiry time) for the given key  in **milliseconds**. Defaults
-      to `:infinity`.
-
-  See the "Shared options" section at the module documentation for more options.
-
-  ## Example
-
-      iex> MyCache.put_new!("foo", "bar")
-      true
-
+  Same as `c:put_new/3` but raises an exception if an error occurs.
   """
-  @callback put_new!(key, value, opts) :: true
+  @callback put_new!(key, value, opts) :: boolean
 
   @doc """
   Puts the given `entries` (key/value pairs) into the `cache`. It will not
   perform any operation at all even if just a single key already exists.
 
-  Returns `true` if all entries were successfully set. It returns `false`
+  Returns `{:ok, true}` if all entries were successfully set, or `{:ok, false}`
   if no key was set (at least one key already existed).
+
+  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
+  `t:error_reason/0`.
 
   ## Options
 
@@ -880,23 +1074,32 @@ defmodule Nebulex.Cache do
   ## Example
 
       iex> MyCache.put_new_all(apples: 3, bananas: 1)
-      true
+      {:ok, true}
 
       iex> MyCache.put_new_all(%{apples: 3, oranges: 1}, ttl: 10_000)
-      false
+      {:ok, false}
 
   Ideally, this operation should be atomic, so all given keys are put at once.
   But it depends purely on the adapter's implementation and the backend used
   internally by the adapter. Hence, it is recommended to review the adapter's
   documentation.
   """
-  @callback put_new_all(entries, opts) :: boolean
+  @callback put_new_all(entries, opts) :: ok_error_tuple(boolean)
+
+  @doc """
+  Same as `c:put_new_all/2` but raises an exception if an error occurs.
+  """
+  @callback put_new_all!(entries, opts) :: boolean
 
   @doc """
   Alters the entry stored under `key`, but only if the entry already exists
   into the Cache.
 
-  Returns `true` if a value was set, otherwise, `false` is returned.
+  Returns `{:ok, true}` if a value was set, otherwise, `{:ok, false}`
+  is returned.
+
+  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
+  `t:error_reason/0`.
 
   ## Options
 
@@ -909,43 +1112,32 @@ defmodule Nebulex.Cache do
   ## Example
 
       iex> MyCache.replace("foo", "bar")
-      false
+      {:ok, false}
 
       iex> MyCache.put_new("foo", "bar")
-      true
+      {:ok, true}
 
       iex> MyCache.replace("foo", "bar2")
-      true
+      {:ok, true}
 
   Update current value and TTL:
 
       iex> MyCache.replace("foo", "bar3", ttl: 10_000)
-      true
+      {:ok, true}
 
   """
-  @callback replace(key, value, opts) :: boolean
+  @callback replace(key, value, opts) :: ok_error_tuple(boolean)
 
   @doc """
-  Similar to `c:replace/3` but raises `KeyError` if `key` is not found.
-
-  ## Options
-
-    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
-      (or expiry time) for the given key  in **milliseconds**. Defaults
-      to `:infinity`.
-
-  See the "Shared options" section at the module documentation for more options.
-
-  ## Example
-
-      iex> MyCache.replace!("foo", "bar")
-      true
-
+  Same as `c:replace/3` but raises an exception if an error occurs.
   """
-  @callback replace!(key, value, opts) :: true
+  @callback replace!(key, value, opts) :: boolean
 
   @doc """
-  Deletes the entry in Cache for a specific `key`.
+  Deletes the entry in cache for a specific `key`.
+
+  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
+  `t:error_reason/0`.
 
   ## Options
 
@@ -962,15 +1154,29 @@ defmodule Nebulex.Cache do
       iex> MyCache.get(:a)
       :ok
 
-      iex> MyCache.delete(:non_existent_key)
+      iex> MyCache.delete(:inexistent)
       :ok
 
   """
-  @callback delete(key, opts) :: :ok
+  @callback delete(key, opts) :: :ok | error
 
   @doc """
-  Returns and removes the value associated with `key` in the Cache.
-  If the `key` does not exist, then `nil` is returned.
+  Same as `c:delete/2` but raises an exception if an error occurs.
+  """
+  @callback delete!(key, opts) :: :ok
+
+  @doc """
+  Removes and returns the value associated with `key` in the cache.
+
+  This function returns:
+
+    * `{:ok, value}` - the cache contains the given `key`, then its `value`
+      is removed and returned.
+
+    * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -982,129 +1188,51 @@ defmodule Nebulex.Cache do
       :ok
 
       iex> MyCache.take(:a)
-      1
+      {:ok, 1}
 
-      iex> MyCache.take(:a)
-      nil
+      iex> {:error, %Nebulex.KeyError{key: :a}} = MyCache.take(:a)
+      _error
 
   """
-  @callback take(key, opts) :: value
+  @callback take(key, opts) :: ok_error_tuple(value, fetch_error_reason)
 
   @doc """
-  Similar to `c:take/2` but raises `KeyError` if `key` is not found.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation for more options.
-
-  ## Example
-
-      MyCache.take!(:a)
-
+  Same as `c:take/2` but raises an exception if an error occurs.
   """
   @callback take!(key, opts) :: value
 
   @doc """
-  Returns whether the given `key` exists in the Cache.
+  Determines if the cache contains an entry for the specified `key`.
+
+  More formally, returns `{:ok, true}` if the cache contains the given `key`.
+  If the cache doesn't contain `key`, `{:ok, :false}` is returned.
+
+  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
+  `t:error_reason/0`.
 
   ## Examples
 
       iex> MyCache.put(:a, 1)
       :ok
 
-      iex> MyCache.has_key?(:a)
-      true
+      iex> MyCache.exists?(:a)
+      {:ok, true}
 
-      iex> MyCache.has_key?(:b)
-      false
-
-  """
-  @callback has_key?(key) :: boolean
-
-  @doc """
-  Gets the value from `key` and updates it, all in one pass.
-
-  `fun` is called with the current cached value under `key` (or `nil` if `key`
-  hasn't been cached) and must return a two-element tuple: the current value
-  (the retrieved value, which can be operated on before being returned) and
-  the new value to be stored under `key`. `fun` may also return `:pop`, which
-  means the current value shall be removed from Cache and returned.
-
-  The returned value is a tuple with the current value returned by `fun` and
-  the new updated value under `key`.
-
-  ## Options
-
-    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
-      (or expiry time) for the given key  in **milliseconds**. Defaults
-      to `:infinity`.
-
-  See the "Shared options" section at the module documentation for more options.
-
-  ## Examples
-
-  Update nonexistent key:
-
-      iex> MyCache.get_and_update(:a, fn current_value ->
-      ...>   {current_value, "value!"}
-      ...> end)
-      {nil, "value!"}
-
-  Update existing key:
-
-      iex> MyCache.get_and_update(:a, fn current_value ->
-      ...>   {current_value, "new value!"}
-      ...> end)
-      {"value!", "new value!"}
-
-  Pop/remove value if exist:
-
-      iex> MyCache.get_and_update(:a, fn _ -> :pop end)
-      {"new value!", nil}
-
-  Pop/remove nonexistent key:
-
-      iex> MyCache.get_and_update(:b, fn _ -> :pop end)
-      {nil, nil}
+      iex> MyCache.exists?(:b)
+      {:ok, false}
 
   """
-  @callback get_and_update(key, (value -> {current_value, new_value} | :pop), opts) ::
-              {current_value, new_value}
-            when current_value: value, new_value: value
+  @callback exists?(key) :: ok_error_tuple(boolean)
 
   @doc """
-  Updates the cached `key` with the given function.
-
-  If `key` is present in Cache with value `value`, `fun` is invoked with
-  argument `value` and its result is used as the new value of `key`.
-
-  If `key` is not present in Cache, `initial` is inserted as the value of `key`.
-  The initial value will not be passed through the update function.
-
-  ## Options
-
-    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
-      (or expiry time) for the given key  in **milliseconds**. Defaults
-      to `:infinity`.
-
-  See the "Shared options" section at the module documentation for more options.
-
-  ## Examples
-
-      iex> MyCache.update(:a, 1, &(&1 * 2))
-      1
-
-      iex> MyCache.update(:a, 1, &(&1 * 2))
-      2
-
-  """
-  @callback update(key, initial :: value, (value -> value), opts) :: value
-
-  @doc """
-  Increments the counter stored at `key` by the given `amount`.
+  Increments the counter stored at `key` by the given `amount`, and returns
+  the current count in the shape of `{:ok, count}`.
 
   If `amount < 0` (negative), the value is decremented by that `amount`
   instead.
+
+  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
+  `t:error_reason/0`.
 
   ## Options
 
@@ -1121,25 +1249,34 @@ defmodule Nebulex.Cache do
   ## Examples
 
       iex> MyCache.incr(:a)
-      1
+      {:ok, 1}
 
       iex> MyCache.incr(:a, 2)
-      3
+      {:ok, 3}
 
       iex> MyCache.incr(:a, -1)
-      2
+      {:ok, 2}
 
       iex> MyCache.incr(:missing_key, 2, default: 10)
-      12
+      {:ok, 12}
 
   """
-  @callback incr(key, amount :: integer, opts) :: integer
+  @callback incr(key, amount :: integer, opts) :: ok_error_tuple(integer)
 
   @doc """
-  Decrements the counter stored at `key` by the given `amount`.
+  Same as `c:incr/3` but raises an exception if an error occurs.
+  """
+  @callback incr!(key, amount :: integer, opts) :: integer
+
+  @doc """
+  Decrements the counter stored at `key` by the given `amount`, and returns
+  the current count in the shape of `{:ok, count}`.
 
   If `amount < 0` (negative), the value is incremented by that `amount`
   instead (opposite to `incr/3`).
+
+  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
+  `t:error_reason/0`.
 
   ## Options
 
@@ -1156,23 +1293,37 @@ defmodule Nebulex.Cache do
   ## Examples
 
       iex> MyCache.decr(:a)
-      -1
+      {:ok, -1}
 
       iex> MyCache.decr(:a, 2)
-      -3
+      {:ok, -3}
 
       iex> MyCache.decr(:a, -1)
-      -2
+      {:ok, -2}
 
       iex> MyCache.decr(:missing_key, 2, default: 10)
-      8
+      {:ok, 8}
 
   """
-  @callback decr(key, amount :: integer, opts) :: integer
+  @callback decr(key, amount :: integer, opts) :: ok_error_tuple(integer)
 
   @doc """
-  Returns the remaining time-to-live for the given `key`. If the `key` does not
-  exist, then `nil` is returned.
+  Same as `c:decr/3` but raises an exception if an error occurs.
+  """
+  @callback decr!(key, amount :: integer, opts) :: integer
+
+  @doc """
+  Returns the remaining time-to-live for the given `key`.
+
+  This function returns:
+
+    * `{:ok, ttl}` - the cache contains the given `key`,
+      then its remaining `ttl` is returned.
+
+    * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:error_reason/0`.
 
   ## Examples
 
@@ -1183,20 +1334,28 @@ defmodule Nebulex.Cache do
       :ok
 
       iex> MyCache.ttl(:a)
-      _remaining_ttl
+      {:ok, _remaining_ttl}
 
       iex> MyCache.ttl(:b)
-      :infinity
+      {:ok, :infinity}
 
-      iex> MyCache.ttl(:c)
-      nil
+      iex> {:error, %Nebulex.KeyError{key: :c}} = MyCache.ttl(:c)
+      _error
 
   """
-  @callback ttl(key) :: timeout | nil
+  @callback ttl(key) :: ok_error_tuple(timeout, fetch_error_reason)
 
   @doc """
-  Returns `true` if the given `key` exists and the new `ttl` was successfully
-  updated, otherwise, `false` is returned.
+  Same as `c:ttl/1` but raises an exception if an error occurs.
+  """
+  @callback ttl!(key) :: timeout
+
+  @doc """
+  Returns `{:ok, true}` if the given `key` exists and the new `ttl` was
+  successfully updated, otherwise, `{:ok, false}` is returned.
+
+  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
+  `t:error_reason/0`.
 
   ## Examples
 
@@ -1204,20 +1363,28 @@ defmodule Nebulex.Cache do
       :ok
 
       iex> MyCache.expire(:a, 5)
-      true
+      {:ok, true}
 
       iex> MyCache.expire(:a, :infinity)
-      true
+      {:ok, true}
 
-      iex> MyCache.ttl(:b, 5)
-      false
+      iex> MyCache.expire(:b, 5)
+      {:ok, false}
 
   """
-  @callback expire(key, ttl :: timeout) :: boolean
+  @callback expire(key, ttl :: timeout) :: ok_error_tuple(boolean)
 
   @doc """
-  Returns `true` if the given `key` exists and the last access time was
-  successfully updated, otherwise, `false` is returned.
+  Same as `c:expire/2` but raises an exception if an error occurs.
+  """
+  @callback expire!(key, ttl :: timeout) :: boolean
+
+  @doc """
+  Returns `{:ok, true}` if the given `key` exists and the last access time was
+  successfully updated, otherwise, `{:ok, false}` is returned.
+
+  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
+  `t:error_reason/0`.
 
   ## Examples
 
@@ -1225,57 +1392,145 @@ defmodule Nebulex.Cache do
       :ok
 
       iex> MyCache.touch(:a)
-      true
+      {:ok, true}
 
       iex> MyCache.ttl(:b)
-      false
+      {:ok, false}
 
   """
-  @callback touch(key) :: boolean
-
-  ## Deprecated Callbacks
+  @callback touch(key) :: ok_error_tuple(boolean)
 
   @doc """
-  Returns the total number of cached entries.
+  Same as `c:touch/1` but raises an exception if an error occurs.
+  """
+  @callback touch!(key) :: boolean
+
+  @doc """
+  Gets the value from `key` and updates it, all in one pass.
+
+  `fun` is called with the current cached value under `key` (or `nil` if `key`
+  hasn't been cached) and must return a two-element tuple: the current value
+  (the retrieved value, which can be operated on before being returned) and
+  the new value to be stored under `key`. `fun` may also return `:pop`, which
+  means the current value shall be removed from Cache and returned.
+
+  This function returns:
+
+    * `{:ok, value}` - The returned value is a tuple with the current value
+      returned by `fun` and the new updated value under `key`.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:error_reason/0`.
+
+  ## Options
+
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
+
+  See the "Shared options" section at the module documentation for more options.
 
   ## Examples
 
-      iex> :ok = Enum.each(1..10, &MyCache.put(&1, &1))
-      iex> MyCache.size()
-      10
+  Update nonexistent key:
 
-      iex> :ok = Enum.each(1..5, &MyCache.delete(&1))
-      iex> MyCache.size()
-      5
+      iex> MyCache.get_and_update(:a, fn current_value ->
+      ...>   {current_value, "value!"}
+      ...> end)
+      {:ok, {nil, "value!"}}
+
+  Update existing key:
+
+      iex> MyCache.get_and_update(:a, fn current_value ->
+      ...>   {current_value, "new value!"}
+      ...> end)
+      {:ok, {"value!", "new value!"}}
+
+  Pop/remove value if exist:
+
+      iex> MyCache.get_and_update(:a, fn _ -> :pop end)
+      {:ok, {"new value!", nil}}
+
+  Pop/remove nonexistent key:
+
+      iex> MyCache.get_and_update(:b, fn _ -> :pop end)
+      {:ok, {nil, nil}}
 
   """
-  @doc deprecated: "Use count_all/2 instead"
-  @callback size() :: integer
+  @callback get_and_update(key, (value -> {current_value, new_value} | :pop), opts) ::
+              ok_error_tuple({current_value, new_value})
+            when current_value: value, new_value: value
 
   @doc """
-  Flushes the cache and returns the number of evicted keys.
+  Same as `c:get_and_update/3` but raises an exception if an error occurs.
+  """
+  @callback get_and_update!(key, (value -> {current_value, new_value} | :pop), opts) ::
+              {current_value, new_value}
+            when current_value: value, new_value: value
+
+  @doc """
+  Updates the cached `key` with the given function.
+
+  If `key` is present in Cache with value `value`, `fun` is invoked with
+  argument `value` and its result is used as the new value of `key`.
+
+  If `key` is not present in Cache, `initial` is inserted as the value of `key`.
+  The initial value will not be passed through the update function.
+
+  This function returns:
+
+    * `{:ok, value}` - The value associated to the given `key` has been updated.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:error_reason/0`.
+
+  ## Options
+
+    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
+      (or expiry time) for the given key  in **milliseconds**. Defaults
+      to `:infinity`.
+
+  See the "Shared options" section at the module documentation for more options.
 
   ## Examples
 
-      iex> :ok = Enum.each(1..5, &MyCache.put(&1, &1))
-      iex> MyCache.flush()
-      5
+      iex> MyCache.update(:a, 1, &(&1 * 2))
+      {:ok, 1}
 
-      iex> MyCache.size()
-      0
+      iex> MyCache.update(:a, 1, &(&1 * 2))
+      {:ok, 2}
 
   """
-  @doc deprecated: "Use delete_all/2 instead"
-  @callback flush() :: integer
+  @callback update(key, initial :: value, (value -> value), opts) :: ok_error_tuple(value)
+
+  @doc """
+  Same as `c:update/4` but raises an exception if an error occurs.
+  """
+  @callback update!(key, initial :: value, (value -> value), opts) :: value
 
   ## Nebulex.Adapter.Queryable
 
-  @optional_callbacks all: 2, count_all: 2, delete_all: 2, stream: 2
+  @optional_callbacks all: 2,
+                      all!: 2,
+                      count_all: 2,
+                      count_all!: 2,
+                      delete_all: 2,
+                      delete_all!: 2,
+                      stream: 2,
+                      stream!: 2
 
   @doc """
   Fetches all entries from cache matching the given `query`.
 
-  May raise `Nebulex.QueryError` if query validation fails.
+  This function returns:
+
+    * `{:ok, matched_entries}` - the query is valid, then it is executed
+      and the matched entries are returned.
+
+    * `{:error, Nebulex.QueryError.t()}` - the query validation failed.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:error_reason/0`.
 
   ## Query values
 
@@ -1286,8 +1541,9 @@ defmodule Nebulex.Cache do
 
   The following query values are shared and/or supported for all adapters:
 
-    * `nil` - Returns a list with all cached entries based on the `:return`
-      option.
+    * `nil` - Matches all entries cached entries. In case of `c:all/2`
+      for example, it returns a list with all cached entries based on
+      the `:return` option.
 
   ### Adapter-specific queries
 
@@ -1329,24 +1585,24 @@ defmodule Nebulex.Cache do
   Fetch all (with default params):
 
       iex> MyCache.all()
-      [1, 2, 3, 4, 5]
+      {:ok, [1, 2, 3, 4, 5]}
 
   Fetch all entries and return values:
 
       iex> MyCache.all(nil, return: :value)
-      [2, 4, 6, 8, 10]
+      {:ok, [2, 4, 6, 8, 10]}
 
   Fetch all entries and return them as key/value pairs:
 
       iex> MyCache.all(nil, return: {:key, :value})
-      [{1, 2}, {2, 4}, {3, 6}, {4, 8}, {5, 10}]
+      {:ok, [{1, 2}, {2, 4}, {3, 6}, {4, 8}, {5, 10}]}
 
   Fetch all entries that match with the given query assuming we are using
   `Nebulex.Adapters.Local` adapter:
 
       iex> query = [{{:_, :"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [:"$1"]}]
       iex> MyCache.all(query)
-      [3, 4, 5]
+      {:ok, [3, 4, 5]}
 
   ## Query
 
@@ -1359,8 +1615,8 @@ defmodule Nebulex.Cache do
 
   Additional built-in queries for `Nebulex.Adapters.Local` adapter:
 
-      iex> unexpired = MyCache.all(:unexpired)
-      iex> expired = MyCache.all(:expired)
+      iex> {:ok, unexpired} = MyCache.all(:unexpired)
+      iex> {:ok, expired} = MyCache.all(:expired)
 
   If we are using Nebulex.Adapters.Local adapter, the stored entry tuple
   `{:entry, key, value, touched, ttl}`, then the match spec could be
@@ -1371,7 +1627,7 @@ defmodule Nebulex.Cache do
       ...>   [{:>, :"$2", 5}], [{{:"$1", :"$2"}}]}
       ...> ]
       iex> MyCache.all(spec)
-      [{3, 6}, {4, 8}, {5, 10}]
+      {:ok, [{3, 6}, {4, 8}, {5, 10}]}
 
   The same previous query but using `Ex2ms`:
 
@@ -1384,19 +1640,28 @@ defmodule Nebulex.Cache do
       ...>   end
 
       iex> MyCache.all(spec)
-      [{3, 6}, {4, 8}, {5, 10}]
+      {:ok, [{3, 6}, {4, 8}, {5, 10}]}
 
   """
-  @callback all(query :: term, opts) :: [any]
+  @callback all(query :: term, opts) :: ok_error_tuple([term], query_error_reason)
+
+  @doc """
+  Same as `c:all/2` but raises an exception if an error occurs.
+  """
+  @callback all!(query :: term, opts) :: [any]
 
   @doc """
   Similar to `c:all/2` but returns a lazy enumerable that emits all entries
   from the cache matching the given `query`.
 
-  If `query` is `nil`, then all entries in cache match and are returned
-  when the stream is evaluated; based on the `:return` option.
+  This function returns:
 
-  May raise `Nebulex.QueryError` if query validation fails.
+    * `{:ok, Enum.t()}` - the query is valid, then the stream is returned.
+
+    * `{:error, Nebulex.QueryError.t()}` - the query validation failed.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:error_reason/0`.
 
   ## Query values
 
@@ -1438,23 +1703,26 @@ defmodule Nebulex.Cache do
 
   Stream all (with default params):
 
-      iex> MyCache.stream() |> Enum.to_list()
+      iex> {:ok, stream} = MyCache.stream()
+      iex> Enum.to_list(stream)
       [1, 2, 3, 4, 5]
 
   Stream all entries and return values:
 
-      iex> nil |> MyCache.stream(return: :value, page_size: 3) |> Enum.to_list()
+      iex> {:ok, stream} = MyCache.stream(nil, return: :value, page_size: 3)
+      iex> Enum.to_list(stream)
       [2, 4, 6, 8, 10]
 
   Stream all entries and return them as key/value pairs:
 
-      iex> nil |> MyCache.stream(return: {:key, :value}) |> Enum.to_list()
+      iex> {:ok, stream} = MyCache.stream(nil, return: {:key, :value})
+      iex> Enum.to_list(stream)
       [{1, 2}, {2, 4}, {3, 6}, {4, 8}, {5, 10}]
 
   Additional built-in queries for `Nebulex.Adapters.Local` adapter:
 
-      iex> unexpired_stream = MyCache.stream(:unexpired)
-      iex> expired_stream = MyCache.stream(:expired)
+      iex> {:ok, unexpired_stream} = MyCache.stream(:unexpired)
+      iex> {:ok, expired_stream} = MyCache.stream(:expired)
 
   If we are using Nebulex.Adapters.Local adapter, the stored entry tuple
   `{:entry, key, value, touched, ttl}`, then the match spec could be
@@ -1464,7 +1732,8 @@ defmodule Nebulex.Cache do
       ...>   {{:entry, :"$1", :"$2", :_, :_},
       ...>   [{:>, :"$2", 5}], [{{:"$1", :"$2"}}]}
       ...> ]
-      iex> MyCache.stream(spec, page_size: 100) |> Enum.to_list()
+      iex> {:ok, stream} = MyCache.stream(spec, page_size: 100)
+      iex> Enum.to_list(stream)
       [{3, 6}, {4, 8}, {5, 10}]
 
   The same previous query but using `Ex2ms`:
@@ -1477,19 +1746,31 @@ defmodule Nebulex.Cache do
       ...>     {_, key, value, _, _} when value > 5 -> {key, value}
       ...>   end
 
-      iex> spec |> MyCache.stream(page_size: 100) |> Enum.to_list()
+      iex> {:ok, stream} = MyCache.stream(spec, page_size: 100)
+      iex> Enum.to_list(stream)
       [{3, 6}, {4, 8}, {5, 10}]
 
   """
-  @callback stream(query :: term, opts) :: Enum.t()
+  @callback stream(query :: term, opts) :: ok_error_tuple(Enum.t(), query_error_reason)
+
+  @doc """
+  Same as `c:stream/2` but raises an exception if an error occurs.
+  """
+  @callback stream!(query :: term, opts) :: Enum.t()
 
   @doc """
   Deletes all entries matching the given `query`. If `query` is `nil`,
   then all entries in the cache are deleted.
 
-  It returns the number of deleted entries.
+  This function returns:
 
-  May raise `Nebulex.QueryError` if query validation fails.
+    * `{:ok, deleted_count}` - the query is valid, then the matched entries
+      are deleted and the `deleted_count` is returned.
+
+    * `{:error, Nebulex.QueryError.t()}` - the query validation failed.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:error_reason/0`.
 
   ## Query values
 
@@ -1508,34 +1789,38 @@ defmodule Nebulex.Cache do
   Delete all (with default params):
 
       iex> MyCache.delete_all()
-      5
+      {:ok, 5}
 
   Delete all entries that match with the given query assuming we are using
   `Nebulex.Adapters.Local` adapter:
 
       iex> query = [{{:_, :"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [true]}]
-      iex> MyCache.delete_all(query)
+      iex> {:ok, deleted_count} = MyCache.delete_all(query)
 
-  > For the local adapter you can use [Ex2ms](https://github.com/ericmj/ex2ms)
-    to build the match specs much easier.
-
-  Additional built-in queries for `Nebulex.Adapters.Local` adapter:
-
-      iex> unexpired = MyCache.delete_all(:unexpired)
-      iex> expired = MyCache.delete_all(:expired)
-
+  See `c:all/2` for more examples, the same applies to `c:delete_all/2`.
   """
-  @callback delete_all(query :: term, opts) :: integer
+  @callback delete_all(query :: term, opts) :: ok_error_tuple(non_neg_integer, query_error_reason)
+
+  @doc """
+  Same as `c:delete_all/2` but raises an exception if an error occurs.
+  """
+  @callback delete_all!(query :: term, opts) :: integer
 
   @doc """
   Counts all entries in cache matching the given `query`.
 
-  It returns the count of the matched entries.
-
   If `query` is `nil` (the default), then the total number of
   cached entries is returned.
 
-  May raise `Nebulex.QueryError` if query validation fails.
+  This function returns:
+
+    * `{:ok, count}` - the query is valid, then the `count` of the
+      matched entries returned.
+
+    * `{:error, Nebulex.QueryError.t()}` - the query validation failed.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:error_reason/0`.
 
   ## Query values
 
@@ -1550,33 +1835,32 @@ defmodule Nebulex.Cache do
   Count all entries in cache:
 
       iex> MyCache.count_all()
-      5
+      {:ok, 5}
 
   Count all entries that match with the given query assuming we are using
   `Nebulex.Adapters.Local` adapter:
 
       iex> query = [{{:_, :"$1", :"$2", :_, :_}, [{:>, :"$2", 5}], [true]}]
-      iex> MyCache.count_all(query)
+      iex> {:ok, count} = MyCache.count_all(query)
 
-  > For the local adapter you can use [Ex2ms](https://github.com/ericmj/ex2ms)
-    to build the match specs much easier.
-
-  Additional built-in queries for `Nebulex.Adapters.Local` adapter:
-
-      iex> unexpired = MyCache.count_all(:unexpired)
-      iex> expired = MyCache.count_all(:expired)
-
+  See `c:all/2` for more examples, the same applies to `c:count_all/2`.
   """
-  @callback count_all(query :: term, opts) :: integer
+  @callback count_all(query :: term, opts) :: ok_error_tuple(non_neg_integer, query_error_reason)
+
+  @doc """
+  Same as `c:count_all/2` but raises an exception if an error occurs.
+  """
+  @callback count_all!(query :: term, opts) :: integer
 
   ## Nebulex.Adapter.Persistence
 
-  @optional_callbacks dump: 2, load: 2
+  @optional_callbacks dump: 2, dump!: 2, load: 2, load!: 2
 
   @doc """
   Dumps a cache to the given file `path`.
 
   Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
+  The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -1591,7 +1875,7 @@ defmodule Nebulex.Cache do
   Populate the cache with some entries:
 
       iex> entries = for x <- 1..10, into: %{}, do: {x, x}
-      iex> MyCache.set_many(entries)
+      iex> MyCache.put_all(entries)
       :ok
 
   Dump cache to a file:
@@ -1600,12 +1884,18 @@ defmodule Nebulex.Cache do
       :ok
 
   """
-  @callback dump(path :: Path.t(), opts) :: :ok | {:error, term}
+  @callback dump(path :: Path.t(), opts) :: :ok | error
+
+  @doc """
+  Same as `c:dump/2` but raises an exception if an error occurs.
+  """
+  @callback dump!(path :: Path.t(), opts) :: :ok
 
   @doc """
   Loads a dumped cache from the given `path`.
 
   Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
+  The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -1620,7 +1910,7 @@ defmodule Nebulex.Cache do
   Populate the cache with some entries:
 
       iex> entries = for x <- 1..10, into: %{}, do: {x, x}
-      iex> MyCache.set_many(entries)
+      iex> MyCache.put_all(entries)
       :ok
 
   Dump cache to a file:
@@ -1634,7 +1924,12 @@ defmodule Nebulex.Cache do
       :ok
 
   """
-  @callback load(path :: Path.t(), opts) :: :ok | {:error, term}
+  @callback load(path :: Path.t(), opts) :: :ok | error
+
+  @doc """
+  Same as `c:load/2` but raises an exception if an error occurs.
+  """
+  @callback load!(path :: Path.t(), opts) :: :ok
 
   ## Nebulex.Adapter.Transaction
 
@@ -1643,7 +1938,11 @@ defmodule Nebulex.Cache do
   @doc """
   Runs the given function inside a transaction.
 
-  A successful transaction returns the value returned by the function.
+  A successful transaction returns the value returned by the function wrapped
+  in a tuple as `{:ok, value}`.
+
+  If an unhandled error occurs the transaction, it will be wrapped up in the
+  shape of `{:error, error}`, where `error` is the original exception.
 
   ## Options
 
@@ -1668,52 +1967,73 @@ defmodule Nebulex.Cache do
       end
 
   """
-  @callback transaction(opts, function :: fun) :: term
+  @callback transaction(opts, function :: fun) :: ok_error_tuple(term, term)
 
   @doc """
-  Returns `true` if the current process is inside a transaction.
+  Returns `{:ok, true}` if the current process is inside a transaction,
+  otherwise, `{:ok, false}` is returned.
+
+  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
+  `t:error_reason/0`.
 
   ## Examples
 
       MyCache.in_transaction?
-      #=> false
+      #=> {:ok, false}
 
       MyCache.transaction(fn ->
-        MyCache.in_transaction? #=> true
+        MyCache.in_transaction? #=> {:ok, true}
       end)
 
   """
-  @callback in_transaction?() :: boolean
+  @callback in_transaction?() :: ok_error_tuple(boolean)
 
   ## Nebulex.Adapter.Stats
 
-  @optional_callbacks stats: 0, dispatch_stats: 1
+  @optional_callbacks stats: 0, stats!: 0, dispatch_stats: 1
 
   @doc """
-  Returns `Nebulex.Stats.t()` with the current stats values.
+  Returns current stats values.
 
-  If the stats are disabled for the cache, then `nil` is returned.
+  This function returns:
+
+    * `{:ok, Nebulex.Stats.t()}` - stats are enabled and available
+      for the cache.
+
+    * `{:ok, nil}` - the stats are disabled for the cache.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:error_reason/0`.
 
   ## Example
 
       iex> MyCache.stats()
-      %Nebulex.Stats{
-        measurements: {
-          evictions: 0,
-          expirations: 0,
-          hits: 0,
-          misses: 0,
-          updates: 0,
-          writes: 0
-        },
-        metadata: %{}
-      }
+      {:ok,
+       %Nebulex.Stats{
+         measurements: %{
+           evictions: 0,
+           expirations: 0,
+           hits: 0,
+           misses: 0,
+           updates: 0,
+           writes: 0
+         },
+         metadata: %{}
+       }}
 
   """
-  @callback stats() :: Nebulex.Stats.t() | nil
+  @callback stats() :: ok_error_tuple(Nebulex.Stats.t() | nil)
+
+  @doc """
+  Same as `c:stats/0` but raises an exception if an error occurs.
+  """
+  @callback stats!() :: Nebulex.Stats.t() | nil
 
   @doc """
   Emits a telemetry event when called with the current stats count.
+
+  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
+  `t:error_reason/0`.
 
   The telemetry `:measurements` map will include the same as
   `Nebulex.Stats.t()`'s measurements. For example:
@@ -1756,5 +2076,5 @@ defmodule Nebulex.Cache do
   defined, a default implementation is provided without any logic, just
   returning `:ok`.
   """
-  @callback dispatch_stats(opts) :: :ok
+  @callback dispatch_stats(opts) :: :ok | error
 end

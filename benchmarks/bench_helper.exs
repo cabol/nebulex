@@ -30,8 +30,8 @@ defmodule BenchHelper do
       "take" => fn input ->
         cache.take(input)
       end,
-      "has_key?" => fn input ->
-        cache.has_key?(input)
+      "exists?" => fn input ->
+        cache.exists?(input)
       end,
       "count_all" => fn _input ->
         cache.count_all()

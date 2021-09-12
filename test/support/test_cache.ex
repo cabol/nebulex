@@ -139,45 +139,45 @@ defmodule Nebulex.TestCache do
     end
 
     @impl true
-    def get(_, key, _) do
+    def fetch(_, key, _) do
       if is_integer(key) do
         raise ArgumentError, "Error"
       else
-        :ok
+        {:ok, :ok}
       end
     end
 
     @impl true
     def put(_, _, _, _, _, _) do
       :ok = Process.sleep(1000)
-      true
+      {:ok, true}
     end
 
     @impl true
     def delete(_, _, _), do: :ok
 
     @impl true
-    def take(_, _, _), do: nil
+    def take(_, _, _), do: {:ok, nil}
 
     @impl true
-    def has_key?(_, _), do: true
+    def exists?(_, _), do: {:ok, true}
 
     @impl true
-    def ttl(_, _), do: nil
+    def ttl(_, _), do: {:ok, nil}
 
     @impl true
-    def expire(_, _, _), do: true
+    def expire(_, _, _), do: {:ok, true}
 
     @impl true
-    def touch(_, _), do: true
+    def touch(_, _), do: {:ok, true}
 
     @impl true
-    def update_counter(_, _, _, _, _, _), do: 1
+    def update_counter(_, _, _, _, _, _), do: {:ok, 1}
 
     @impl true
     def get_all(_, _, _) do
       :ok = Process.sleep(1000)
-      %{}
+      {:ok, %{}}
     end
 
     @impl true
@@ -186,16 +186,16 @@ defmodule Nebulex.TestCache do
     @impl true
     def execute(_, :count_all, _, _) do
       _ = Process.exit(self(), :normal)
-      0
+      {:ok, 0}
     end
 
     def execute(_, :delete_all, _, _) do
       Process.sleep(2000)
-      0
+      {:ok, 0}
     end
 
     @impl true
-    def stream(_, _, _), do: 1..10
+    def stream(_, _, _), do: {:ok, 1..10}
   end
 
   defmodule PartitionedMock do

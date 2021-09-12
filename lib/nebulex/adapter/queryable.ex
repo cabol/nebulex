@@ -31,10 +31,15 @@ defmodule Nebulex.Adapter.Queryable do
   @doc """
   Executes the `query` according to the given `operation`.
 
-  Raises `Nebulex.QueryError` if query is invalid.
+  This callback returns:
 
-  In the the adapter does not support the given `operation`, an `ArgumentError`
-  exception should be raised.
+    * `{:ok, query_result}` - the query is valid, then it is executed
+      and the result returned.
+
+    * `{:error, Nebulex.QueryError.t()}` - the query validation failed.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:Nebulex.Cache.error_reason/0`.
 
   ## Operations
 
@@ -53,14 +58,27 @@ defmodule Nebulex.Adapter.Queryable do
               operation :: :all | :count_all | :delete_all,
               query :: term,
               opts
-            ) :: [term] | integer
+            ) ::
+              Nebulex.Cache.ok_error_tuple(
+                [term] | non_neg_integer,
+                Nebulex.Cache.query_error_reason()
+              )
 
   @doc """
   Streams the given `query`.
 
-  Raises `Nebulex.QueryError` if query is invalid.
+  This callback returns:
+
+    * `{:ok, stream}` - the query is valid, then the stream is built
+      and returned.
+
+    * `{:error, Nebulex.QueryError.t()}` - the query validation failed.
+
+    * `{:error, reason}` - an error occurred while executing the command.
+      The `reason` can be one of `t:Nebulex.Cache.error_reason/0`.
 
   See `c:Nebulex.Cache.stream/2`.
   """
-  @callback stream(adapter_meta, query :: term, opts) :: Enumerable.t()
+  @callback stream(adapter_meta, query :: term, opts) ::
+              Nebulex.Cache.ok_error_tuple(Enumerable.t(), Nebulex.Cache.query_error_reason())
 end

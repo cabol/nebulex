@@ -57,4 +57,37 @@ defmodule Nebulex.Helpers do
     |> Enum.map(&Macro.camelize("#{&1}"))
     |> Module.concat()
   end
+
+  @doc false
+  defmacro unwrap_or_raise(call) do
+    quote do
+      case unquote(call) do
+        {:ok, value} -> value
+        {:error, reason} when is_exception(reason) -> raise reason
+        {:error, reason} -> raise Nebulex.Error, reason: reason
+        other -> other
+      end
+    end
+  end
+
+  @doc false
+  defmacro wrap_ok(call) do
+    quote do
+      {:ok, unquote(call)}
+    end
+  end
+
+  @doc false
+  defmacro wrap_error(call) do
+    quote do
+      {:error, unquote(call)}
+    end
+  end
+
+  @doc false
+  defmacro wrap_error(exception, opts) do
+    quote do
+      {:error, unquote(exception).exception(unquote(opts))}
+    end
+  end
 end

@@ -408,8 +408,8 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
-  defspan has_key?(adapter_meta, key) do
-    eval_while(adapter_meta, :has_key?, [key], false)
+  defspan exists?(adapter_meta, key) do
+    eval_while(adapter_meta, :exists?, [key], false)
   end
 
   @impl true

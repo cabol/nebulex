@@ -257,13 +257,13 @@ iex> for key <- 1..3 do
 ["Galileo", "Charles", "Albert"]
 ```
 
-There is a function `has_key?` to check if a key exist in cache:
+There is a function `exists?` to check if a key exist in cache:
 
 ```elixir
-iex> Blog.Cache.has_key?(1)
+iex> Blog.Cache.exists?(1)
 true
 
-iex> Blog.Cache.has_key?(10)
+iex> Blog.Cache.exists?(10)
 false
 ```
 

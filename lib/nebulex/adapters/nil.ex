@@ -70,6 +70,8 @@ defmodule Nebulex.Adapters.Nil do
   # Inherit default transaction implementation
   use Nebulex.Adapter.Transaction
 
+  import Nebulex.Helpers
+
   ## Nebulex.Adapter
 
   @impl true
@@ -84,46 +86,54 @@ defmodule Nebulex.Adapters.Nil do
   ## Nebulex.Adapter.Entry
 
   @impl true
-  def get(_, _, _), do: nil
+  def fetch(adapter_meta, key, _) do
+    wrap_error Nebulex.KeyError, key: key, cache: adapter_meta.cache
+  end
 
   @impl true
-  def get_all(_, _, _), do: %{}
+  def get_all(_, _, _), do: {:ok, %{}}
 
   @impl true
-  def put(_, _, _, _, _, _), do: true
+  def put(_, _, _, _, _, _), do: {:ok, true}
 
   @impl true
-  def put_all(_, _, _, _, _), do: true
+  def put_all(_, _, _, _, _), do: {:ok, true}
 
   @impl true
   def delete(_, _, _), do: :ok
 
   @impl true
-  def take(_, _, _), do: nil
+  def take(adapter_meta, key, _) do
+    wrap_error Nebulex.KeyError, key: key, cache: adapter_meta.cache
+  end
 
   @impl true
-  def has_key?(_, _), do: false
+  def exists?(_, _), do: {:ok, false}
 
   @impl true
-  def ttl(_, _), do: nil
+  def ttl(adapter_meta, key) do
+    wrap_error Nebulex.KeyError, key: key, cache: adapter_meta.cache
+  end
 
   @impl true
-  def expire(_, _, _), do: true
+  def expire(_, _, _), do: {:ok, false}
 
   @impl true
-  def touch(_, _), do: true
+  def touch(_, _), do: {:ok, false}
 
   @impl true
-  def update_counter(_, _, amount, _, default, _), do: default + amount
+  def update_counter(_, _, amount, _, default, _) do
+    {:ok, default + amount}
+  end
 
   ## Nebulex.Adapter.Queryable
 
   @impl true
-  def execute(_, :all, _, _), do: []
-  def execute(_, _, _, _), do: 0
+  def execute(_, :all, _, _), do: {:ok, []}
+  def execute(_, _, _, _), do: {:ok, 0}
 
   @impl true
-  def stream(_, _, _), do: Stream.each([], & &1)
+  def stream(_, _, _), do: {:ok, Stream.each([], & &1)}
 
   ## Nebulex.Adapter.Persistence
 

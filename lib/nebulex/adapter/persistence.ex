@@ -27,22 +27,22 @@ defmodule Nebulex.Adapter.Persistence do
   @doc """
   Dumps a cache to the given file `path`.
 
-  Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
+  Returns `:ok` if successful, or `Nebulex.Cache.error()` if an error occurs.
 
   See `c:Nebulex.Cache.dump/2`.
   """
   @callback dump(Nebulex.Adapter.adapter_meta(), Path.t(), Nebulex.Cache.opts()) ::
-              :ok | {:error, term}
+              :ok | Nebulex.Cache.error()
 
   @doc """
   Loads a dumped cache from the given `path`.
 
-  Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
+  Returns `:ok` if successful, or `Nebulex.Cache.error()` if an error occurs.
 
   See `c:Nebulex.Cache.load/2`.
   """
   @callback load(Nebulex.Adapter.adapter_meta(), Path.t(), Nebulex.Cache.opts()) ::
-              :ok | {:error, term}
+              :ok | Nebulex.Cache.error()
 
   alias Nebulex.Entry
 
@@ -51,29 +51,29 @@ defmodule Nebulex.Adapter.Persistence do
     quote do
       @behaviour Nebulex.Adapter.Persistence
 
+      import Nebulex.Helpers
+
       # sobelow_skip ["Traversal.FileModule"]
       @impl true
       def dump(%{cache: cache}, path, opts) do
-        path
-        |> File.open([:read, :write], fn io_dev ->
-          nil
-          |> cache.stream(return: :entry)
-          |> Stream.filter(&(not Entry.expired?(&1)))
-          |> Stream.map(&{&1.key, &1.value})
-          |> Stream.chunk_every(Keyword.get(opts, :entries_per_line, 10))
-          |> Enum.each(fn entries ->
-            bin = Entry.encode(entries, get_compression(opts))
-            :ok = IO.puts(io_dev, bin)
-          end)
+        with_file(path, [:read, :write], fn io_dev ->
+          with {:ok, stream} <- cache.stream(nil, return: :entry) do
+            stream
+            |> Stream.filter(&(not Entry.expired?(&1)))
+            |> Stream.map(&{&1.key, &1.value})
+            |> Stream.chunk_every(Keyword.get(opts, :entries_per_line, 10))
+            |> Enum.each(fn entries ->
+              bin = Entry.encode(entries, get_compression(opts))
+              :ok = IO.puts(io_dev, bin)
+            end)
+          end
         end)
-        |> handle_response()
       end
 
       # sobelow_skip ["Traversal.FileModule"]
       @impl true
       def load(%{cache: cache}, path, opts) do
-        path
-        |> File.open([:read], fn io_dev ->
+        with_file(path, [:read], fn io_dev ->
           io_dev
           |> IO.stream(:line)
           |> Stream.map(&String.trim/1)
@@ -82,15 +82,26 @@ defmodule Nebulex.Adapter.Persistence do
             cache.put_all(entries, opts)
           end)
         end)
-        |> handle_response()
       end
 
       defoverridable dump: 3, load: 3
 
       ## Helpers
 
-      defp handle_response({:ok, _}), do: :ok
-      defp handle_response({:error, _} = error), do: error
+      defp with_file(path, modes, function) do
+        case File.open(path, modes) do
+          {:ok, io_device} ->
+            try do
+              function.(io_device)
+            after
+              :ok = File.close(io_device)
+            end
+
+          {:error, reason} ->
+            reason = %File.Error{reason: reason, action: "open", path: path}
+            wrap_error Nebulex.Error, reason: reason
+        end
+      end
 
       defp get_compression(opts) do
         case Keyword.get(opts, :compression) do

@@ -471,7 +471,7 @@ defmodule Nebulex.CachingTest do
 
   @decorate cacheable(cache: Cache)
   def get_false_with_side_effect(v) do
-    Cache.update("side-effect", 1, &(&1 + 1))
+    _ = Cache.update!("side-effect", 1, &(&1 + 1))
     v
   end
 

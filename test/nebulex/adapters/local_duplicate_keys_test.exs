@@ -39,19 +39,19 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
         assert cache.get(:b) == [1, 2]
         assert cache.get(:c) == 1
 
-        assert cache.get_all([:a, :b, :c]) == %{a: [1, 2, 2], b: [1, 2], c: 1}
+        assert cache.get_all!([:a, :b, :c]) == %{a: [1, 2, 2], b: [1, 2], c: 1}
       end)
     end
 
-    test "take", %{caches: caches} do
+    test "take!", %{caches: caches} do
       for_all_caches(caches, fn cache ->
         :ok = cache.put_all(a: 1, a: 2, a: 2, b: 1, b: 2, c: 1)
 
-        assert cache.take(:a) == [1, 2, 2]
-        assert cache.take(:b) == [1, 2]
-        assert cache.take(:c) == 1
+        assert cache.take!(:a) == [1, 2, 2]
+        assert cache.take!(:b) == [1, 2]
+        assert cache.take!(:c) == 1
 
-        assert cache.get_all([:a, :b, :c]) == %{}
+        assert cache.get_all!([:a, :b, :c]) == %{}
       end)
     end
 
@@ -62,28 +62,28 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
         :ok = cache.put(:a, 2)
 
         assert cache.get(:a) == [1, 2, 2]
-        assert cache.delete(:a)
+        assert cache.delete!(:a) == :ok
         refute cache.get(:a)
       end)
     end
 
     test "put_new", %{caches: caches} do
       for_all_caches(caches, fn cache ->
-        assert cache.put_new(:a, 1)
+        assert cache.put_new(:a, 1) == {:ok, true}
         :ok = cache.put(:a, 2)
-        refute cache.put_new(:a, 3)
+        assert cache.put_new(:a, 3) == {:ok, false}
 
         assert cache.get(:a) == [1, 2]
       end)
     end
 
-    test "has_key?", %{caches: caches} do
+    test "exists?", %{caches: caches} do
       for_all_caches(caches, fn cache ->
         :ok = cache.put(:a, 1)
         :ok = cache.put(:a, 2)
 
-        assert cache.has_key?(:a)
-        refute cache.has_key?(:b)
+        assert cache.exists?(:a) == {:ok, true}
+        assert cache.exists?(:b) == {:ok, false}
       end)
     end
 
@@ -93,12 +93,12 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
         :ok = cache.put(:a, 2, ttl: 10_000)
         :ok = cache.put(:a, 3)
 
-        [ttl1, ttl2, ttl3] = cache.ttl(:a)
+        {:ok, [ttl1, ttl2, ttl3]} = cache.ttl(:a)
         assert ttl1 > 1000
         assert ttl2 > 6000
         assert ttl3 == :infinity
 
-        refute cache.ttl(:b)
+        assert {:error, %Nebulex.KeyError{key: :b}} = cache.ttl(:b)
       end)
     end
 
