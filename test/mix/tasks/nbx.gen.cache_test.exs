@@ -27,7 +27,7 @@ defmodule Mix.Tasks.Nbx.Gen.CacheTest do
           # GC interval for pushing new generation: 12 hrs
           gc_interval: :timer.hours(12),
           # Max 1 million entries in cache
-          max_size: 1_00_000,
+          max_size: 1_000_000,
           # Max 2 GB of memory
           allocated_memory: 2_000_000_000,
           # GC min timeout: 10 sec
@@ -120,7 +120,7 @@ defmodule Mix.Tasks.Nbx.Gen.CacheTest do
             # GC interval for pushing new generation: 12 hrs
             gc_interval: :timer.hours(12),
             # Max 1 million entries in cache
-            max_size: 1_00_000,
+            max_size: 1_000_000,
             # Max 2 GB of memory
             allocated_memory: 2_000_000_000,
             # GC min timeout: 10 sec
@@ -157,7 +157,7 @@ defmodule Mix.Tasks.Nbx.Gen.CacheTest do
             # GC interval for pushing new generation: 12 hrs
             gc_interval: :timer.hours(12),
             # Max 1 million entries in cache
-            max_size: 1_00_000,
+            max_size: 1_000_000,
             # Max 2 GB of memory
             allocated_memory: 2_000_000_000,
             # GC min timeout: 10 sec
@@ -213,7 +213,7 @@ defmodule Mix.Tasks.Nbx.Gen.CacheTest do
               # GC interval for pushing new generation: 12 hrs
               gc_interval: :timer.hours(12),
               # Max 1 million entries in cache
-              max_size: 1_00_000
+              max_size: 1_000_000
             },
             # Default auto-generated L2 cache (partitioned cache)
             {
@@ -222,7 +222,7 @@ defmodule Mix.Tasks.Nbx.Gen.CacheTest do
                 # GC interval for pushing new generation: 12 hrs
                 gc_interval: :timer.hours(12),
                 # Max 1 million entries in cache
-                max_size: 1_00_000
+                max_size: 1_000_000
               ]
             }
           ]
