@@ -52,7 +52,7 @@ if Code.ensure_loaded?(Decorator.Define) do
     if the option `key:` or `keys:` is not configured. By default it is
     `Nebulex.Caching.SimpleKeyGenerator`. But you can change the default
     key generator at compile time with the option `:default_key_generator`.
-    For example, one can define a cache with a default key generator like so:
+    For example, one can define a cache with a default key generator as:
 
         defmodule MyApp.Cache do
           use Nebulex.Cache,
@@ -66,14 +66,18 @@ if Code.ensure_loaded?(Decorator.Define) do
           def generate(mod, fun, args), do: :erlang.phash2({mod, fun, args})
         end
 
-    The given key generator must implement the `Nebulex.Caching.KeyGenerator`
+    The key generator module must implement the `Nebulex.Caching.KeyGenerator`
     behaviour.
+
+    > **IMPORTANT:** There are some caveats to keep in mind when using
+      the key generator, therefore, it is highly recommended to review
+      `Nebulex.Caching.KeyGenerator` behaviour documentation before.
 
     Also, you can provide a different key generator at any time
     (overriding the default one) when using any caching annotation
     through the option `:key_generator`. For example:
 
-        @decorate cache_put(cache: Cache, key_generator: MyApp.Cache.AnotherKeyGenerator)
+        @decorate cache_put(cache: Cache, key_generator: CustomKeyGenerator)
         def update_account(account) do
           # the logic for updating the account ...
         end
@@ -125,7 +129,7 @@ if Code.ensure_loaded?(Decorator.Define) do
     ### Functions with multiple clauses
 
     Since [decorator lib](https://github.com/arjan/decorator#functions-with-multiple-clauses)
-    is used, it is important to be aware of the recommendations, warns,
+    is used, it is important to be aware of its recommendations, warns,
     limitations, and so on. In this case, for functions with multiple clauses
     the general advice is to create an empty function head, and call the
     decorator on that head, like so:
@@ -513,12 +517,9 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     defp keygen_block(attrs, ctx) do
       args =
-        for arg <- ctx.args do
-          case arg do
-            {:\\, _, [var, _]} -> var
-            var -> var
-          end
-        end
+        ctx.args
+        |> Enum.reduce([], &walk/2)
+        |> Enum.reverse()
 
       cond do
         key = Keyword.get(attrs, :key) ->
@@ -538,6 +539,25 @@ if Code.ensure_loaded?(Decorator.Define) do
             )
           end
       end
+    end
+
+    defp walk({:\\, _, [ast, _]}, acc) do
+      walk(ast, acc)
+    end
+
+    defp walk({:=, _, [_, ast]}, acc) do
+      walk(ast, acc)
+    end
+
+    defp walk({var, [line: _], nil} = ast, acc) do
+      case "#{var}" do
+        "_" <> _ -> acc
+        _ -> [ast | acc]
+      end
+    end
+
+    defp walk(_ast, acc) do
+      acc
     end
 
     defp action_block(:cacheable, block, _attrs, keygen) do

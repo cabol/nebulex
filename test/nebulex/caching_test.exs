@@ -276,6 +276,28 @@ defmodule Nebulex.CachingTest do
       assert multiple_clauses(2, 2) == 16
       assert Cache.get(2) == 16
     end
+
+    test "cacheable annotation with multiple function clauses and pattern-matching " do
+      key = TestKeyGenerator.generate(__MODULE__, :get_with_keygen2, [1, 2])
+
+      refute Cache.get(key)
+      assert get_with_keygen2(1, 2, %{a: {1, 2}}) == {1, 2}
+      assert Cache.get(key) == {1, 2}
+
+      key = TestKeyGenerator.generate(__MODULE__, :get_with_keygen2, [1, 2, %{b: 3}])
+
+      refute Cache.get(key)
+      assert get_with_keygen2(1, 2, %{b: 3}) == {1, 2, %{b: 3}}
+      assert Cache.get(key) == {1, 2, %{b: 3}}
+    end
+
+    test "cacheable annotation with ignored arguments" do
+      key = TestKeyGenerator.generate(__MODULE__, :get_with_keygen3, [1, %{b: 2}])
+
+      refute Cache.get(key)
+      assert get_with_keygen3(1, 2, 3, {1, 2}, [1], %{a: 1}, %{b: 2}) == {1, %{b: 2}}
+      assert Cache.get(key) == {1, %{b: 2}}
+    end
   end
 
   describe "default key generator on" do
@@ -416,6 +438,22 @@ defmodule Nebulex.CachingTest do
   @decorate cacheable(cache: Cache, key_generator: TestKeyGenerator)
   def get_with_keygen(x, y) do
     {x, y}
+  end
+
+  @decorate cacheable(cache: Cache, key_generator: TestKeyGenerator)
+  def get_with_keygen2(x, y, z)
+
+  def get_with_keygen2(x, y, %{a: {_x, _y}}) do
+    {x, y}
+  end
+
+  def get_with_keygen2(x, y, %{b: _} = z) do
+    {x, y, z}
+  end
+
+  @decorate cacheable(cache: Cache, key_generator: TestKeyGenerator)
+  def get_with_keygen3(x, _y, _, {_, _}, [_], %{}, %{} = z) do
+    {x, z}
   end
 
   @decorate cache_evict(cache: Cache, key_generator: TestKeyGenerator)
