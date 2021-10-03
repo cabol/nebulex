@@ -77,9 +77,28 @@ if Code.ensure_loaded?(Decorator.Define) do
     (overriding the default one) when using any caching annotation
     through the option `:key_generator`. For example:
 
+        # With a module implementing the key-generator behaviour
         @decorate cache_put(cache: Cache, key_generator: CustomKeyGenerator)
         def update_account(account) do
-          # the logic for updating the account ...
+          # the logic for updating the given entity ...
+        end
+
+        # With the shorthand tuple {module, args}
+        @decorate cache_put(
+                    cache: Cache,
+                    key_generator: {CustomKeyGenerator, [account.name]}
+                  )
+        def update_account2(account) do
+          # the logic for updating the given entity ...
+        end
+
+        # With a MFA tuple
+        @decorate cache_put(
+                    cache: Cache,
+                    key_generator: {AnotherModule, :genkey, [account.id]}
+                  )
+        def update_account3(account) do
+          # the logic for updating the given entity ...
         end
 
     > The `:key_generator` option is available for all caching annotations.
@@ -222,11 +241,23 @@ if Code.ensure_loaded?(Decorator.Define) do
         be cached). Returning `false` will cause that nothing is stored in the
         cache.
 
-      * `:key_generator` - The custom key generator module implementing the
-        `Nebulex.Caching.KeyGenerator` behaviour. If present, this option
-        overrides the default key generator provided by the cache, and it is
-        applied only if the option `key:` or `keys:` is not configured.
-        In other words, the option `key:` or `keys:` overrides this option.
+      * `:key_generator` - The custom key-generator to be used (optional).
+        If present, this option overrides the default key generator provided
+        by the cache, and it is applied only if the option `key:` or `keys:`
+        is not present. In other words, the option `key:` or `keys:` overrides
+        the `:key_generator` option. See "The `:key_generator` option" section
+        below for more information about the possible values.
+
+    ## The `:key_generator` option
+
+    The possible values for the `:key_generator` are:
+
+      * A module implementing the `Nebulex.Caching.KeyGenerator` behaviour.
+
+      * A MFA tuple `{module, function, args}` for a function to call to
+        generate the key before the cache is invoked. A shorthand value of
+        `{module, args}` is equivalent to
+        `{module, :generate, [calling_module, calling_function_name, args]}`.
 
     ## Putting all together
 
@@ -526,9 +557,7 @@ if Code.ensure_loaded?(Decorator.Define) do
           quote(do: unquote(key))
 
         keygen = Keyword.get(attrs, :key_generator) ->
-          quote do
-            unquote(keygen).generate(unquote(ctx.module), unquote(ctx.name), unquote(args))
-          end
+          keygen_call(keygen, ctx, args)
 
         true ->
           quote do
@@ -558,6 +587,28 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     defp walk(_ast, acc) do
       acc
+    end
+
+    # MFA key-generator: `{module, function, args}`
+    defp keygen_call({:{}, _, [mod, fun, args]}, _ctx, _keygen_args) do
+      quote do
+        unquote(mod).unquote(fun)(unquote_splicing(args))
+      end
+    end
+
+    # Key-generator tuple `{module, args}`, where the `module` implements
+    # the key-generator behaviour
+    defp keygen_call({{_, _, _} = mod, args}, ctx, _keygen_args) when is_list(args) do
+      quote do
+        unquote(mod).generate(unquote(ctx.module), unquote(ctx.name), unquote(args))
+      end
+    end
+
+    # Key-generator module implementing the behaviour
+    defp keygen_call({_, _, _} = keygen, ctx, args) do
+      quote do
+        unquote(keygen).generate(unquote(ctx.module), unquote(ctx.name), unquote(args))
+      end
     end
 
     defp action_block(:cacheable, block, _attrs, keygen) do

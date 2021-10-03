@@ -2,6 +2,8 @@ defmodule Nebulex.CachingTest do
   use ExUnit.Case, async: true
   use Nebulex.Caching
 
+  @behaviour Nebulex.Caching.KeyGenerator
+
   defmodule Cache do
     use Nebulex.Cache,
       otp_app: :nebulex,
@@ -322,6 +324,83 @@ defmodule Nebulex.CachingTest do
     end
   end
 
+  describe "key-generator tuple on" do
+    test "cacheable annotation" do
+      key = generate_key({1, 2})
+
+      refute Cache.get(key)
+      assert get_with_tuple_keygen(1, 2) == {1, 2}
+      assert Cache.get(key) == {1, 2}
+    end
+
+    test "cacheable annotation (with key-generator: TestKeyGenerator)" do
+      key = TestKeyGenerator.generate(:a, :b, [1])
+
+      refute Cache.get(key)
+      assert get_with_tuple_keygen2(1, 2) == {1, 2}
+      assert Cache.get(key) == {1, 2}
+    end
+
+    test "cache_evict annotation" do
+      key = generate_key({"foo", "bar"})
+
+      :ok = Cache.put(key, {"foo", "bar"})
+      assert Cache.get(key) == {"foo", "bar"}
+
+      assert evict_with_tuple_keygen("foo", "bar") == {"foo", "bar"}
+      refute Cache.get(key)
+    end
+
+    test "cache_put annotation" do
+      assert multiple_clauses(2, 2) == 4
+      assert Cache.get(2) == 4
+
+      assert put_with_tuple_keygen(2, 4) == 8
+      assert multiple_clauses(2, 2) == 8
+      assert Cache.get(2) == 8
+
+      assert put_with_tuple_keygen(2, 8) == 16
+      assert multiple_clauses(2, 2) == 16
+      assert Cache.get(2) == 16
+    end
+  end
+
+  describe "key-generator with shorthand tuple on" do
+    test "cacheable annotation" do
+      key = TestKeyGenerator.generate(__MODULE__, :get_with_shorthand_tuple_keygen, [1])
+
+      refute Cache.get(key)
+      assert get_with_shorthand_tuple_keygen(1, 2, 3) == {1, 2}
+      assert Cache.get(key) == {1, 2}
+    end
+
+    test "cacheable annotation (with key-generator: __MODULE__)" do
+      key = generate(__MODULE__, :get_with_shorthand_tuple_keygen2, [1])
+
+      refute Cache.get(key)
+      assert get_with_shorthand_tuple_keygen2(1, 2) == {1, 2}
+      assert Cache.get(key) == {1, 2}
+    end
+
+    test "cache_evict annotation" do
+      key = TestKeyGenerator.generate(__MODULE__, :evict_with_shorthand_tuple_keygen, ["foo"])
+
+      :ok = Cache.put(key, {"foo", "bar"})
+      assert Cache.get(key) == {"foo", "bar"}
+
+      assert evict_with_shorthand_tuple_keygen("foo", "bar") == {"foo", "bar"}
+      refute Cache.get(key)
+    end
+
+    test "cache_put annotation" do
+      key = TestKeyGenerator.generate(__MODULE__, :put_with_shorthand_tuple_keygen, ["foo"])
+
+      refute Cache.get(key)
+      assert put_with_shorthand_tuple_keygen("foo", "bar") == {"foo", "bar"}
+      assert Cache.get(key) == {"foo", "bar"}
+    end
+  end
+
   ## Annotated Functions
 
   @decorate cacheable(cache: Cache)
@@ -471,6 +550,54 @@ defmodule Nebulex.CachingTest do
 
   @decorate cache_evict(cache: CacheWithDefaultKeyGenerator)
   def del_with_default_key_generator(id), do: id
+
+  @decorate cacheable(cache: Cache, key_generator: {TestKeyGenerator, [x]})
+  def get_with_shorthand_tuple_keygen(x, y, _z) do
+    {x, y}
+  end
+
+  @decorate cacheable(cache: Cache, key_generator: {__MODULE__, [x]})
+  def get_with_shorthand_tuple_keygen2(x, y) do
+    {x, y}
+  end
+
+  @decorate cache_evict(cache: Cache, key_generator: {TestKeyGenerator, [x]})
+  def evict_with_shorthand_tuple_keygen(x, y) do
+    {x, y}
+  end
+
+  @decorate cache_put(cache: Cache, key_generator: {TestKeyGenerator, [x]})
+  def put_with_shorthand_tuple_keygen(x, y) do
+    {x, y}
+  end
+
+  @decorate cacheable(cache: Cache, key_generator: {__MODULE__, :generate_key, [{x, y}]})
+  def get_with_tuple_keygen(x, y) do
+    {x, y}
+  end
+
+  @decorate cacheable(cache: Cache, key_generator: {TestKeyGenerator, :generate, [:a, :b, [x]]})
+  def get_with_tuple_keygen2(x, y) do
+    {x, y}
+  end
+
+  @decorate cache_evict(cache: Cache, key_generator: {__MODULE__, :generate_key, [{x, y}]})
+  def evict_with_tuple_keygen(x, y) do
+    {x, y}
+  end
+
+  @decorate cache_put(cache: Cache, key_generator: {__MODULE__, :generate_key, [x]})
+  def put_with_tuple_keygen(x, y) do
+    x * y
+  end
+
+  # Custom key-generator function
+  def generate_key(arg), do: arg
+
+  @impl Nebulex.Caching.KeyGenerator
+  def generate(module, function_name, args) do
+    :erlang.phash2({module, function_name, args})
+  end
 
   ## Private Functions
 
