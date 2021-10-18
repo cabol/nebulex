@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.2.1](https://github.com/cabol/nebulex/tree/v2.2.1) (2021-10-18)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.2.0...v2.2.1)
+
+**Closed issues:**
+
+- Compilation error if cacheable decorator has an argument ignored
+  (FIX: Skip ignored and/or unassigned arguments when invoking key generator)
+  [#134](https://github.com/cabol/nebulex/issues/134)
+- Is it possible to use return value in key-generation along with the passed parameters?
+  [#132](https://github.com/cabol/nebulex/issues/132)
+
+**Merged pull requests:**
+
+- Fix `max_size` to be actually 1 million instead of 100,000
+  [#133](https://github.com/cabol/nebulex/pull/133)
+  ([adamz-prescribefit](https://github.com/adamz-prescribefit))
+
 ## [v2.2.0](https://github.com/cabol/nebulex/tree/v2.2.0) (2021-09-10)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.1.1...v2.2.0)
