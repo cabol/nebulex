@@ -327,12 +327,21 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   @impl true
-  defspan get_all(adapter_meta, keys, _opts) do
-    Enum.reduce(keys, %{}, fn key, acc ->
-      if obj = get(adapter_meta, key, []),
-        do: Map.put(acc, key, obj),
-        else: acc
-    end)
+  defspan get_all(adapter_meta, keys, opts) do
+    fun = fn level, {keys_acc, map_acc} ->
+      map = with_dynamic_cache(level, :get_all, [keys_acc, opts])
+      map_acc = Map.merge(map_acc, map)
+
+      case keys_acc -- Map.keys(map) do
+        [] -> {:halt, {[], map_acc}}
+        keys_acc -> {:cont, {keys_acc, map_acc}}
+      end
+    end
+
+    opts
+    |> levels(adapter_meta.levels)
+    |> Enum.reduce_while({keys, %{}}, fun)
+    |> elem(1)
   end
 
   @impl true
