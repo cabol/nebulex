@@ -140,8 +140,11 @@ defmodule Nebulex.TestCache do
 
     @impl true
     def get(_, key, _) do
-      if is_integer(key), do: raise(ArgumentError, "Error")
-      :ok
+      if is_integer(key) do
+        raise ArgumentError, "Error"
+      else
+        :ok
+      end
     end
 
     @impl true

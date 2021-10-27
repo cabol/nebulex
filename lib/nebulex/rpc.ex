@@ -144,6 +144,9 @@ defmodule Nebulex.RPC do
 
           {:exception, original, _} ->
             :erlang.raise(:error, original, __STACKTRACE__)
+
+          other ->
+            reraise %Nebulex.RPCError{reason: other}, __STACKTRACE__
         end
     end
 

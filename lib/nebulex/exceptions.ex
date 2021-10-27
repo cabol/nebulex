@@ -73,3 +73,29 @@ defmodule Nebulex.RPCMultiCallError do
     %__MODULE__{message: message}
   end
 end
+
+defmodule Nebulex.RPCError do
+  @moduledoc """
+  Raised at runtime when a RPC error occurs.
+  """
+
+  @type t :: %__MODULE__{reason: atom}
+
+  defexception [:reason]
+
+  @impl true
+  def message(%__MODULE__{reason: reason}) do
+    format_reason(reason)
+  end
+
+  # :erpc.call/5 doesn't format error messages.
+  defp format_reason({:erpc, _} = reason) do
+    """
+    The RPC operation failed with reason:
+
+    #{inspect(reason)}
+
+    See :erpc.call/5 for more information about the error reasons.
+    """
+  end
+end

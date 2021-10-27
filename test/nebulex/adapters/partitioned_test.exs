@@ -200,6 +200,21 @@ defmodule Nebulex.Adapters.PartitionedTest do
     end
   end
 
+  if Code.ensure_loaded?(:erpc) do
+    describe ":erpc" do
+      test "timeout error" do
+        assert Partitioned.put(1, 1) == :ok
+        assert Partitioned.get(1, timeout: 1000) == 1
+
+        msg = ~r"The RPC operation failed with reason:\n\n{:erpc, :timeout}"
+
+        assert_raise Nebulex.RPCError, msg, fn ->
+          Partitioned.get(1, timeout: 0)
+        end
+      end
+    end
+  end
+
   ## Private Functions
 
   defp teardown_cache(key) do
