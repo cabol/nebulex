@@ -4,7 +4,7 @@ defmodule Nebulex.Helpers do
 
   ## API
 
-  @spec get_option(Keyword.t(), atom, String.t(), (any -> boolean), term) :: term
+  @spec get_option(Keyword.t(), atom, binary, (any -> boolean), term) :: term
   def get_option(opts, key, expected, valid?, default \\ nil)
       when is_list(opts) and is_atom(key) do
     value = Keyword.get(opts, key, default)
@@ -28,7 +28,7 @@ defmodule Nebulex.Helpers do
     end
   end
 
-  @spec assert_behaviour(module, module, String.t()) :: module
+  @spec assert_behaviour(module, module, binary) :: module
   def assert_behaviour(module, behaviour, msg \\ "module") do
     if behaviour in module_behaviours(module, msg) do
       module
@@ -38,7 +38,7 @@ defmodule Nebulex.Helpers do
     end
   end
 
-  @spec module_behaviours(module, String.t()) :: [module]
+  @spec module_behaviours(module, binary) :: [module]
   def module_behaviours(module, msg) do
     if Code.ensure_compiled(module) != {:module, module} do
       raise ArgumentError,

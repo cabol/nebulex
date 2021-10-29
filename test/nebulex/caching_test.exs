@@ -22,6 +22,12 @@ defmodule Nebulex.CachingTest do
     def generate(mod, fun, args), do: :erlang.phash2({mod, fun, args})
   end
 
+  defmodule ErrorCache do
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Local
+  end
+
   defmodule Meta do
     defstruct [:id, :count]
     @type t :: %__MODULE__{}
@@ -53,6 +59,36 @@ defmodule Nebulex.CachingTest do
           use Nebulex.Caching
 
           @decorate cacheable(a: 1)
+          def t(a, b) do
+            {a, b}
+          end
+        end
+      end
+    end
+
+    test "cacheable fails invalid option :on_error" do
+      msg = "expected on_error: to be :raise or :nothing, got: :invalid"
+
+      assert_raise ArgumentError, msg, fn ->
+        defmodule Test do
+          use Nebulex.Caching
+
+          @decorate cacheable(cache: Cache, on_error: :invalid)
+          def t(a, b) do
+            {a, b}
+          end
+        end
+      end
+    end
+
+    test "cache_evict fails invalid option :keys" do
+      msg = "expected keys: to be a list with at least one element, got: []"
+
+      assert_raise ArgumentError, msg, fn ->
+        defmodule Test do
+          use Nebulex.Caching
+
+          @decorate cache_evict(cache: Cache, keys: [])
           def t(a, b) do
             {a, b}
           end
@@ -401,6 +437,20 @@ defmodule Nebulex.CachingTest do
     end
   end
 
+  describe "option :on_error on" do
+    test "cacheable annotation" do
+      assert get_with_exception("foo") == "foo"
+    end
+
+    test "cache_put annotation" do
+      assert update_with_exception("foo") == "foo"
+    end
+
+    test "cache_evict annotation" do
+      assert evict_with_exception("foo") == "foo"
+    end
+  end
+
   ## Annotated Functions
 
   @decorate cacheable(cache: Cache)
@@ -589,6 +639,21 @@ defmodule Nebulex.CachingTest do
   @decorate cache_put(cache: Cache, key_generator: {__MODULE__, :generate_key, [x]})
   def put_with_tuple_keygen(x, y) do
     x * y
+  end
+
+  @decorate cacheable(cache: ErrorCache, key: x, on_error: :nothing)
+  def get_with_exception(x) do
+    x
+  end
+
+  @decorate cache_put(cache: ErrorCache, key: x, on_error: :nothing)
+  def update_with_exception(x) do
+    x
+  end
+
+  @decorate cache_evict(cache: ErrorCache, key: x, on_error: :nothing)
+  def evict_with_exception(x) do
+    x
   end
 
   # Custom key-generator function

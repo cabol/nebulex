@@ -248,6 +248,13 @@ if Code.ensure_loaded?(Decorator.Define) do
         the `:key_generator` option. See "The `:key_generator` option" section
         below for more information about the possible values.
 
+      * `:on_error` - It may be one of `:raise` (the default) or `:nothing`.
+        The decorators/annotations call the cache under the hood, hence,
+        by default, any error or exception at executing a cache command
+        is propagated. When this option is set to `:nothing`, any error
+        or exception executing a cache command is ignored and the annotated
+        function is executed normally.
+
     ## The `:key_generator` option
 
     The possible values for the `:key_generator` are:
@@ -535,7 +542,7 @@ if Code.ensure_loaded?(Decorator.Define) do
       opts_var = attrs[:opts] || []
 
       keygen_block = keygen_block(attrs, context)
-      action_block = action_block(action, block, attrs, keygen_block)
+      action_block = action_block(action, block, attrs, keygen_block, on_error_opt(attrs))
 
       quote do
         cache = unquote(cache)
@@ -611,18 +618,30 @@ if Code.ensure_loaded?(Decorator.Define) do
       end
     end
 
-    defp action_block(:cacheable, block, _attrs, keygen) do
+    defp action_block(:cacheable, block, _attrs, keygen, on_error) do
       quote do
         key = unquote(keygen)
+        on_error = unquote(on_error)
 
-        case cache.get(key, opts) do
-          nil -> Caching.eval_match(unquote(block), match, cache, key, opts)
-          val -> val
+        case Caching.run_cmd(cache, :get, [key, opts], on_error) do
+          nil ->
+            result = unquote(block)
+
+            Caching.run_cmd(
+              Caching,
+              :eval_match,
+              [result, match, cache, key, opts],
+              on_error,
+              result
+            )
+
+          val ->
+            val
         end
       end
     end
 
-    defp action_block(:cache_put, block, attrs, keygen) do
+    defp action_block(:cache_put, block, attrs, keygen, on_error) do
       keys = get_keys(attrs)
 
       key =
@@ -631,14 +650,22 @@ if Code.ensure_loaded?(Decorator.Define) do
           else: keygen
 
       quote do
-        Caching.eval_match(unquote(block), match, cache, unquote(key), opts)
+        result = unquote(block)
+
+        Caching.run_cmd(
+          Caching,
+          :eval_match,
+          [result, match, cache, unquote(key), opts],
+          unquote(on_error),
+          result
+        )
       end
     end
 
-    defp action_block(:cache_evict, block, attrs, keygen) do
+    defp action_block(:cache_evict, block, attrs, keygen, on_error) do
       before_invocation? = attrs[:before_invocation] || false
 
-      eviction = eviction_block(attrs, keygen)
+      eviction = eviction_block(attrs, keygen, on_error)
 
       if is_boolean(before_invocation?) && before_invocation? do
         quote do
@@ -654,25 +681,25 @@ if Code.ensure_loaded?(Decorator.Define) do
       end
     end
 
-    defp eviction_block(attrs, keygen) do
+    defp eviction_block(attrs, keygen, on_error) do
       keys = get_keys(attrs)
       all_entries? = attrs[:all_entries] || false
 
       cond do
         is_boolean(all_entries?) && all_entries? ->
-          quote(do: cache.delete_all())
+          quote(do: Caching.run_cmd(cache, :delete_all, [], unquote(on_error), 0))
 
         is_list(keys) and length(keys) > 0 ->
-          delete_keys_block(keys)
+          delete_keys_block(keys, on_error)
 
         true ->
-          quote(do: cache.delete(unquote(keygen)))
+          quote(do: Caching.run_cmd(cache, :delete, [unquote(keygen)], unquote(on_error), :ok))
       end
     end
 
-    defp delete_keys_block(keys) do
+    defp delete_keys_block(keys, on_error) do
       quote do
-        Enum.each(unquote(keys), fn k -> if k, do: cache.delete(k) end)
+        Enum.each(unquote(keys), &Caching.run_cmd(cache, :delete, [&1], unquote(on_error), :ok))
       end
     end
 
@@ -682,6 +709,16 @@ if Code.ensure_loaded?(Decorator.Define) do
         :keys,
         "a list with at least one element",
         &((is_list(&1) and length(&1) > 0) or is_nil(&1))
+      )
+    end
+
+    defp on_error_opt(attrs) do
+      get_option(
+        attrs,
+        :on_error,
+        ":raise or :nothing",
+        &(&1 in [:raise, :nothing]),
+        :raise
       )
     end
 
@@ -722,6 +759,24 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     def cache_put(cache, key, value, opts) do
       cache.put(key, value, opts)
+    end
+
+    @doc """
+    Convenience function for ignoring cache errors when `:on_error` option
+    is set to `:nothing`
+
+    **NOTE:** Internal purposes only.
+    """
+    def run_cmd(mod, fun, args, on_error, default \\ nil)
+
+    def run_cmd(mod, fun, args, :raise, _default) do
+      apply(mod, fun, args)
+    end
+
+    def run_cmd(mod, fun, args, :nothing, default) do
+      apply(mod, fun, args)
+    rescue
+      _e -> default
     end
   end
 end
