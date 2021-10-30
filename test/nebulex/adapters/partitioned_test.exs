@@ -242,7 +242,10 @@ defmodule Nebulex.Adapters.PartitionedTest do
         assert Partitioned.put(1, 1) == :ok
         assert Partitioned.get(1, timeout: 1000) == 1
 
-        msg = ~r"The RPC operation failed with reason:\n\n{:erpc, :timeout}"
+        node = "#{inspect(Partitioned.get_node(1))}"
+        reason = "#{inspect({:erpc, :timeout})}"
+
+        msg = ~r"The RPC operation failed on node #{node} with reason:\n\n#{reason}"
 
         assert_raise Nebulex.RPCError, msg, fn ->
           Partitioned.get(1, timeout: 0)

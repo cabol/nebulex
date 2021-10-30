@@ -79,19 +79,19 @@ defmodule Nebulex.RPCError do
   Raised at runtime when a RPC error occurs.
   """
 
-  @type t :: %__MODULE__{reason: atom}
+  @type t :: %__MODULE__{reason: atom, node: node}
 
-  defexception [:reason]
+  defexception [:reason, :node]
 
   @impl true
-  def message(%__MODULE__{reason: reason}) do
-    format_reason(reason)
+  def message(%__MODULE__{reason: reason, node: node}) do
+    format_reason(reason, node)
   end
 
   # :erpc.call/5 doesn't format error messages.
-  defp format_reason({:erpc, _} = reason) do
+  defp format_reason({:erpc, _} = reason, node) do
     """
-    The RPC operation failed with reason:
+    The RPC operation failed on node #{inspect(node)} with reason:
 
     #{inspect(reason)}
 
