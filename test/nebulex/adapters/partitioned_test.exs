@@ -3,6 +3,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
   use Nebulex.CacheTest
 
   import Nebulex.CacheCase
+  import Nebulex.Helpers
 
   alias Nebulex.Adapter
   alias Nebulex.TestCache.{Partitioned, PartitionedMock}
@@ -20,7 +21,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
       start_caches(
         [node() | Node.list()],
         [
-          {Partitioned, [name: @cache_name]},
+          {Partitioned, [name: @cache_name, join_timeout: 2000]},
           {PartitionedMock, []}
         ]
       )
@@ -128,7 +129,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
     end
   end
 
-  describe "cluster" do
+  describe "cluster scenario:" do
     test "node leaves and then rejoins", %{name: name, cluster: cluster} do
       assert node() == @primary
       assert :lists.usort(Node.list()) == cluster -- [node()]
@@ -164,6 +165,41 @@ defmodule Nebulex.Adapters.PartitionedTest do
       assert Partitioned.get(4) == 44
       assert Partitioned.get(2) == 2
       assert Partitioned.get(1) == 1
+    end
+
+    test "bootstrap leaves cache from the cluster when terminated and then rejoins when restarted",
+         %{name: name} do
+      prefix = [:nebulex, :test_cache, :partitioned, :bootstrap]
+      started = prefix ++ [:started]
+      stopped = prefix ++ [:stopped]
+      joined = prefix ++ [:joined]
+      exit_sig = prefix ++ [:exit]
+
+      with_telemetry_handler(__MODULE__, [started, stopped, joined, exit_sig], fn ->
+        assert node() in Partitioned.nodes()
+
+        true =
+          [name, Bootstrap]
+          |> normalize_module_name()
+          |> Process.whereis()
+          |> Process.exit(:stop)
+
+        assert_receive {^exit_sig, %{system_time: _}, %{reason: :stop}}, 5000
+        assert_receive {^stopped, %{system_time: _}, %{reason: :stop, cluster_nodes: nodes}}, 5000
+
+        refute node() in nodes
+
+        assert_receive {^started, %{system_time: _}, %{}}, 5000
+        assert_receive {^joined, %{system_time: _}, %{cluster_nodes: nodes}}, 5000
+
+        assert node() in nodes
+        assert nodes -- Partitioned.nodes() == []
+
+        :ok = Process.sleep(2100)
+
+        assert_receive {^joined, %{system_time: _}, %{cluster_nodes: nodes}}, 5000
+        assert node() in nodes
+      end)
     end
   end
 

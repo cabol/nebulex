@@ -157,6 +157,10 @@ defmodule Nebulex.Adapters.Partitioned do
     * `:task_supervisor_opts` - Start-time options passed to
       `Task.Supervisor.start_link/1` when the adapter is initialized.
 
+    * `:join_timeout` - Interval time in milliseconds for joining the
+      running partitioned cache to the cluster. This is to ensure it is
+      always joined. Defaults to `:timer.seconds(180)`.
+
   ## Shared options
 
   Almost all of the cache functions outlined in `Nebulex.Cache` module
@@ -194,6 +198,64 @@ defmodule Nebulex.Adapters.Partitioned do
 
   See also the [Telemetry guide](http://hexdocs.pm/nebulex/telemetry.html)
   for more information and examples.
+
+  ## Adapter-specific telemetry events
+
+  This adapter exposes following Telemetry events:
+
+    * `telemetry_prefix ++ [:bootstrap, :started]` - Dispatched by the adapter
+      when the bootstrap process is started.
+
+      * Measurements: `%{system_time: non_neg_integer}`
+      * Metadata:
+
+        ```
+        %{
+          adapter_meta: %{optional(atom) => term},
+          cluster_nodes: [node]
+        }
+        ```
+
+    * `telemetry_prefix ++ [:bootstrap, :stopped]` - Dispatched by the adapter
+      when the bootstrap process is stopped.
+
+      * Measurements: `%{system_time: non_neg_integer}`
+      * Metadata:
+
+        ```
+        %{
+          adapter_meta: %{optional(atom) => term},
+          cluster_nodes: [node],
+          reason: term
+        }
+        ```
+
+    * `telemetry_prefix ++ [:bootstrap, :exit]` - Dispatched by the adapter
+      when the bootstrap has received an exit signal.
+
+      * Measurements: `%{system_time: non_neg_integer}`
+      * Metadata:
+
+        ```
+        %{
+          adapter_meta: %{optional(atom) => term},
+          cluster_nodes: [node],
+          reason: term
+        }
+        ```
+
+    * `telemetry_prefix ++ [:bootstrap, :joined]` - Dispatched by the adapter
+      when the bootstrap has joined the cache to the cluster.
+
+      * Measurements: `%{system_time: non_neg_integer}`
+      * Metadata:
+
+        ```
+        %{
+          adapter_meta: %{optional(atom) => term},
+          cluster_nodes: [node]
+        }
+        ```
 
   ## Stats
 
@@ -342,7 +404,7 @@ defmodule Nebulex.Adapters.Partitioned do
       |> assert_behaviour(Nebulex.Adapter.Keyslot, "keyslot")
 
     # Maybe task supervisor for distributed tasks
-    {task_sup_name, children} = sup_child_spec(name, opts)
+    {task_sup_name, children} = task_sup_child_spec(name, opts)
 
     # Prepare metadata
     adapter_meta = %{
@@ -362,7 +424,7 @@ defmodule Nebulex.Adapters.Partitioned do
         strategy: :rest_for_one,
         children: [
           {cache.__primary__, primary_opts},
-          {__MODULE__.Bootstrap, Map.put(adapter_meta, :cache, cache)}
+          {__MODULE__.Bootstrap, {Map.put(adapter_meta, :cache, cache), opts}}
           | children
         ]
       )
@@ -371,11 +433,11 @@ defmodule Nebulex.Adapters.Partitioned do
   end
 
   if Code.ensure_loaded?(:erpc) do
-    defp sup_child_spec(_name, _opts) do
+    defp task_sup_child_spec(_name, _opts) do
       {nil, []}
     end
   else
-    defp sup_child_spec(name, opts) do
+    defp task_sup_child_spec(name, opts) do
       # task supervisor to execute parallel and/or remote commands
       task_sup_name = normalize_module_name([name, TaskSupervisor])
       task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
@@ -695,14 +757,21 @@ defmodule Nebulex.Adapters.Partitioned.Bootstrap do
   import Nebulex.Helpers
 
   alias Nebulex.Cache.Cluster
+  alias Nebulex.Telemetry
+
+  # Default join timeout
+  @join_timeout :timer.seconds(180)
+
+  # State
+  defstruct [:adapter_meta, :join_timeout]
 
   ## API
 
   @doc false
-  def start_link(%{name: name} = adapter_meta) do
+  def start_link({%{name: name}, _} = state) do
     GenServer.start_link(
       __MODULE__,
-      adapter_meta,
+      state,
       name: normalize_module_name([name, Bootstrap])
     )
   end
@@ -710,20 +779,79 @@ defmodule Nebulex.Adapters.Partitioned.Bootstrap do
   ## GenServer Callbacks
 
   @impl true
-  def init(adapter_meta) do
+  def init({adapter_meta, opts}) do
     # Trap exit signals to run cleanup job
     _ = Process.flag(:trap_exit, true)
 
-    # Ensure joining the cluster only when the cache supervision tree is started
+    # Bootstrap started
+    :ok = dispatch_telemetry_event(:started, adapter_meta)
+
+    # Ensure joining the cluster when the cache supervision tree is started
     :ok = Cluster.join(adapter_meta.name)
 
+    # Bootstrap joined the cache to the cluster
+    :ok = dispatch_telemetry_event(:joined, adapter_meta)
+
+    # Build initial state
+    state = build_state(adapter_meta, opts)
+
     # Start bootstrap process
-    {:ok, adapter_meta}
+    {:ok, state, state.join_timeout}
   end
 
   @impl true
-  def terminate(_reason, adapter_meta) do
+  def handle_info(message, state)
+
+  def handle_info(:timeout, %__MODULE__{adapter_meta: adapter_meta} = state) do
+    # Ensure it is always joined to the cluster
+    :ok = Cluster.join(adapter_meta.name)
+
+    # Bootstrap joined the cache to the cluster
+    :ok = dispatch_telemetry_event(:joined, adapter_meta)
+
+    {:noreply, state, state.join_timeout}
+  end
+
+  def handle_info({:EXIT, _from, reason}, %__MODULE__{adapter_meta: adapter_meta} = state) do
+    # Bootstrap received exit signal
+    :ok = dispatch_telemetry_event(:exit, adapter_meta, %{reason: reason})
+
+    {:stop, reason, state}
+  end
+
+  @impl true
+  def terminate(reason, %__MODULE__{adapter_meta: adapter_meta}) do
     # Ensure leaving the cluster when the cache stops
     :ok = Cluster.leave(adapter_meta.name)
+
+    # Bootstrap stopped or terminated
+    :ok = dispatch_telemetry_event(:stopped, adapter_meta, %{reason: reason})
+  end
+
+  ## Private Functions
+
+  defp build_state(adapter_meta, opts) do
+    # Join timeout to ensure it is always joined to the cluster
+    join_timeout =
+      get_option(
+        opts,
+        :join_timeout,
+        "an integer > 0",
+        &(is_integer(&1) and &1 > 0),
+        @join_timeout
+      )
+
+    %__MODULE__{adapter_meta: adapter_meta, join_timeout: join_timeout}
+  end
+
+  defp dispatch_telemetry_event(event, adapter_meta, meta \\ %{}) do
+    Telemetry.execute(
+      adapter_meta.telemetry_prefix ++ [:bootstrap, event],
+      %{system_time: System.system_time()},
+      Map.merge(meta, %{
+        adapter_meta: adapter_meta,
+        cluster_nodes: Cluster.get_nodes(adapter_meta.name)
+      })
+    )
   end
 end
