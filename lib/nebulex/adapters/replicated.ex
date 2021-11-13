@@ -554,15 +554,22 @@ defmodule Nebulex.Adapters.Replicated do
   end
 
   defp multi_call(%{name: name, task_sup: task_sup} = meta, action, args, opts) do
-    task_sup
-    |> RPC.multi_call(
-      Cluster.get_nodes(name),
-      __MODULE__,
-      :with_dynamic_cache,
-      [meta, action, args],
-      opts
-    )
-    |> handle_rpc_multi_call(meta, action)
+    # Run the command locally first
+    local = with_dynamic_cache(meta, action, args)
+
+    # Run the command on the remote nodes
+    {ok_nodes, error_nodes} =
+      RPC.multi_call(
+        task_sup,
+        Cluster.get_nodes(name) -- [node()],
+        __MODULE__,
+        :with_dynamic_cache,
+        [meta, action, args],
+        opts
+      )
+
+    # Process the responses adding the local one as source of truth
+    handle_rpc_multi_call({[local | ok_nodes], error_nodes}, meta, action)
   end
 
   defp handle_rpc_multi_call({res, []}, _meta, _action), do: hd(res)
@@ -574,6 +581,7 @@ defmodule Nebulex.Adapters.Replicated do
 
   defp handle_rpc_multi_call({responses, {:sanitized, {errors, rpc_errors}}}, meta, action) do
     _ = dispatch_replication_error(meta, action, rpc_errors)
+
     raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
   end
 

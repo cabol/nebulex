@@ -92,7 +92,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
     test "incr/3 raises when the counter is not an integer" do
       :ok = Replicated.put(:counter, "string")
 
-      assert_raise Nebulex.RPCMultiCallError, fn ->
+      assert_raise ArgumentError, fn ->
         Replicated.incr(:counter, 10)
       end
     end
@@ -135,15 +135,19 @@ defmodule Nebulex.Adapters.ReplicatedTest do
     end
 
     test "error: rpc error" do
-      test_with_dynamic_cache(ReplicatedMock, [name: :replicated_mock], fn ->
+      node_pid_list = start_caches(cluster_nodes(), [{ReplicatedMock, []}])
+
+      try do
         _ = Process.flag(:trap_exit, true)
 
-        msg = ~r"RPC error executing action: put_all\n\nResponses:"
+        msg = ~r"RPC error while executing action :put_all\n\nSuccessful responses:"
 
         assert_raise Nebulex.RPCMultiCallError, msg, fn ->
           ReplicatedMock.put_all(a: 1, b: 2)
         end
-      end)
+      after
+        stop_caches(node_pid_list)
+      end
     end
 
     test "ok: start/stop cache nodes" do

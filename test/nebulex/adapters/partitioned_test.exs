@@ -208,7 +208,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
       assert Partitioned.put_all(for(x <- 1..100_000, do: {x, x}), timeout: 60_000) == :ok
       assert Partitioned.get(1, timeout: 1000) == 1
 
-      msg = ~r"RPC error executing action: all\n\nResponses:"
+      msg = ~r"RPC error while executing action :all\n\nSuccessful responses:"
 
       assert_raise Nebulex.RPCMultiCallError, msg, fn ->
         Partitioned.all(nil, timeout: 1)
@@ -228,7 +228,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
         PartitionedMock.get(1)
       end
 
-      msg = ~r"RPC error executing action: count_all\n\nResponses:"
+      msg = ~r"RPC error while executing action :count_all\n\nSuccessful responses:"
 
       assert_raise Nebulex.RPCMultiCallError, msg, fn ->
         PartitionedMock.count_all()

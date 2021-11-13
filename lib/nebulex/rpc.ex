@@ -246,7 +246,7 @@ defmodule Nebulex.RPC do
         {:ok, res}, _node_callback, {ok, err} ->
           {[res | ok], err}
 
-        {class, _} = error, node_callback, {ok, err} when class in [:error, :exit, :throw] ->
+        {kind, _} = error, node_callback, {ok, err} when kind in [:error, :exit, :throw] ->
           {ok, [{error, node_callback} | err]}
       end
     }

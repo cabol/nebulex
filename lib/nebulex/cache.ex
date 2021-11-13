@@ -76,7 +76,12 @@ defmodule Nebulex.Cache do
   one could define a module:
 
       defmodule MyApp.Telemetry do
-        def handle_event([:my_app, :cache, :command, event], measurements, metadata, config) do
+        def handle_event(
+              [:my_app, :cache, :command, event],
+              measurements,
+              metadata,
+              config
+            ) do
           case event do
             :start ->
               # Handle start event ...
