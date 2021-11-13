@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.3.0](https://github.com/cabol/nebulex/tree/v2.3.0) (2021-11-13)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.2.1...v2.3.0)
+
+**Implemented enhancements:**
+
+- Additional Telemetry events for the partitioned adapter
+  [#143](https://github.com/cabol/nebulex/issues/143)
+- Add option `:join_timeout` to the partitioned adapter
+  [#142](https://github.com/cabol/nebulex/issues/142)
+- Option `:on_error` for caching annotations to ignore cache exceptions when
+  required [#141](https://github.com/cabol/nebulex/issues/141)
+- Fix `Nebulex.Adapters.Multilevel.get_all/3` to call the same invoked function
+  into the underlying levels [#139](https://github.com/cabol/nebulex/issues/139)
+- Option `:key_generator` admits MFA tuple `{module, function, args}` as value
+  on the annotated functions [#135](https://github.com/cabol/nebulex/issues/135)
+
+**Closed issues:**
+
+- Unhandled :erpc failures
+  [#140](https://github.com/cabol/nebulex/issues/140)
+- Release a version with new telemetry dependency
+  [#137](https://github.com/cabol/nebulex/issues/137)
+- handle\_rpc\_multi\_call/3 doesn't handle empty list in res argument
+  [#136](https://github.com/cabol/nebulex/issues/136)
+- New telemetry isn't user friendly
+  [#129](https://github.com/cabol/nebulex/issues/129)
+
 ## [v2.2.1](https://github.com/cabol/nebulex/tree/v2.2.1) (2021-10-18)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.2.0...v2.2.1)
