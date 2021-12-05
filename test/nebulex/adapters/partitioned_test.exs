@@ -38,7 +38,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
     {:ok, cache: Partitioned, name: @cache_name, cluster: cluster, on_error: &assert_query_error/1}
   end
 
-  defp assert_query_error(%Nebulex.RPCMulticallError{errors: errors}) do
+  defp assert_query_error(%Nebulex.Error{reason: {:rpc_multicall_error, errors}}) do
     for {_node, {:error, reason}} <- errors do
       assert %Nebulex.QueryError{} = reason
     end
@@ -129,7 +129,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
     test "incr raises when the counter is not an integer" do
       :ok = Partitioned.put(:counter, "string")
 
-      assert_raise Nebulex.RPCError, fn ->
+      assert_raise Nebulex.Error, ~r"RPC call failed on node", fn ->
         Partitioned.incr!(:counter, 10)
       end
     end
@@ -173,8 +173,9 @@ defmodule Nebulex.Adapters.PartitionedTest do
       assert Partitioned.get!(1) == 1
     end
 
-    test "bootstrap leaves cache from the cluster when terminated and then rejoins when restarted",
-         %{name: name} do
+    test "cache leaves the cluster when terminated and then rejoins when restarted", %{
+      name: name
+    } do
       prefix = [:nebulex, :test_cache, :partitioned, :bootstrap]
       started = prefix ++ [:started]
       stopped = prefix ++ [:stopped]
@@ -214,10 +215,10 @@ defmodule Nebulex.Adapters.PartitionedTest do
       assert Partitioned.put_all(for(x <- 1..100_000, do: {x, x}), timeout: 60_000) == :ok
       assert Partitioned.get!(1, timeout: 1000) == 1
 
-      assert {:error, %Nebulex.RPCMulticallError{} = reason} = Partitioned.all(nil, timeout: 0)
-      assert reason.action == :all
+      assert {:error, %Nebulex.Error{reason: {:rpc_multicall_error, errors}}} =
+               Partitioned.all(nil, timeout: 0)
 
-      for {_node, error} <- reason.errors do
+      for {_node, error} <- errors do
         assert error == {:error, {:erpc, :timeout}}
       end
     end
@@ -225,30 +226,30 @@ defmodule Nebulex.Adapters.PartitionedTest do
     test "runtime error" do
       _ = Process.flag(:trap_exit, true)
 
-      assert {:error, %Nebulex.RPCMulticallError{errors: errors}} =
+      assert {:error, %Nebulex.Error{reason: {:rpc_multicall_error, errors}}} =
                PartitionedMock.get_all([1, 2], timeout: 10)
 
       for {_node, {error, _call}} <- errors do
         assert error == {:error, {:erpc, :timeout}}
       end
 
-      assert {:error, %Nebulex.RPCMulticallError{errors: errors}} =
+      assert {:error, %Nebulex.Error{reason: {:rpc_multicall_error, errors}}} =
                PartitionedMock.put_all(a: 1, b: 2)
 
       for {_node, {error, _call}} <- errors do
         assert error == {:error, {:EXIT, {:signal, :normal}}}
       end
 
-      assert {:error, %Nebulex.RPCError{node: node, reason: {:EXIT, {reason, _}}}} =
+      assert {:error, %Nebulex.Error{reason: {:rpc_error, {node, {:EXIT, {reason, _}}}}}} =
                PartitionedMock.get(1)
 
       assert node == :"node3@127.0.0.1"
       assert reason == %ArgumentError{message: "Error"}
 
-      assert {:error, %Nebulex.RPCMulticallError{} = reason} = PartitionedMock.count_all()
-      assert reason.action == :count_all
+      assert {:error, %Nebulex.Error{reason: {:rpc_multicall_error, errors}}} =
+               PartitionedMock.count_all()
 
-      for {_node, error} <- reason.errors do
+      for {_node, error} <- errors do
         assert error == {:exit, {:signal, :normal}}
       end
     end

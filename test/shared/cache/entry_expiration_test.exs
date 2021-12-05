@@ -70,8 +70,8 @@ defmodule Nebulex.Cache.EntryExpirationTest do
         assert cache.ttl!(:b) == :infinity
       end
 
-      test "raises Nebulex.KeyError if key does not exist", %{cache: cache} do
-        msg = ~r"key :non_existent not found in cache: #{inspect(cache)}"
+      test "raises Nebulex.KeyError if key does not exist", %{cache: cache, name: name} do
+        msg = ~r"key :non_existent not found in cache: #{inspect(name)}"
 
         assert_raise Nebulex.KeyError, msg, fn ->
           cache.ttl!(:non_existent)

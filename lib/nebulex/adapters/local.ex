@@ -391,6 +391,7 @@ defmodule Nebulex.Adapters.Local do
     # Build adapter metadata
     adapter_meta = %{
       cache: cache,
+      name: opts[:name] || cache,
       telemetry: telemetry,
       telemetry_prefix: telemetry_prefix,
       meta_tab: meta_tab,
@@ -674,7 +675,7 @@ defmodule Nebulex.Adapters.Local do
     quote do
       case unquote(adapter_meta).backend.unquote(fun)(unquote(tab), unquote(key)) do
         [] ->
-          wrap_error Nebulex.KeyError, key: unquote(key), cache: unquote(adapter_meta).cache
+          wrap_error Nebulex.KeyError, key: unquote(key), cache: unquote(adapter_meta).name
 
         [entry(ttl: :infinity) = entry] ->
           {:ok, entry}
@@ -692,7 +693,7 @@ defmodule Nebulex.Adapters.Local do
   defp validate_ttl(entry(key: key, touched: touched, ttl: ttl) = entry, tab, adapter_meta) do
     if Time.now() - touched >= ttl do
       true = adapter_meta.backend.delete(tab, key)
-      wrap_error Nebulex.KeyError, key: key, cache: adapter_meta.cache, reason: :expired
+      wrap_error Nebulex.KeyError, key: key, cache: adapter_meta.name, reason: :expired
     else
       {:ok, entry}
     end

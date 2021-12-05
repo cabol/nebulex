@@ -140,9 +140,9 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       try do
         _ = Process.flag(:trap_exit, true)
 
-        msg = ~r"RPC error while executing action :put_all\n\nSuccessful responses:"
+        msg = ~r"RPC multicall failed with errors ([{node, error}, ...]):"
 
-        assert_raise Nebulex.RPCMulticallError, msg, fn ->
+        assert_raise Nebulex.Error, msg, fn ->
           ReplicatedMock.put_all(a: 1, b: 2)
         end
       after

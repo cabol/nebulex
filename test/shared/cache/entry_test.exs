@@ -291,8 +291,8 @@ defmodule Nebulex.Cache.EntryTest do
         end
       end
 
-      test "raises when the key does not exist in cache", %{cache: cache} do
-        msg = ~r"key \"non-existent\" not found in cache: #{inspect(cache)}"
+      test "raises when the key does not exist in cache", %{cache: cache, name: name} do
+        msg = ~r"key \"non-existent\" not found in cache: #{inspect(name)}"
 
         assert_raise Nebulex.KeyError, msg, fn ->
           cache.fetch!("non-existent")
@@ -458,8 +458,8 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.get!(1) == nil
       end
 
-      test "raises when the key does not exist in cache", %{cache: cache} do
-        msg = ~r"key \"non-existent\" not found in cache: #{inspect(cache)}"
+      test "raises when the key does not exist in cache", %{cache: cache, name: name} do
+        msg = ~r"key \"non-existent\" not found in cache: #{inspect(name)}"
 
         assert_raise Nebulex.KeyError, msg, fn ->
           cache.take!("non-existent")

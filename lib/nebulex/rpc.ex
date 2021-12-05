@@ -32,7 +32,7 @@ defmodule Nebulex.RPC do
 
   @doc """
   Evaluates `apply(mod, fun, args)` on node `node` and returns the corresponding
-  evaluation result, or `{:badrpc, Nebulex.RPCError.t()}` if the call fails.
+  evaluation result, or `{:error, Nebulex.Error.t()}` if the call fails.
 
   A timeout, in milliseconds or `:infinity`, can be given with a default value
   of `5000`.
@@ -43,7 +43,7 @@ defmodule Nebulex.RPC do
       "1"
 
   """
-  @spec call(node, module, atom, [term], timeout) :: term | {:error, Nebulex.RPCError.t()}
+  @spec call(node, module, atom, [term], timeout) :: term | {:error, Nebulex.Error.t()}
   def call(node, mod, fun, args, timeout \\ 5000)
 
   def call(node, mod, fun, args, _timeout) when node == node() do
@@ -52,7 +52,7 @@ defmodule Nebulex.RPC do
 
   def call(node, mod, fun, args, timeout) do
     with {:badrpc, reason} <- :rpc.call(node, mod, fun, args, timeout) do
-      wrap_error Nebulex.RPCError, reason: reason, node: node
+      wrap_error Nebulex.Error, reason: {:rpc_error, {node, reason}}, module: __MODULE__
     end
   end
 
@@ -156,6 +156,26 @@ defmodule Nebulex.RPC do
   end
 
   ## Helpers
+
+  @doc """
+  Helper for formatting RPC errors.
+  """
+  @spec format_error(term) :: binary
+  def format_error(error)
+
+  def format_error({:rpc_error, {node, reason}}) do
+    "RPC call failed on node #{inspect(node)} with reason: #{inspect(reason)}"
+  end
+
+  def format_error({:rpc_multicall_error, errors}) when is_list(errors) do
+    """
+    RPC multicall failed with errors ([{node, error}, ...]):
+
+    #{inspect(errors, pretty: true)}
+    """
+  end
+
+  ## Private Functions
 
   defp default_reducer do
     {
