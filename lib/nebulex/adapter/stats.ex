@@ -25,7 +25,6 @@ defmodule Nebulex.Adapter.Stats do
     * `{:ok, nil}` - the stats are disabled for the cache.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:Nebulex.Cache.error_reason/0`.
 
   The adapter may also include additional custom measurements,
   as well as metadata.

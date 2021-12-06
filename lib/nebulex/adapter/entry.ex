@@ -38,7 +38,6 @@ defmodule Nebulex.Adapter.Entry do
     * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:Nebulex.Cache.error_reason/0`.
 
   See `c:Nebulex.Cache.fetch/2`.
   """
@@ -51,7 +50,6 @@ defmodule Nebulex.Adapter.Entry do
   it is ignored and not added into the returned map.
 
   Returns `{:error, reason}` if there's any other error with the cache.
-  The `reason` may be one of `t:Nebulex.Cache.error_reason/0`.
 
   See `c:Nebulex.Cache.get_all/2`.
   """
@@ -66,8 +64,7 @@ defmodule Nebulex.Adapter.Entry do
   Returns `{:ok, true}` if the `value` with key `key` is successfully inserted,
   otherwise, `{:ok, false}` is returned.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` may be one of
-  `t:Nebulex.Cache.error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   ## OnWrite
 
@@ -100,8 +97,7 @@ defmodule Nebulex.Adapter.Entry do
   Returns `{:ok, true}` if all the keys were inserted. If no key was inserted
   (at least one key already existed), `{:ok, false}` is returned.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` may be one of
-  `t:Nebulex.Cache.error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   ## OnWrite
 
@@ -127,8 +123,7 @@ defmodule Nebulex.Adapter.Entry do
   @doc """
   Deletes a single entry from cache.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` may be one of
-  `t:Nebulex.Cache.error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   See `c:Nebulex.Cache.delete/2`.
   """
@@ -145,7 +140,6 @@ defmodule Nebulex.Adapter.Entry do
     * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:Nebulex.Cache.error_reason/0`.
 
   See `c:Nebulex.Cache.take/2`.
   """
@@ -159,8 +153,7 @@ defmodule Nebulex.Adapter.Entry do
   If `amount` < 0, the counter is decremented by the given `amount`.
   If `amount` == 0, the counter is not updated.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` may be one of
-  `t:Nebulex.Cache.error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   See `c:Nebulex.Cache.incr/3`.
   See `c:Nebulex.Cache.decr/3`.
@@ -175,8 +168,7 @@ defmodule Nebulex.Adapter.Entry do
   More formally, returns `{:ok, true}` if the cache contains the given `key`.
   If the cache doesn't contain `key`, `{:ok, :false}` is returned.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` may be one of
-  `t:Nebulex.Cache.error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   See `c:Nebulex.Cache.exists?/1`.
   """
@@ -193,7 +185,6 @@ defmodule Nebulex.Adapter.Entry do
     * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:Nebulex.Cache.error_reason/0`.
 
   See `c:Nebulex.Cache.ttl/1`.
   """
@@ -204,8 +195,7 @@ defmodule Nebulex.Adapter.Entry do
   Returns `{:ok, true}` if the given `key` exists and the new `ttl` was
   successfully updated, otherwise, `{:ok, false}` is returned.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` may be one of
-  `t:Nebulex.Cache.error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   See `c:Nebulex.Cache.expire/2`.
   """
@@ -215,8 +205,7 @@ defmodule Nebulex.Adapter.Entry do
   Returns `{:ok, true}` if the given `key` exists and the last access time was
   successfully updated, otherwise, `{:ok, false}` is returned.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` may be one of
-  `t:Nebulex.Cache.error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   See `c:Nebulex.Cache.touch/1`.
   """

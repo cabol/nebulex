@@ -48,13 +48,15 @@ defmodule Nebulex.Cache.TransactionTest do
       end
 
       test "error: exception is raised", %{cache: cache} do
-        assert cache.transaction(fn ->
-                 with :ok <- cache.put(1, 11),
-                      11 <- cache.fetch!(1),
-                      :ok <- cache.delete(1) do
-                   :ok = cache.get(1)
-                 end
-               end) == {:error, %MatchError{term: {:ok, nil}}}
+        assert_raise MatchError, fn ->
+          cache.transaction(fn ->
+            with :ok <- cache.put(1, 11),
+                 11 <- cache.fetch!(1),
+                 :ok <- cache.delete(1) do
+              :ok = cache.get(1)
+            end
+          end)
+        end
       end
 
       test "aborted", %{name: name, cache: cache} do

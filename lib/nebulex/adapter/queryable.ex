@@ -39,7 +39,6 @@ defmodule Nebulex.Adapter.Queryable do
     * `{:error, Nebulex.QueryError.t()}` - the query validation failed.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:Nebulex.Cache.error_reason/0`.
 
   ## Operations
 
@@ -75,7 +74,6 @@ defmodule Nebulex.Adapter.Queryable do
     * `{:error, Nebulex.QueryError.t()}` - the query validation failed.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:Nebulex.Cache.error_reason/0`.
 
   See `c:Nebulex.Cache.stream/2`.
   """

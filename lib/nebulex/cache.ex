@@ -273,26 +273,23 @@ defmodule Nebulex.Cache do
   @typedoc "Cache action options"
   @type opts :: Keyword.t()
 
-  @typedoc "Common error reasons"
-  @type error_reason ::
-          Nebulex.Error.t()
-          | Nebulex.RPCError.t()
-          | Exception.t()
+  @typedoc "Proxy type for base Nebulex error"
+  @type nbx_error :: Nebulex.Error.t()
 
   @typedoc "Fetch error reasons"
-  @type fetch_error_reason :: Nebulex.KeyError.t() | error_reason
+  @type fetch_error_reason :: Nebulex.KeyError.t() | nbx_error
 
   @typedoc "Query error reasons"
-  @type query_error_reason :: Nebulex.QueryError.t() | error_reason
+  @type query_error_reason :: Nebulex.QueryError.t() | nbx_error
 
   @typedoc "Error tuple with common reasons"
-  @type error :: error(error_reason)
+  @type error :: error(nbx_error)
 
   @typedoc "Error tuple type"
   @type error(reason) :: {:error, reason}
 
   @typedoc "Ok/Error tuple with default error reasons"
-  @type ok_error_tuple(ok) :: ok_error_tuple(ok, error_reason)
+  @type ok_error_tuple(ok) :: ok_error_tuple(ok, nbx_error)
 
   @typedoc "Ok/Error tuple type"
   @type ok_error_tuple(ok, error) :: {:ok, ok} | {:error, error}
@@ -844,7 +841,6 @@ defmodule Nebulex.Cache do
     * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -866,8 +862,8 @@ defmodule Nebulex.Cache do
 
   @doc """
   Same as `c:fetch/2` but raises `Nebulex.KeyError` if the cache doesn't
-  contain `key`, or `t:error_reason/0` if another error occurs while
-  executing the command.
+  contain `key`, or `Nebulex.Error` if another error occurs while executing
+  the command.
   """
   @callback fetch!(key, opts) :: value
 
@@ -883,7 +879,6 @@ defmodule Nebulex.Cache do
       then the `default` is returned.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -904,7 +899,7 @@ defmodule Nebulex.Cache do
       {:ok, :default}
 
   """
-  @callback get(key, default :: value, opts) :: ok_error_tuple(value, error_reason)
+  @callback get(key, default :: value, opts) :: ok_error_tuple(value)
 
   @doc """
   Same as `c:get/3` but raises an exception if an error occurs.
@@ -917,7 +912,6 @@ defmodule Nebulex.Cache do
   it is ignored and not added into the returned map.
 
   Returns `{:error, reason}` if an error occurs while executing the command.
-  The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -947,7 +941,6 @@ defmodule Nebulex.Cache do
   `put` operation.
 
   Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
-  The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -989,7 +982,6 @@ defmodule Nebulex.Cache do
   existing values with new values (just as regular `put`).
 
   Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
-  The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -1026,8 +1018,7 @@ defmodule Nebulex.Cache do
   Returns `{:ok, true}` if a value was set, otherwise, `{:ok, false}`
   is returned.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
-  `t:error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   ## Options
 
@@ -1060,8 +1051,7 @@ defmodule Nebulex.Cache do
   Returns `{:ok, true}` if all entries were successfully set, or `{:ok, false}`
   if no key was set (at least one key already existed).
 
-  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
-  `t:error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   ## Options
 
@@ -1098,8 +1088,7 @@ defmodule Nebulex.Cache do
   Returns `{:ok, true}` if a value was set, otherwise, `{:ok, false}`
   is returned.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
-  `t:error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   ## Options
 
@@ -1136,8 +1125,7 @@ defmodule Nebulex.Cache do
   @doc """
   Deletes the entry in cache for a specific `key`.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
-  `t:error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   ## Options
 
@@ -1176,7 +1164,6 @@ defmodule Nebulex.Cache do
     * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -1207,8 +1194,7 @@ defmodule Nebulex.Cache do
   More formally, returns `{:ok, true}` if the cache contains the given `key`.
   If the cache doesn't contain `key`, `{:ok, :false}` is returned.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
-  `t:error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   ## Examples
 
@@ -1231,8 +1217,7 @@ defmodule Nebulex.Cache do
   If `amount < 0` (negative), the value is decremented by that `amount`
   instead.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
-  `t:error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   ## Options
 
@@ -1275,8 +1260,7 @@ defmodule Nebulex.Cache do
   If `amount < 0` (negative), the value is incremented by that `amount`
   instead (opposite to `incr/3`).
 
-  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
-  `t:error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   ## Options
 
@@ -1323,7 +1307,6 @@ defmodule Nebulex.Cache do
     * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:error_reason/0`.
 
   ## Examples
 
@@ -1354,8 +1337,7 @@ defmodule Nebulex.Cache do
   Returns `{:ok, true}` if the given `key` exists and the new `ttl` was
   successfully updated, otherwise, `{:ok, false}` is returned.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
-  `t:error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   ## Examples
 
@@ -1383,8 +1365,7 @@ defmodule Nebulex.Cache do
   Returns `{:ok, true}` if the given `key` exists and the last access time was
   successfully updated, otherwise, `{:ok, false}` is returned.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
-  `t:error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   ## Examples
 
@@ -1420,7 +1401,6 @@ defmodule Nebulex.Cache do
       returned by `fun` and the new updated value under `key`.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -1482,7 +1462,6 @@ defmodule Nebulex.Cache do
     * `{:ok, value}` - The value associated to the given `key` has been updated.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -1530,7 +1509,6 @@ defmodule Nebulex.Cache do
     * `{:error, Nebulex.QueryError.t()}` - the query validation failed.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:error_reason/0`.
 
   ## Query values
 
@@ -1661,7 +1639,6 @@ defmodule Nebulex.Cache do
     * `{:error, Nebulex.QueryError.t()}` - the query validation failed.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:error_reason/0`.
 
   ## Query values
 
@@ -1770,7 +1747,6 @@ defmodule Nebulex.Cache do
     * `{:error, Nebulex.QueryError.t()}` - the query validation failed.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:error_reason/0`.
 
   ## Query values
 
@@ -1820,7 +1796,6 @@ defmodule Nebulex.Cache do
     * `{:error, Nebulex.QueryError.t()}` - the query validation failed.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:error_reason/0`.
 
   ## Query values
 
@@ -1860,7 +1835,6 @@ defmodule Nebulex.Cache do
   Dumps a cache to the given file `path`.
 
   Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
-  The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -1895,7 +1869,6 @@ defmodule Nebulex.Cache do
   Loads a dumped cache from the given `path`.
 
   Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
-  The `reason` can be one of `t:error_reason/0`.
 
   ## Options
 
@@ -1941,8 +1914,14 @@ defmodule Nebulex.Cache do
   A successful transaction returns the value returned by the function wrapped
   in a tuple as `{:ok, value}`.
 
-  If an unhandled error occurs the transaction, it will be wrapped up in the
-  shape of `{:error, error}`, where `error` is the original exception.
+  In case the transaction cannot be executed, then `{:error, reason}` is
+  returned.
+
+  If an unhandled error/exception occurs, the error will bubble up from the
+  transaction function.
+
+  If `transaction/2` is called inside another transaction, the function is
+  simply executed without wrapping the new transaction call in any way.
 
   ## Options
 
@@ -1973,8 +1952,7 @@ defmodule Nebulex.Cache do
   Returns `{:ok, true}` if the current process is inside a transaction,
   otherwise, `{:ok, false}` is returned.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
-  `t:error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   ## Examples
 
@@ -2003,7 +1981,6 @@ defmodule Nebulex.Cache do
     * `{:ok, nil}` - the stats are disabled for the cache.
 
     * `{:error, reason}` - an error occurred while executing the command.
-      The `reason` can be one of `t:error_reason/0`.
 
   ## Example
 
@@ -2032,8 +2009,7 @@ defmodule Nebulex.Cache do
   @doc """
   Emits a telemetry event when called with the current stats count.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
-  `t:error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   The telemetry `:measurements` map will include the same as
   `Nebulex.Stats.t()`'s measurements. For example:

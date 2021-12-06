@@ -762,7 +762,15 @@ defmodule Nebulex.Adapters.Local do
         {:ok, spec}
 
       {:error, _result} ->
-        wrap_error Nebulex.QueryError, message: "invalid match spec", query: spec
+        msg = """
+        expected query to be one of:
+
+        nil | :unexpired | :expired | :ets.match_spec()
+
+        but got:
+        """
+
+        wrap_error Nebulex.QueryError, message: msg, query: spec
     end
   end
 

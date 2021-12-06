@@ -66,8 +66,7 @@ defmodule Nebulex.Adapter.Transaction do
   Returns `{:ok, true}` if the current process is inside a transaction,
   otherwise, `{:ok, false}` is returned.
 
-  Returns `{:error, reason}` if an error occurs. The `reason` can be one of
-  `t:Nebulex.Cache.error_reason/0`.
+  Returns `{:error, reason}` if an error occurs.
 
   See `c:Nebulex.Cache.in_transaction?/0`.
   """
@@ -92,8 +91,6 @@ defmodule Nebulex.Adapter.Transaction do
           cache,
           fun
         )
-      rescue
-        error -> {:error, error}
       end
 
       @impl true

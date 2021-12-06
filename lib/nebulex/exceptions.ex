@@ -33,8 +33,8 @@ defmodule Nebulex.Error do
     "Cache #{inspect(cache)} has aborted a transaction on nodes: #{inspect(nodes)}"
   end
 
-  def format_error(%File.Error{} = file_error) do
-    File.Error.message(file_error)
+  def format_error(exception) when is_exception(exception) do
+    exception.__struct__.message(exception)
   end
 
   def format_error(reason) do
@@ -116,7 +116,7 @@ defmodule Nebulex.QueryError do
     query = Keyword.fetch!(opts, :query)
 
     message = """
-    #{message} in query:
+    #{message}
 
     #{inspect(query, pretty: true)}
     """
