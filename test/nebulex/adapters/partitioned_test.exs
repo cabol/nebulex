@@ -11,8 +11,10 @@ defmodule Nebulex.Adapters.PartitionedTest do
   @primary :"primary@127.0.0.1"
   @cache_name :partitioned_cache
 
-  # Set config
-  :ok = Application.put_env(:nebulex, Partitioned, primary: [backend: :shards])
+  setup_all do
+    # Set config
+    :ok = Application.put_env(:nebulex, Partitioned, primary: [backend: :shards])
+  end
 
   setup do
     cluster = :lists.usort([@primary | Application.get_env(:nebulex, :nodes, [])])
@@ -237,7 +239,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
                PartitionedMock.put_all(a: 1, b: 2)
 
       for {_node, {error, _call}} <- errors do
-        assert error == {:error, {:EXIT, {:signal, :normal}}}
+        assert error == {:exit, {:signal, :normal}}
       end
 
       assert {:error, %Nebulex.Error{reason: {:rpc_error, {node, {:EXIT, {reason, _}}}}}} =

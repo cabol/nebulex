@@ -181,7 +181,9 @@ defmodule Nebulex.TestCache do
     end
 
     @impl true
-    def put_all(_, _, _, _, _), do: Process.exit(self(), :normal)
+    def put_all(_, _, _, _, _) do
+      {:ok, Process.exit(self(), :normal)}
+    end
 
     @impl true
     def execute(_, :count_all, _, _) do

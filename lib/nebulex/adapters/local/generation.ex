@@ -223,9 +223,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   defp get_meta_tab(server_ref) when is_atom(server_ref) or is_pid(server_ref) do
-    Adapter.with_meta(server_ref, fn _, %{meta_tab: meta_tab} ->
-      meta_tab
-    end)
+    unwrap_or_raise Adapter.with_meta(server_ref, fn _, %{meta_tab: meta_tab} -> meta_tab end)
   end
 
   defp get_meta_tab(server_ref), do: server_ref

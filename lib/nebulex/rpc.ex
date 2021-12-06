@@ -109,7 +109,7 @@ defmodule Nebulex.RPC do
           reducer_fun.({:error, exception.original}, group, acc)
       catch
         :exit, reason ->
-          reducer_fun.({:error, {:EXIT, reason}}, group, acc)
+          reducer_fun.({:exit, reason}, group, acc)
       end
     end)
   end

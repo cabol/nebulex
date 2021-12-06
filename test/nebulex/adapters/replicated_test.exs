@@ -4,33 +4,25 @@ defmodule Nebulex.Adapters.ReplicatedTest do
 
   import Mock
   import Nebulex.CacheCase
+  import Nebulex.Helpers
 
   alias Nebulex.TestCache.{Replicated, ReplicatedMock}
 
   @cache_name :replicated_cache
 
-  setup_all do
+  setup do
     node_pid_list = start_caches(cluster_nodes(), [{Replicated, [name: @cache_name]}])
 
+    default_dynamic_cache = Replicated.get_dynamic_cache()
+    _ = Replicated.put_dynamic_cache(@cache_name)
+
     on_exit(fn ->
+      _ = Replicated.put_dynamic_cache(default_dynamic_cache)
       :ok = Process.sleep(100)
       stop_caches(node_pid_list)
     end)
 
     {:ok, cache: Replicated, name: @cache_name}
-  end
-
-  setup do
-    default_dynamic_cache = Replicated.get_dynamic_cache()
-    _ = Replicated.put_dynamic_cache(@cache_name)
-
-    _ = Replicated.delete_all()
-
-    on_exit(fn ->
-      Replicated.put_dynamic_cache(default_dynamic_cache)
-    end)
-
-    :ok
   end
 
   describe "c:init/1" do
@@ -49,44 +41,58 @@ defmodule Nebulex.Adapters.ReplicatedTest do
   describe "replicated cache:" do
     test "put/3" do
       assert Replicated.put(1, 1) == :ok
-      assert Replicated.get(1) == 1
+      assert Replicated.get!(1) == 1
 
-      assert_for_all_replicas(Replicated, :get, [1], 1)
+      assert_for_all_replicas(Replicated, :get!, [1], 1)
 
       assert Replicated.put_all(a: 1, b: 2, c: 3) == :ok
 
-      assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})
+      assert_for_all_replicas(Replicated, :get_all!, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})
     end
 
     test "delete/2" do
       assert Replicated.put("foo", "bar") == :ok
-      assert Replicated.get("foo") == "bar"
+      assert Replicated.get!("foo") == "bar"
 
-      assert_for_all_replicas(Replicated, :get, ["foo"], "bar")
+      assert_for_all_replicas(Replicated, :get!, ["foo"], "bar")
 
       assert Replicated.delete("foo") == :ok
-      refute Replicated.get("foo")
+      refute Replicated.get!("foo")
 
-      assert_for_all_replicas(Replicated, :get, ["foo"], nil)
+      assert_for_all_replicas(Replicated, :get!, ["foo"], nil)
     end
 
     test "take/2" do
       assert Replicated.put("foo", "bar") == :ok
-      assert Replicated.get("foo") == "bar"
+      assert Replicated.get!("foo") == "bar"
 
-      assert_for_all_replicas(Replicated, :get, ["foo"], "bar")
+      assert_for_all_replicas(Replicated, :get!, ["foo"], "bar")
 
-      assert Replicated.take("foo") == "bar"
-      refute Replicated.get("foo")
+      assert Replicated.take!("foo") == "bar"
+      refute Replicated.get!("foo")
 
-      assert_for_all_replicas(Replicated, :take, ["foo"], nil)
+      assert_for_all_replicas(Replicated, :get!, ["foo"], nil)
+    end
+
+    test "take/2 (Nebulex.KeyError on remote nodes)" do
+      Replicated.__primary__().with_dynamic_cache(
+        normalize_module_name([@cache_name, Primary]),
+        fn ->
+          :ok = Replicated.__primary__().put("foo", "bar")
+        end
+      )
+
+      assert Replicated.take!("foo") == "bar"
+      refute Replicated.get!("foo")
+
+      assert_for_all_replicas(Replicated, :get!, ["foo"], nil)
     end
 
     test "incr/3" do
-      assert Replicated.incr(:counter, 3) == 3
-      assert Replicated.incr(:counter) == 4
+      assert Replicated.incr!(:counter, 3) == 3
+      assert Replicated.incr!(:counter) == 4
 
-      assert_for_all_replicas(Replicated, :get, [:counter], 4)
+      assert_for_all_replicas(Replicated, :get!, [:counter], 4)
     end
 
     test "incr/3 raises when the counter is not an integer" do
@@ -100,12 +106,12 @@ defmodule Nebulex.Adapters.ReplicatedTest do
     test "delete_all/2" do
       assert Replicated.put_all(a: 1, b: 2, c: 3) == :ok
 
-      assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})
+      assert_for_all_replicas(Replicated, :get_all!, [[:a, :b, :c]], %{a: 1, b: 2, c: 3})
 
-      assert Replicated.delete_all() == 3
-      assert Replicated.count_all() == 0
+      assert Replicated.delete_all!() == 3
+      assert Replicated.count_all!() == 0
 
-      assert_for_all_replicas(Replicated, :get_all, [[:a, :b, :c]], %{})
+      assert_for_all_replicas(Replicated, :get_all!, [[:a, :b, :c]], %{})
     end
   end
 
@@ -140,10 +146,11 @@ defmodule Nebulex.Adapters.ReplicatedTest do
       try do
         _ = Process.flag(:trap_exit, true)
 
-        msg = ~r"RPC multicall failed with errors ([{node, error}, ...]):"
+        assert {:error, %Nebulex.Error{reason: {:rpc_multicall_error, errors}}} =
+                 ReplicatedMock.put_new_all(a: 1, b: 2)
 
-        assert_raise Nebulex.Error, msg, fn ->
-          ReplicatedMock.put_all(a: 1, b: 2)
+        for {_node, error} <- errors do
+          assert error == {:exit, {:signal, :normal}}
         end
       after
         stop_caches(node_pid_list)
@@ -161,7 +168,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
 
         assert_for_all_replicas(
           Replicated,
-          :get_all,
+          :get_all!,
           [[:a, :b, :c]],
           %{a: 1, b: 2, c: 3}
         )
@@ -177,7 +184,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
         wait_until(10, 1000, fn ->
           assert_for_all_replicas(
             Replicated,
-            :get_all,
+            :get_all!,
             [[:a, :b, :c]],
             %{a: 1, b: 2, c: 3}
           )
@@ -198,8 +205,8 @@ defmodule Nebulex.Adapters.ReplicatedTest do
             assert meta[:function_name] == :put
 
             assert [
-                     "node5@127.0.0.1": :noconnection,
-                     "node3@127.0.0.1": %Nebulex.RegistryLookupError{}
+                     "node5@127.0.0.1": {:error, {:erpc, :noconnection}},
+                     "node3@127.0.0.1": {:error, %Nebulex.Error{reason: {:registry_error, _}}}
                    ] = meta[:rpc_errors]
           end
         end
@@ -211,7 +218,7 @@ defmodule Nebulex.Adapters.ReplicatedTest do
 
         assert_for_all_replicas(
           Replicated,
-          :get_all,
+          :get_all!,
           [[:a, :b, :c]],
           %{a: 1, b: 2, c: 3}
         )
@@ -248,82 +255,6 @@ defmodule Nebulex.Adapters.ReplicatedTest do
 
         [_, _] = Task.yield_many([task1, task2])
       end)
-    end
-  end
-
-  describe "doesn't leave behind EXIT messages after calling, with exits trapped:" do
-    test "all/0" do
-      put_all_and_trap_exits(a: 1, b: 2, c: 3)
-      Replicated.all()
-      refute_receive {:EXIT, _, :normal}
-    end
-
-    test "delete/1" do
-      put_all_and_trap_exits(a: 1)
-      Replicated.delete(:a)
-      refute_receive {:EXIT, _, :normal}
-    end
-
-    test "delete_all/2" do
-      put_all_and_trap_exits(a: 1, b: 2, c: 3)
-      Replicated.delete_all()
-      refute_receive {:EXIT, _, :normal}
-    end
-
-    test "get/1" do
-      put_all_and_trap_exits(a: 1)
-      Replicated.get(:a)
-      refute_receive {:EXIT, _, :normal}
-    end
-
-    test "incr/1" do
-      put_all_and_trap_exits(a: 1)
-      Replicated.incr(:a)
-      refute_receive {:EXIT, _, :normal}
-    end
-
-    test "nodes/0" do
-      put_all_and_trap_exits([])
-      Replicated.nodes()
-      refute_receive {:EXIT, _, :normal}
-    end
-
-    test "put/2" do
-      put_all_and_trap_exits([])
-      Replicated.put(:a, 1)
-      refute_receive {:EXIT, _, :normal}
-    end
-
-    test "put_all/1" do
-      put_all_and_trap_exits([])
-      Replicated.put_all(a: 1, b: 2, c: 3)
-      refute_receive {:EXIT, _, :normal}
-    end
-
-    test "count_all/2" do
-      put_all_and_trap_exits([])
-      Replicated.count_all()
-      refute_receive {:EXIT, _, :normal}
-    end
-
-    test "stream/0" do
-      put_all_and_trap_exits(a: 1, b: 2, c: 3)
-      Replicated.stream() |> Enum.take(10)
-      refute_receive {:EXIT, _, :normal}
-    end
-
-    test "take/1" do
-      put_all_and_trap_exits(a: 1)
-      Replicated.take(:a)
-      refute_receive {:EXIT, _, :normal}
-    end
-
-    # Put the values, ensure we didn't generate a message before trapping exits,
-    # then trap exits.
-    defp put_all_and_trap_exits(kv_pairs) do
-      Replicated.put_all(kv_pairs, ttl: :infinity)
-      refute_receive {:EXIT, _, :normal}
-      Process.flag(:trap_exit, true)
     end
   end
 
