@@ -546,13 +546,15 @@ defmodule Nebulex.Adapters.Multilevel do
       adapter_meta.levels
       |> Enum.with_index(1)
       |> Enum.reduce_while({:ok, init_acc}, &update_stats/2)
+    else
+      {:ok, nil}
     end
   end
 
   # We can safely disable this warning since the atom created dynamically is
   # always re-used; the number of levels is limited and known before hand.
   # sobelow_skip ["DOS.BinToAtom"]
-  defp update_stats({meta, idx}, stats_acc) do
+  defp update_stats({meta, idx}, {:ok, stats_acc}) do
     case with_dynamic_cache(meta, :stats, []) do
       {:ok, nil} ->
         {:cont, {:ok, stats_acc}}

@@ -729,16 +729,8 @@ defmodule Nebulex.Adapters.Local do
     {:ok, value}
   end
 
-  defp return({:ok, entry()} = ok, _field) do
-    ok
-  end
-
   defp return({:ok, entries}, :value) when is_list(entries) do
     {:ok, for(entry(value: value) <- entries, do: value)}
-  end
-
-  defp return({:ok, entries} = ok, _) when is_list(entries) do
-    ok
   end
 
   defp return(other, _field) do

@@ -35,8 +35,8 @@ defmodule Nebulex.Cache.Stats do
             Map.merge(info.metadata, opts[:metadata] || %{})
           )
         else
-          false -> :ok
-          error -> error
+          {:error, _} = error -> error
+          _ -> :ok
         end
       end)
     end

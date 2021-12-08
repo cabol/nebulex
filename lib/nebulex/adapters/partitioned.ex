@@ -545,6 +545,8 @@ defmodule Nebulex.Adapters.Partitioned do
 
   @impl true
   defspan stream(adapter_meta, query, opts) do
+    timeout = opts[:timeout] || 5000
+
     Stream.resource(
       fn ->
         Cluster.get_nodes(adapter_meta.name)
@@ -560,7 +562,7 @@ defmodule Nebulex.Adapters.Partitioned do
                               __MODULE__,
                               :eval_stream,
                               [adapter_meta, query, opts],
-                              opts[:timeout] || 5000
+                              timeout
                             )
 
           {elements, nodes}

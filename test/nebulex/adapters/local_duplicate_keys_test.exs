@@ -35,9 +35,9 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
       for_all_caches(caches, fn cache ->
         :ok = cache.put_all(a: 1, a: 2, a: 2, b: 1, b: 2, c: 1)
 
-        assert cache.get(:a) == [1, 2, 2]
-        assert cache.get(:b) == [1, 2]
-        assert cache.get(:c) == 1
+        assert cache.get!(:a) == [1, 2, 2]
+        assert cache.get!(:b) == [1, 2]
+        assert cache.get!(:c) == 1
 
         assert cache.get_all!([:a, :b, :c]) == %{a: [1, 2, 2], b: [1, 2], c: 1}
       end)
@@ -61,9 +61,9 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
         :ok = cache.put(:a, 2)
         :ok = cache.put(:a, 2)
 
-        assert cache.get(:a) == [1, 2, 2]
+        assert cache.get!(:a) == [1, 2, 2]
         assert cache.delete!(:a) == :ok
-        refute cache.get(:a)
+        refute cache.get!(:a)
       end)
     end
 
@@ -73,7 +73,7 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
         :ok = cache.put(:a, 2)
         assert cache.put_new(:a, 3) == {:ok, false}
 
-        assert cache.get(:a) == [1, 2]
+        assert cache.get!(:a) == [1, 2]
       end)
     end
 
@@ -106,9 +106,9 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
       for_all_caches(caches, fn cache ->
         :ok = cache.put_all(a: 1, a: 2, a: 2, b: 1, b: 2, c: 1)
 
-        assert cache.count_all() == 6
-        assert cache.delete_all() == 6
-        assert cache.count_all() == 0
+        assert cache.count_all!() == 6
+        assert cache.delete_all!() == 6
+        assert cache.count_all!() == 0
       end)
     end
 
@@ -121,8 +121,8 @@ defmodule Nebulex.Adapters.LocalDuplicateKeysTest do
             {_, key, value, _, _} when value == 2 -> key
           end
 
-        res_stream = test_ms |> cache.stream() |> Enum.to_list() |> Enum.sort()
-        res_query = test_ms |> cache.all() |> Enum.sort()
+        res_stream = test_ms |> cache.stream!() |> Enum.to_list() |> Enum.sort()
+        res_query = test_ms |> cache.all!() |> Enum.sort()
 
         assert res_stream == [:a, :a, :b]
         assert res_query == res_stream

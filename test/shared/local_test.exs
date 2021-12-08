@@ -37,14 +37,14 @@ defmodule Nebulex.LocalTest do
                    "backends [:ets, :shards], got: :xyz"
       end
 
-      test "because cache is stopped", %{cache: cache} do
+      test "because cache is stopped", %{cache: cache, name: name} do
         :ok = cache.stop()
 
         assert cache.put(1, 13) ==
                  {:error,
                   %Nebulex.Error{
                     module: Nebulex.Error,
-                    reason: {:registry_error, :local_with_ets}
+                    reason: {:registry_error, name}
                   }}
 
         msg = ~r"could not lookup Nebulex cache"

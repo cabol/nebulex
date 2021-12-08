@@ -2,8 +2,6 @@ defmodule Nebulex.Cache.EntryTest do
   import Nebulex.CacheCase
 
   deftests do
-    import Mock
-
     describe "put/3" do
       test "puts the given entry into the cache", %{cache: cache} do
         for x <- 1..4, do: assert(cache.put(x, x) == :ok)
@@ -26,12 +24,6 @@ defmodule Nebulex.Cache.EntryTest do
           cache.put("hello", "world", ttl: "1")
         end
       end
-
-      test_with_mock "returns an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        put: fn _, _, _, _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert cache.put("hello", "world") ==
-                 {:error, %Nebulex.Error{module: Nebulex.Error, reason: :error}}
-      end
     end
 
     describe "put!/3" do
@@ -44,13 +36,6 @@ defmodule Nebulex.Cache.EntryTest do
         for x <- 3..4, do: assert(cache.put!(x, x * x) == :ok)
         assert cache.fetch!(3) == 9
         assert cache.fetch!(4) == 16
-      end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        put: fn _, _, _, _, _, _ -> {:error, %RuntimeError{message: "error"}} end do
-        assert_raise RuntimeError, ~r"error", fn ->
-          cache.put!("hello", "world")
-        end
       end
     end
 
@@ -77,12 +62,6 @@ defmodule Nebulex.Cache.EntryTest do
           cache.put_new("hello", "world", ttl: "1")
         end
       end
-
-      test_with_mock "returns an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        put: fn _, _, _, _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert cache.put_new("hello", "world") ==
-                 {:error, %Nebulex.Error{module: Nebulex.Error, reason: :error}}
-      end
     end
 
     describe "put_new!/3" do
@@ -94,13 +73,6 @@ defmodule Nebulex.Cache.EntryTest do
       test "raises false if the key does exist already", %{cache: cache} do
         assert cache.put_new!("hello", "world") == true
         assert cache.put_new!("hello", "world") == false
-      end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        put: fn _, _, _, _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.put_new!("hello", "world")
-        end
       end
     end
 
@@ -127,12 +99,6 @@ defmodule Nebulex.Cache.EntryTest do
           cache.replace("hello", "world", ttl: "1")
         end
       end
-
-      test_with_mock "returns an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        put: fn _, _, _, _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert cache.replace("hello", "world") ==
-                 {:error, %Nebulex.Error{module: Nebulex.Error, reason: :error}}
-      end
     end
 
     describe "replace!/3" do
@@ -144,13 +110,6 @@ defmodule Nebulex.Cache.EntryTest do
 
       test "returns false when the key is not found", %{cache: cache} do
         assert cache.replace!("foo", "bar") == false
-      end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        put: fn _, _, _, _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.replace!("hello", "world")
-        end
       end
     end
 
@@ -194,12 +153,6 @@ defmodule Nebulex.Cache.EntryTest do
           cache.put_all(%{"apples" => 1, "bananas" => 3}, ttl: "1")
         end
       end
-
-      test_with_mock "returns an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        put_all: fn _, _, _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert cache.put_all(%{"apples" => 1, "bananas" => 3}) ==
-                 {:error, %Nebulex.Error{module: Nebulex.Error, reason: :error}}
-      end
     end
 
     describe "put_all!/2" do
@@ -210,13 +163,6 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.fetch!("bananas") == 3
         assert cache.fetch!(:blueberries) == 2
         assert cache.fetch!(:strawberries) == 5
-      end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        put_all: fn _, _, _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.put_all!(other: 1)
-        end
       end
     end
 
@@ -237,12 +183,6 @@ defmodule Nebulex.Cache.EntryTest do
           cache.put_new_all(%{"apples" => 1, "bananas" => 3}, ttl: "1")
         end
       end
-
-      test_with_mock "returns an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        put_all: fn _, _, _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert cache.put_new_all(%{"apples" => 1, "bananas" => 3}) ==
-                 {:error, %Nebulex.Error{module: Nebulex.Error, reason: :error}}
-      end
     end
 
     describe "put_new_all!/2" do
@@ -256,13 +196,6 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.put_new_all!(%{"apples" => 1, "bananas" => 3}) == true
         assert cache.put_new_all!(%{"apples" => 3, "oranges" => 1}) == false
       end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        put_all: fn _, _, _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.put_new_all!(other: 1)
-        end
-      end
     end
 
     describe "fetch/2" do
@@ -275,11 +208,6 @@ defmodule Nebulex.Cache.EntryTest do
 
       test "returns {:error, :not_found} if key does not exist in cache", %{cache: cache} do
         assert {:error, %Nebulex.KeyError{key: "non-existent"}} = cache.fetch("non-existent")
-      end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        fetch: fn _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert cache.fetch(1) == {:error, %Nebulex.Error{module: Nebulex.Error, reason: :error}}
       end
     end
 
@@ -298,13 +226,6 @@ defmodule Nebulex.Cache.EntryTest do
           cache.fetch!("non-existent")
         end
       end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        fetch: fn _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.fetch!("raise")
-        end
-      end
     end
 
     describe "get/2" do
@@ -319,11 +240,6 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.get("non-existent") == {:ok, nil}
         assert cache.get("non-existent", "default") == {:ok, "default"}
       end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        fetch: fn _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert {:error, %Nebulex.Error{reason: :error}} = cache.get("error")
-      end
     end
 
     describe "get!/2" do
@@ -337,13 +253,6 @@ defmodule Nebulex.Cache.EntryTest do
       test "returns default if key does not exist in cache", %{cache: cache} do
         refute cache.get!("non-existent")
         assert cache.get!("non-existent", "default") == "default"
-      end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        fetch: fn _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.get!("raise")
-        end
       end
     end
 
@@ -361,11 +270,6 @@ defmodule Nebulex.Cache.EntryTest do
       test "returns an empty map when the given key list is empty", %{cache: cache} do
         assert cache.get_all([]) == {:ok, %{}}
       end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        get_all: fn _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert cache.get_all(1) == {:error, %Nebulex.Error{module: Nebulex.Error, reason: :error}}
-      end
     end
 
     describe "get_all!/2" do
@@ -381,13 +285,6 @@ defmodule Nebulex.Cache.EntryTest do
 
       test "returns an empty map when the given key list is empty", %{cache: cache} do
         assert cache.get_all!([]) == %{}
-      end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        get_all: fn _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.get_all!([:foo])
-        end
       end
     end
 
@@ -405,12 +302,6 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.delete(:non_existent) == :ok
         refute cache.get!(:non_existent)
       end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        delete: fn _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert cache.delete("error") ==
-                 {:error, %Nebulex.Error{module: Nebulex.Error, reason: :error}}
-      end
     end
 
     describe "delete!/2" do
@@ -420,13 +311,6 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.fetch!("foo") == "bar"
         assert cache.delete!("foo") == :ok
         refute cache.get!("foo")
-      end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        delete: fn _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.delete!("raise")
-        end
       end
     end
 
@@ -442,12 +326,6 @@ defmodule Nebulex.Cache.EntryTest do
       test "returns nil if the key does not exist in cache", %{cache: cache} do
         assert {:error, %Nebulex.KeyError{key: :non_existent}} = cache.take(:non_existent)
         assert {:error, %Nebulex.KeyError{key: nil}} = cache.take(nil)
-      end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        take: fn _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert cache.take("error") ==
-                 {:error, %Nebulex.Error{module: Nebulex.Error, reason: :error}}
       end
     end
 
@@ -465,13 +343,6 @@ defmodule Nebulex.Cache.EntryTest do
           cache.take!("non-existent")
         end
       end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        take: fn _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.take!("raise")
-        end
-      end
     end
 
     describe "exists?/1" do
@@ -485,12 +356,6 @@ defmodule Nebulex.Cache.EntryTest do
       test "returns false if key does not exist in cache", %{cache: cache} do
         assert cache.exists?(:non_existent) == {:ok, false}
         assert cache.exists?(nil) == {:ok, false}
-      end
-
-      test_with_mock "returns an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        exists?: fn _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert cache.exists?("error") ==
-                 {:error, %Nebulex.Error{module: Nebulex.Error, reason: :error}}
       end
     end
 
@@ -516,26 +381,6 @@ defmodule Nebulex.Cache.EntryTest do
         :ok = cache.stop()
 
         assert_raise Nebulex.Error, fn ->
-          cache.update!("error", 1, &String.to_integer/1)
-        end
-      end
-
-      test_with_mock "raises because put error",
-                     %{cache: cache},
-                     cache.__adapter__(),
-                     [:passthrough],
-                     put: fn _, _, _, _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.update!("error", 1, &String.to_integer/1)
-        end
-      end
-
-      test_with_mock "raises because fetch error",
-                     %{cache: cache},
-                     cache.__adapter__(),
-                     [:passthrough],
-                     fetch: fn _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
           cache.update!("error", 1, &String.to_integer/1)
         end
       end
@@ -597,13 +442,6 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.incr!(:counter, -2) == 3
         assert cache.incr!(:counter, -3) == 0
       end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        update_counter: fn _, _, _, _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.incr!(:raise)
-        end
-      end
     end
 
     describe "decr/3" do
@@ -661,13 +499,6 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.decr!(:counter, -1) == -5
         assert cache.decr!(:counter, -2) == -3
         assert cache.decr!(:counter, -3) == 0
-      end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        update_counter: fn _, _, _, _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.decr!(:raise)
-        end
       end
     end
 

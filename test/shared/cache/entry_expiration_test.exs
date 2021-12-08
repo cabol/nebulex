@@ -2,8 +2,6 @@ defmodule Nebulex.Cache.EntryExpirationTest do
   import Nebulex.CacheCase
 
   deftests do
-    import Mock
-
     describe "ttl option is given to" do
       test "put", %{cache: cache} do
         assert cache.put!("foo", "bar", ttl: 500) == :ok
@@ -102,13 +100,6 @@ defmodule Nebulex.Cache.EntryExpirationTest do
           cache.expire!(:a, "hello")
         end
       end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        expire: fn _, _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.expire!(:raise, 100)
-        end
-      end
     end
 
     describe "touch!/1" do
@@ -128,13 +119,6 @@ defmodule Nebulex.Cache.EntryExpirationTest do
 
       test "returns false if key does not exist", %{cache: cache} do
         assert cache.touch!(:non_existent) == false
-      end
-
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
-        touch: fn _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
-        assert_raise Nebulex.Error, ~r"Nebulex error:\n\n:error", fn ->
-          cache.touch!(:raise)
-        end
       end
     end
 
