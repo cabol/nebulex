@@ -49,23 +49,23 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
       :ok = Multilevel.put(2, 2, level: 2)
       :ok = Multilevel.put(3, 3, level: 3)
 
-      assert Multilevel.get(1) == 1
-      refute Multilevel.get(1, level: 2)
-      refute Multilevel.get(1, level: 3)
+      assert Multilevel.get!(1) == 1
+      refute Multilevel.get!(1, nil, level: 2)
+      refute Multilevel.get!(1, nil, level: 3)
 
-      assert Multilevel.get(2) == 2
-      assert Multilevel.get(2, level: 1) == 2
-      assert Multilevel.get(2, level: 2) == 2
-      refute Multilevel.get(2, level: 3)
+      assert Multilevel.get!(2) == 2
+      assert Multilevel.get!(2, nil, level: 1) == 2
+      assert Multilevel.get!(2, nil, level: 2) == 2
+      refute Multilevel.get!(2, nil, level: 3)
 
-      assert Multilevel.get(3, level: 3) == 3
-      refute Multilevel.get(3, level: 1)
-      refute Multilevel.get(3, level: 2)
+      assert Multilevel.get!(3, nil, level: 3) == 3
+      refute Multilevel.get!(3, nil, level: 1)
+      refute Multilevel.get!(3, nil, level: 2)
 
-      assert Multilevel.get(3) == 3
-      assert Multilevel.get(3, level: 1) == 3
-      assert Multilevel.get(3, level: 2) == 3
-      assert Multilevel.get(3, level: 2) == 3
+      assert Multilevel.get!(3) == 3
+      assert Multilevel.get!(3, nil, level: 1) == 3
+      assert Multilevel.get!(3, nil, level: 2) == 3
+      assert Multilevel.get!(3, nil, level: 2) == 3
     end
 
     test "fetched value is replicated with TTL on previous levels" do
@@ -73,27 +73,27 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
       assert Multilevel.ttl(:a) > 0
 
       :ok = Process.sleep(1100)
-      refute Multilevel.get(:a, level: 1)
-      refute Multilevel.get(:a, level: 2)
-      refute Multilevel.get(:a, level: 3)
+      refute Multilevel.get!(:a, nil, level: 1)
+      refute Multilevel.get!(:a, nil, level: 2)
+      refute Multilevel.get!(:a, nil, level: 3)
 
       assert Multilevel.put(:b, 1, level: 3) == :ok
-      assert Multilevel.ttl(:b) == :infinity
-      assert Multilevel.expire(:b, 1000)
-      assert Multilevel.ttl(:b) > 0
-      refute Multilevel.get(:b, level: 1)
-      refute Multilevel.get(:b, level: 2)
-      assert Multilevel.get(:b, level: 3) == 1
+      assert Multilevel.ttl!(:b) == :infinity
+      assert Multilevel.expire!(:b, 1000)
+      assert Multilevel.ttl!(:b) > 0
+      refute Multilevel.get!(:b, nil, level: 1)
+      refute Multilevel.get!(:b, nil, level: 2)
+      assert Multilevel.get!(:b, nil, level: 3) == 1
 
-      assert Multilevel.get(:b) == 1
-      assert Multilevel.get(:b, level: 1) == 1
-      assert Multilevel.get(:b, level: 2) == 1
-      assert Multilevel.get(:b, level: 3) == 1
+      assert Multilevel.get!(:b) == 1
+      assert Multilevel.get!(:b, nil, level: 1) == 1
+      assert Multilevel.get!(:b, nil, level: 2) == 1
+      assert Multilevel.get!(:b, nil, level: 3) == 1
 
       :ok = Process.sleep(1100)
-      refute Multilevel.get(:b, level: 1)
-      refute Multilevel.get(:b, level: 2)
-      refute Multilevel.get(:b, level: 3)
+      refute Multilevel.get!(:b, nil, level: 1)
+      refute Multilevel.get!(:b, nil, level: 2)
+      refute Multilevel.get!(:b, nil, level: 3)
     end
   end
 
@@ -122,7 +122,7 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
         assert Multilevel.put_all(kv_pairs) == :ok
 
         for k <- 1..100 do
-          assert Multilevel.get(k) == k
+          assert Multilevel.get!(k) == k
         end
       end)
 

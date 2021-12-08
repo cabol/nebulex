@@ -487,7 +487,7 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.exists?(nil) == {:ok, false}
       end
 
-      test_with_mock "raises an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
+      test_with_mock "returns an error", %{cache: cache}, cache.__adapter__(), [:passthrough],
         exists?: fn _, _ -> {:error, %Nebulex.Error{reason: :error}} end do
         assert cache.exists?("error") ==
                  {:error, %Nebulex.Error{module: Nebulex.Error, reason: :error}}
