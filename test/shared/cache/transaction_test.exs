@@ -74,13 +74,17 @@ defmodule Nebulex.Cache.TransactionTest do
 
         :ok = Process.sleep(200)
 
-        assert {:error, %Nebulex.Error{reason: {:transaction_aborted, ^cache, [_ | _]}}} =
-                 cache.transaction(
-                   [keys: [:aborted], retries: 1],
-                   fn ->
-                     cache.get(:aborted)
-                   end
-                 )
+        assert_raise Nebulex.Error, ~r"Cache #{inspect(name)} has aborted a transaction", fn ->
+          {:error, %Nebulex.Error{} = reason} =
+            cache.transaction(
+              [keys: [:aborted], retries: 1],
+              fn ->
+                cache.get(:aborted)
+              end
+            )
+
+          raise reason
+        end
       end
     end
 

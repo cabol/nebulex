@@ -44,7 +44,7 @@ defmodule Nebulex.RPC do
 
   """
   @spec call(node, module, atom, [term], timeout) :: term | {:error, Nebulex.Error.t()}
-  def call(node, mod, fun, args, timeout \\ 5000)
+  def call(node, mod, fun, args, timeout)
 
   def call(node, mod, fun, args, _timeout) when node == node() do
     apply(mod, fun, args)

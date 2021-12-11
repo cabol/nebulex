@@ -361,6 +361,15 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     alias Nebulex.Caching
 
+    @typedoc "Type for on_error action"
+    @type on_error :: :nothing | :raise
+
+    @typedoc "Type for match function"
+    @type match :: (term -> boolean | {true, term})
+
+    @typedoc "Type for the key generator"
+    @type keygen :: module | {module, function_name :: atom, args :: [term]}
+
     @doc """
     Provides a way of annotating functions to be cached (cacheable aspect).
 
@@ -620,24 +629,14 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     defp action_block(:cacheable, block, _attrs, keygen, on_error) do
       quote do
-        key = unquote(keygen)
-        on_error = unquote(on_error)
-
-        case Caching.run_cmd(cache, :get, [key, opts], on_error) do
-          nil ->
-            result = unquote(block)
-
-            Caching.run_cmd(
-              Caching,
-              :eval_match,
-              [result, match, cache, key, opts],
-              on_error,
-              result
-            )
-
-          val ->
-            val
-        end
+        Caching.eval_cacheable(
+          cache,
+          unquote(keygen),
+          opts,
+          match,
+          unquote(on_error),
+          fn -> unquote(block) end
+        )
       end
     end
 
@@ -650,56 +649,32 @@ if Code.ensure_loaded?(Decorator.Define) do
           else: keygen
 
       quote do
-        result = unquote(block)
-
-        Caching.run_cmd(
-          Caching,
-          :eval_match,
-          [result, match, cache, unquote(key), opts],
+        Caching.eval_cache_put(
+          cache,
+          unquote(key),
+          opts,
+          unquote(block),
           unquote(on_error),
-          result
+          match
         )
       end
     end
 
     defp action_block(:cache_evict, block, attrs, keygen, on_error) do
       before_invocation? = attrs[:before_invocation] || false
-
-      eviction = eviction_block(attrs, keygen, on_error)
-
-      if is_boolean(before_invocation?) && before_invocation? do
-        quote do
-          unquote(eviction)
-          unquote(block)
-        end
-      else
-        quote do
-          result = unquote(block)
-          unquote(eviction)
-          result
-        end
-      end
-    end
-
-    defp eviction_block(attrs, keygen, on_error) do
-      keys = get_keys(attrs)
       all_entries? = attrs[:all_entries] || false
+      keys = get_keys(attrs)
 
-      cond do
-        is_boolean(all_entries?) && all_entries? ->
-          quote(do: Caching.run_cmd(cache, :delete_all, [], unquote(on_error), 0))
-
-        is_list(keys) and length(keys) > 0 ->
-          delete_keys_block(keys, on_error)
-
-        true ->
-          quote(do: Caching.run_cmd(cache, :delete, [unquote(keygen)], unquote(on_error), :ok))
-      end
-    end
-
-    defp delete_keys_block(keys, on_error) do
       quote do
-        Enum.each(unquote(keys), &Caching.run_cmd(cache, :delete, [&1], unquote(on_error), :ok))
+        Caching.eval_cache_evict(
+          unquote(before_invocation?),
+          unquote(all_entries?),
+          cache,
+          unquote(keygen),
+          unquote(keys),
+          unquote(on_error),
+          fn -> unquote(block) end
+        )
       end
     end
 
@@ -722,21 +697,78 @@ if Code.ensure_loaded?(Decorator.Define) do
       )
     end
 
-    @doc """
-    This function is for internal purposes only.
+    ## Helpers
 
-    **NOTE:** Workaround to avoid dialyzer warnings when using declarative
-    annotation-based caching via decorators.
+    @doc """
+    Convenience function for wrapping and/or encapsulating
+    the **cacheable** decorator logic.
+
+    **NOTE:** Internal purposes only.
     """
-    @spec eval_match(term, (term -> boolean | {true, term}), module, term, Keyword.t()) :: term
-    def eval_match(result, match, cache, key, opts) do
+    @spec eval_cacheable(module, term, Keyword.t(), match, on_error, fun) :: term
+    def eval_cacheable(cache, key, opts, match, on_error, block_fun) do
+      case {cache.fetch(key, opts), on_error} do
+        {{:ok, value}, _} ->
+          value
+
+        {{:error, %Nebulex.KeyError{}}, _} ->
+          eval_cache_put(cache, key, opts, block_fun.(), on_error, match)
+
+        {{:error, _}, :nothing} ->
+          block_fun.()
+
+        {{:error, reason}, :raise} ->
+          raise reason
+      end
+    end
+
+    @doc """
+    Convenience function for wrapping and/or encapsulating
+    the **cache_evict** decorator logic.
+
+    **NOTE:** Internal purposes only.
+    """
+    @spec eval_cache_evict(boolean, boolean, module, keygen, [term], on_error, fun) :: term
+    def eval_cache_evict(before_invocation?, all_entries?, cache, keygen, keys, on_error, block_fun)
+
+    def eval_cache_evict(true, all_entries?, cache, keygen, keys, on_error, block_fun) do
+      _ = do_evict(all_entries?, cache, keygen, keys, on_error)
+      block_fun.()
+    end
+
+    def eval_cache_evict(false, all_entries?, cache, keygen, keys, on_error, block_fun) do
+      result = block_fun.()
+      _ = do_evict(all_entries?, cache, keygen, keys, on_error)
+      result
+    end
+
+    defp do_evict(true, cache, _keygen, _keys, on_error) do
+      run_cmd(cache, :delete_all, [], on_error)
+    end
+
+    defp do_evict(false, cache, _keygen, keys, on_error) when is_list(keys) and length(keys) > 0 do
+      Enum.each(keys, &run_cmd(cache, :delete, [&1], on_error))
+    end
+
+    defp do_evict(false, cache, keygen, _keys, on_error) do
+      run_cmd(cache, :delete, [keygen], on_error)
+    end
+
+    @doc """
+    Convenience function for wrapping and/or encapsulating
+    the **cache_put** decorator logic.
+
+    **NOTE:** Internal purposes only.
+    """
+    @spec eval_cache_put(module, term, Keyword.t(), term, atom, match) :: any
+    def eval_cache_put(cache, key, opts, result, on_error, match) do
       case match.(result) do
         {true, value} ->
-          :ok = Caching.cache_put(cache, key, value, opts)
+          _ = run_cmd(__MODULE__, :cache_put, [cache, key, value, opts], on_error)
           result
 
         true ->
-          :ok = Caching.cache_put(cache, key, result, opts)
+          _ = run_cmd(__MODULE__, :cache_put, [cache, key, result, opts], on_error)
           result
 
         false ->
@@ -767,16 +799,17 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     **NOTE:** Internal purposes only.
     """
-    def run_cmd(mod, fun, args, on_error, default \\ nil)
+    @spec run_cmd(module, atom, [term], on_error) :: any
+    def run_cmd(mod, fun, args, on_error)
 
-    def run_cmd(mod, fun, args, :raise, _default) do
+    def run_cmd(mod, fun, args, :nothing) do
       apply(mod, fun, args)
     end
 
-    def run_cmd(mod, fun, args, :nothing, default) do
-      apply(mod, fun, args)
-    rescue
-      _e -> default
+    def run_cmd(mod, fun, args, :raise) do
+      with {:error, reason} <- apply(mod, fun, args) do
+        raise reason
+      end
     end
   end
 end

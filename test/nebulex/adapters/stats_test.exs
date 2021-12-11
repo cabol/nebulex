@@ -340,6 +340,12 @@ defmodule Nebulex.Adapters.StatsTest do
                }
       end)
     end
+
+    test_with_mock "returns an error", Cache.__adapter__(), [:passthrough],
+      stats: fn _ -> {:error, %Nebulex.Error{reason: :error}} end do
+      assert Cache.dispatch_stats() ==
+               {:error, %Nebulex.Error{module: Nebulex.Error, reason: :error}}
+    end
   end
 
   describe "dispatch_stats/1 with dynamic cache" do

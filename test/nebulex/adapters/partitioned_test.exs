@@ -217,6 +217,10 @@ defmodule Nebulex.Adapters.PartitionedTest do
       assert Partitioned.put_all(for(x <- 1..100_000, do: {x, x}), timeout: 60_000) == :ok
       assert Partitioned.get!(1, timeout: 1000) == 1
 
+      assert_raise Nebulex.Error, ~r"RPC multicall failed with errors", fn ->
+        Partitioned.all!(nil, timeout: 0)
+      end
+
       assert {:error, %Nebulex.Error{reason: {:rpc_multicall_error, errors}}} =
                Partitioned.all(nil, timeout: 0)
 

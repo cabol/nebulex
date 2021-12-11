@@ -146,5 +146,5 @@ defmodule Nebulex.Adapters.Nil do
   ## Nebulex.Adapter.Stats
 
   @impl true
-  def stats(_), do: %Nebulex.Stats{}
+  def stats(_), do: {:ok, %Nebulex.Stats{}}
 end

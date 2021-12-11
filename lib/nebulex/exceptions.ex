@@ -80,27 +80,6 @@ defmodule Nebulex.KeyError do
   end
 end
 
-defmodule Nebulex.RegistryLookupError do
-  @moduledoc """
-  Raised at runtime when the cache was not started or it does not exist.
-  """
-
-  @type t :: %__MODULE__{message: binary, name: atom}
-
-  defexception [:message, :name]
-
-  @doc false
-  def exception(opts) do
-    name = Keyword.fetch!(opts, :name)
-
-    msg =
-      "could not lookup Nebulex cache #{inspect(name)} because it was " <>
-        "not started or it does not exist"
-
-    %__MODULE__{message: msg, name: name}
-  end
-end
-
 defmodule Nebulex.QueryError do
   @moduledoc """
   Raised at runtime when the query is invalid.
@@ -122,54 +101,5 @@ defmodule Nebulex.QueryError do
     """
 
     %__MODULE__{message: message}
-  end
-end
-
-defmodule Nebulex.RPCMulticallError do
-  @moduledoc """
-  Raised at runtime when a RPC multi_call error occurs.
-  """
-
-  @type t :: %__MODULE__{action: atom, errors: [term], responses: [term]}
-
-  defexception [:action, :errors, :responses]
-
-  @doc false
-  def exception(opts) do
-    action = Keyword.fetch!(opts, :action)
-    errors = Keyword.fetch!(opts, :errors)
-    responses = Keyword.fetch!(opts, :responses)
-
-    %__MODULE__{action: action, errors: errors, responses: responses}
-  end
-
-  @doc false
-  def message(%__MODULE__{action: action, errors: errors, responses: responses}) do
-    """
-    RPC error while executing action #{inspect(action)}
-
-    Successful responses:
-
-    #{inspect(responses, pretty: true)}
-
-    Remote errors:
-
-    #{inspect(errors, pretty: true)}
-    """
-  end
-end
-
-defmodule Nebulex.RPCError do
-  @moduledoc """
-  Raised at runtime when a RPC error occurs.
-  """
-
-  @type t :: %__MODULE__{reason: term, node: node}
-
-  defexception [:reason, :node]
-
-  @doc false
-  def message(%__MODULE__{reason: reason, node: node}) do
-    "RPC call failed on node #{inspect(node)} with reason: #{inspect(reason)}"
   end
 end

@@ -72,16 +72,13 @@ defmodule Nebulex.Helpers do
 
   @doc false
   defmacro wrap_ok(call) do
+    # FIXME: this is because coveralls does not mark this as covered
+    # coveralls-ignore-start
     quote do
       {:ok, unquote(call)}
     end
-  end
 
-  @doc false
-  defmacro wrap_error(call) do
-    quote do
-      {:error, unquote(call)}
-    end
+    # coveralls-ignore-stop
   end
 
   @doc false

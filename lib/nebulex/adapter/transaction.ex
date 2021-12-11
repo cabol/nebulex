@@ -70,7 +70,7 @@ defmodule Nebulex.Adapter.Transaction do
 
   See `c:Nebulex.Cache.in_transaction?/0`.
   """
-  @callback in_transaction?(Nebulex.Adapter.adapter_meta()) :: boolean
+  @callback in_transaction?(Nebulex.Adapter.adapter_meta()) :: Nebulex.Cache.ok_error_tuple(boolean)
 
   @doc false
   defmacro __using__(_opts) do
@@ -80,7 +80,7 @@ defmodule Nebulex.Adapter.Transaction do
       import Nebulex.Helpers
 
       @impl true
-      def transaction(%{pid: pid, cache: cache} = adapter_meta, opts, fun) do
+      def transaction(%{pid: pid} = adapter_meta, opts, fun) do
         adapter_meta
         |> do_in_transaction?()
         |> do_transaction(
@@ -88,7 +88,7 @@ defmodule Nebulex.Adapter.Transaction do
           Keyword.get(opts, :keys, []),
           Keyword.get(opts, :nodes, [node()]),
           Keyword.get(opts, :retries, :infinity),
-          cache,
+          adapter_meta[:name] || adapter_meta[:cache],
           fun
         )
       end

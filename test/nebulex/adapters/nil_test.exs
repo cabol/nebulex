@@ -137,7 +137,7 @@ defmodule Nebulex.Adapters.NilTest do
     test "stats/0", %{cache: cache} do
       assert cache.put("foo", "bar") == :ok
       refute cache.get!("foo")
-      assert cache.stats() == %Nebulex.Stats{}
+      assert cache.stats() == {:ok, %Nebulex.Stats{}}
     end
   end
 
