@@ -14,50 +14,6 @@ defmodule Nebulex.TestCache do
     end
   end
 
-  defmodule TestHook do
-    @moduledoc false
-    use GenServer
-
-    alias Nebulex.Hook
-
-    @actions [:get, :put]
-
-    def start_link(opts \\ []) do
-      GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-    end
-
-    ## Hook Function
-
-    def track(%Hook{step: :before, name: name}) when name in @actions do
-      System.system_time(:microsecond)
-    end
-
-    def track(%Hook{step: :after_return, name: name} = event) when name in @actions do
-      GenServer.cast(__MODULE__, {:track, event})
-    end
-
-    def track(hook), do: hook
-
-    ## Error Hook Function
-
-    def hook_error(%Hook{name: :get}), do: raise(ArgumentError, "error")
-
-    def hook_error(hook), do: hook
-
-    ## GenServer
-
-    @impl GenServer
-    def init(_opts) do
-      {:ok, %{}}
-    end
-
-    @impl GenServer
-    def handle_cast({:track, %Hook{acc: start} = hook}, state) do
-      _ = send(:hooked_cache, %{hook | acc: System.system_time(:microsecond) - start})
-      {:noreply, state}
-    end
-  end
-
   defmodule Cache do
     @moduledoc false
     use Nebulex.Cache,

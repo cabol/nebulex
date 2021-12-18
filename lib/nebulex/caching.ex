@@ -793,20 +793,11 @@ if Code.ensure_loaded?(Decorator.Define) do
       cache.put(key, value, opts)
     end
 
-    @doc """
-    Convenience function for ignoring cache errors when `:on_error` option
-    is set to `:nothing`
-
-    **NOTE:** Internal purposes only.
-    """
-    @spec run_cmd(module, atom, [term], on_error) :: any
-    def run_cmd(mod, fun, args, on_error)
-
-    def run_cmd(mod, fun, args, :nothing) do
+    defp run_cmd(mod, fun, args, :nothing) do
       apply(mod, fun, args)
     end
 
-    def run_cmd(mod, fun, args, :raise) do
+    defp run_cmd(mod, fun, args, :raise) do
       with {:error, reason} <- apply(mod, fun, args) do
         raise reason
       end
