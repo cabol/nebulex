@@ -339,15 +339,15 @@ defmodule Nebulex.LocalTest do
 
     defp all_or_stream(cache, action, ms, opts \\ [])
 
-    defp all_or_stream(cache, :all, ms, opts) do
+    defp all_or_stream(cache, :all!, ms, opts) do
       ms
-      |> cache.all(opts)
+      |> cache.all!(opts)
       |> handle_query_result()
     end
 
-    defp all_or_stream(cache, :stream, ms, opts) do
+    defp all_or_stream(cache, :stream!, ms, opts) do
       ms
-      |> cache.stream(opts)
+      |> cache.stream!(opts)
       |> handle_query_result()
     end
 

@@ -547,7 +547,8 @@ defmodule Nebulex.Adapters.Multilevel do
       |> Enum.with_index(1)
       |> Enum.reduce_while({:ok, init_acc}, &update_stats/2)
     else
-      {:ok, nil}
+      wrap_error Nebulex.Error,
+        reason: {:stats_error, adapter_meta[:name] || adapter_meta[:cache]}
     end
   end
 
@@ -556,15 +557,15 @@ defmodule Nebulex.Adapters.Multilevel do
   # sobelow_skip ["DOS.BinToAtom"]
   defp update_stats({meta, idx}, {:ok, stats_acc}) do
     case with_dynamic_cache(meta, :stats, []) do
-      {:ok, nil} ->
-        {:cont, {:ok, stats_acc}}
-
       {:ok, stats} ->
         level_idx = :"l#{idx}"
         measurements = Map.put(stats_acc.measurements, level_idx, stats.measurements)
         metadata = Map.put(stats_acc.metadata, level_idx, stats.metadata)
 
         {:cont, {:ok, %{stats_acc | measurements: measurements, metadata: metadata}}}
+
+      {:error, %Nebulex.Error{reason: {:stats_error, _}}} ->
+        {:cont, {:ok, stats_acc}}
 
       {:error, _} = error ->
         {:halt, error}

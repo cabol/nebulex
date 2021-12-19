@@ -833,14 +833,14 @@ defmodule Nebulex.Cache do
   @doc """
   Fetches the value for a specific `key` in the cache.
 
-  This function returns:
+  If the cache contains the given `key`, then its value is returned
+  in the shape of `{:ok, value}`.
 
-    * `{:ok, value}` - the cache contains the given `key`, then its `value`
-      is returned.
+  If the cache does not contain `key`, `{:error, Nebulex.KeyError.t()}`
+  is returned.
 
-    * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
-
-    * `{:error, reason}` - an error occurred while executing the command.
+  Returns `{:error, Nebulex.Error.t()}` if any other error occurs while
+  executing the command.
 
   ## Options
 
@@ -862,7 +862,7 @@ defmodule Nebulex.Cache do
 
   @doc """
   Same as `c:fetch/2` but raises `Nebulex.KeyError` if the cache doesn't
-  contain `key`, or `Nebulex.Error` if another error occurs while executing
+  contain `key`, or `Nebulex.Error` if any other error occurs while executing
   the command.
   """
   @callback fetch!(key, opts) :: value
@@ -870,15 +870,13 @@ defmodule Nebulex.Cache do
   @doc """
   Gets a value from cache where the key matches the given `key`.
 
-  This function returns:
+  If the cache contains the given `key`, then its value is returned
+  in the shape of `{:ok, value}`.
 
-    * `{:ok, value}` - the `key` is present in the cache,
-      then its `value` is returned.
+  If the cache does not contain `key`, `{:ok, default}` is returned.
 
-    * `{:ok, default}` - the `key` was not found in the cache,
-      then the `default` is returned.
-
-    * `{:error, reason}` - an error occurred while executing the command.
+  Returns `{:error, Nebulex.Error.t()}` if an error occurs while
+  executing the command.
 
   ## Options
 
@@ -999,10 +997,10 @@ defmodule Nebulex.Cache do
       iex> MyCache.put_all(%{apples: 2, oranges: 1}, ttl: 10_000)
       :ok
 
-  Ideally, this operation should be atomic, so all given keys are put at once.
-  But it depends purely on the adapter's implementation and the backend used
-  internally by the adapter. Hence, it is recommended to review the adapter's
-  documentation.
+  **NOTE:** Ideally, this operation should be atomic, so all given keys are
+  put at once. But it depends purely on the adapter's implementation and the
+  backend used internally by the adapter. Hence, it is recommended to review
+  the adapter's documentation.
   """
   @callback put_all(entries, opts) :: :ok | error
 
@@ -1069,10 +1067,10 @@ defmodule Nebulex.Cache do
       iex> MyCache.put_new_all(%{apples: 3, oranges: 1}, ttl: 10_000)
       {:ok, false}
 
-  Ideally, this operation should be atomic, so all given keys are put at once.
-  But it depends purely on the adapter's implementation and the backend used
-  internally by the adapter. Hence, it is recommended to review the adapter's
-  documentation.
+  **NOTE:** Ideally, this operation should be atomic, so all given keys are
+  put at once. But it depends purely on the adapter's implementation and the
+  backend used internally by the adapter. Hence, it is recommended to review
+  the adapter's documentation.
   """
   @callback put_new_all(entries, opts) :: ok_error_tuple(boolean)
 
@@ -1156,14 +1154,14 @@ defmodule Nebulex.Cache do
   @doc """
   Removes and returns the value associated with `key` in the cache.
 
-  This function returns:
+  If `key` is present in the cache, its value is removed and then returned
+  in the shape of `{:ok, value}`.
 
-    * `{:ok, value}` - the cache contains the given `key`, then its `value`
-      is removed and returned.
+  If `key` is not present in the cache, `{:error, Nebulex.KeyError.t()}`
+  is returned.
 
-    * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
-
-    * `{:error, reason}` - an error occurred while executing the command.
+  Returns `{:error, Nebulex.Error.t()}` if any other error occurs while
+  executing the command.
 
   ## Options
 
@@ -1299,14 +1297,14 @@ defmodule Nebulex.Cache do
   @doc """
   Returns the remaining time-to-live for the given `key`.
 
-  This function returns:
+  If `key` is present in the cache, then its remaining TTL is returned
+  in the shape of `{:ok, ttl}`.
 
-    * `{:ok, ttl}` - the cache contains the given `key`,
-      then its remaining `ttl` is returned.
+  If `key` is not present in the cache, `{:error, Nebulex.KeyError.t()}`
+  is returned.
 
-    * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
-
-    * `{:error, reason}` - an error occurred while executing the command.
+  Returns `{:error, Nebulex.Error.t()}` if any other error occurs while
+  executing the command.
 
   ## Examples
 
@@ -1397,8 +1395,8 @@ defmodule Nebulex.Cache do
 
   This function returns:
 
-    * `{:ok, value}` - The returned value is a tuple with the current value
-      returned by `fun` and the new updated value under `key`.
+    * `{:ok, {current_value, new_value}}` - The `current_value` is the current
+      cached value and `new_value` the updated one returned by `fun`.
 
     * `{:error, reason}` - an error occurred while executing the command.
 
@@ -1451,11 +1449,10 @@ defmodule Nebulex.Cache do
   @doc """
   Updates the cached `key` with the given function.
 
-  If `key` is present in Cache with value `value`, `fun` is invoked with
-  argument `value` and its result is used as the new value of `key`.
-
-  If `key` is not present in Cache, `initial` is inserted as the value of `key`.
-  The initial value will not be passed through the update function.
+  If` key` is present in the cache, then the existing value is passed to `fun`
+  and its result is used as the updated value of `key`. If `key` is not present
+  in the cache, `default` is inserted as the value of `key`. The default value
+  will not be passed through the update function.
 
   This function returns:
 
@@ -1527,7 +1524,7 @@ defmodule Nebulex.Cache do
 
   The `query` value depends entirely on the adapter implementation; it could
   any term. Therefore, it is highly recommended to see adapters' documentation
-  for more information about building queries. For example, the built-in
+  for more information about supported queries. For example, the built-in
   `Nebulex.Adapters.Local` adapter uses `:ets.match_spec()` for queries,
   as well as other pre-defined ones like `:unexpired` and `:expired`.
 
@@ -1978,8 +1975,6 @@ defmodule Nebulex.Cache do
     * `{:ok, Nebulex.Stats.t()}` - stats are enabled and available
       for the cache.
 
-    * `{:ok, nil}` - the stats are disabled for the cache.
-
     * `{:error, reason}` - an error occurred while executing the command.
 
   ## Example
@@ -1999,12 +1994,12 @@ defmodule Nebulex.Cache do
        }}
 
   """
-  @callback stats() :: ok_error_tuple(Nebulex.Stats.t() | nil)
+  @callback stats() :: ok_error_tuple(Nebulex.Stats.t())
 
   @doc """
   Same as `c:stats/0` but raises an exception if an error occurs.
   """
-  @callback stats!() :: Nebulex.Stats.t() | nil
+  @callback stats!() :: Nebulex.Stats.t()
 
   @doc """
   Emits a telemetry event when called with the current stats count.

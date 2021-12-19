@@ -33,6 +33,10 @@ defmodule Nebulex.Error do
     "Cache #{inspect(cache)} has aborted a transaction on nodes: #{inspect(nodes)}"
   end
 
+  def format_error({:stats_error, cache}) do
+    "stats disabled or not supported by the cache #{inspect(cache)}"
+  end
+
   def format_error(exception) when is_exception(exception) do
     exception.__struct__.message(exception)
   end

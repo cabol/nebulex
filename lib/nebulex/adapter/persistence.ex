@@ -27,7 +27,7 @@ defmodule Nebulex.Adapter.Persistence do
   @doc """
   Dumps a cache to the given file `path`.
 
-  Returns `:ok` if successful, or `Nebulex.Cache.error()` if an error occurs.
+  Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
 
   See `c:Nebulex.Cache.dump/2`.
   """
@@ -37,7 +37,7 @@ defmodule Nebulex.Adapter.Persistence do
   @doc """
   Loads a dumped cache from the given `path`.
 
-  Returns `:ok` if successful, or `Nebulex.Cache.error()` if an error occurs.
+  Returns `:ok` if successful, or `{:error, reason}` if an error occurs.
 
   See `c:Nebulex.Cache.load/2`.
   """

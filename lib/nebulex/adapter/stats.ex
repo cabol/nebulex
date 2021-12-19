@@ -39,6 +39,8 @@ defmodule Nebulex.Adapter.Stats do
     quote do
       @behaviour Nebulex.Adapter.Stats
 
+      import Nebulex.Helpers
+
       @impl true
       def stats(adapter_meta) do
         if counter_ref = adapter_meta[:stats_counter] do
@@ -58,7 +60,8 @@ defmodule Nebulex.Adapter.Stats do
 
           {:ok, stats}
         else
-          {:ok, nil}
+          wrap_error Nebulex.Error,
+            reason: {:stats_error, adapter_meta[:name] || adapter_meta[:cache]}
         end
       end
 

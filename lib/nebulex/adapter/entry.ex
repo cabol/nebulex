@@ -30,14 +30,14 @@ defmodule Nebulex.Adapter.Entry do
   @doc """
   Fetches the value for a specific `key` in the cache.
 
-  This callback returns:
+  If the cache contains the given `key`, then its value is returned
+  in the shape of `{:ok, value}`.
 
-    * `{:ok, value}` - the cache contains the given `key`, then its `value`
-      is returned.
+  If the cache does not contain `key`, `{:error, Nebulex.KeyError.t()}`
+  is returned.
 
-    * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
-
-    * `{:error, reason}` - an error occurred while executing the command.
+  Returns `{:error, Nebulex.Error.t()}` if any other error occurs while
+  executing the command.
 
   See `c:Nebulex.Cache.fetch/2`.
   """
@@ -49,7 +49,7 @@ defmodule Nebulex.Adapter.Entry do
   specified `keys`. For every key that does not hold a value or does not exist,
   it is ignored and not added into the returned map.
 
-  Returns `{:error, reason}` if there's any other error with the cache.
+  Returns `{:error, reason}` if an error occurs while executing the command.
 
   See `c:Nebulex.Cache.get_all/2`.
   """
@@ -132,14 +132,14 @@ defmodule Nebulex.Adapter.Entry do
   @doc """
   Removes and returns the value associated with `key` in the cache.
 
-  This function returns:
+  If `key` is present in the cache, its value is removed and then returned
+  in the shape of `{:ok, value}`.
 
-    * `{:ok, value}` - the cache contains the given `key`, then its `value`
-      is removed and returned.
+  If `key` is not present in the cache, `{:error, Nebulex.KeyError.t()}`
+  is returned.
 
-    * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
-
-    * `{:error, reason}` - an error occurred while executing the command.
+  Returns `{:error, Nebulex.Error.t()}` if any other error occurs while
+  executing the command.
 
   See `c:Nebulex.Cache.take/2`.
   """
@@ -177,14 +177,14 @@ defmodule Nebulex.Adapter.Entry do
   @doc """
   Returns the remaining time-to-live for the given `key`.
 
-  This function returns:
+  If `key` is present in the cache, then its remaining TTL is returned
+  in the shape of `{:ok, ttl}`.
 
-    * `{:ok, ttl}` - the cache contains the given `key`,
-      then its remaining `ttl` is returned.
+  If `key` is not present in the cache, `{:error, Nebulex.KeyError.t()}`
+  is returned.
 
-    * `{:error, Nebulex.KeyError.t()}` - the cache doesn't contain `key`.
-
-    * `{:error, reason}` - an error occurred while executing the command.
+  Returns `{:error, Nebulex.Error.t()}` if any other error occurs while
+  executing the command.
 
   See `c:Nebulex.Cache.ttl/1`.
   """

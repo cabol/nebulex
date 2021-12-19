@@ -310,14 +310,14 @@ defmodule Nebulex.Adapters.StatsTest do
     setup_with_cache(Cache, @config)
 
     test "stats/0 returns nil" do
-      refute Cache.stats!()
+      assert_raise Nebulex.Error, ~r"stats disabled or not supported by the cache", fn ->
+        Cache.stats!()
+      end
     end
 
     test "dispatch_stats/1 is skipped" do
       with_telemetry_handler(__MODULE__, [@event], fn ->
-        :ok = Cache.dispatch_stats()
-
-        refute_receive {@event, _, %{cache: Nebulex.Cache.StatsTest.Cache}}
+        assert {:error, %Nebulex.Error{reason: {:stats_error, _}}} = Cache.dispatch_stats()
       end)
     end
   end

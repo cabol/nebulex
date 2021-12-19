@@ -55,8 +55,14 @@ defmodule Nebulex.Adapter.Transaction do
   A successful transaction returns the value returned by the function wrapped
   in a tuple as `{:ok, value}`.
 
-  If an unhandled error occurs the transaction, it will be wrapped up in the
-  shape of `{:error, error}`, where `error` is the original exception.
+  In case the transaction cannot be executed, then `{:error, reason}` is
+  returned.
+
+  If an unhandled error/exception occurs, the error will bubble up from the
+  transaction function.
+
+  If `transaction/2` is called inside another transaction, the function is
+  simply executed without wrapping the new transaction call in any way.
 
   See `c:Nebulex.Cache.transaction/2`.
   """
