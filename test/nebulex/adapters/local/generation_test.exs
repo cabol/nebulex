@@ -272,6 +272,11 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       :ok = Process.sleep(1100)
 
       assert generations_len(LocalWithSizeLimit) == 2
+      assert LocalWithSizeLimit.count_all!() == 4
+
+      :ok = Process.sleep(1100)
+
+      assert generations_len(LocalWithSizeLimit) == 2
       assert LocalWithSizeLimit.count_all!() == 0
 
       :ok = LocalWithSizeLimit.stop()

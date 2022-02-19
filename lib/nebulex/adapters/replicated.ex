@@ -739,11 +739,7 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
         with :ok <- maybe_run_on_nodes(adapter_meta, nodes, :new_generation),
              :ok <- copy_entries_from_nodes(adapter_meta, nodes),
              :ok <- maybe_run_on_nodes(adapter_meta, [node()], :new_generation) do
-<<<<<<< HEAD
-          maybe_run_on_nodes(adapter_meta, nodes, :reset_generation_timer)
-=======
           :ok = maybe_run_on_nodes(adapter_meta, nodes, :reset_generation_timer)
->>>>>>> Fix and/or improve docs
         end
     end
   end
