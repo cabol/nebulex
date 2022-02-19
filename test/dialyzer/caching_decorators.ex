@@ -1,4 +1,4 @@
-defmodule Nebulex.Dialyzer.CachingTest do
+defmodule Nebulex.Dialyzer.CachingDecorators do
   @moduledoc false
   use Nebulex.Caching
 

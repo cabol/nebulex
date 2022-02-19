@@ -732,9 +732,8 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
         #    gap among cluster nodes as small as possible).
         with :ok <- maybe_run_on_nodes(adapter_meta, nodes, :new_generation),
              :ok <- copy_entries_from_nodes(adapter_meta, nodes),
-             :ok <- maybe_run_on_nodes(adapter_meta, [node()], :new_generation),
-             :ok <- maybe_run_on_nodes(adapter_meta, nodes, :reset_generation_timer) do
-          :ok
+             :ok <- maybe_run_on_nodes(adapter_meta, [node()], :new_generation) do
+          maybe_run_on_nodes(adapter_meta, nodes, :reset_generation_timer)
         end
     end
   end

@@ -7,9 +7,8 @@ defmodule Nebulex.Cache.TransactionTest do
         refute cache.transaction(fn ->
                  with :ok <- cache.put(1, 11),
                       11 <- cache.get!(1),
-                      :ok <- cache.delete(1),
-                      value <- cache.get(1) do
-                   value
+                      :ok <- cache.delete(1) do
+                   cache.get(1)
                  end
                end)
       end
@@ -23,9 +22,8 @@ defmodule Nebulex.Cache.TransactionTest do
                      fn ->
                        with :ok <- cache.put(1, 11),
                             11 <- cache.get!(1),
-                            :ok <- cache.delete(1),
-                            value <- cache.get(1) do
-                         value
+                            :ok <- cache.delete(1) do
+                         cache.get(1)
                        end
                      end
                    )

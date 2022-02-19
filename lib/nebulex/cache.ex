@@ -1363,7 +1363,7 @@ defmodule Nebulex.Cache do
       iex> expired = MyCache.all(:expired)
 
   If we are using Nebulex.Adapters.Local adapter, the stored entry tuple
-  `{:entry, key, value, version, expire_at}`, then the match spec could be
+  `{:entry, key, value, touched, ttl}`, then the match spec could be
   something like:
 
       iex> spec = [
@@ -1457,7 +1457,7 @@ defmodule Nebulex.Cache do
       iex> expired_stream = MyCache.stream(:expired)
 
   If we are using Nebulex.Adapters.Local adapter, the stored entry tuple
-  `{:entry, key, value, version, expire_at}`, then the match spec could be
+  `{:entry, key, value, touched, ttl}`, then the match spec could be
   something like:
 
       iex> spec = [

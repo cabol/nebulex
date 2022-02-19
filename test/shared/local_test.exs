@@ -298,18 +298,28 @@ defmodule Nebulex.LocalTest do
       end)
     end
 
-    defp all_or_stream(cache, action, ms, opts \\ []) do
-      cache
-      |> apply(action, [ms, opts])
-      |> case do
-        list when is_list(list) ->
-          :lists.usort(list)
+    defp all_or_stream(cache, action, ms, opts \\ [])
 
-        stream ->
-          stream
-          |> Enum.to_list()
-          |> :lists.usort()
-      end
+    defp all_or_stream(cache, :all, ms, opts) do
+      ms
+      |> cache.all(opts)
+      |> handle_query_result()
+    end
+
+    defp all_or_stream(cache, :stream, ms, opts) do
+      ms
+      |> cache.stream(opts)
+      |> handle_query_result()
+    end
+
+    defp handle_query_result(list) when is_list(list) do
+      :lists.usort(list)
+    end
+
+    defp handle_query_result(stream) do
+      stream
+      |> Enum.to_list()
+      |> :lists.usort()
     end
   end
 end

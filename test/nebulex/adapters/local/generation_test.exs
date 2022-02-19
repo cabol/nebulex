@@ -254,19 +254,30 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       assert LocalWithSizeLimit.count_all() == 0
 
       _ = cache_put(LocalWithSizeLimit, 1..4)
+
       assert LocalWithSizeLimit.count_all() == 4
 
       :ok = Process.sleep(1100)
+
       assert generations_len(LocalWithSizeLimit) == 2
 
       :ok = Process.sleep(1100)
+
       assert generations_len(LocalWithSizeLimit) == 2
 
       _ = cache_put(LocalWithSizeLimit, 5..8)
-      assert LocalWithSizeLimit.count_all() == 8
+
+      assert LocalWithSizeLimit.count_all() == 4
 
       :ok = Process.sleep(1100)
+
       assert generations_len(LocalWithSizeLimit) == 2
+      assert LocalWithSizeLimit.count_all() == 4
+
+      :ok = Process.sleep(1100)
+
+      assert generations_len(LocalWithSizeLimit) == 2
+      assert LocalWithSizeLimit.count_all() == 0
 
       :ok = LocalWithSizeLimit.stop()
     end

@@ -371,8 +371,8 @@ defmodule Nebulex.Adapters.Local.Generation do
        )
        when not is_nil(max_size) do
     meta_tab
-    |> newer()
-    |> backend.info(:size)
+    |> list()
+    |> Enum.reduce(0, &(backend.info(&1, :size) + &2))
     |> maybe_cleanup(max_size, state)
   end
 
@@ -503,9 +503,13 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp memory_info(backend, meta_tab) do
     meta_tab
-    |> newer()
-    |> backend.info(:memory)
-    |> Kernel.*(:erlang.system_info(:wordsize))
+    |> list()
+    |> Enum.reduce(0, fn gen, acc ->
+      gen
+      |> backend.info(:memory)
+      |> Kernel.*(:erlang.system_info(:wordsize))
+      |> Kernel.+(acc)
+    end)
   end
 
   defp linear_inverse_backoff(size, max_size, min_timeout, max_timeout) do
