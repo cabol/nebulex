@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.3.1](https://github.com/cabol/nebulex/tree/v2.3.1) (2022-03-13)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.3.0...v2.3.1)
+
+**Implemented enhancements:**
+
+- Improve cache memory/size checks for local adapter
+  [#145](https://github.com/cabol/nebulex/issues/145)
+
+**Closed issues:**
+
+- What happens if cache uses more memory than the machine have?
+  [#144](https://github.com/cabol/nebulex/issues/144)
+
 ## [v2.3.0](https://github.com/cabol/nebulex/tree/v2.3.0) (2021-11-13)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.2.1...v2.3.0)
