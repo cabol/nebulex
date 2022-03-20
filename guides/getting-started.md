@@ -376,9 +376,9 @@ iex> Blog.Cache.all(:unexpired)
 iex> Blog.Cache.all(:expired)
 
 # if we are using `Nebulex.Adapters.Local` adapter, the stored entry
-# is a tuple `{key, value, version, expire_at}`, then the match spec
+# is a tuple `{:entry, key, value, touched, ttl}`, then the match spec
 # could be something like:
-iex> spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
+iex> spec = [{{:_, :"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
 iex> Blog.Cache.all(spec)
 _all_matched
 
@@ -386,7 +386,7 @@ _all_matched
 iex> import Ex2ms
 iex> spec =
 ...>   fun do
-...>     {key, value, _, _} when value > 10 -> {key, value}
+...>     {_, key, value, _, _} when value > 10 -> {key, value}
 ...>   end
 iex> Blog.Cache.all(spec)
 _all_matched

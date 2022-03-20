@@ -252,7 +252,7 @@ defmodule Nebulex.Adapters.Local do
       MyCache.all(:expired)
 
       # using a custom match spec (all values > 10)
-      spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
+      spec = [{{:_, :"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
       MyCache.all(spec)
 
       # using Ex2ms
@@ -260,7 +260,7 @@ defmodule Nebulex.Adapters.Local do
 
       spec =
         fun do
-          {key, value, _version, _expire_at} when value > 10 -> {key, value}
+          {_, key, value, _, _} when value > 10 -> {key, value}
         end
 
       MyCache.all(spec)
