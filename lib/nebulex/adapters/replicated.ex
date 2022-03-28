@@ -266,6 +266,8 @@ defmodule Nebulex.Adapters.Replicated do
   # Inherit default persistence implementation
   use Nebulex.Adapter.Persistence
 
+  use Bitwise, only_operators: true
+
   import Nebulex.Adapter
   import Nebulex.Helpers
 
@@ -529,28 +531,37 @@ defmodule Nebulex.Adapters.Replicated do
 
   ## Private Functions
 
-  defp with_transaction(
-         %{pid: pid, name: name} = adapter_meta,
-         action,
-         keys,
-         args,
-         opts \\ []
-       ) do
-    nodes = Cluster.get_nodes(name)
+  defp with_transaction(adapter_meta, action, keys, args, opts \\ []) do
+    do_with_transaction(adapter_meta, action, keys, args, opts, 1)
+  end
 
-    # Ensure it waits until ongoing delete_all or sync operations finish,
-    # if there's any.
-    :global.trans(
-      {name, pid},
-      fn ->
+  defp do_with_transaction(%{name: name} = adapter_meta, action, keys, args, opts, times) do
+    # This is a bit hacky because the `:global_locks` table managed by
+    # `:global` is being accessed directly breaking the encapsulation.
+    # So far, this has been the simplest and fastest way to validate if
+    # the global sync lock `:"$sync_lock"` is set, so we block write-like
+    # operations until it finishes. The other option would be trying to
+    # lock the same key `:"$sync_lock"`, and then when the lock is acquired,
+    # delete it before processing the write operation. But this means another
+    # global lock across the cluster everytime there is a write. So for the
+    # time being, we just read the global table to validate it which is much
+    # faster; since it is a local read with the global ETS, there is no global
+    # locks across the cluster.
+    case :ets.lookup(:global_locks, :"$sync_lock") do
+      [_] ->
+        :ok = random_sleep(times)
+
+        do_with_transaction(adapter_meta, action, keys, args, opts, times + 1)
+
+      [] ->
+        nodes = Cluster.get_nodes(name)
+
         # Write-like operation must be wrapped within a transaction
         # to ensure proper replication
         transaction(adapter_meta, [keys: keys, nodes: nodes], fn ->
           multi_call(adapter_meta, action, args, opts)
         end)
-      end,
-      nodes
-    )
+    end
   end
 
   defp multi_call(%{name: name, task_sup: task_sup} = meta, action, args, opts) do
@@ -614,6 +625,29 @@ defmodule Nebulex.Adapters.Replicated do
       )
     end
   end
+
+  # coveralls-ignore-start
+
+  defp random_sleep(times) do
+    _ =
+      if rem(times, 10) == 0 do
+        _ = :rand.seed(:exsplus)
+      end
+
+    # First time 1/4 seconds, then doubling each time up to 8 seconds max
+    tmax =
+      if times > 5 do
+        8000
+      else
+        div((1 <<< times) * 1000, 8)
+      end
+
+    tmax
+    |> :rand.uniform()
+    |> Process.sleep()
+  end
+
+  # coveralls-ignore-stop
 end
 
 defmodule Nebulex.Adapters.Replicated.Bootstrap do
@@ -698,14 +732,14 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
   ## Helpers
 
   defp lock(name) do
-    nodes = Cluster.get_nodes(name)
-    true = :global.set_lock({name, self()}, nodes)
+    true = :global.set_lock({:"$sync_lock", self()}, Cluster.get_nodes(name))
+
     :ok
   end
 
   defp unlock(name) do
-    nodes = Cluster.get_nodes(name)
-    true = :global.del_lock({name, self()}, nodes)
+    true = :global.del_lock({:"$sync_lock", self()}, Cluster.get_nodes(name))
+
     :ok
   end
 

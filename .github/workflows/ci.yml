@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - elixir: 1.12.x
+          - elixir: 1.13.x
             otp: 24.x
             coverage: true
             dialyzer: true

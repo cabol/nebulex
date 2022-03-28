@@ -16,9 +16,13 @@ defmodule Nebulex.Telemetry.StatsHandler do
     update_stats(metadata)
   end
 
+  # coveralls-ignore-start
+
   def handle_event(_event, _measurements, _metadata, _ref) do
     :ok
   end
+
+  # coveralls-ignore-stop
 
   defp update_stats(%{
          function_name: action,

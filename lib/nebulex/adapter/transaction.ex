@@ -71,11 +71,12 @@ defmodule Nebulex.Adapter.Transaction do
       @behaviour Nebulex.Adapter.Transaction
 
       @impl true
-      def transaction(%{pid: pid} = adapter_meta, opts, fun) do
+      def transaction(%{cache: cache, pid: pid} = adapter_meta, opts, fun) do
         adapter_meta
         |> in_transaction?()
         |> do_transaction(
           pid,
+          adapter_meta[:name] || cache,
           Keyword.get(opts, :keys, []),
           Keyword.get(opts, :nodes, [node()]),
           Keyword.get(opts, :retries, :infinity),
@@ -85,27 +86,29 @@ defmodule Nebulex.Adapter.Transaction do
 
       @impl true
       def in_transaction?(%{pid: pid}) do
-        if Process.get({pid, self()}), do: true, else: false
+        !!Process.get({pid, self()})
       end
 
       defoverridable transaction: 3, in_transaction?: 1
 
       ## Helpers
 
-      defp do_transaction(true, _pid, _keys, _nodes, _retries, fun) do
+      defp do_transaction(true, _pid, _name, _keys, _nodes, _retries, fun) do
         fun.()
       end
 
-      defp do_transaction(false, pid, keys, nodes, retries, fun) do
-        ids = lock_ids(pid, keys)
+      defp do_transaction(false, pid, name, keys, nodes, retries, fun) do
+        ids = lock_ids(name, keys)
 
         case set_locks(ids, nodes, retries) do
           true ->
             try do
               _ = Process.put({pid, self()}, %{keys: keys, nodes: nodes})
+
               fun.()
             after
               _ = Process.delete({pid, self()})
+
               del_locks(ids, nodes)
             end
 
@@ -128,22 +131,21 @@ defmodule Nebulex.Adapter.Transaction do
 
           {:error, locked_ids} ->
             :ok = del_locks(locked_ids, nodes)
+
             false
         end
       end
 
       defp del_locks(ids, nodes) do
-        Enum.each(ids, fn id ->
-          true = :global.del_lock(id, nodes)
-        end)
+        Enum.each(ids, &:global.del_lock(&1, nodes))
       end
 
-      defp lock_ids(pid, []) do
-        [{pid, self()}]
+      defp lock_ids(name, []) do
+        [{name, self()}]
       end
 
-      defp lock_ids(pid, keys) do
-        for key <- keys, do: {{pid, key}, self()}
+      defp lock_ids(name, keys) do
+        Enum.map(keys, &{{name, &1}, self()})
       end
     end
   end
