@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.3.2](https://github.com/cabol/nebulex/tree/v2.3.2) (2022-03-29)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.3.1...v2.3.2)
+
+**Closed issues:**
+
+- Transaction in Replicate not block global
+  [#147](https://github.com/cabol/nebulex/issues/147)
+- The match spec in the doc should be of size 5 instead of size 4
+  [#146](https://github.com/cabol/nebulex/issues/146)
+- Performance penalty when using Multilevel + Local + Redis adapters
+  [#138](https://github.com/cabol/nebulex/issues/138)
+
 ## [v2.3.1](https://github.com/cabol/nebulex/tree/v2.3.1) (2022-03-13)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.3.0...v2.3.1)
