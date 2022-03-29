@@ -88,7 +88,7 @@ config :blog, Blog.Cache,
   allocated_memory: 2_000_000_000,
   # GC min timeout: 10 sec
   gc_cleanup_min_timeout: :timer.seconds(10),
-  # GC min timeout: 10 min
+  # GC max timeout: 10 min
   gc_cleanup_max_timeout: :timer.minutes(10)
 ```
 
@@ -107,7 +107,7 @@ config :blog, Blog.Cache,
   allocated_memory: 2_000_000_000,
   # GC min timeout: 10 sec
   gc_cleanup_min_timeout: :timer.seconds(10),
-  # GC min timeout: 10 min
+  # GC max timeout: 10 min
   gc_cleanup_max_timeout: :timer.minutes(10)
 ```
 
@@ -531,7 +531,7 @@ config :blog, Blog.PartitionedCache,
     allocated_memory: 2_000_000_000,
     # GC min timeout: 10 sec
     gc_cleanup_min_timeout: :timer.seconds(10),
-    # GC min timeout: 10 min
+    # GC max timeout: 10 min
     gc_cleanup_max_timeout: :timer.minutes(10)
   ]
 ```

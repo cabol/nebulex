@@ -32,7 +32,7 @@ defmodule Mix.Tasks.Nbx.Gen.CacheTest do
           allocated_memory: 2_000_000_000,
           # GC min timeout: 10 sec
           gc_cleanup_min_timeout: :timer.seconds(10),
-          # GC min timeout: 10 min
+          # GC max timeout: 10 min
           gc_cleanup_max_timeout: :timer.minutes(10)
         """)
       end)
@@ -125,7 +125,7 @@ defmodule Mix.Tasks.Nbx.Gen.CacheTest do
             allocated_memory: 2_000_000_000,
             # GC min timeout: 10 sec
             gc_cleanup_min_timeout: :timer.seconds(10),
-            # GC min timeout: 10 min
+            # GC max timeout: 10 min
             gc_cleanup_max_timeout: :timer.minutes(10)
           ]
         """)
@@ -162,7 +162,7 @@ defmodule Mix.Tasks.Nbx.Gen.CacheTest do
             allocated_memory: 2_000_000_000,
             # GC min timeout: 10 sec
             gc_cleanup_min_timeout: :timer.seconds(10),
-            # GC min timeout: 10 min
+            # GC max timeout: 10 min
             gc_cleanup_max_timeout: :timer.minutes(10)
           ]
         """)
