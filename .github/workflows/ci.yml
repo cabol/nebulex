@@ -88,9 +88,9 @@ jobs:
         uses: actions/cache@v1
         with:
           path: priv/plts
-          key: '${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plt-v4'
+          key: '${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plt-v5'
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plt-v4
+            ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plt-v5
 
       - name: Run static analysis checks
         run: |
