@@ -1,4 +1,4 @@
-if Code.ensure_loaded?(Decorator.Define) do
+if Code.ensure_compiled(Decorator.Define) do
   defmodule Nebulex.Hook do
     @moduledoc """
     Pre/Post Hooks
