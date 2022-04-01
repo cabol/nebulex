@@ -189,7 +189,7 @@ defmodule Nebulex.Adapters.Replicated do
         ```
 
     * `telemetry_prefix ++ [:bootstrap]` - Dispatched by the adapter at start
-      time when there are errors while synching up with the cluster nodes.
+      time when there are errors while syncing up with the cluster nodes.
 
       * Measurements:
 
@@ -220,7 +220,7 @@ defmodule Nebulex.Adapters.Replicated do
   or alter the cache somehow to ensure as much consistency as possible across
   all members of the cluster. These locks may be per key or for the entire cache
   depending on the operation taking place. For that reason, it is very important
-  to be aware about those operation that can potentally lead to performance and
+  to be aware about those operation that can potentially lead to performance and
   scalability issues, so that you can do a better usage of the replicated
   adapter. The following is with the operations and aspects you should pay
   attention to:

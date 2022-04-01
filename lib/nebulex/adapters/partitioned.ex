@@ -48,7 +48,7 @@ defmodule Nebulex.Adapters.Partitioned do
       However, this adapter does not provide fault-tolerance implementation,
       each piece of data is kept in a single node/machine (via sharding), then,
       if a node fails, the data kept by this node won't be available for the
-      rest of the cluster memebers.
+      rest of the cluster members.
 
   > Based on **"Distributed Caching Essential Lessons"** by **Cameron Purdy**
     and [Coherence Partitioned Cache Service][oracle-pcs].

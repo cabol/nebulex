@@ -176,7 +176,7 @@ defmodule Nebulex.Cache do
 
   **NOTE:** The events outlined above are the recommended for the adapters
   to dispatch. However, it is highly recommended to review the used adapter
-  documentation to ensure it is fullly compatible with these events, perhaps
+  documentation to ensure it is fully compatible with these events, perhaps
   differences, or perhaps also additional events.
 
   ## Stats
@@ -1302,7 +1302,7 @@ defmodule Nebulex.Cache do
     * `:return` - Tells the query what to return from the matched entries.
       See the possible values in the "Query return option" section below.
       The default depends on the adapter, for example, the default for the
-      built-in adapters is `:key`. This option is supported by the build-in
+      built-in adapters is `:key`. This option is supported by the built-in
       adapters, but it is recommended to see the adapter's documentation
       to confirm its compatibility with this option.
 
@@ -1407,7 +1407,7 @@ defmodule Nebulex.Cache do
     * `:return` - Tells the query what to return from the matched entries.
       See the possible values in the "Query return option" section below.
       The default depends on the adapter, for example, the default for the
-      built-in adapters is `:key`. This option is supported by the build-in
+      built-in adapters is `:key`. This option is supported by the built-in
       adapters, but it is recommended to see the adapter's documentation
       to confirm its compatibility with this option.
 

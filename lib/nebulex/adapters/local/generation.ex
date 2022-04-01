@@ -6,7 +6,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   known as generations, based on age of the objects. An object is allocated
   in the youngest generation, sometimes called the nursery, and is promoted
   to an older generation if its lifetime exceeds the threshold of its current
-  generation (defined by option `:gc_interval`). Everytime the GC runs
+  generation (defined by option `:gc_interval`). Every time the GC runs
   (triggered by `:gc_interval` timeout), a new cache generation is created
   and the oldest one is deleted.
 
@@ -84,7 +84,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   ## API
 
   @doc """
-  Starts the garbage collector for the build-in local cache adapter.
+  Starts the garbage collector for the built-in local cache adapter.
   """
   @spec start_link(opts) :: GenServer.on_start()
   def start_link(opts) do
