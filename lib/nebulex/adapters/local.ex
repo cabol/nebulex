@@ -175,7 +175,7 @@ defmodule Nebulex.Adapters.Local do
   mechanism is pushing a new cache generation and remove the oldest one. In
   this way, we ensure only the most frequently used keys are always available
   in the newer generation and the the least frequently used are evicted when
-  the garbage collector runs, and the garbage collector is triggered uppon
+  the garbage collector runs, and the garbage collector is triggered upon
   these conditions:
 
     * When the time interval defined by `:gc_interval` is completed.
