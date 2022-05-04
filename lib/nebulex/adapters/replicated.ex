@@ -543,7 +543,7 @@ defmodule Nebulex.Adapters.Replicated do
     # operations until it finishes. The other option would be trying to
     # lock the same key `:"$sync_lock"`, and then when the lock is acquired,
     # delete it before processing the write operation. But this means another
-    # global lock across the cluster everytime there is a write. So for the
+    # global lock across the cluster every time there is a write. So for the
     # time being, we just read the global table to validate it which is much
     # faster; since it is a local read with the global ETS, there is no global
     # locks across the cluster.
