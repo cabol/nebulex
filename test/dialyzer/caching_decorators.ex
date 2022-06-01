@@ -53,6 +53,25 @@ defmodule Nebulex.Dialyzer.CachingDecorators do
     filter
   end
 
+  @spec get_user_key(integer) :: binary
+  @decorate cacheable(
+              cache: {__MODULE__, :dynamic_cache, [:dynamic]},
+              key_generator: {__MODULE__, [id]}
+            )
+  def get_user_key(id), do: id
+
+  @spec update_user_key(integer) :: binary
+  @decorate cacheable(cache: Cache, key_generator: {__MODULE__, :generate_key, [id]})
+  def update_user_key(id), do: id
+
+  ## Helpers
+
   defp match({:ok, updated}), do: {true, updated}
   defp match({:error, _}), do: false
+
+  def generate(mod, fun, args), do: :erlang.phash2({mod, fun, args})
+
+  def generate_key(args), do: :erlang.phash2(args)
+
+  def dynamic_cache(_, _, _, _), do: Cache
 end

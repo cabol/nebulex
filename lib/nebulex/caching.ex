@@ -224,7 +224,9 @@ if Code.ensure_loaded?(Decorator.Define) do
     options:
 
       * `:cache` - Defines what cache to use (required). Raises `ArgumentError`
-        if the option is not present. Can be either a cache, or an MFA tuple referencing a function returning the cache.
+        if the option is not present. It can be also a MFA tuple to resolve the
+        cache dynamically in runtime by calling it. See "The :cache option"
+        section below for more information.
 
       * `:key` - Defines the cache access key (optional). It overrides the
         `:key_generator` option. If this option is not present, a default
@@ -255,7 +257,34 @@ if Code.ensure_loaded?(Decorator.Define) do
         or exception executing a cache command is ignored and the annotated
         function is executed normally.
 
-    ## The `:key_generator` option
+    ### The `:cache` option
+
+    The cache option can be the de defined cache module or an MFA tuple to
+    resolve the cache dynamically in runtime. When it is an MFA tuple, the
+    MFA is invoked passing the calling module, function name, and arguments
+    by default, and the MFA arguments are passed as extra arguments.
+    For example:
+
+        @decorate cacheable(cache: {MyApp.Cache, :cache, []}, key: var)
+        def some_function(var) do
+          # Some logic ...
+        end
+
+    The annotated function above will call `MyApp.Cache.cache(mod, fun, args)`
+    to resolve the cache in runtime, where `mod` is the calling module, `fun`
+    the calling function name, and `args` the calling arguments.
+
+    Also, we can define the function passing some extra arguments, like so:
+
+        @decorate cacheable(cache: {MyApp.Cache, :cache, ["extra"]}, key: var)
+        def some_function(var) do
+          # Some logic ...
+        end
+
+    In this case, the MFA will be invoked by adding the extra arguments, like:
+    `MyApp.Cache.cache(mod, fun, args, "extra")`.
+
+    ### The `:key_generator` option
 
     The possible values for the `:key_generator` are:
 
@@ -314,11 +343,6 @@ if Code.ensure_loaded?(Decorator.Define) do
             Repo.get!(User, id)
           end
 
-          @decorate cacheable(cache: {MyApp.Accounts, :get_dynamic_cache, []}, key: {User, id}, opts: [ttl: @ttl])
-          def get_user_from_dynamic_cache!(id) do
-            Repo.get!(User, id)
-          end
-
           @decorate cacheable(
                       cache: Cache,
                       key: {User, username},
@@ -355,8 +379,6 @@ if Code.ensure_loaded?(Decorator.Define) do
             |> User.changeset(attrs)
             |> Repo.insert()
           end
-
-          def get_dynamic_cache, Application.fetch_env!(:my_app, :cache)
         end
 
     See [Cache Usage Patters Guide](http://hexdocs.pm/nebulex/cache-usage-patterns.html).
@@ -544,55 +566,25 @@ if Code.ensure_loaded?(Decorator.Define) do
     ## Private Functions
 
     defp caching_action(action, attrs, block, context) do
-      cache = attrs[:cache] || raise ArgumentError, "expected cache: to be given as argument"
+      _cache = attrs[:cache] || raise ArgumentError, "expected cache: to be given as argument"
       match_var = attrs[:match] || quote(do: fn _ -> true end)
       opts_var = attrs[:opts] || []
 
-      keygen_block = keygen_block(attrs, context)
-      action_block = action_block(action, block, attrs, keygen_block, on_error_opt(attrs))
-
-      quote do
-        cache = unquote(cache)
-        opts = unquote(opts_var)
-        match = unquote(match_var)
-
-        cache =
-          case cache do
-            {m, f, args} -> apply(m, f, args)
-            cache -> cache
-          end
-
-        unquote(action_block)
-      end
-    end
-
-    defp keygen_block(attrs, ctx) do
       args =
-        ctx.args
+        context.args
         |> Enum.reduce([], &walk/2)
         |> Enum.reverse()
 
-      cond do
-        key = Keyword.get(attrs, :key) ->
-          quote(do: unquote(key))
+      cache_block = cache_block(attrs, args, context)
+      keygen_block = keygen_block(attrs, args, context)
+      action_block = action_block(action, block, attrs, keygen_block, on_error_opt(attrs))
 
-        keygen = Keyword.get(attrs, :key_generator) ->
-          keygen_call(keygen, ctx, args)
+      quote do
+        cache = unquote(cache_block)
+        opts = unquote(opts_var)
+        match = unquote(match_var)
 
-        true ->
-          quote do
-            cache =
-              case cache do
-                {m, f, args} -> apply(m, f, args)
-                cache -> cache
-              end
-
-            cache.__default_key_generator__().generate(
-              unquote(ctx.module),
-              unquote(ctx.name),
-              unquote(args)
-            )
-          end
+        unquote(action_block)
       end
     end
 
@@ -615,18 +607,60 @@ if Code.ensure_loaded?(Decorator.Define) do
       acc
     end
 
-    # MFA key-generator: `{module, function, args}`
-    defp keygen_call({:{}, _, [mod, fun, args]}, _ctx, _keygen_args) do
+    defp cache_block(attrs, args, ctx) do
+      attrs
+      |> Keyword.get(:cache)
+      |> cache_call(ctx, args)
+    end
+
+    defp keygen_block(attrs, args, ctx) do
+      cond do
+        key = Keyword.get(attrs, :key) ->
+          quote(do: unquote(key))
+
+        keygen = Keyword.get(attrs, :key_generator) ->
+          keygen_call(keygen, ctx, args)
+
+        true ->
+          quote do
+            cache.__default_key_generator__().generate(
+              unquote(ctx.module),
+              unquote(ctx.name),
+              unquote(args)
+            )
+          end
+      end
+    end
+
+    # MFA cache: `{module, function, args}`
+    defp cache_call({:{}, _, [mod, fun, cache_args]}, ctx, args) do
       quote do
-        unquote(mod).unquote(fun)(unquote_splicing(args))
+        unquote(mod).unquote(fun)(
+          unquote(ctx.module),
+          unquote(ctx.name),
+          unquote(args),
+          unquote_splicing(cache_args)
+        )
+      end
+    end
+
+    # Module implementing the cache behaviour (default)
+    defp cache_call({_, _, _} = cache, _ctx, _args) do
+      quote(do: unquote(cache))
+    end
+
+    # MFA key-generator: `{module, function, args}`
+    defp keygen_call({:{}, _, [mod, fun, keygen_args]}, _ctx, _args) do
+      quote do
+        unquote(mod).unquote(fun)(unquote_splicing(keygen_args))
       end
     end
 
     # Key-generator tuple `{module, args}`, where the `module` implements
     # the key-generator behaviour
-    defp keygen_call({{_, _, _} = mod, args}, ctx, _keygen_args) when is_list(args) do
+    defp keygen_call({{_, _, _} = mod, keygen_args}, ctx, _args) when is_list(keygen_args) do
       quote do
-        unquote(mod).generate(unquote(ctx.module), unquote(ctx.name), unquote(args))
+        unquote(mod).generate(unquote(ctx.module), unquote(ctx.name), unquote(keygen_args))
       end
     end
 
@@ -773,6 +807,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     def cache_put(cache, {:"$keys", keys}, value, opts) do
       entries = for k <- keys, do: {k, value}
+
       cache.put_all(entries, opts)
     end
 

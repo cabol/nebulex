@@ -178,12 +178,6 @@ defmodule Nebulex.CachingTest do
       assert Cache.get(0) == "hello"
     end
 
-    test "dynamic" do
-      refute Cache.get(0)
-      assert get_without_args_dynamic() == "hello"
-      assert Cache.get(0) == "hello"
-    end
-
     test "with side effects and returning false (issue #111)" do
       refute Cache.get("side-effect")
       assert get_false_with_side_effect(false) == false
@@ -457,13 +451,54 @@ defmodule Nebulex.CachingTest do
     end
   end
 
+  describe "option :cache with MFA" do
+    test "cacheable annotation" do
+      refute Cache.get("foo")
+      assert get_mfa_cache_without_extra_args("foo") == "foo"
+      assert Cache.get("foo") == "foo"
+    end
+
+    test "cache_put annotation" do
+      :ok = Cache.put("foo", "bar")
+
+      assert update_mfa_cache_without_extra_args("bar bar") == "bar bar"
+      assert Cache.get("foo") == "bar bar"
+    end
+
+    test "cache_evict annotation" do
+      :ok = Cache.put("foo", "bar")
+
+      assert delete_mfa_cache_without_extra_args("bar bar") == "bar bar"
+      refute Cache.get("foo")
+    end
+  end
+
+  describe "option :cache with MFA and extra args" do
+    test "cacheable annotation" do
+      refute Cache.get("foo")
+      assert get_mfa_cache_with_extra_args("foo") == "foo"
+      assert Cache.get("foo") == "foo"
+    end
+
+    test "cache_put annotation" do
+      :ok = Cache.put("foo", "bar")
+
+      assert update_mfa_cache_with_extra_args("bar bar") == "bar bar"
+      assert Cache.get("foo") == "bar bar"
+    end
+
+    test "cache_evict annotation" do
+      :ok = Cache.put("foo", "bar")
+
+      assert delete_mfa_cache_with_extra_args("bar bar") == "bar bar"
+      refute Cache.get("foo")
+    end
+  end
+
   ## Annotated Functions
 
   @decorate cacheable(cache: Cache)
   def get_without_args, do: "hello"
-
-  @decorate cacheable(cache: {Nebulex.CachingTest, :get_dynamic_cache, []})
-  def get_without_args_dynamic, do: "hello"
 
   @decorate cacheable(cache: Cache, key: x)
   def get_by_x(x, y \\ "y") do
@@ -665,6 +700,38 @@ defmodule Nebulex.CachingTest do
     x
   end
 
+  @decorate cacheable(cache: {__MODULE__, :cache_with_extra_args, ["extra_arg"]}, key: var)
+  def get_mfa_cache_with_extra_args(var) do
+    var
+  end
+
+  @decorate cacheable(cache: {__MODULE__, :cache_without_extra_args, []}, key: var)
+  def get_mfa_cache_without_extra_args(var) do
+    var
+  end
+
+  @decorate cache_put(cache: {__MODULE__, :cache_with_extra_args, ["extra_arg"]}, key: "foo")
+  def update_mfa_cache_with_extra_args(var) do
+    var
+  end
+
+  @decorate cache_put(cache: {__MODULE__, :cache_without_extra_args, []}, key: "foo")
+  def update_mfa_cache_without_extra_args(var) do
+    var
+  end
+
+  @decorate cache_evict(cache: {__MODULE__, :cache_with_extra_args, ["extra_arg"]}, key: "foo")
+  def delete_mfa_cache_with_extra_args(var) do
+    var
+  end
+
+  @decorate cache_evict(cache: {__MODULE__, :cache_without_extra_args, []}, key: "foo")
+  def delete_mfa_cache_without_extra_args(var) do
+    var
+  end
+
+  ## Helpers
+
   # Custom key-generator function
   def generate_key(arg), do: arg
 
@@ -673,7 +740,9 @@ defmodule Nebulex.CachingTest do
     :erlang.phash2({module, function_name, args})
   end
 
-  def get_dynamic_cache, do: Cache
+  def cache_with_extra_args(_mod, _fun, _args, _extra_arg), do: Cache
+
+  def cache_without_extra_args(_mod, _fun, _args), do: Cache
 
   ## Private Functions
 
