@@ -224,7 +224,7 @@ if Code.ensure_loaded?(Decorator.Define) do
     options:
 
       * `:cache` - Defines what cache to use (required). Raises `ArgumentError`
-        if the option is not present.
+        if the option is not present. Can be either a cache, or an MFA tuple referencing a function returning the cache.
 
       * `:key` - Defines the cache access key (optional). It overrides the
         `:key_generator` option. If this option is not present, a default
@@ -314,6 +314,11 @@ if Code.ensure_loaded?(Decorator.Define) do
             Repo.get!(User, id)
           end
 
+          @decorate cacheable(cache: {MyApp.Accounts, :get_dynamic_cache, []}, key: {User, id}, opts: [ttl: @ttl])
+          def get_user_from_dynamic_cache!(id) do
+            Repo.get!(User, id)
+          end
+
           @decorate cacheable(
                       cache: Cache,
                       key: {User, username},
@@ -350,6 +355,8 @@ if Code.ensure_loaded?(Decorator.Define) do
             |> User.changeset(attrs)
             |> Repo.insert()
           end
+
+          def get_dynamic_cache, Application.fetch_env!(:my_app, :cache)
         end
 
     See [Cache Usage Patters Guide](http://hexdocs.pm/nebulex/cache-usage-patterns.html).
@@ -549,6 +556,12 @@ if Code.ensure_loaded?(Decorator.Define) do
         opts = unquote(opts_var)
         match = unquote(match_var)
 
+        cache =
+          case cache do
+            {m, f, args} -> apply(m, f, args)
+            cache -> cache
+          end
+
         unquote(action_block)
       end
     end
@@ -568,6 +581,12 @@ if Code.ensure_loaded?(Decorator.Define) do
 
         true ->
           quote do
+            cache =
+              case cache do
+                {m, f, args} -> apply(m, f, args)
+                cache -> cache
+              end
+
             cache.__default_key_generator__().generate(
               unquote(ctx.module),
               unquote(ctx.name),

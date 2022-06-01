@@ -178,6 +178,12 @@ defmodule Nebulex.CachingTest do
       assert Cache.get(0) == "hello"
     end
 
+    test "dynamic" do
+      refute Cache.get(0)
+      assert get_without_args_dynamic() == "hello"
+      assert Cache.get(0) == "hello"
+    end
+
     test "with side effects and returning false (issue #111)" do
       refute Cache.get("side-effect")
       assert get_false_with_side_effect(false) == false
@@ -456,6 +462,9 @@ defmodule Nebulex.CachingTest do
   @decorate cacheable(cache: Cache)
   def get_without_args, do: "hello"
 
+  @decorate cacheable(cache: {Nebulex.CachingTest, :get_dynamic_cache, []})
+  def get_without_args_dynamic, do: "hello"
+
   @decorate cacheable(cache: Cache, key: x)
   def get_by_x(x, y \\ "y") do
     case x do
@@ -663,6 +672,8 @@ defmodule Nebulex.CachingTest do
   def generate(module, function_name, args) do
     :erlang.phash2({module, function_name, args})
   end
+
+  def get_dynamic_cache, do: Cache
 
   ## Private Functions
 
