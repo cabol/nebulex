@@ -306,6 +306,7 @@ defmodule Nebulex.Adapters.Local do
   use Nebulex.Adapter.Stats
 
   import Nebulex.Adapter
+  import Nebulex.Helpers
   import Record
 
   alias Nebulex.Adapter.Stats
@@ -387,6 +388,16 @@ defmodule Nebulex.Adapters.Local do
                   "#{inspect(@backends)}, got: #{inspect(val)}"
       end
 
+    # Internal option for max nested match specs based on number of keys
+    purge_batch_size =
+      get_option(
+        opts,
+        :purge_batch_size,
+        "an integer > 0",
+        &(is_integer(&1) and &1 > 0),
+        100
+      )
+
     # Build adapter metadata
     adapter_meta = %{
       cache: cache,
@@ -395,6 +406,7 @@ defmodule Nebulex.Adapters.Local do
       meta_tab: meta_tab,
       stats_counter: stats_counter,
       backend: backend,
+      purge_batch_size: purge_batch_size,
       started_at: DateTime.utc_now()
     }
 
@@ -487,16 +499,17 @@ defmodule Nebulex.Adapters.Local do
       on_write,
       adapter_meta.meta_tab,
       adapter_meta.backend,
+      adapter_meta.purge_batch_size,
       entries
     )
   end
 
-  defp do_put_all(:put, meta_tab, backend, entries) do
-    put_entries(meta_tab, backend, entries)
+  defp do_put_all(:put, meta_tab, backend, batch_size, entries) do
+    put_entries(meta_tab, backend, entries, batch_size)
   end
 
-  defp do_put_all(:put_new, meta_tab, backend, entries) do
-    put_new_entries(meta_tab, backend, entries)
+  defp do_put_all(:put_new, meta_tab, backend, batch_size, entries) do
+    put_new_entries(meta_tab, backend, entries, batch_size)
   end
 
   @impl true
@@ -715,22 +728,136 @@ defmodule Nebulex.Adapters.Local do
     end
   end
 
-  defp put_entries(meta_tab, backend, entry_or_entries) do
-    meta_tab
-    |> newer_gen()
-    |> backend.insert(entry_or_entries)
+  defp put_entries(meta_tab, backend, entries, batch_size \\ 0)
+
+  defp put_entries(meta_tab, backend, entries, batch_size) when is_list(entries) do
+    do_put_entries(meta_tab, backend, entries, fn older_gen ->
+      keys = Enum.map(entries, fn entry(key: key) -> key end)
+
+      do_delete_all(backend, older_gen, keys, batch_size)
+    end)
   end
 
-  defp put_new_entries(meta_tab, backend, entry_or_entries) do
-    meta_tab
-    |> newer_gen()
-    |> backend.insert_new(entry_or_entries)
+  defp put_entries(meta_tab, backend, entry(key: key) = entry, _batch_size) do
+    do_put_entries(meta_tab, backend, entry, fn older_gen ->
+      true = backend.delete(older_gen, key)
+    end)
+  end
+
+  defp do_put_entries(meta_tab, backend, entry_or_entries, purge_fun) do
+    case list_gen(meta_tab) do
+      [newer_gen] ->
+        backend.insert(newer_gen, entry_or_entries)
+
+      [newer_gen, older_gen] ->
+        _ = purge_fun.(older_gen)
+
+        backend.insert(newer_gen, entry_or_entries)
+    end
+  end
+
+  defp put_new_entries(meta_tab, backend, entries, batch_size \\ 0)
+
+  defp put_new_entries(meta_tab, backend, entries, batch_size) when is_list(entries) do
+    do_put_new_entries(meta_tab, backend, entries, fn newer_gen, older_gen ->
+      with true <- backend.insert_new(older_gen, entries) do
+        keys = Enum.map(entries, fn entry(key: key) -> key end)
+
+        _ = do_delete_all(backend, older_gen, keys, batch_size)
+
+        backend.insert_new(newer_gen, entries)
+      end
+    end)
+  end
+
+  defp put_new_entries(meta_tab, backend, entry(key: key) = entry, _batch_size) do
+    do_put_new_entries(meta_tab, backend, entry, fn newer_gen, older_gen ->
+      with true <- backend.insert_new(older_gen, entry) do
+        true = backend.delete(older_gen, key)
+
+        backend.insert_new(newer_gen, entry)
+      end
+    end)
+  end
+
+  defp do_put_new_entries(meta_tab, backend, entry_or_entries, purge_fun) do
+    case list_gen(meta_tab) do
+      [newer_gen] ->
+        backend.insert_new(newer_gen, entry_or_entries)
+
+      [newer_gen, older_gen] ->
+        purge_fun.(newer_gen, older_gen)
+    end
   end
 
   defp update_entry(meta_tab, backend, key, updates) do
-    meta_tab
-    |> newer_gen()
-    |> backend.update_element(key, updates)
+    case list_gen(meta_tab) do
+      [newer_gen] ->
+        backend.update_element(newer_gen, key, updates)
+
+      [newer_gen, older_gen] ->
+        with false <- backend.update_element(newer_gen, key, updates),
+             entry() = entry <- pop_entry(older_gen, key, false, backend) do
+          entry =
+            Enum.reduce(updates, entry, fn
+              {3, value}, acc -> entry(acc, value: value)
+              {4, value}, acc -> entry(acc, touched: value)
+              {5, value}, acc -> entry(acc, ttl: value)
+            end)
+
+          backend.insert(newer_gen, entry)
+        end
+    end
+  end
+
+  defp do_delete_all(backend, tab, keys, batch_size) do
+    do_delete_all(backend, tab, keys, batch_size, 0)
+  end
+
+  defp do_delete_all(backend, tab, [key], _batch_size, deleted) do
+    true = backend.delete(tab, key)
+
+    deleted + 1
+  end
+
+  defp do_delete_all(backend, tab, [k1, k2 | keys], batch_size, deleted) do
+    k1 = if is_tuple(k1), do: {k1}, else: k1
+    k2 = if is_tuple(k2), do: {k2}, else: k2
+
+    do_delete_all(
+      backend,
+      tab,
+      keys,
+      batch_size,
+      deleted,
+      2,
+      {:orelse, {:==, :"$1", k1}, {:==, :"$1", k2}}
+    )
+  end
+
+  defp do_delete_all(backend, tab, [], _batch_size, deleted, _count, acc) do
+    backend.select_delete(tab, delete_all_match_spec(acc)) + deleted
+  end
+
+  defp do_delete_all(backend, tab, keys, batch_size, deleted, count, acc)
+       when count >= batch_size do
+    deleted = backend.select_delete(tab, delete_all_match_spec(acc)) + deleted
+
+    do_delete_all(backend, tab, keys, batch_size, deleted)
+  end
+
+  defp do_delete_all(backend, tab, [k | keys], batch_size, deleted, count, acc) do
+    k = if is_tuple(k), do: {k}, else: k
+
+    do_delete_all(
+      backend,
+      tab,
+      keys,
+      batch_size,
+      deleted,
+      count + 1,
+      {:orelse, acc, {:==, :"$1", k}}
+    )
   end
 
   defp return(entry_or_entries, field \\ nil)
@@ -741,7 +868,7 @@ defmodule Nebulex.Adapters.Local do
   defp return(entry(key: _) = entry, _field), do: entry
 
   defp return(entries, field) when is_list(entries) do
-    for entry <- entries, do: return(entry, field)
+    Enum.map(entries, &return(&1, field))
   end
 
   defp validate_ttl(nil, _, _), do: nil
@@ -776,7 +903,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp validate_match_spec(spec, _opts) do
-    case :ets.test_ms({nil, nil, nil, :infinity}, spec) do
+    case :ets.test_ms(entry(key: 1, value: 1, touched: Time.now(), ttl: 1000), spec) do
       {:ok, _result} ->
         spec
 
@@ -810,5 +937,15 @@ defmodule Nebulex.Adapters.Local do
 
   defp maybe_match_spec_return_true(match_spec, _operation) do
     match_spec
+  end
+
+  defp delete_all_match_spec(conds) do
+    [
+      {
+        entry(key: :"$1", value: :"$2", touched: :"$3", ttl: :"$4"),
+        [conds],
+        [true]
+      }
+    ]
   end
 end

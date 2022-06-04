@@ -133,7 +133,8 @@ defmodule Nebulex.Cache.EntryTest do
               :"atom#{elem}" => elem,
               "#{elem}" => elem,
               {:tuple, elem} => elem,
-              <<100, elem>> => elem
+              <<100, elem>> => elem,
+              [elem] => elem
             }
 
             Map.merge(acc, sample)
