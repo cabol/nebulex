@@ -178,7 +178,9 @@ defmodule Nebulex.LocalTest do
 
       test "delete all matched entries", %{cache: cache, name: name} do
         values = cache_put(cache, 1..5)
+
         _ = new_generation(cache, name)
+
         values = values ++ cache_put(cache, 6..10)
 
         assert cache.count_all() == 10
@@ -196,6 +198,19 @@ defmodule Nebulex.LocalTest do
         assert cache.delete_all(test_ms) == 5
         assert cache.count_all(test_ms) == 0
         assert cache.all() |> Enum.sort() == Enum.sort(rem)
+      end
+
+      test "delete all entries given by a list of keys", %{cache: cache} do
+        entries = for x <- 1..10, into: %{}, do: {x, x}
+
+        :ok = cache.put_all(entries)
+
+        assert cache.count_all() == 10
+
+        assert cache.delete_all({:in, [2, 4, 6, 8, 10, 12]}) == 5
+
+        assert cache.count_all() == 5
+        assert cache.all() |> Enum.sort() == [1, 3, 5, 7, 9]
       end
     end
 

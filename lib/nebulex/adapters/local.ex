@@ -235,14 +235,29 @@ defmodule Nebulex.Adapters.Local do
 
   ## Queryable API
 
-  The adapter supports as query parameter the following values:
+  Since this adapter is implemented on top of ETS tables, the query must be
+  a valid match spec given by `:ets.match_spec()`. However, there are some
+  predefined and/or shorthand queries you can use. See the section
+  "Predefined queries" below for for information.
 
-    * `query` - `nil | :unexpired | :expired | :ets.match_spec()`
+  Internally, an entry is represented by the tuple
+  `{:entry, key, value, touched, ttl}`, which means the match pattern within
+  the `:ets.match_spec()` must be something like:
+  `{:entry, :"$1", :"$2", :"$3", :"$4"}`.
+  In order to make query building easier, you can use `Ex2ms` library.
 
-  Internally, an entry is represented by the tuple `{key, val, vsn, exp}`,
-  which means the match pattern within the `:ets.match_spec()` must be
-  something like `{:"$1", :"$2", :"$3", :"$4"}`. In order to make query
-  building easier, you can use `Ex2ms` library.
+  ### Predefined queries
+
+    * `nil` - All keys are returned.
+
+    * `:unexpired` -  All unexpired keys/entries.
+
+    * `:expired` -  All expired keys/entries.
+
+    * `{:in, [term]}` - Only the keys in the given key list (`[term]`)
+      are returned. This predefined query is only supported for
+      `c:Nebulex.Cache.delete_all/2`. This is the recommended
+      way of doing bulk delete of keys.
 
   ## Examples
 
@@ -250,6 +265,7 @@ defmodule Nebulex.Adapters.Local do
       MyCache.all()
       MyCache.all(:unexpired)
       MyCache.all(:expired)
+      MyCache.all({:in, ["foo", "bar"]})
 
       # using a custom match spec (all values > 10)
       spec = [{{:_, :"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
@@ -325,7 +341,7 @@ defmodule Nebulex.Adapters.Local do
   @backends ~w(ets shards)a
 
   # Inline common instructions
-  @compile {:inline, list_gen: 1, newer_gen: 1}
+  @compile {:inline, list_gen: 1, newer_gen: 1, test_ms: 0}
 
   ## Nebulex.Adapter
 
@@ -616,6 +632,15 @@ defmodule Nebulex.Adapters.Local do
     Generation.delete_all(meta_tab)
   end
 
+  defp do_execute(%{meta_tab: meta_tab} = adapter_meta, :delete_all, {:in, keys}, _opts)
+       when is_list(keys) do
+    meta_tab
+    |> list_gen()
+    |> Enum.reduce(0, fn gen, acc ->
+      do_delete_all(adapter_meta.backend, gen, keys, adapter_meta.purge_batch_size) + acc
+    end)
+  end
+
   defp do_execute(%{meta_tab: meta_tab, backend: backend}, operation, query, opts) do
     query =
       query
@@ -903,7 +928,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp validate_match_spec(spec, _opts) do
-    case :ets.test_ms(entry(key: 1, value: 1, touched: Time.now(), ttl: 1000), spec) do
+    case :ets.test_ms(test_ms(), spec) do
       {:ok, _result} ->
         spec
 
@@ -948,4 +973,6 @@ defmodule Nebulex.Adapters.Local do
       }
     ]
   end
+
+  defp test_ms, do: entry(key: 1, value: 1, touched: Time.now(), ttl: 1000)
 end
