@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.4.0](https://github.com/cabol/nebulex/tree/v2.4.0) (2022-06-05)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.3.2...v2.4.0)
+
+**Closed issues:**
+
+- Multiple keys deletion at once with predefined query `{:in, keys}`
+  [#159](https://github.com/cabol/nebulex/issues/159)
+- Duplicate data keys when put in replicated cache when start app
+  [#158](https://github.com/cabol/nebulex/issues/158)
+- Option `:cache` admits MFA tuple `{module, function, args}` as value on the
+  annotated functions
+  [#157](https://github.com/cabol/nebulex/issues/157)
+
+**Merged pull requests:**
+
+- Allow passing dynamic cache configuration to the decorators
+  [#156](https://github.com/cabol/nebulex/pull/156)
+  ([suzdalnitski](https://github.com/suzdalnitski))
+- Fix typo
+  [#154](https://github.com/cabol/nebulex/pull/154)
+  ([kianmeng](https://github.com/kianmeng))
+- User erlef/setup-beam for GitHub Actions
+  [#153](https://github.com/cabol/nebulex/pull/153)
+  ([kianmeng](https://github.com/kianmeng))
+- Fix typos
+  [#152](https://github.com/cabol/nebulex/pull/152)
+  ([george124816](https://github.com/george124816))
+- Fix config comments
+  [#150](https://github.com/cabol/nebulex/pull/150)
+  ([alexandrubagu](https://github.com/alexandrubagu))
+
 ## [v2.3.2](https://github.com/cabol/nebulex/tree/v2.3.2) (2022-03-29)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.3.1...v2.3.2)
