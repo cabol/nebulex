@@ -58,7 +58,7 @@ Horde | Nebulex.Adapters.Horde | [nebulex_adapters_horde][nbx_horde]
 [nil]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Nil.html
 [nbx_cachex]: https://github.com/cabol/nebulex_adapters_cachex
 [nbx_redis]: https://github.com/cabol/nebulex_redis_adapter
-[nbx_horde]: https://github.com/cabol/nebulex_adapters_horde
+[nbx_horde]: https://github.com/eliasdarruda/nebulex_adapters_horde
 
 
 For example, if you want to use a built-in cache, add to your `mix.exs` file:
