@@ -49,7 +49,7 @@ Multilevel | [Nebulex.Adapters.Multilevel][ma] | Built-In
 Nil (special adapter that disables the cache) | [Nebulex.Adapters.Nil][nil] | Built-In
 Cachex | Nebulex.Adapters.Cachex | [nebulex_adapters_cachex][nbx_cachex]
 Redis | NebulexRedisAdapter | [nebulex_redis_adapter][nbx_redis]
-Horde | Nebulex.Adapters.Horde | [nebulex_adapters_horde][nbx_horde]
+Distributed with Horde | Nebulex.Adapters.Horde | [nebulex_adapters_horde][nbx_horde]
 
 [la]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Local.html
 [pa]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Partitioned.html
