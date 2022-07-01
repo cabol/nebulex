@@ -75,6 +75,7 @@ defmodule Nebulex.Adapters.StatsTest do
 
     test "writes and updates" do
       assert Cache.put_all(a: 1, b: 2) == :ok
+      assert Cache.put_all(%{a: 1, b: 2}) == :ok
       refute Cache.put_new_all(a: 1, b: 2)
       assert Cache.put_new_all(c: 3, d: 4, e: 3)
       assert Cache.put(1, 1) == :ok
@@ -94,9 +95,9 @@ defmodule Nebulex.Adapters.StatsTest do
 
       wait_until(fn ->
         assert_stats_measurements(Cache,
-          l1: [expirations: 1, misses: 1, writes: 8, updates: 4],
-          l2: [expirations: 1, misses: 1, writes: 8, updates: 4],
-          l3: [expirations: 1, misses: 1, writes: 8, updates: 4]
+          l1: [expirations: 1, misses: 1, writes: 10, updates: 4],
+          l2: [expirations: 1, misses: 1, writes: 10, updates: 4],
+          l3: [expirations: 1, misses: 1, writes: 10, updates: 4]
         )
       end)
     end

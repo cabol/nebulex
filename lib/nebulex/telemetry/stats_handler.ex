@@ -69,7 +69,7 @@ defmodule Nebulex.Telemetry.StatsHandler do
          args: [entries | _],
          adapter_meta: %{stats_counter: ref}
        }) do
-    :ok = Stats.incr(ref, :writes, length(entries))
+    :ok = Stats.incr(ref, :writes, Enum.count(entries))
   end
 
   defp update_stats(%{function_name: :delete, result: _, adapter_meta: %{stats_counter: ref}}) do
