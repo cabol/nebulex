@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.4.1](https://github.com/cabol/nebulex/tree/v2.4.1) (2022-07-10)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.4.0...v2.4.1)
+
+**Closed issues:**
+
+- Telemetry handler fails when using `put_all`
+  [#163](https://github.com/cabol/nebulex/issues/163)
+- Fix `incr/3` to initialize default value if ttl is expired
+  [#162](https://github.com/cabol/nebulex/issues/162)
+- Cannot use variables in decorator keys
+  [#161](https://github.com/cabol/nebulex/issues/161)
+
+**Merged pull requests:**
+
+- Update stats handler to handle map type argument passed to `put_all`
+  [#164](https://github.com/cabol/nebulex/pull/164)
+  ([ananthakumaran](https://github.com/ananthakumaran))
+- New adapter with Horde
+  [#160](https://github.com/cabol/nebulex/pull/160)
+  ([eliasdarruda](https://github.com/eliasdarruda))
+
 ## [v2.4.0](https://github.com/cabol/nebulex/tree/v2.4.0) (2022-06-05)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.3.2...v2.4.0)
