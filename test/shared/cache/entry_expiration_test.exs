@@ -39,6 +39,7 @@ defmodule Nebulex.Cache.EntryExpirationTest do
       test "take", %{cache: cache} do
         :ok = cache.put("foo", "bar", ttl: 500)
         :ok = Process.sleep(600)
+
         refute cache.take(1)
       end
 
@@ -49,6 +50,16 @@ defmodule Nebulex.Cache.EntryExpirationTest do
         assert_raise KeyError, fn ->
           cache.take!(1)
         end
+      end
+
+      test "incr (initializes default value if ttl is expired)", %{cache: cache} do
+        assert cache.incr(:counter, 1, ttl: 200) == 1
+        assert cache.incr(:counter) == 2
+
+        :ok = Process.sleep(210)
+
+        assert cache.incr(:counter, 1, ttl: 200) == 1
+        assert cache.incr(:counter) == 2
       end
     end
 

@@ -500,8 +500,8 @@ defmodule Nebulex.Adapters.Local do
     put_new_entries(meta_tab, backend, entry)
   end
 
-  defp do_put(:replace, meta_tab, backend, entry(key: key, value: value, ttl: ttl)) do
-    update_entry(meta_tab, backend, key, [{3, value}, {4, nil}, {5, ttl}])
+  defp do_put(:replace, meta_tab, backend, entry(key: key, value: value)) do
+    update_entry(meta_tab, backend, key, [{3, value}])
   end
 
   @impl true
@@ -563,9 +563,20 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   defspan update_counter(adapter_meta, key, amount, ttl, default, _opts) do
-    adapter_meta.meta_tab
+    # Get needed metadata
+    meta_tab = adapter_meta.meta_tab
+    backend = adapter_meta.backend
+
+    # Verify if the key has expired
+    _ =
+      meta_tab
+      |> list_gen()
+      |> do_get(key, backend)
+
+    # Run the counter operation
+    meta_tab
     |> newer_gen()
-    |> adapter_meta.backend.update_counter(
+    |> backend.update_counter(
       key,
       {3, amount},
       entry(key: key, value: default, touched: Time.now(), ttl: ttl)

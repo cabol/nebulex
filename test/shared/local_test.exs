@@ -320,6 +320,43 @@ defmodule Nebulex.LocalTest do
         end)
       end
 
+      test "expire/3 (fallback to older generation)", %{cache: cache, name: name} do
+        assert cache.put("foo", "bar") == :ok
+
+        _ = new_generation(cache, name)
+
+        refute get_from_new(cache, name, "foo")
+        assert get_from_old(cache, name, "foo") == "bar"
+
+        assert cache.expire("foo", 200) == true
+
+        assert get_from_new(cache, name, "foo") == "bar"
+        refute get_from_old(cache, name, "foo")
+
+        :ok = Process.sleep(210)
+
+        refute cache.get("foo")
+      end
+
+      test "incr/3 (fallback to older generation)", %{cache: cache, name: name} do
+        assert cache.put(:counter, 0, ttl: 200) == :ok
+
+        _ = new_generation(cache, name)
+
+        refute get_from_new(cache, name, :counter)
+        assert get_from_old(cache, name, :counter) == 0
+
+        assert cache.incr(:counter) == 1
+        assert cache.incr(:counter) == 2
+
+        assert get_from_new(cache, name, :counter) == 2
+        refute get_from_old(cache, name, :counter)
+
+        :ok = Process.sleep(210)
+
+        assert cache.incr(:counter) == 1
+      end
+
       test "all/2 (no duplicates)", %{cache: cache, name: name} do
         entries = for x <- 1..20, into: %{}, do: {x, x}
         keys = Map.keys(entries) |> Enum.sort()
