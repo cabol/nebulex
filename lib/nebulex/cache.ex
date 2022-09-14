@@ -960,7 +960,7 @@ defmodule Nebulex.Cache do
       :ok
 
       iex> MyCache.get(:a)
-      :ok
+      nil
 
       iex> MyCache.delete(:non_existent_key)
       :ok
