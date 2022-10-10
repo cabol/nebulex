@@ -174,16 +174,91 @@ defmodule Nebulex.CachingTest do
 
     test "without args" do
       refute Cache.get(0)
+
       assert get_without_args() == "hello"
       assert Cache.get(0) == "hello"
     end
 
     test "with side effects and returning false (issue #111)" do
       refute Cache.get("side-effect")
+
       assert get_false_with_side_effect(false) == false
       assert Cache.get("side-effect") == 1
+
       assert get_false_with_side_effect(false) == false
       assert Cache.get("side-effect") == 1
+    end
+
+    test "with referenced key" do
+      # Expected values
+      referenced_key = {:"$nbx_referenced_key", "referenced_id"}
+      result = %{id: "referenced_id", name: "referenced_name"}
+
+      # Nothing is cached yet
+      refute Cache.get("referenced_id")
+      refute Cache.get("referenced_name")
+
+      # First run: the function block is executed and its result is cached under
+      # the referenced key, and the referenced key is cached under the given key
+      assert get_with_referenced_key("referenced_name") == result
+
+      # Assert the key points to the referenced key
+      assert Cache.get("referenced_name") == referenced_key
+
+      # Assert the referenced key points to the cached value
+      assert Cache.get("referenced_id") == result
+
+      # Next run: the value should come from the cache
+      assert get_with_referenced_key("referenced_name") == result
+
+      # Simulate a cache eviction for the referenced key
+      :ok = Cache.delete("referenced_id")
+
+      # The value under the referenced key should not longer exist
+      refute Cache.get("referenced_id")
+
+      # Assert the key still points to the referenced key
+      assert Cache.get("referenced_name") == referenced_key
+
+      # Next run: the key does exist but the referenced key doesn't, then the
+      # function block is executed and the result is cached under the referenced
+      # key back again
+      assert get_with_referenced_key("referenced_name") == result
+
+      # Assert the key points to the referenced key
+      assert Cache.get("referenced_name") == referenced_key
+
+      # Assert the referenced key points to the cached value
+      assert Cache.get("referenced_id") == result
+
+      # Similate the referenced key is overridden
+      :ok = Cache.put("referenced_name", "overridden")
+
+      # The referenced key is overridden
+      assert get_with_referenced_key("referenced_name") == "overridden"
+    end
+
+    test "with referenced key from args" do
+      # Expected values
+      referenced_key = {:"$nbx_referenced_key", "id"}
+      result = %{attrs: %{id: "id"}, name: "name"}
+
+      # Nothing is cached yet
+      refute Cache.get("id")
+      refute Cache.get("name")
+
+      # First run: the function block is executed and its result is cached under
+      # the referenced key, and the referenced key is cached under the given key
+      assert get_with_referenced_key_from_args("name", %{id: "id"}) == result
+
+      # Assert the key points to the referenced key
+      assert Cache.get("name") == referenced_key
+
+      # Assert the referenced key points to the cached value
+      assert Cache.get("id") == result
+
+      # Next run: the value should come from the cache
+      assert get_with_referenced_key_from_args("name", %{id: "id"}) == result
     end
   end
 
@@ -728,6 +803,16 @@ defmodule Nebulex.CachingTest do
   @decorate cache_evict(cache: {__MODULE__, :cache_without_extra_args, []}, key: "foo")
   def delete_mfa_cache_without_extra_args(var) do
     var
+  end
+
+  @decorate cacheable(cache: Cache, key: name, references: & &1.id)
+  def get_with_referenced_key(name) do
+    %{id: "referenced_id", name: name}
+  end
+
+  @decorate cacheable(cache: Cache, key: name, references: attrs.id)
+  def get_with_referenced_key_from_args(name, attrs) do
+    %{attrs: attrs, name: name}
   end
 
   ## Helpers

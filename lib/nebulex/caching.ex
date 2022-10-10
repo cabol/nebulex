@@ -390,6 +390,19 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     alias Nebulex.Caching
 
+    ## Types
+
+    @typedoc "Type for :on_error option"
+    @type on_error_opt :: :raise | :nothing
+
+    @typedoc "Match function type"
+    @type match_fun :: (term -> boolean | {true, term})
+
+    @typedoc "Type spec for the option :references"
+    @type references :: (term -> term) | nil | term
+
+    ## API
+
     @doc """
     Provides a way of annotating functions to be cached (cacheable aspect).
 
@@ -398,6 +411,21 @@ if Code.ensure_loaded?(Decorator.Define) do
     is not executed.
 
     ## Options
+
+      * `:references` - (Optional) Indicates the key given by the option
+        `:key` references another key given by the option `:references`.
+        In other words, when it is present, this option tells the `cacheable`
+        decorator to store the function's block result under the referenced
+        key given by the option `:references`, and the referenced key under
+        the key given by the option `:key`. The value could be:
+
+        * `nil` - (Default) It is ignored (no key references).
+        * `(term -> term)` - An anonymous function receiving the result of the
+          function's code block evaluation and must return the referenced key.
+        * `any` - It could be an explicit term or value, for example, a fixed
+          value or a function argument.
+
+        See the "Referenced keys" section for more information.
 
     See the "Shared options" section at the module documentation.
 
@@ -410,13 +438,13 @@ if Code.ensure_loaded?(Decorator.Define) do
 
           @ttl :timer.hours(1)
 
-          @decorate cacheable(cache: Cache, key: name)
-          def get_by_name(name, age) do
+          @decorate cacheable(cache: Cache, key: id, opts: [ttl: @ttl])
+          def get_by_id(id) do
             # your logic (maybe the loader to retrieve the value from the SoR)
           end
 
-          @decorate cacheable(cache: Cache, key: age, opts: [ttl: @ttl])
-          def get_by_age(age) do
+          @decorate cacheable(cache: Cache, key: email, references: & &1.id)
+          def get_by_email(email) do
             # your logic (maybe the loader to retrieve the value from the SoR)
           end
 
@@ -432,6 +460,95 @@ if Code.ensure_loaded?(Decorator.Define) do
     The **Read-through** pattern is supported by this decorator. The loader to
     retrieve the value from the system-of-record (SoR) is your function's logic
     and the rest is provided by the macro under-the-hood.
+
+    ## Referenced keys
+
+    Referenced keys are particularly useful when you have multiple different
+    keys keeping the same value. For example, let's imagine we have an schema
+    `User` with more than one unique field, like `:id`, `:email`, and `:token`.
+    We may have a module with functions retrieving the user account by any of
+    those fields, like so:
+
+        defmodule MyApp.UserAccounts do
+          use Nebulex.Caching
+
+          alias MyApp.Cache
+
+          @decorate cacheable(cache: Cache, key: id)
+          def get_user_account(id) do
+            # your logic ...
+          end
+
+          @decorate cacheable(cache: Cache, key: email)
+          def get_user_account_by_email(email) do
+            # your logic ...
+          end
+
+          @decorate cacheable(cache: Cache, key: token)
+          def get_user_account_by_token(token) do
+            # your logic ...
+          end
+
+          @decorate cache_evict(
+                      cache: Cache,
+                      keys: [user.id, user.email, user.token]
+                    )
+          def update_user_account(user) do
+            # your logic ...
+          end
+        end
+
+    As you notice, all the three functions will end up storing the same user
+    record under a different key. This is not very efficient in terms of
+    memory space, is it? Besides, when the user record is updated, we have
+    to invalidate the previously cached entries, which means, we have to
+    specify in the `cache_evict` decorator all the different keys the user
+    account has ben cached under.
+
+    By means of the referenced keys, we can address it in a better and simpler
+    way. The module will look like this:
+
+        defmodule MyApp.UserAccounts do
+          use Nebulex.Caching
+
+          alias MyApp.Cache
+
+          @decorate cacheable(cache: Cache, key: id)
+          def get_user_account(id) do
+            # your logic ...
+          end
+
+          @decorate cacheable(cache: Cache, key: email, references: & &1.id)
+          def get_user_account_by_email(email) do
+            # your logic ...
+          end
+
+          @decorate cacheable(cache: Cache, key: token, references: & &1.id)
+          def get_user_account_by_token(token) do
+            # your logic ...
+          end
+
+          @decorate cache_evict(cache: Cache, key: user.id)
+          def update_user_account(user) do
+            # your logic ...
+          end
+        end
+
+    With the option `:references` we are indicating to the `cacheable` decorator
+    to store the user id (`& &1.id` - assuming the function returns an user
+    record) under the key `email` and the key `token`, and the user record
+    itself under the user id, which is the referenced key. This time, instead of
+    storing the same object three times, it will be stored only once under the
+    user id, and the other entries will just keep a reference to it. When the
+    functions `get_user_account_by_email/1` or `get_user_account_by_token/1`
+    are executed, the decorator will automatically handle it; under-the-hood,
+    it will fetch the referenced key given by `email` or `token` first, and
+    then get the user record under the referenced key.
+
+    On the other hand, in the eviction function `update_user_account/1`, since
+    the user record is stored only once under the user id, we just need to set
+    the user id in the option `:key`; no need to specify multiple keys like in
+    the previous case.
     """
     def cacheable(attrs, block, context) do
       caching_action(:cacheable, attrs, block, context)
@@ -567,8 +684,9 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     defp caching_action(action, attrs, block, context) do
       _cache = attrs[:cache] || raise ArgumentError, "expected cache: to be given as argument"
-      match_var = attrs[:match] || quote(do: fn _ -> true end)
       opts_var = attrs[:opts] || []
+      on_error_var = on_error_opt(attrs)
+      match_var = attrs[:match] || quote(do: fn _ -> true end)
 
       args =
         context.args
@@ -577,12 +695,13 @@ if Code.ensure_loaded?(Decorator.Define) do
 
       cache_block = cache_block(attrs, args, context)
       keygen_block = keygen_block(attrs, args, context)
-      action_block = action_block(action, block, attrs, keygen_block, on_error_opt(attrs))
+      action_block = action_block(action, block, attrs, keygen_block)
 
       quote do
         cache = unquote(cache_block)
         opts = unquote(opts_var)
         match = unquote(match_var)
+        on_error = unquote(on_error_var)
 
         unquote(action_block)
       end
@@ -671,30 +790,23 @@ if Code.ensure_loaded?(Decorator.Define) do
       end
     end
 
-    defp action_block(:cacheable, block, _attrs, keygen, on_error) do
+    defp action_block(:cacheable, block, attrs, keygen) do
+      references = Keyword.get(attrs, :references)
+
       quote do
-        key = unquote(keygen)
-        on_error = unquote(on_error)
-
-        case Caching.run_cmd(cache, :get, [key, opts], on_error) do
-          nil ->
-            result = unquote(block)
-
-            Caching.run_cmd(
-              Caching,
-              :eval_match,
-              [result, match, cache, key, opts],
-              on_error,
-              result
-            )
-
-          val ->
-            val
-        end
+        Caching.eval_cacheable(
+          cache,
+          unquote(keygen),
+          unquote(references),
+          opts,
+          on_error,
+          match,
+          fn -> unquote(block) end
+        )
       end
     end
 
-    defp action_block(:cache_put, block, attrs, keygen, on_error) do
+    defp action_block(:cache_put, block, attrs, keygen) do
       keys = get_keys(attrs)
 
       key =
@@ -709,16 +821,18 @@ if Code.ensure_loaded?(Decorator.Define) do
           Caching,
           :eval_match,
           [result, match, cache, unquote(key), opts],
-          unquote(on_error),
+          on_error,
           result
         )
+
+        result
       end
     end
 
-    defp action_block(:cache_evict, block, attrs, keygen, on_error) do
+    defp action_block(:cache_evict, block, attrs, keygen) do
       before_invocation? = attrs[:before_invocation] || false
 
-      eviction = eviction_block(attrs, keygen, on_error)
+      eviction = eviction_block(attrs, keygen)
 
       if is_boolean(before_invocation?) && before_invocation? do
         quote do
@@ -728,31 +842,33 @@ if Code.ensure_loaded?(Decorator.Define) do
       else
         quote do
           result = unquote(block)
+
           unquote(eviction)
+
           result
         end
       end
     end
 
-    defp eviction_block(attrs, keygen, on_error) do
+    defp eviction_block(attrs, keygen) do
       keys = get_keys(attrs)
       all_entries? = attrs[:all_entries] || false
 
       cond do
         is_boolean(all_entries?) && all_entries? ->
-          quote(do: Caching.run_cmd(cache, :delete_all, [], unquote(on_error), 0))
+          quote(do: Caching.run_cmd(cache, :delete_all, [], on_error, 0))
 
         is_list(keys) and length(keys) > 0 ->
-          delete_keys_block(keys, on_error)
+          delete_keys_block(keys)
 
         true ->
-          quote(do: Caching.run_cmd(cache, :delete, [unquote(keygen)], unquote(on_error), :ok))
+          quote(do: Caching.run_cmd(cache, :delete, [unquote(keygen)], on_error, :ok))
       end
     end
 
-    defp delete_keys_block(keys, on_error) do
+    defp delete_keys_block(keys) do
       quote do
-        Enum.each(unquote(keys), &Caching.run_cmd(cache, :delete, [&1], unquote(on_error), :ok))
+        Enum.each(unquote(keys), &Caching.run_cmd(cache, :delete, [&1], on_error, :ok))
       end
     end
 
@@ -775,32 +891,113 @@ if Code.ensure_loaded?(Decorator.Define) do
       )
     end
 
+    ## Helpers
+
     @doc """
-    This function is for internal purposes only.
+    Convenience function for evaluating the `cacheable` decorator in runtime.
+
+    **NOTE:** For internal purposes only.
+    """
+    @spec eval_cacheable(
+            module,
+            term,
+            references,
+            Keyword.t(),
+            on_error_opt,
+            match_fun,
+            (() -> term)
+          ) :: term
+    def eval_cacheable(cache, key, references, opts, on_error, match, block)
+
+    def eval_cacheable(cache, key, nil, opts, on_error, match, block) do
+      with nil <- run_cmd(cache, :get, [key, opts], on_error) do
+        result = block.()
+
+        run_cmd(
+          __MODULE__,
+          :eval_match,
+          [result, match, cache, key, opts],
+          on_error,
+          result
+        )
+
+        result
+      end
+    end
+
+    def eval_cacheable(cache, key, references, opts, on_error, match, block) do
+      case run_cmd(cache, :get, [key, opts], on_error) do
+        nil ->
+          result = block.()
+
+          referenced_key =
+            with link_fun when is_function(link_fun, 1) <- references do
+              link_fun.(result)
+            end
+
+          with true <-
+                 run_cmd(
+                   __MODULE__,
+                   :eval_match,
+                   [result, match, cache, referenced_key, opts],
+                   on_error,
+                   result
+                 ) do
+            :ok = cache_put(cache, key, {:"$nbx_referenced_key", referenced_key}, opts)
+          end
+
+          result
+
+        {:"$nbx_referenced_key", referenced_key} ->
+          with nil <- run_cmd(cache, :get, [referenced_key, opts], on_error) do
+            result = block.()
+
+            run_cmd(
+              __MODULE__,
+              :eval_match,
+              [result, match, cache, referenced_key, opts],
+              on_error,
+              result
+            )
+
+            result
+          end
+
+        val ->
+          val
+      end
+    end
+
+    @doc """
+    Convenience function for evaluating the `:match` function in runtime.
+
+    **NOTE:** For internal purposes only.
 
     **NOTE:** Workaround to avoid dialyzer warnings when using declarative
     annotation-based caching via decorators.
     """
-    @spec eval_match(term, (term -> boolean | {true, term}), module, term, Keyword.t()) :: term
+    @spec eval_match(term, match_fun, module, term, Keyword.t()) :: boolean
     def eval_match(result, match, cache, key, opts) do
       case match.(result) do
         {true, value} ->
           :ok = Caching.cache_put(cache, key, value, opts)
-          result
+
+          true
 
         true ->
           :ok = Caching.cache_put(cache, key, result, opts)
-          result
+
+          true
 
         false ->
-          result
+          false
       end
     end
 
     @doc """
     Convenience function for cache_put annotation.
 
-    **NOTE:** Internal purposes only.
+    **NOTE:** For internal purposes only.
     """
     @spec cache_put(module, {:"$keys", term} | term, term, Keyword.t()) :: :ok
     def cache_put(cache, key, value, opts)
@@ -819,8 +1016,9 @@ if Code.ensure_loaded?(Decorator.Define) do
     Convenience function for ignoring cache errors when `:on_error` option
     is set to `:nothing`
 
-    **NOTE:** Internal purposes only.
+    **NOTE:** For internal purposes only.
     """
+    @spec run_cmd(module, atom, [term], on_error_opt, term) :: term
     def run_cmd(mod, fun, args, on_error, default \\ nil)
 
     def run_cmd(mod, fun, args, :raise, _default) do
