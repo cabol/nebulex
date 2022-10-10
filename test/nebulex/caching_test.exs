@@ -174,16 +174,81 @@ defmodule Nebulex.CachingTest do
 
     test "without args" do
       refute Cache.get(0)
+
       assert get_without_args() == "hello"
       assert Cache.get(0) == "hello"
     end
 
     test "with side effects and returning false (issue #111)" do
       refute Cache.get("side-effect")
+
       assert get_false_with_side_effect(false) == false
       assert Cache.get("side-effect") == 1
+
       assert get_false_with_side_effect(false) == false
       assert Cache.get("side-effect") == 1
+    end
+
+    test "with binding" do
+      # Expected values
+      binding_key = {:"$nbx_binding_key", "binding_id"}
+      result = %{id: "binding_id", name: "binding_name"}
+
+      # Nothing is cached yet
+      refute Cache.get("binding_id")
+      refute Cache.get("binding_name")
+
+      # First run: the function block is executed, the result is cached under
+      # the binding value, and the binding value is cached under the given key
+      assert get_with_binding("binding_name") == result
+
+      # Assert the key points to the binding
+      assert Cache.get("binding_name") == binding_key
+
+      # Assert the binding points to the cached value
+      assert Cache.get("binding_id") == result
+
+      # Next run: the value should come from the cache
+      assert get_with_binding("binding_name") == result
+
+      # Simulate a cache eviction for the binding value
+      :ok = Cache.delete("binding_id")
+
+      # The value under the key binding should not longer exist
+      refute Cache.get("binding_id")
+
+      # Assert the key still points to the binding
+      assert Cache.get("binding_name") == binding_key
+
+      # Next run: the key does exist but the bound value doesn't, then the
+      # function block is executed and the result is cached under the binding
+      # value back again
+      assert get_with_binding("binding_name") == result
+
+      # Assert the key points to the binding
+      assert Cache.get("binding_name") == binding_key
+
+      # Assert the binding points to the cached value
+      assert Cache.get("binding_id") == result
+
+      # Similate binding is overridden
+      :ok = Cache.put("binding_name", "overridden")
+
+      # The binding is overridden
+      assert get_with_binding("binding_name") == "overridden"
+    end
+
+    test "with wrong binding" do
+      assert_raise ArgumentError, ~r"expected bind_to: to be an anonymous function", fn ->
+        defmodule Test do
+          use Nebulex.Caching
+
+          @decorate cacheable(cache: Cache, key: name, bind_to: fn x, y -> {x, y} end)
+          def get_with_binding_error(name) do
+            %{id: "binding_id", name: name}
+          end
+        end
+      end
     end
   end
 
@@ -728,6 +793,11 @@ defmodule Nebulex.CachingTest do
   @decorate cache_evict(cache: {__MODULE__, :cache_without_extra_args, []}, key: "foo")
   def delete_mfa_cache_without_extra_args(var) do
     var
+  end
+
+  @decorate cacheable(cache: Cache, key: name, bind_to: & &1.id)
+  def get_with_binding(name) do
+    %{id: "binding_id", name: name}
   end
 
   ## Helpers

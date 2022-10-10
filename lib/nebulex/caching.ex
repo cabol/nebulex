@@ -390,6 +390,15 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     alias Nebulex.Caching
 
+    @typedoc "Type for :on_error option"
+    @type on_error_opt :: :raise | :nothing
+
+    @typedoc "Match function type"
+    @type match_fun :: (term -> boolean | {true, term})
+
+    @typedoc "Binding function type"
+    @type bind_fun :: (term -> term) | nil
+
     @doc """
     Provides a way of annotating functions to be cached (cacheable aspect).
 
@@ -399,7 +408,18 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     ## Options
 
+      * `:bind_to` - (Optional) The binding function could be `nil` (ignored),
+        or an anonymous function receiving the result of the function's code
+        block evaluation and must return the binding key. This will tell the
+        `cacheable` decorator to store the function's evaluation result under
+        the return binding key and the binding key under the given `key`.
+        See the "Bindings" section below.
+
     See the "Shared options" section at the module documentation.
+
+    ## Bindings
+
+    TODO: Add docs.
 
     ## Examples
 
@@ -410,13 +430,13 @@ if Code.ensure_loaded?(Decorator.Define) do
 
           @ttl :timer.hours(1)
 
-          @decorate cacheable(cache: Cache, key: name)
-          def get_by_name(name, age) do
+          @decorate cacheable(cache: Cache, key: id, opts: [ttl: @ttl])
+          def get_by_id(id) do
             # your logic (maybe the loader to retrieve the value from the SoR)
           end
 
-          @decorate cacheable(cache: Cache, key: age, opts: [ttl: @ttl])
-          def get_by_age(age) do
+          @decorate cacheable(cache: Cache, key: email, bind_to: & &1.id)
+          def get_by_email(email) do
             # your logic (maybe the loader to retrieve the value from the SoR)
           end
 
@@ -569,6 +589,8 @@ if Code.ensure_loaded?(Decorator.Define) do
       _cache = attrs[:cache] || raise ArgumentError, "expected cache: to be given as argument"
       match_var = attrs[:match] || quote(do: fn _ -> true end)
       opts_var = attrs[:opts] || []
+      on_error_var = on_error_opt(attrs)
+      bind_to_var = bind_to_opt(attrs)
 
       args =
         context.args
@@ -577,12 +599,13 @@ if Code.ensure_loaded?(Decorator.Define) do
 
       cache_block = cache_block(attrs, args, context)
       keygen_block = keygen_block(attrs, args, context)
-      action_block = action_block(action, block, attrs, keygen_block, on_error_opt(attrs))
+      action_block = action_block(action, block, attrs, keygen_block, bind_to_var)
 
       quote do
         cache = unquote(cache_block)
         opts = unquote(opts_var)
         match = unquote(match_var)
+        on_error = unquote(on_error_var)
 
         unquote(action_block)
       end
@@ -671,30 +694,24 @@ if Code.ensure_loaded?(Decorator.Define) do
       end
     end
 
-    defp action_block(:cacheable, block, _attrs, keygen, on_error) do
+    defp action_block(:cacheable, block, _attrs, keygen, bind_to) do
       quote do
         key = unquote(keygen)
-        on_error = unquote(on_error)
+        bind_to = unquote(bind_to)
 
-        case Caching.run_cmd(cache, :get, [key, opts], on_error) do
-          nil ->
-            result = unquote(block)
-
-            Caching.run_cmd(
-              Caching,
-              :eval_match,
-              [result, match, cache, key, opts],
-              on_error,
-              result
-            )
-
-          val ->
-            val
-        end
+        Caching.eval_cacheable(
+          cache,
+          key,
+          opts,
+          on_error,
+          match,
+          bind_to,
+          fn -> unquote(block) end
+        )
       end
     end
 
-    defp action_block(:cache_put, block, attrs, keygen, on_error) do
+    defp action_block(:cache_put, block, attrs, keygen, _binding) do
       keys = get_keys(attrs)
 
       key =
@@ -709,16 +726,18 @@ if Code.ensure_loaded?(Decorator.Define) do
           Caching,
           :eval_match,
           [result, match, cache, unquote(key), opts],
-          unquote(on_error),
+          on_error,
           result
         )
+
+        result
       end
     end
 
-    defp action_block(:cache_evict, block, attrs, keygen, on_error) do
+    defp action_block(:cache_evict, block, attrs, keygen, _binding) do
       before_invocation? = attrs[:before_invocation] || false
 
-      eviction = eviction_block(attrs, keygen, on_error)
+      eviction = eviction_block(attrs, keygen)
 
       if is_boolean(before_invocation?) && before_invocation? do
         quote do
@@ -728,31 +747,33 @@ if Code.ensure_loaded?(Decorator.Define) do
       else
         quote do
           result = unquote(block)
+
           unquote(eviction)
+
           result
         end
       end
     end
 
-    defp eviction_block(attrs, keygen, on_error) do
+    defp eviction_block(attrs, keygen) do
       keys = get_keys(attrs)
       all_entries? = attrs[:all_entries] || false
 
       cond do
         is_boolean(all_entries?) && all_entries? ->
-          quote(do: Caching.run_cmd(cache, :delete_all, [], unquote(on_error), 0))
+          quote(do: Caching.run_cmd(cache, :delete_all, [], on_error, 0))
 
         is_list(keys) and length(keys) > 0 ->
-          delete_keys_block(keys, on_error)
+          delete_keys_block(keys)
 
         true ->
-          quote(do: Caching.run_cmd(cache, :delete, [unquote(keygen)], unquote(on_error), :ok))
+          quote(do: Caching.run_cmd(cache, :delete, [unquote(keygen)], on_error, :ok))
       end
     end
 
-    defp delete_keys_block(keys, on_error) do
+    defp delete_keys_block(keys) do
       quote do
-        Enum.each(unquote(keys), &Caching.run_cmd(cache, :delete, [&1], unquote(on_error), :ok))
+        Enum.each(unquote(keys), &Caching.run_cmd(cache, :delete, [&1], on_error, :ok))
       end
     end
 
@@ -775,32 +796,124 @@ if Code.ensure_loaded?(Decorator.Define) do
       )
     end
 
+    # sobelow_skip ["RCE.CodeModule"]
+    defp bind_to_opt(attrs) do
+      bind_to = Keyword.get(attrs, :bind_to)
+      {evaluated_bind_to, _} = Code.eval_quoted(bind_to)
+
+      if is_nil(evaluated_bind_to) or is_function(evaluated_bind_to, 1) do
+        bind_to
+      else
+        raise ArgumentError,
+              "expected bind_to: to be an anonymous function with arity 1 or nil, " <>
+                "but got: #{inspect(evaluated_bind_to)}"
+      end
+    end
+
+    ## Helpers
+
     @doc """
-    This function is for internal purposes only.
+    Convenience function for evaluating the `cacheable` decorator in runtime.
+
+    **NOTE:** For internal purposes only.
+    """
+    @spec eval_cacheable(
+            module,
+            term,
+            Keyword.t(),
+            on_error_opt,
+            match_fun,
+            bind_fun,
+            (() -> term)
+          ) :: term
+    def eval_cacheable(cache, key, opts, on_error, match, bind_to, block)
+
+    def eval_cacheable(cache, key, opts, on_error, match, nil, block) do
+      with nil <- run_cmd(cache, :get, [key, opts], on_error) do
+        result = block.()
+
+        run_cmd(
+          __MODULE__,
+          :eval_match,
+          [result, match, cache, key, opts],
+          on_error,
+          result
+        )
+
+        result
+      end
+    end
+
+    def eval_cacheable(cache, key, opts, on_error, match, bind_to, block)
+        when is_function(bind_to, 1) do
+      case run_cmd(cache, :get, [key, opts], on_error) do
+        nil ->
+          result = block.()
+          binding_key = bind_to.(result)
+
+          with true <-
+                 run_cmd(
+                   __MODULE__,
+                   :eval_match,
+                   [result, match, cache, binding_key, opts],
+                   on_error,
+                   result
+                 ) do
+            :ok = cache_put(cache, key, {:"$nbx_binding_key", binding_key}, opts)
+          end
+
+          result
+
+        {:"$nbx_binding_key", binding_key} ->
+          with nil <- run_cmd(cache, :get, [binding_key, opts], on_error) do
+            result = block.()
+
+            run_cmd(
+              __MODULE__,
+              :eval_match,
+              [result, match, cache, binding_key, opts],
+              on_error,
+              result
+            )
+
+            result
+          end
+
+        val ->
+          val
+      end
+    end
+
+    @doc """
+    Convenience function for evaluating the `:match` function in runtime.
+
+    **NOTE:** For internal purposes only.
 
     **NOTE:** Workaround to avoid dialyzer warnings when using declarative
     annotation-based caching via decorators.
     """
-    @spec eval_match(term, (term -> boolean | {true, term}), module, term, Keyword.t()) :: term
+    @spec eval_match(term, match_fun, module, term, Keyword.t()) :: boolean
     def eval_match(result, match, cache, key, opts) do
       case match.(result) do
         {true, value} ->
           :ok = Caching.cache_put(cache, key, value, opts)
-          result
+
+          true
 
         true ->
           :ok = Caching.cache_put(cache, key, result, opts)
-          result
+
+          true
 
         false ->
-          result
+          false
       end
     end
 
     @doc """
     Convenience function for cache_put annotation.
 
-    **NOTE:** Internal purposes only.
+    **NOTE:** For internal purposes only.
     """
     @spec cache_put(module, {:"$keys", term} | term, term, Keyword.t()) :: :ok
     def cache_put(cache, key, value, opts)
@@ -819,8 +932,9 @@ if Code.ensure_loaded?(Decorator.Define) do
     Convenience function for ignoring cache errors when `:on_error` option
     is set to `:nothing`
 
-    **NOTE:** Internal purposes only.
+    **NOTE:** For internal purposes only.
     """
+    @spec run_cmd(module, atom, [term], on_error_opt, term) :: term
     def run_cmd(mod, fun, args, on_error, default \\ nil)
 
     def run_cmd(mod, fun, args, :raise, _default) do
