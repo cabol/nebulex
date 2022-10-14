@@ -266,7 +266,7 @@ defmodule Nebulex.Adapters.Replicated do
   # Inherit default persistence implementation
   use Nebulex.Adapter.Persistence
 
-  import Bitwise, only_operators: true
+  import Bitwise, only: [<<<: 2]
 
   import Nebulex.Adapter
   import Nebulex.Helpers
