@@ -16,12 +16,14 @@ jobs:
     strategy:
       matrix:
         include:
-          - elixir: 1.13.x
-            otp: 24.x
+          - elixir: 1.14.x
+            otp: 25.x
             style: true
             coverage: true
             sobelow: true
             dialyzer: true
+          - elixir: 1.13.x
+            otp: 24.x
           - elixir: 1.11.x
             otp: 23.x
             inch-report: true
@@ -94,14 +96,12 @@ jobs:
         run: mix sobelow --exit --skip
         if: ${{ matrix.sobelow }}
 
-      - name: Retrieve PLT Cache
+      - name: Restore PLT Cache
         uses: actions/cache@v3
         id: plt-cache
         with:
           path: priv/plts
-          key: >-
-            ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plts-${{
-            hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}-v0
+          key: ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plt-v1
         if: ${{ matrix.dialyzer }}
 
       - name: Create PLTs
@@ -111,7 +111,7 @@ jobs:
         if: ${{ matrix.dialyzer && steps.plt-cache.outputs.cache-hit != 'true' }}
 
       - name: Run dialyzer
-        run: mix dialyzer --no-check --halt-exit-status
+        run: mix dialyzer --format github
         if: ${{ matrix.dialyzer && steps.plt-cache.outputs.cache-hit != 'true' }}
 
       - name: Doc coverage report

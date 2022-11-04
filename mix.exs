@@ -57,7 +57,7 @@ defmodule Nebulex.MixProject do
       {:mock, "~> 0.3", only: :test},
       {:excoveralls, "~> 0.14", only: :test},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.1", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.11", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 0.5", only: [:dev, :test]},
 
@@ -118,7 +118,6 @@ defmodule Nebulex.MixProject do
       flags: [
         :unmatched_returns,
         :error_handling,
-        :race_conditions,
         :no_opaque,
         :unknown,
         :no_return

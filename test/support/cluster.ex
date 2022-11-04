@@ -18,11 +18,30 @@ defmodule Nebulex.Cluster do
   end
 
   def spawn_node(node_host) do
-    {:ok, node} = :slave.start(to_charlist("127.0.0.1"), node_name(node_host), inet_loader_args())
+    {:ok, node} = start_peer(node_host)
+
     _ = add_code_paths(node)
     _ = transfer_configuration(node)
     _ = ensure_applications_started(node)
+
     {:ok, node}
+  end
+
+  if Code.ensure_loaded?(:peer) do
+    defp start_peer(node_host) do
+      {:ok, _pid, node} =
+        :peer.start(%{
+          name: node_name(node_host),
+          host: to_charlist("127.0.0.1"),
+          args: [inet_loader_args()]
+        })
+
+      {:ok, node}
+    end
+  else
+    defp start_peer(node_host) do
+      :slave.start(to_charlist("127.0.0.1"), node_name(node_host), inet_loader_args())
+    end
   end
 
   defp rpc(node, module, function, args) do
