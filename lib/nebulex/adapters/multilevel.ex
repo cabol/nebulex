@@ -385,7 +385,7 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   defspan delete(adapter_meta, key, opts) do
-    eval(adapter_meta, :delete, [key, opts], opts)
+    eval(adapter_meta, :delete, [key, opts], Keyword.put(opts, :reverse, true))
   end
 
   @impl true
@@ -403,7 +403,7 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   defp do_take(levels, result, key, _opts) do
-    _ = eval(levels, :delete, [key, []])
+    _ = eval(levels, :delete, [key, []], reverse: true)
     result
   end
 
@@ -440,13 +440,14 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   defspan execute(adapter_meta, operation, query, opts) do
-    {reducer, acc_in} =
+    {levels, reducer, acc_in} =
       case operation do
-        :all -> {&(&1 ++ &2), []}
-        _ -> {&(&1 + &2), 0}
+        :all -> {adapter_meta.levels, &(&1 ++ &2), []}
+        :delete_all -> {Enum.reverse(adapter_meta.levels), &(&1 + &2), 0}
+        _ -> {adapter_meta.levels, &(&1 + &2), 0}
       end
 
-    Enum.reduce(adapter_meta.levels, acc_in, fn level, acc ->
+    Enum.reduce(levels, acc_in, fn level, acc ->
       level
       |> with_dynamic_cache(operation, [query, opts])
       |> reducer.(acc)
@@ -561,9 +562,16 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   defp levels(opts, levels) do
-    case Keyword.get(opts, :level) do
-      nil -> levels
-      level -> [Enum.at(levels, level - 1)]
+    levels =
+      case Keyword.get(opts, :level) do
+        nil -> levels
+        level -> [Enum.at(levels, level - 1)]
+      end
+
+    if Keyword.get(opts, :reverse) do
+      Enum.reverse(levels)
+    else
+      levels
     end
   end
 
