@@ -106,7 +106,8 @@ defmodule Nebulex.MixProject do
         "guides/getting-started.md",
         "guides/cache-usage-patterns.md",
         "guides/telemetry.md",
-        "guides/migrating-to-v2.md"
+        "guides/migrating-to-v2.md",
+        "guides/creating-new-adapter.md"
       ]
     ]
   end
