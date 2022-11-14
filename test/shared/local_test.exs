@@ -7,15 +7,6 @@ defmodule Nebulex.LocalTest do
 
     alias Nebulex.{Adapter, Entry}
 
-    describe "with_dynamic_cache/3" do
-      test "ok", %{cache: cache} do
-        test_with_dynamic_cache(cache, fn ->
-          :ok = cache.put("foo", "bar")
-          assert cache.get("foo") == "bar"
-        end)
-      end
-    end
-
     describe "error" do
       test "on init because invalid backend", %{cache: cache} do
         assert {:error, {%RuntimeError{message: msg}, _}} =

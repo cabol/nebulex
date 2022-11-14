@@ -241,7 +241,21 @@ if Code.ensure_loaded?(Decorator.Define) do
         result is cached as it is (the default). If `{true, value}` is returned,
         then the `value` is what is cached (useful to control what is meant to
         be cached). Returning `false` will cause that nothing is stored in the
-        cache.
+        cache. The default match function looks like this:
+
+        ```elixir
+        fn
+          {:error, _} -> false
+          :error -> false
+          nil -> false
+          _ -> true
+        end
+        ```
+
+        By default, if the code-block evaluation returns any of the following
+        terms/values `nil`, `:error`, `{:error, term}`, the default match
+        function returns `false` (the returned result is not cached),
+        otherwise, `true` is returned (the returned result is cached).
 
       * `:key_generator` - The custom key-generator to be used (optional).
         If present, this option overrides the default key generator provided
@@ -683,17 +697,17 @@ if Code.ensure_loaded?(Decorator.Define) do
     ## Private Functions
 
     defp caching_action(action, attrs, block, context) do
-      _cache = attrs[:cache] || raise ArgumentError, "expected cache: to be given as argument"
+      cache = attrs[:cache] || raise ArgumentError, "expected cache: to be given as argument"
       opts_var = attrs[:opts] || []
       on_error_var = on_error_opt(attrs)
-      match_var = attrs[:match] || quote(do: fn _ -> true end)
+      match_var = attrs[:match] || default_match_fun()
 
       args =
         context.args
         |> Enum.reduce([], &walk/2)
         |> Enum.reverse()
 
-      cache_block = cache_block(attrs, args, context)
+      cache_block = cache_block(cache, args, context)
       keygen_block = keygen_block(attrs, args, context)
       action_block = action_block(action, block, attrs, keygen_block)
 
@@ -704,6 +718,17 @@ if Code.ensure_loaded?(Decorator.Define) do
         on_error = unquote(on_error_var)
 
         unquote(action_block)
+      end
+    end
+
+    defp default_match_fun do
+      quote do
+        fn
+          {:error, _} -> false
+          :error -> false
+          nil -> false
+          _ -> true
+        end
       end
     end
 
@@ -726,10 +751,21 @@ if Code.ensure_loaded?(Decorator.Define) do
       acc
     end
 
-    defp cache_block(attrs, args, ctx) do
-      attrs
-      |> Keyword.get(:cache)
-      |> cache_call(ctx, args)
+    # MFA cache: `{module, function, args}`
+    defp cache_block({:{}, _, [mod, fun, cache_args]}, args, ctx) do
+      quote do
+        unquote(mod).unquote(fun)(
+          unquote(ctx.module),
+          unquote(ctx.name),
+          unquote(args),
+          unquote_splicing(cache_args)
+        )
+      end
+    end
+
+    # Module implementing the cache behaviour (default)
+    defp cache_block({_, _, _} = cache, _args, _ctx) do
+      quote(do: unquote(cache))
     end
 
     defp keygen_block(attrs, args, ctx) do
@@ -749,23 +785,6 @@ if Code.ensure_loaded?(Decorator.Define) do
             )
           end
       end
-    end
-
-    # MFA cache: `{module, function, args}`
-    defp cache_call({:{}, _, [mod, fun, cache_args]}, ctx, args) do
-      quote do
-        unquote(mod).unquote(fun)(
-          unquote(ctx.module),
-          unquote(ctx.name),
-          unquote(args),
-          unquote_splicing(cache_args)
-        )
-      end
-    end
-
-    # Module implementing the cache behaviour (default)
-    defp cache_call({_, _, _} = cache, _ctx, _args) do
-      quote(do: unquote(cache))
     end
 
     # MFA key-generator: `{module, function, args}`
@@ -931,8 +950,8 @@ if Code.ensure_loaded?(Decorator.Define) do
           result = block.()
 
           referenced_key =
-            with link_fun when is_function(link_fun, 1) <- references do
-              link_fun.(result)
+            with ref_fun when is_function(ref_fun, 1) <- references do
+              ref_fun.(result)
             end
 
           with true <-

@@ -100,18 +100,33 @@ defmodule Nebulex.CachingTest do
   describe "cacheable" do
     test "with default opts" do
       refute Cache.get("x")
-      assert get_by_x("x") == {"x", "y"}
-      assert Cache.get("x") == {"x", "y"}
-      refute get_by_x("nil")
-      refute Cache.get("nil")
+      assert get_by_x("x") == nil
+      refute Cache.get("x")
 
-      refute Cache.get({2, 2})
-      assert get_by_xy(2, 2) == {2, 4}
-      assert Cache.get({2, 2}) == {2, 4}
+      assert get_by_x(1, 11) == 11
+      assert Cache.get(1) == 11
+
+      assert get_by_x(2, {:ok, 22}) == {:ok, 22}
+      assert Cache.get(2) == {:ok, 22}
+
+      assert get_by_x(3, :error) == :error
+      refute Cache.get(3)
+
+      assert get_by_x(4, {:error, 4}) == {:error, 4}
+      refute Cache.get(4)
+
+      refute Cache.get({:xy, 2})
+      assert get_by_xy(:xy, 2) == {:xy, 4}
+      assert Cache.get({:xy, 2}) == {:xy, 4}
 
       :ok = Process.sleep(1100)
-      assert Cache.get("x") == {"x", "y"}
-      assert Cache.get({2, 2}) == {2, 4}
+
+      refute Cache.get("x")
+      assert Cache.get(1) == 11
+      assert Cache.get(2) == {:ok, 22}
+      refute Cache.get(3)
+      refute Cache.get(4)
+      assert Cache.get({:xy, 2}) == {:xy, 4}
     end
 
     test "with opts" do
@@ -264,16 +279,28 @@ defmodule Nebulex.CachingTest do
 
   describe "cache_put" do
     test "with default opts" do
+      assert update_fun(1) == nil
+      refute Cache.get(1)
+
+      assert update_fun(1, :error) == :error
+      refute Cache.get(1)
+
+      assert update_fun(1, {:error, :error}) == {:error, :error}
+      refute Cache.get(1)
+
       assert set_keys(x: 1, y: 2, z: 3) == :ok
-      assert update_fun(:x) == :x
-      assert update_fun(:y) == :y
-      assert Cache.get(:x) == :x
-      assert Cache.get(:y) == :y
+
+      assert update_fun(:x, 2) == 2
+      assert update_fun(:y, {:ok, 4}) == {:ok, 4}
+
+      assert Cache.get(:x) == 2
+      assert Cache.get(:y) == {:ok, 4}
       assert Cache.get(:z) == 3
 
       :ok = Process.sleep(1100)
-      assert Cache.get(:x) == :x
-      assert Cache.get(:y) == :y
+
+      assert Cache.get(:x) == 2
+      assert Cache.get(:y) == {:ok, 4}
       assert Cache.get(:z) == 3
     end
 
@@ -576,11 +603,16 @@ defmodule Nebulex.CachingTest do
   def get_without_args, do: "hello"
 
   @decorate cacheable(cache: Cache, key: x)
-  def get_by_x(x, y \\ "y") do
-    case x do
-      "nil" -> nil
-      _ -> {x, y}
+  def get_by_x(x, y \\ nil) do
+    with _ when not is_nil(x) <- x,
+         _ when not is_nil(y) <- y do
+      y
     end
+  end
+
+  @decorate cacheable(cache: Cache, key: {x, y})
+  def get_by_xy(x, y) do
+    {x, y * 2}
   end
 
   @decorate cacheable(cache: Cache, opts: [ttl: 1000])
@@ -606,11 +638,6 @@ defmodule Nebulex.CachingTest do
     _ -> :error
   end
 
-  @decorate cacheable(cache: Cache, key: {x, y})
-  def get_by_xy(x, y) do
-    {x, y * 2}
-  end
-
   @decorate cacheable(cache: Cache)
   def get_with_default_key(x, y) do
     _ = {x, y}
@@ -631,8 +658,11 @@ defmodule Nebulex.CachingTest do
   def update_without_args, do: "hello"
 
   @decorate cache_put(cache: Cache, key: x)
-  def update_fun(x) do
-    x
+  def update_fun(x, y \\ nil) do
+    with _ when not is_nil(x) <- x,
+         _ when not is_nil(y) <- y do
+      y
+    end
   end
 
   @decorate cache_put(cache: Cache, key: x, opts: [ttl: 1000])
