@@ -563,7 +563,7 @@ defmodule Nebulex.Cache do
 
   @doc """
   Returns the default key generator applied only when using
-  **"declarative annotation-based caching"** via `Nebulex.Caching`.
+  **"declarative annotation-based caching"** via `Nebulex.Caching.Decorators`.
 
   Sometimes you may want to set a different key generator when using
   declarative caching. By default, the key generator is set to
@@ -572,7 +572,8 @@ defmodule Nebulex.Cache do
 
       use Nebulex.Cache, default_key_generator: MyKeyGenerator
 
-  See `Nebulex.Caching` and `Nebulex.Caching.KeyGenerator` for more information.
+  See `Nebulex.Caching.Decorators` and `Nebulex.Caching.KeyGenerator`
+  for more information.
   """
   @callback __default_key_generator__ :: Nebulex.Caching.KeyGenerator.t()
 

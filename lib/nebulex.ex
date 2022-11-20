@@ -6,10 +6,12 @@ defmodule Nebulex do
       Via the cache, we can put, get, update, delete and query existing entries.
       A cache needs an adapter to communicate to the in-memory data store.
 
-    * `Nebulex.Caching` - decorators provide an elegant way of annotating
-      functions to be cached or evicted. By means of these decorators, it is
-      possible the implementation of cache usage patterns like **Read-through**,
-      **Write-through**, **Cache-as-SoR**, etc.
+    * `Nebulex.Caching` - Declarative annotation-based caching via
+      **`Nebulex.Caching.Decorators`**. Decorators provide n elegant way of
+      annotating functions to be cached or evicted. Caching decorators also
+      enable the usage and/or implementation of cache usage patterns like
+      **Read-through**, **Write-through**, **Cache-as-SoR**, etc.
+      See [Cache Usage Patters Guide](http://hexdocs.pm/nebulex/cache-usage-patterns.html).
 
   In the following sections, we will provide an overview of those components and
   how they interact with each other. Feel free to access their respective module

@@ -22,7 +22,7 @@ defmodule Nebulex.CachingTest do
     def generate(mod, fun, args), do: :erlang.phash2({mod, fun, args})
   end
 
-  defmodule ErrorCache do
+  defmodule YetAnotherCache do
     use Nebulex.Cache,
       otp_app: :nebulex,
       adapter: Nebulex.Adapters.Local
@@ -203,10 +203,14 @@ defmodule Nebulex.CachingTest do
       assert get_false_with_side_effect(false) == false
       assert Cache.get("side-effect") == 1
     end
+  end
+
+  describe "cachable with references" do
+    setup_with_cache(YetAnotherCache)
 
     test "with referenced key" do
       # Expected values
-      referenced_key = {:"$nbx_referenced_key", "referenced_id"}
+      referenced_key = cache_ref("referenced_id")
       result = %{id: "referenced_id", name: "referenced_name"}
 
       # Nothing is cached yet
@@ -255,7 +259,7 @@ defmodule Nebulex.CachingTest do
 
     test "with referenced key from args" do
       # Expected values
-      referenced_key = {:"$nbx_referenced_key", "id"}
+      referenced_key = cache_ref("id")
       result = %{attrs: %{id: "id"}, name: "name"}
 
       # Nothing is cached yet
@@ -274,6 +278,78 @@ defmodule Nebulex.CachingTest do
 
       # Next run: the value should come from the cache
       assert get_with_referenced_key_from_args("name", %{id: "id"}) == result
+    end
+
+    test "returns fixed referenced" do
+      # Expected values
+      referenced_key = cache_ref("fixed_id")
+      result = %{id: "fixed_id", name: "name"}
+
+      # Nothing is cached yet
+      refute Cache.get("fixed_id")
+      refute Cache.get("name")
+
+      # First run: the function block is executed and its result is cached under
+      # the referenced key, and the referenced key is cached under the given key
+      assert get_with_fixed_referenced_key("name") == result
+
+      # Assert the key points to the referenced key
+      assert Cache.get("name") == referenced_key
+
+      # Assert the referenced key points to the cached value
+      assert Cache.get("fixed_id") == result
+
+      # Next run: the value should come from the cache
+      assert get_with_fixed_referenced_key("name") == result
+    end
+
+    test "returns referenced key by calling referenced cache" do
+      # Expected values
+      referenced_key = cache_ref(YetAnotherCache, "referenced_id")
+      result = %{id: "referenced_id", name: "referenced_name"}
+
+      # Nothing is cached yet
+      refute Cache.get("referenced_id")
+      refute Cache.get("referenced_name")
+
+      # First run: the function block is executed and its result is cached under
+      # the referenced key, and the referenced key is cached under the given key
+      assert get_with_ref_key_with_cache("referenced_name") == result
+
+      # Assert the key points to the referenced key
+      assert Cache.get("referenced_name") == referenced_key
+
+      # Assert the referenced key points to the cached value
+      assert YetAnotherCache.get("referenced_id") == result
+
+      # Next run: the value should come from the cache
+      assert get_with_ref_key_with_cache("referenced_name") == result
+
+      # Simulate a cache eviction for the referenced key
+      :ok = YetAnotherCache.delete("referenced_id")
+
+      # The value under the referenced key should not longer exist
+      refute YetAnotherCache.get("referenced_id")
+
+      # Assert the key still points to the referenced key
+      assert Cache.get("referenced_name") == referenced_key
+
+      # Next run: the key does exist but the referenced key doesn't, then the
+      # function block is executed and the result is cached under the referenced
+      # key back again
+      assert get_with_ref_key_with_cache("referenced_name") == result
+
+      # Assert the key points to the referenced key
+      assert Cache.get("referenced_name") == referenced_key
+
+      # Assert the referenced key points to the cached value
+      assert YetAnotherCache.get("referenced_id") == result
+
+      # Similate the referenced key is overridden
+      :ok = Cache.put("referenced_name", "overridden")
+
+      # The referenced key is overridden
+      assert get_with_ref_key_with_cache("referenced_name") == "overridden"
     end
   end
 
@@ -790,17 +866,17 @@ defmodule Nebulex.CachingTest do
     x * y
   end
 
-  @decorate cacheable(cache: ErrorCache, key: x, on_error: :nothing)
+  @decorate cacheable(cache: YetAnotherCache, key: x, on_error: :nothing)
   def get_with_exception(x) do
     x
   end
 
-  @decorate cache_put(cache: ErrorCache, key: x, on_error: :nothing)
+  @decorate cache_put(cache: YetAnotherCache, key: x, on_error: :nothing)
   def update_with_exception(x) do
     x
   end
 
-  @decorate cache_evict(cache: ErrorCache, key: x, on_error: :nothing)
+  @decorate cache_evict(cache: YetAnotherCache, key: x, on_error: :nothing)
   def evict_with_exception(x) do
     x
   end
@@ -843,6 +919,16 @@ defmodule Nebulex.CachingTest do
   @decorate cacheable(cache: Cache, key: name, references: attrs.id)
   def get_with_referenced_key_from_args(name, attrs) do
     %{attrs: attrs, name: name}
+  end
+
+  @decorate cacheable(cache: Cache, key: name, references: "fixed_id")
+  def get_with_fixed_referenced_key(name) do
+    %{id: "fixed_id", name: name}
+  end
+
+  @decorate cacheable(cache: Cache, key: name, references: &cache_ref(YetAnotherCache, &1.id))
+  def get_with_ref_key_with_cache(name) do
+    %{id: "referenced_id", name: name}
   end
 
   ## Helpers
