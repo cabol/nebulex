@@ -60,14 +60,16 @@ defmodule Nebulex.Cache.TransactionTest do
       end
 
       test "aborted", %{name: name, cache: cache} do
+        key = {name, :aborted}
+
         Task.start_link(fn ->
           _ = cache.put_dynamic_cache(name)
 
           cache.transaction(
-            [keys: [:aborted], retries: 1],
+            [keys: [key], retries: 1],
             fn ->
-              :ok = cache.put(:aborted, true)
-              Process.sleep(1100)
+              :ok = cache.put(key, true)
+              Process.sleep(2000)
             end
           )
         end)
@@ -76,9 +78,9 @@ defmodule Nebulex.Cache.TransactionTest do
 
         assert_raise RuntimeError, "transaction aborted", fn ->
           cache.transaction(
-            [keys: [:aborted], retries: 1],
+            [keys: [key], retries: 1],
             fn ->
-              cache.get(:aborted)
+              cache.get(key)
             end
           )
         end

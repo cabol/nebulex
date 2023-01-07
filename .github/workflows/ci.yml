@@ -10,25 +10,31 @@ on:
 
 jobs:
   nebulex_test:
-    name: 'Nebulex Test (Elixir ${{ matrix.elixir }} OTP ${{ matrix.otp }})'
-    runs-on: ubuntu-latest
+    name: >-
+      Nebulex Test (Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }} /
+      OS ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
 
     strategy:
       matrix:
         include:
           - elixir: 1.14.x
             otp: 25.x
+            os: 'ubuntu-latest'
             style: true
             coverage: true
             sobelow: true
             dialyzer: true
           - elixir: 1.13.x
             otp: 24.x
+            os: 'ubuntu-latest'
           - elixir: 1.11.x
             otp: 23.x
+            os: 'ubuntu-20.04'
             inch-report: true
           - elixir: 1.9.x
             otp: 22.x
+            os: 'ubuntu-20.04'
 
     env:
       GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'

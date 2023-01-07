@@ -306,13 +306,16 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   @impl true
   def handle_call(:delete_all, _from, %__MODULE__{} = state) do
+    # Get current size
     size =
       state
       |> Map.from_struct()
       |> Local.execute(:count_all, nil, [])
 
+    # Create new generation
     :ok = new_gen(state)
 
+    # Delete all objects
     :ok =
       state.meta_tab
       |> list()
@@ -322,8 +325,13 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   def handle_call({:new_generation, reset_timer?}, _from, state) do
+    # Create new generation
     :ok = new_gen(state)
-    {:reply, :ok, %{state | gc_heartbeat_ref: maybe_reset_timer(reset_timer?, state)}}
+
+    # Maybe reset heartbeat timer
+    heartbeat_ref = maybe_reset_timer(reset_timer?, state)
+
+    {:reply, :ok, %{state | gc_heartbeat_ref: heartbeat_ref}}
   end
 
   def handle_call(
@@ -348,86 +356,90 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   @impl true
-  def handle_info(:heartbeat, %__MODULE__{gc_interval: time, gc_heartbeat_ref: ref} = state) do
+  def handle_info(
+        :heartbeat,
+        %__MODULE__{
+          gc_interval: gc_interval,
+          gc_heartbeat_ref: heartbeat_ref
+        } = state
+      ) do
+    # Create new generation
     :ok = new_gen(state)
-    {:noreply, %{state | gc_heartbeat_ref: start_timer(time, ref)}}
+
+    # Reset heartbeat timer
+    heartbeat_ref = start_timer(gc_interval, heartbeat_ref)
+
+    {:noreply, %{state | gc_heartbeat_ref: heartbeat_ref}}
   end
 
   def handle_info(:cleanup, state) do
-    state =
-      state
-      |> check_size()
-      |> check_memory()
+    # Check size first, if the cleanup is done, skip checking the memory,
+    # otherwise, check the memory too.
+    {_, state} =
+      with {false, state} <- check_size(state) do
+        check_memory(state)
+      end
 
     {:noreply, state}
   end
 
-  defp check_size(
-         %__MODULE__{
-           meta_tab: meta_tab,
-           max_size: max_size,
-           backend: backend
-         } = state
-       )
-       when not is_nil(max_size) do
-    meta_tab
-    |> list()
-    |> Enum.reduce(0, &(backend.info(&1, :size) + &2))
-    |> maybe_cleanup(max_size, state)
+  defp check_size(%__MODULE__{max_size: max_size} = state) when not is_nil(max_size) do
+    maybe_cleanup(:size, state)
   end
 
-  defp check_size(state), do: state
-
-  defp check_memory(
-         %__MODULE__{
-           meta_tab: meta_tab,
-           backend: backend,
-           allocated_memory: allocated
-         } = state
-       )
-       when not is_nil(allocated) do
-    backend
-    |> memory_info(meta_tab)
-    |> maybe_cleanup(allocated, state)
+  defp check_size(state) do
+    {false, state}
   end
 
-  defp check_memory(state), do: state
+  defp check_memory(%__MODULE__{allocated_memory: allocated} = state) when not is_nil(allocated) do
+    maybe_cleanup(:memory, state)
+  end
+
+  defp check_memory(state) do
+    {false, state}
+  end
 
   defp maybe_cleanup(
-         size,
-         max_size,
+         info,
          %__MODULE__{
-           gc_cleanup_max_timeout: max_timeout,
            gc_cleanup_ref: cleanup_ref,
+           gc_cleanup_min_timeout: min_timeout,
+           gc_cleanup_max_timeout: max_timeout,
            gc_interval: gc_interval,
            gc_heartbeat_ref: heartbeat_ref
          } = state
-       )
-       when size >= max_size do
-    :ok = new_gen(state)
+       ) do
+    case cleanup_info(info, state) do
+      {size, max_size} when size >= max_size ->
+        # Create a new generation
+        :ok = new_gen(state)
 
-    %{
-      state
-      | gc_cleanup_ref: start_timer(max_timeout, cleanup_ref, :cleanup),
-        gc_heartbeat_ref: start_timer(gc_interval, heartbeat_ref)
-    }
+        # Reset the heartbeat timer
+        heartbeat_ref = start_timer(gc_interval, heartbeat_ref)
+
+        # Reset the cleanup timer
+        cleanup_ref =
+          info
+          |> cleanup_info(state)
+          |> elem(0)
+          |> reset_cleanup_timer(max_size, min_timeout, max_timeout, cleanup_ref)
+
+        {true, %{state | gc_heartbeat_ref: heartbeat_ref, gc_cleanup_ref: cleanup_ref}}
+
+      {size, max_size} ->
+        # Reset the cleanup timer
+        cleanup_ref = reset_cleanup_timer(size, max_size, min_timeout, max_timeout, cleanup_ref)
+
+        {false, %{state | gc_cleanup_ref: cleanup_ref}}
+    end
   end
 
-  defp maybe_cleanup(
-         size,
-         max_size,
-         %__MODULE__{
-           gc_cleanup_min_timeout: min_timeout,
-           gc_cleanup_max_timeout: max_timeout,
-           gc_cleanup_ref: cleanup_ref
-         } = state
-       ) do
-    cleanup_ref =
-      size
-      |> linear_inverse_backoff(max_size, min_timeout, max_timeout)
-      |> start_timer(cleanup_ref, :cleanup)
+  defp cleanup_info(:size, %__MODULE__{backend: mod, meta_tab: tab, max_size: max}) do
+    {size_info(mod, tab), max}
+  end
 
-    %{state | gc_cleanup_ref: cleanup_ref}
+  defp cleanup_info(:memory, %__MODULE__{backend: mod, meta_tab: tab, allocated_memory: max}) do
+    {memory_info(mod, tab), max}
   end
 
   ## Private Functions
@@ -447,22 +459,22 @@ defmodule Nebulex.Adapters.Local.Generation do
         # Since the older generation is deleted, update evictions count
         :ok = Stats.incr(stats_counter, :evictions, backend.info(older, :size))
 
+        # Update generations
+        :ok = Metadata.put(meta_tab, :generations, [gen_tab, newer])
+
         # Process the older generation:
         # - Delete previously stored deprecated generation
         # - Flush the older generation
         # - Deprecate it (mark it for deletion)
         :ok = process_older_gen(meta_tab, backend, older)
 
-        # Update generations
-        Metadata.put(meta_tab, :generations, [gen_tab, newer])
-
       [newer] ->
         # Update generations
-        Metadata.put(meta_tab, :generations, [gen_tab, newer])
+        :ok = Metadata.put(meta_tab, :generations, [gen_tab, newer])
 
       [] ->
-        # update generations
-        Metadata.put(meta_tab, :generations, [gen_tab])
+        # Update generations
+        :ok = Metadata.put(meta_tab, :generations, [gen_tab])
     end
   end
 
@@ -486,6 +498,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp start_timer(time, ref \\ nil, event \\ :heartbeat) do
     _ = if ref, do: Process.cancel_timer(ref)
+
     Process.send_after(self(), event, time)
   end
 
@@ -501,6 +514,18 @@ defmodule Nebulex.Adapters.Local.Generation do
     start_timer(state.gc_interval, state.gc_heartbeat_ref)
   end
 
+  defp reset_cleanup_timer(size, max_size, min_timeout, max_timeout, cleanup_ref) do
+    size
+    |> linear_inverse_backoff(max_size, min_timeout, max_timeout)
+    |> start_timer(cleanup_ref, :cleanup)
+  end
+
+  defp size_info(backend, meta_tab) do
+    meta_tab
+    |> list()
+    |> Enum.reduce(0, &(backend.info(&1, :size) + &2))
+  end
+
   defp memory_info(backend, meta_tab) do
     meta_tab
     |> list()
@@ -510,6 +535,14 @@ defmodule Nebulex.Adapters.Local.Generation do
       |> Kernel.*(:erlang.system_info(:wordsize))
       |> Kernel.+(acc)
     end)
+  end
+
+  defp linear_inverse_backoff(size, _max_size, _min_timeout, max_timeout) when size <= 0 do
+    max_timeout
+  end
+
+  defp linear_inverse_backoff(size, max_size, min_timeout, _max_timeout) when size >= max_size do
+    min_timeout
   end
 
   defp linear_inverse_backoff(size, max_size, min_timeout, max_timeout) do
