@@ -504,7 +504,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp start_timer(time, ref \\ nil, event \\ :heartbeat)
 
-  defp start_timer(:nil, _, _), do: nil
+  defp start_timer(nil, _, _), do: nil
 
   defp start_timer(time, ref, event) do
     _ = if ref, do: Process.cancel_timer(ref)
