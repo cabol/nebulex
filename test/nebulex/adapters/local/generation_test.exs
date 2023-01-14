@@ -307,6 +307,26 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
     end
   end
 
+  describe "cleanup cover" do
+    test "cleanup when gc_interval not set" do
+      {:ok, _pid} =
+        LocalWithSizeLimit.start_link(
+          max_size: 3,
+          gc_cleanup_min_timeout: 1000,
+          gc_cleanup_max_timeout: 1500
+        )
+
+      # Put some entries to exceed the max size
+      _ = cache_put(LocalWithSizeLimit, 1..4)
+
+      # Wait the max cleanup timeout
+      :ok = Process.sleep(1600)
+
+      # assert not crashed
+      assert LocalWithSizeLimit.count_all() == 4
+    end
+  end
+
   ## Private Functions
 
   defp check_cache_size(cache) do
