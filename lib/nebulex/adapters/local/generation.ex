@@ -496,9 +496,12 @@ defmodule Nebulex.Adapters.Local.Generation do
     Metadata.put(meta_tab, :deprecated, older)
   end
 
-  defp start_timer(time, ref \\ nil, event \\ :heartbeat) do
-    _ = if ref, do: Process.cancel_timer(ref)
+  defp start_timer(time, ref \\ nil, event \\ :heartbeat)
 
+  defp start_timer(nil, _, _), do: nil
+
+  defp start_timer(time, ref, event) do
+    _ = if ref, do: Process.cancel_timer(ref)
     Process.send_after(self(), event, time)
   end
 
