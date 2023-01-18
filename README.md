@@ -50,6 +50,7 @@ Nil (special adapter that disables the cache) | [Nebulex.Adapters.Nil][nil] | Bu
 Cachex | Nebulex.Adapters.Cachex | [nebulex_adapters_cachex][nbx_cachex]
 Redis | NebulexRedisAdapter | [nebulex_redis_adapter][nbx_redis]
 Distributed with Horde | Nebulex.Adapters.Horde | [nebulex_adapters_horde][nbx_horde]
+Multilevel with cluster broadcasting | NebulexLocalMultilevelAdapter | [nebulex_local_multilevel_adapter][nbx_local_multilevel]
 
 [la]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Local.html
 [pa]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Partitioned.html
@@ -59,6 +60,7 @@ Distributed with Horde | Nebulex.Adapters.Horde | [nebulex_adapters_horde][nbx_h
 [nbx_cachex]: https://github.com/cabol/nebulex_adapters_cachex
 [nbx_redis]: https://github.com/cabol/nebulex_redis_adapter
 [nbx_horde]: https://github.com/eliasdarruda/nebulex_adapters_horde
+[nbx_local_multilevel]: https://github.com/slab/nebulex_local_multilevel_adapter
 
 
 For example, if you want to use a built-in cache, add to your `mix.exs` file:
