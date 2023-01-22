@@ -64,7 +64,11 @@ defmodule Nebulex.Adapters.Local.Generation do
     :allocated_memory,
     :gc_cleanup_min_timeout,
     :gc_cleanup_max_timeout,
-    :gc_cleanup_ref
+    :gc_cleanup_ref,
+    :generation_max_size,
+    :generation_allocated_memory,
+    :generation_cleanup_timeout,
+    :generation_cleanup_ref
   ]
 
   use GenServer
@@ -242,19 +246,30 @@ defmodule Nebulex.Adapters.Local.Generation do
     # Initial state
     state = struct(__MODULE__, parse_opts(opts))
 
-    # Init cleanup timer
-    cleanup_ref =
-      if state.max_size || state.allocated_memory,
-        do: start_timer(state.gc_cleanup_max_timeout, nil, :cleanup)
+    old_strategy? = state.generation_max_size == nil and state.generation_allocated_memory == nil
 
-    # Timer ref
-    {:ok, ref} =
-      if state.gc_interval,
-        do: {new_gen(state), start_timer(state.gc_interval)},
-        else: {new_gen(state), nil}
+    new_gen(state)
 
-    # Update state
-    state = %{state | gc_cleanup_ref: cleanup_ref, gc_heartbeat_ref: ref}
+    state =
+      if old_strategy? do
+        # Init cleanup timer
+        cleanup_ref =
+          if state.max_size || state.allocated_memory,
+            do: start_timer(state.gc_cleanup_max_timeout, nil, :cleanup)
+
+        # Timer ref
+        ref =
+          if state.gc_interval,
+            do: start_timer(state.gc_interval),
+            else: nil
+
+        %{state | gc_cleanup_ref: cleanup_ref, gc_heartbeat_ref: ref}
+      else
+        ref = start_timer(state.generation_cleanup_timeout, nil, :generation_cleanup)
+
+        %{state | generation_cleanup_ref: ref}
+      end
+
 
     {:ok, state, {:continue, :attach_stats_handler}}
   end
@@ -279,7 +294,13 @@ defmodule Nebulex.Adapters.Local.Generation do
       gc_cleanup_min_timeout:
         get_option(opts, :gc_cleanup_min_timeout, "an integer > 0", pos_integer, 10_000),
       gc_cleanup_max_timeout:
-        get_option(opts, :gc_cleanup_max_timeout, "an integer > 0", pos_integer, 600_000)
+        get_option(opts, :gc_cleanup_max_timeout, "an integer > 0", pos_integer, 600_000),
+      generation_max_size:
+        get_option(opts, :generation_max_size, "an integer > 0", pos_integer_or_nil),
+      generation_allocated_memory:
+        get_option(opts, :generation_allocated_memory, "an integer > 0", pos_integer_or_nil),
+      generation_cleanup_timeout:
+        get_option(opts, :generation_cleanup_timeout, "an integer > 0", pos_integer, 3_000)
     })
   end
 
@@ -384,6 +405,21 @@ defmodule Nebulex.Adapters.Local.Generation do
     {:noreply, state}
   end
 
+  @impl true
+  def handle_info(
+        :generation_cleanup,
+        %__MODULE__{
+          generation_cleanup_timeout: generation_cleanup_timeout
+        } = state
+      ) do
+    ref = start_timer(generation_cleanup_timeout, nil, :generation_cleanup)
+
+    maybe_generation_cleanup(state)
+
+    {:noreply, %{state | generation_cleanup_ref: ref}}
+  end
+
+
   defp check_size(%__MODULE__{max_size: max_size} = state) when not is_nil(max_size) do
     maybe_cleanup(:size, state)
   end
@@ -398,6 +434,23 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp check_memory(state) do
     {false, state}
+  end
+
+  defp maybe_generation_cleanup(
+    %__MODULE__{
+      meta_tab: meta_tab,
+      backend: backend,
+      generation_max_size: generation_max_size,
+      generation_allocated_memory: generation_allocated_memory
+    } = state
+  ) do
+    [newest | _] = list(meta_tab)
+    size = size_info(backend, [newest])
+    memory = memory_info(backend, [newest])
+    if size > generation_max_size or memory > generation_allocated_memory do
+      new_gen(state)
+    end
+    {:ok}
   end
 
   defp maybe_cleanup(
