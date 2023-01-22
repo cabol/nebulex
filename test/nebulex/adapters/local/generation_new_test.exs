@@ -226,72 +226,69 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
   #   end
   # end
 
-  # describe "max size" do
-  #   test "cleanup is triggered when size limit is reached" do
-  #     {:ok, _pid} =
-  #       LocalWithSizeLimit.start_link(
-  #         gc_interval: 3_600_000,
-  #         max_size: 3,
-  #         gc_cleanup_min_timeout: 1000,
-  #         gc_cleanup_max_timeout: 1500
-  #       )
+  describe "max size" do
+    test "cleanup is triggered when size limit is reached" do
+      {:ok, _pid} =
+        LocalWithSizeLimit.start_link(
+          generation_max_size: 3
+        )
 
-  #     # Initially there should be only 1 generation and no entries
-  #     assert generations_len(LocalWithSizeLimit) == 1
-  #     assert LocalWithSizeLimit.count_all() == 0
+      # Initially there should be only 1 generation and no entries
+      assert generations_len(LocalWithSizeLimit) == 1
+      assert LocalWithSizeLimit.count_all() == 0
 
-  #     # Put some entries to exceed the max size
-  #     _ = cache_put(LocalWithSizeLimit, 1..4)
+      # Put some entries to exceed the max size
+      _ = cache_put(LocalWithSizeLimit, 1..4)
 
-  #     # Validate current size
-  #     assert LocalWithSizeLimit.count_all() == 4
+      # Validate current size
+      assert LocalWithSizeLimit.count_all() == 4
 
-  #     # Wait the max cleanup timeout
-  #     :ok = Process.sleep(1600)
+      # Manually trigger cleanup
+      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
-  #     # There should be 2 generation now
-  #     assert generations_len(LocalWithSizeLimit) == 2
+      # There should be 2 generation now
+      assert generations_len(LocalWithSizeLimit) == 2
 
-  #     # The entries should be now in the older generation
-  #     assert LocalWithSizeLimit.count_all() == 4
+      # The entries should be now in the older generation
+      assert LocalWithSizeLimit.count_all() == 4
 
-  #     # Wait the min cleanup timeout since max size is exceeded
-  #     :ok = Process.sleep(1100)
+      # Manually trigger cleanup, no cleanup
+      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
-  #     # Cache should be empty now
-  #     assert LocalWithSizeLimit.count_all() == 0
+      # The entries should be still in the older generation
+      assert LocalWithSizeLimit.count_all() == 4
 
-  #     # Put some entries without exceeding the max size
-  #     _ = cache_put(LocalWithSizeLimit, 5..6)
+      # Put some entries without exceeding the max size
+      _ = cache_put(LocalWithSizeLimit, 5..9)
 
-  #     # Validate current size
-  #     assert LocalWithSizeLimit.count_all() == 2
+      # Validate current size
+      assert LocalWithSizeLimit.count_all() == 9
 
-  #     # Wait the max cleanup timeout (timeout should be relative to the size)
-  #     :ok = Process.sleep(1600)
+      # Manually trigger cleanup
+      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
-  #     # The entries should be in the newer generation yet
-  #     assert LocalWithSizeLimit.count_all() == 2
+      # The entries should be in the older generation yet
+      assert LocalWithSizeLimit.count_all() == 5
 
-  #     # Put some entries to exceed the max size
-  #     _ = cache_put(LocalWithSizeLimit, 7..8)
+      # Put some entries to exceed the max size
+      _ = cache_put(LocalWithSizeLimit, 11..16)
 
-  #     # Wait the max cleanup timeout
-  #     :ok = Process.sleep(1600)
+      # Manually trigger cleanup
+      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
-  #     # The entries should be in the newer generation yet
-  #     assert LocalWithSizeLimit.count_all() == 4
+      # The entries should be in the older generation yet
+      assert LocalWithSizeLimit.count_all() == 6
 
-  #     # Wait the min cleanup timeout since max size is exceeded
-  #     :ok = Process.sleep(1100)
+      # Manually trigger cleanup
+      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
-  #     # Cache should be empty now
-  #     assert LocalWithSizeLimit.count_all() == 0
+      # Cache should be empty now
+      assert LocalWithSizeLimit.count_all() == 6
 
-  #     # Stop the cache
-  #     :ok = LocalWithSizeLimit.stop()
-  #   end
-  # end
+      # Stop the cache
+      :ok = LocalWithSizeLimit.stop()
+    end
+  end
 
   # describe "cleanup cover" do
   #   test "cleanup when gc_interval not set" do
@@ -348,11 +345,11 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
   #   for(_ <- 1..n, do: "a")
   # end
 
-  # defp generations_len(name) do
-  #   name
-  #   |> Generation.list()
-  #   |> length()
-  # end
+  defp generations_len(name) do
+    name
+    |> Generation.list()
+    |> length()
+  end
 
   # defp task_fun(cache, i) do
   #   :ok = cache.put("#{inspect(self())}.#{i}", i)

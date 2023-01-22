@@ -145,6 +145,18 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   @doc """
+  Manually trigger the generation cleanup check.
+
+  ## Example
+
+      Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(MyCache)
+  """
+  @spec maybe_generation_cleanup(server_ref) :: :ok
+  def maybe_generation_cleanup(server_ref) do
+    do_call(server_ref, :maybe_generation_cleanup)
+  end
+
+  @doc """
   Returns the memory info in a tuple form `{used_mem, total_mem}`.
 
   ## Example
@@ -356,6 +368,11 @@ defmodule Nebulex.Adapters.Local.Generation do
     {:reply, :ok, %{state | gc_heartbeat_ref: heartbeat_ref}}
   end
 
+  def handle_call(:maybe_generation_cleanup, _from, state) do
+    maybe_generation_cleanup_impl(state)
+    {:reply, :ok, state}
+  end
+
   def handle_call(
         :memory_info,
         _from,
@@ -414,7 +431,7 @@ defmodule Nebulex.Adapters.Local.Generation do
       ) do
     ref = start_timer(generation_cleanup_timeout, nil, :generation_cleanup)
 
-    maybe_generation_cleanup(state)
+    maybe_generation_cleanup_impl(state)
 
     {:noreply, %{state | generation_cleanup_ref: ref}}
   end
@@ -436,7 +453,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     {false, state}
   end
 
-  defp maybe_generation_cleanup(
+  defp maybe_generation_cleanup_impl(
     %__MODULE__{
       meta_tab: meta_tab,
       backend: backend,
@@ -445,8 +462,8 @@ defmodule Nebulex.Adapters.Local.Generation do
     } = state
   ) do
     [newest | _] = list(meta_tab)
-    size = size_info(backend, [newest])
-    memory = memory_info(backend, [newest])
+    size = backend.info(newest, :size)
+    memory = backend.info(newest, :memory)
     if size > generation_max_size or memory > generation_allocated_memory do
       new_gen(state)
     end
