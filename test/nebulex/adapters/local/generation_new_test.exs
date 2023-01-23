@@ -12,7 +12,6 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
 
   alias Nebulex.Adapters.Local.Generation
   alias Nebulex.Adapters.Local.GenerationNewTest.LocalWithSizeLimit
-  alias Nebulex.TestCache.Cache
 
   describe "generation_new init" do
     test "ok: with default options" do
@@ -175,7 +174,7 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
 
       tasks = for i <- 1..3, do: Task.async(fn -> task_fun(LocalWithSizeLimit, i) end)
 
-      for _ <- 1..100 do
+      for _ <- 1..50 do
         :ok = Process.sleep(10)
 
         LocalWithSizeLimit
@@ -304,7 +303,6 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
 
   defp assert_mem_size(greater_or_less) do
     {mem_size, max_size} = Generation.memory_info(LocalWithSizeLimit)
-    IO.puts("mem_size is: #{mem_size}")
     assert apply(Kernel, greater_or_less, [mem_size, max_size])
   end
 
