@@ -67,7 +67,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     :gc_cleanup_ref,
     :generation_max_size,
     :generation_allocated_memory,
-    :generation_max_time,
+    :generation_start_timeout,
     :generation_created_at,
     :generation_cleanup_timeout,
     :generation_cleanup_ref
@@ -260,7 +260,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     # Initial state
     state = struct(__MODULE__, parse_opts(opts))
 
-    old_strategy? = state.generation_max_size == nil and state.generation_allocated_memory == nil
+    old_strategy? = state.generation_max_size == nil and state.generation_allocated_memory == nil and state.generation_start_timeout == nil
 
     new_gen(state)
 
@@ -317,8 +317,8 @@ defmodule Nebulex.Adapters.Local.Generation do
         get_option(opts, :generation_max_size, "an integer > 0", pos_integer_or_nil),
       generation_allocated_memory:
         get_option(opts, :generation_allocated_memory, "an integer > 0", pos_integer_or_nil),
-      generation_max_time:
-        get_option(opts, :generation_max_time, "an integer > 0", pos_integer_or_nil),
+      generation_start_timeout:
+        get_option(opts, :generation_start_timeout, "an integer > 0", pos_integer_or_nil),
       generation_cleanup_timeout:
         get_option(opts, :generation_cleanup_timeout, "an integer > 0", pos_integer, 3_000)
     })
@@ -465,7 +465,7 @@ defmodule Nebulex.Adapters.Local.Generation do
            backend: backend,
            generation_max_size: generation_max_size,
            generation_created_at: generation_created_at,
-           generation_max_time: generation_max_time,
+           generation_start_timeout: generation_start_timeout,
            generation_allocated_memory: generation_allocated_memory
          } = state
        ) do
@@ -477,7 +477,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     # IO.inspect(state, label: "state")
 
     if size > generation_max_size or memory > generation_allocated_memory or
-         now - generation_created_at > generation_max_time do
+         now - generation_created_at > generation_start_timeout do
       new_gen(state)
       %{state | generation_created_at: now}
     else

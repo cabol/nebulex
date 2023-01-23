@@ -80,6 +80,57 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
     end
   end
 
+  describe "generation start timeout" do
+    test "no sleep" do
+      assert {:ok, _pid} =
+        LocalWithSizeLimit.start_link(
+          # 0 means every manual cleanup will trigger new generation
+          generation_start_timeout: 0
+        )
+      _ = cache_put(LocalWithSizeLimit, 1..3)
+
+      assert 1 == generations_len(LocalWithSizeLimit)
+
+      Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+
+      assert 2 == generations_len(LocalWithSizeLimit)
+
+      assert 3 == LocalWithSizeLimit.count_all()
+
+      Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+
+      assert 0 == LocalWithSizeLimit.count_all()
+
+      LocalWithSizeLimit.stop()
+    end
+
+    test "sleep" do
+      assert {:ok, _pid} =
+        LocalWithSizeLimit.start_link(
+          generation_start_timeout: 50,
+          generation_cleanup_timeout: 5
+        )
+      _ = cache_put(LocalWithSizeLimit, 1..3)
+
+      Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+
+      assert 1 == generations_len(LocalWithSizeLimit)
+
+      :timer.sleep(65)
+
+      assert 2 == generations_len(LocalWithSizeLimit)
+
+      assert 3 == LocalWithSizeLimit.count_all()
+
+      :timer.sleep(65)
+
+      assert 0 == LocalWithSizeLimit.count_all()
+
+      LocalWithSizeLimit.stop()
+
+    end
+  end
+
   # describe "gc" do
   #   setup_with_dynamic_cache(Cache, :gc_test,
   #     backend: :shards,
