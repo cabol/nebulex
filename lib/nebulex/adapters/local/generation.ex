@@ -65,7 +65,6 @@ defmodule Nebulex.Adapters.Local.Generation do
     :gc_cleanup_min_timeout,
     :gc_cleanup_max_timeout,
     :gc_cleanup_ref,
-
     :generation_max_size,
     :generation_allocated_memory,
     :generation_max_time,
@@ -282,9 +281,14 @@ defmodule Nebulex.Adapters.Local.Generation do
       else
         ref = start_timer(state.generation_cleanup_timeout, nil, :generation_cleanup)
 
-        %{state | generation_cleanup_ref: ref, generation_created_at: System.monotonic_time(:millisecond)}
+        %{
+          state
+          | generation_cleanup_ref: ref,
+            generation_created_at: System.monotonic_time(:millisecond),
+            max_size: state.generation_max_size,
+            allocated_memory: state.generation_allocated_memory
+        }
       end
-
 
     {:ok, state, {:continue, :attach_stats_handler}}
   end
@@ -310,7 +314,6 @@ defmodule Nebulex.Adapters.Local.Generation do
         get_option(opts, :gc_cleanup_min_timeout, "an integer > 0", pos_integer, 10_000),
       gc_cleanup_max_timeout:
         get_option(opts, :gc_cleanup_max_timeout, "an integer > 0", pos_integer, 600_000),
-
       generation_max_size:
         get_option(opts, :generation_max_size, "an integer > 0", pos_integer_or_nil),
       generation_allocated_memory:
@@ -387,7 +390,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   def handle_call({:realloc, mem_size}, _from, state) do
-    {:reply, :ok, %{state | allocated_memory: mem_size}}
+    {:reply, :ok, %{state | allocated_memory: mem_size, generation_allocated_memory: mem_size}}
   end
 
   def handle_call(:get_state, _from, state) do
@@ -427,7 +430,6 @@ defmodule Nebulex.Adapters.Local.Generation do
     {:noreply, state}
   end
 
-  @impl true
   def handle_info(
         :generation_cleanup,
         %__MODULE__{
@@ -440,7 +442,6 @@ defmodule Nebulex.Adapters.Local.Generation do
 
     {:noreply, %{state | generation_cleanup_ref: ref}}
   end
-
 
   defp check_size(%__MODULE__{max_size: max_size} = state) when not is_nil(max_size) do
     maybe_cleanup(:size, state)
@@ -459,20 +460,23 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   defp maybe_generation_cleanup_impl(
-    %__MODULE__{
-      meta_tab: meta_tab,
-      backend: backend,
-      generation_max_size: generation_max_size,
-      generation_created_at: generation_created_at,
-      generation_max_time: generation_max_time,
-      generation_allocated_memory: generation_allocated_memory
-    } = state
-  ) do
+         %__MODULE__{
+           meta_tab: meta_tab,
+           backend: backend,
+           generation_max_size: generation_max_size,
+           generation_created_at: generation_created_at,
+           generation_max_time: generation_max_time,
+           generation_allocated_memory: generation_allocated_memory
+         } = state
+       ) do
     [newest | _] = list(meta_tab)
     size = backend.info(newest, :size)
-    memory = backend.info(newest, :memory)
+    memory = backend.info(newest, :memory) * :erlang.system_info(:wordsize)
     now = System.monotonic_time(:millisecond)
-    if size > generation_max_size or memory > generation_allocated_memory or now - generation_created_at > generation_max_time do
+    # IO.puts("size: #{size} memory: #{memory} diff: #{now - generation_created_at}")
+    # IO.inspect(state, label: "state")
+    if size > generation_max_size or memory > generation_allocated_memory or
+         now - generation_created_at > generation_max_time do
       new_gen(state)
       %{state | generation_created_at: now}
     else
