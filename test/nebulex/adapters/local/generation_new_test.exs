@@ -83,33 +83,37 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
   describe "generation start timeout" do
     test "no sleep" do
       assert {:ok, _pid} =
-        LocalWithSizeLimit.start_link(
-          # 0 means every manual cleanup will trigger new generation
-          generation_start_timeout: 0
-        )
+               LocalWithSizeLimit.start_link(
+                 # 1 is very small and means every manual cleanup will trigger new generation
+                 generation_start_timeout: 1
+               )
+
       _ = cache_put(LocalWithSizeLimit, 1..3)
 
       assert 1 == generations_len(LocalWithSizeLimit)
 
+      :timer.sleep(2)
       Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
       assert 2 == generations_len(LocalWithSizeLimit)
 
       assert 3 == LocalWithSizeLimit.count_all()
 
+      :timer.sleep(2)
       Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
       assert 0 == LocalWithSizeLimit.count_all()
 
-      LocalWithSizeLimit.stop()
+      :ok = LocalWithSizeLimit.stop()
     end
 
     test "sleep" do
       assert {:ok, _pid} =
-        LocalWithSizeLimit.start_link(
-          generation_start_timeout: 50,
-          generation_cleanup_timeout: 5
-        )
+               LocalWithSizeLimit.start_link(
+                 generation_start_timeout: 50,
+                 generation_cleanup_timeout: 5
+               )
+
       _ = cache_put(LocalWithSizeLimit, 1..3)
 
       Generation.maybe_generation_cleanup(LocalWithSizeLimit)
@@ -126,79 +130,9 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
 
       assert 0 == LocalWithSizeLimit.count_all()
 
-      LocalWithSizeLimit.stop()
-
+      :ok = LocalWithSizeLimit.stop()
     end
   end
-
-  # describe "gc" do
-  #   setup_with_dynamic_cache(Cache, :gc_test,
-  #     backend: :shards,
-  #     gc_interval: 1000,
-  #     compressed: true
-  #   )
-
-  #   test "create generations", %{cache: cache, name: name} do
-  #     assert generations_len(name) == 1
-
-  #     :ok = Process.sleep(1020)
-  #     assert generations_len(name) == 2
-
-  #     assert cache.delete_all() == 0
-
-  #     :ok = Process.sleep(1020)
-  #     assert generations_len(name) == 2
-  #   end
-
-  #   test "create new generation and reset timeout", %{cache: cache, name: name} do
-  #     assert generations_len(name) == 1
-
-  #     :ok = Process.sleep(800)
-
-  #     cache.with_dynamic_cache(name, fn ->
-  #       cache.new_generation()
-  #     end)
-
-  #     assert generations_len(name) == 2
-
-  #     :ok = Process.sleep(500)
-  #     assert generations_len(name) == 2
-
-  #     :ok = Process.sleep(520)
-  #     assert generations_len(name) == 2
-  #   end
-
-  #   test "create new generation without reset timeout", %{cache: cache, name: name} do
-  #     assert generations_len(name) == 1
-
-  #     :ok = Process.sleep(800)
-
-  #     cache.with_dynamic_cache(name, fn ->
-  #       cache.new_generation(reset_timer: false)
-  #     end)
-
-  #     assert generations_len(name) == 2
-
-  #     :ok = Process.sleep(500)
-  #     assert generations_len(name) == 2
-  #   end
-
-  #   test "reset timer", %{cache: cache, name: name} do
-  #     assert generations_len(name) == 1
-
-  #     :ok = Process.sleep(800)
-
-  #     cache.with_dynamic_cache(name, fn ->
-  #       cache.reset_generation_timer()
-  #     end)
-
-  #     :ok = Process.sleep(220)
-  #     assert generations_len(name) == 1
-
-  #     :ok = Process.sleep(1000)
-  #     assert generations_len(name) == 2
-  #   end
-  # end
 
   describe "allocated memory" do
     test "cleanup is triggered when max generation size is reached" do
@@ -235,10 +169,7 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
     end
 
     test "cleanup while cache is being used" do
-      {:ok, _pid} =
-        LocalWithSizeLimit.start_link(
-          generation_max_size: 3
-        )
+      {:ok, _pid} = LocalWithSizeLimit.start_link(generation_max_size: 3)
 
       assert generations_len(LocalWithSizeLimit) == 1
 
@@ -333,6 +264,39 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
 
       # Stop the cache
       :ok = LocalWithSizeLimit.stop()
+    end
+  end
+
+  describe "disable gc" do
+    test "disable gc" do
+      {:ok, _pid} = LocalWithSizeLimit.start_link(generation_max_size: 3)
+
+      # Put some entries to exceed the max size
+      _ = cache_put(LocalWithSizeLimit, 1..4)
+
+      # Manually trigger cleanup
+      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+
+      assert generations_len(LocalWithSizeLimit) == 2
+
+      _ = cache_put(LocalWithSizeLimit, 5..8)
+
+      :ok = Nebulex.Adapters.Local.Generation.enable_gc(LocalWithSizeLimit, false)
+      :ok = Nebulex.Adapters.Local.Generation.enable_gc(LocalWithSizeLimit, false)
+
+      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+
+      assert 8 == LocalWithSizeLimit.count_all()
+
+      :ok = Nebulex.Adapters.Local.Generation.enable_gc(LocalWithSizeLimit, true)
+      :ok = Nebulex.Adapters.Local.Generation.enable_gc(LocalWithSizeLimit, true)
+
+      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+
+      assert 4 == LocalWithSizeLimit.count_all()
+
+      LocalWithSizeLimit.stop()
+
     end
   end
 

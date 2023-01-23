@@ -171,6 +171,19 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   @doc """
+  enable/disable gc. If already enabled/disabled, do nothing
+
+  ## Example
+      Nebulex.Adapters.Local.Generation.enable_gc(MyCache, false)
+
+      Nebulex.Adapters.Local.Generation.enable_gc(MyCache, true)
+  """
+  @spec enable_gc(server_ref, boolean()) :: :ok
+  def enable_gc(server_ref, enable) do
+    do_call(server_ref, {:enable_gc, enable})
+  end
+
+  @doc """
   Resets the timer for pushing new cache generations.
 
   ## Example
@@ -260,7 +273,9 @@ defmodule Nebulex.Adapters.Local.Generation do
     # Initial state
     state = struct(__MODULE__, parse_opts(opts))
 
-    old_strategy? = state.generation_max_size == nil and state.generation_allocated_memory == nil and state.generation_start_timeout == nil
+    old_strategy? =
+      state.generation_max_size == nil and state.generation_allocated_memory == nil and
+        state.generation_start_timeout == nil
 
     new_gen(state)
 
@@ -289,6 +304,7 @@ defmodule Nebulex.Adapters.Local.Generation do
             allocated_memory: state.generation_allocated_memory
         }
       end
+
     {:ok, state, {:continue, :attach_stats_handler}}
   end
 
@@ -396,6 +412,29 @@ defmodule Nebulex.Adapters.Local.Generation do
     {:reply, state, state}
   end
 
+  def handle_call(
+        {:enable_gc, enable},
+        _from,
+        %__MODULE__{
+          generation_cleanup_timeout: generation_cleanup_timeout,
+          generation_cleanup_ref: generation_cleanup_ref
+        } = state
+      ) do
+    generation_cleanup_ref =
+      cond do
+        enable and generation_cleanup_ref == nil ->
+          start_timer(generation_cleanup_timeout, nil, :generation_cleanup)
+
+        not enable and generation_cleanup_ref != nil ->
+          Process.cancel_timer(generation_cleanup_ref)
+          nil
+        true ->
+          generation_cleanup_ref
+      end
+
+    {:reply, :ok, %{state | generation_cleanup_ref: generation_cleanup_ref}}
+  end
+
   @impl true
   def handle_cast(:reset_timer, state) do
     {:noreply, %{state | gc_heartbeat_ref: maybe_reset_timer(true, state)}}
@@ -463,6 +502,7 @@ defmodule Nebulex.Adapters.Local.Generation do
          %__MODULE__{
            meta_tab: meta_tab,
            backend: backend,
+           generation_cleanup_ref: generation_cleanup_ref,
            generation_max_size: generation_max_size,
            generation_created_at: generation_created_at,
            generation_start_timeout: generation_start_timeout,
@@ -476,8 +516,8 @@ defmodule Nebulex.Adapters.Local.Generation do
     # IO.puts("size: #{size} memory: #{memory} diff: #{now - generation_created_at}")
     # IO.inspect(state, label: "state")
 
-    if size > generation_max_size or memory > generation_allocated_memory or
-         now - generation_created_at > generation_start_timeout do
+    if generation_cleanup_ref != nil and (size > generation_max_size or memory > generation_allocated_memory or
+         now - generation_created_at > generation_start_timeout) do
       new_gen(state)
       %{state | generation_created_at: now}
     else
