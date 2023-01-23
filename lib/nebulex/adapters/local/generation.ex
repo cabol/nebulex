@@ -289,7 +289,6 @@ defmodule Nebulex.Adapters.Local.Generation do
             allocated_memory: state.generation_allocated_memory
         }
       end
-
     {:ok, state, {:continue, :attach_stats_handler}}
   end
 
@@ -433,10 +432,11 @@ defmodule Nebulex.Adapters.Local.Generation do
   def handle_info(
         :generation_cleanup,
         %__MODULE__{
+          generation_cleanup_ref: generation_cleanup_ref,
           generation_cleanup_timeout: generation_cleanup_timeout
         } = state
       ) do
-    ref = start_timer(generation_cleanup_timeout, nil, :generation_cleanup)
+    ref = start_timer(generation_cleanup_timeout, generation_cleanup_ref, :generation_cleanup)
 
     state = maybe_generation_cleanup_impl(state)
 
@@ -475,6 +475,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     now = System.monotonic_time(:millisecond)
     # IO.puts("size: #{size} memory: #{memory} diff: #{now - generation_created_at}")
     # IO.inspect(state, label: "state")
+
     if size > generation_max_size or memory > generation_allocated_memory or
          now - generation_created_at > generation_max_time do
       new_gen(state)

@@ -183,30 +183,30 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
       :ok = LocalWithSizeLimit.stop()
     end
 
-    # test "cleanup while cache is being used" do
-    #   {:ok, _pid} =
-    #     LocalWithSizeLimit.start_link(
-    #       gc_interval: 3_600_000,
-    #       allocated_memory: 100,
-    #       gc_cleanup_min_timeout: 1000,
-    #       gc_cleanup_max_timeout: 3000
-    #     )
+    test "cleanup while cache is being used" do
+      {:ok, _pid} =
+        LocalWithSizeLimit.start_link(
+          generation_max_size: 3
+        )
 
-    #   assert generations_len(LocalWithSizeLimit) == 1
+      assert generations_len(LocalWithSizeLimit) == 1
 
-    #   tasks = for i <- 1..3, do: Task.async(fn -> task_fun(LocalWithSizeLimit, i) end)
+      tasks = for i <- 1..3, do: Task.async(fn -> task_fun(LocalWithSizeLimit, i) end)
 
-    #   for _ <- 1..100 do
-    #     :ok = Process.sleep(10)
+      for _ <- 1..100 do
+        :ok = Process.sleep(10)
 
-    #     LocalWithSizeLimit
-    #     |> Generation.server()
-    #     |> send(:cleanup)
-    #   end
+        LocalWithSizeLimit
+        |> Generation.server()
+        |> send(:generation_cleanup)
+      end
 
-    #   for task <- tasks, do: Task.shutdown(task)
-    #   :ok = LocalWithSizeLimit.stop()
-    # end
+      # at least one cleanup has happened, then total length will be 2
+      assert generations_len(LocalWithSizeLimit) == 2
+
+      for task <- tasks, do: Task.shutdown(task)
+      :ok = LocalWithSizeLimit.stop()
+    end
   end
 
   describe "max size" do
@@ -286,15 +286,6 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
   end
 
   # ## Private Functions
-
-  # defp check_cache_size(cache) do
-  #   :cleanup =
-  #     cache
-  #     |> Generation.server()
-  #     |> send(:cleanup)
-
-  #   :ok = Process.sleep(1000)
-  # end
 
   defp assert_mem_size(greater_or_less) do
     {mem_size, max_size} = Generation.memory_info(LocalWithSizeLimit)
