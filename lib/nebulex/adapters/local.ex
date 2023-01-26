@@ -471,9 +471,10 @@ defmodule Nebulex.Adapters.Local do
     adapter_meta = %{adapter_meta | telemetry: Map.get(adapter_meta, :in_span?, false)}
 
     Enum.reduce(keys, %{}, fn key, acc ->
-      if obj = get(adapter_meta, key, []),
-        do: Map.put(acc, key, obj),
-        else: acc
+      case get(adapter_meta, key, []) do
+        nil -> acc
+        obj -> Map.put(acc, key, obj)
+      end
     end)
   end
 
