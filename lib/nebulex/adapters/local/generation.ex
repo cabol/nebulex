@@ -51,6 +51,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   # State
   defstruct [
     :cache,
+    :name,
     :telemetry,
     :telemetry_prefix,
     :meta_tab,
@@ -402,6 +403,8 @@ defmodule Nebulex.Adapters.Local.Generation do
   defp maybe_cleanup(
          info,
          %__MODULE__{
+           cache: cache,
+           name: name,
            gc_cleanup_ref: cleanup_ref,
            gc_cleanup_min_timeout: min_timeout,
            gc_cleanup_max_timeout: max_timeout,
@@ -413,6 +416,9 @@ defmodule Nebulex.Adapters.Local.Generation do
       {size, max_size} when size >= max_size ->
         # Create a new generation
         :ok = new_gen(state)
+
+        # Purge expired entries
+        _ = cache.delete_all(:expired, dynamic_cache: name)
 
         # Reset the heartbeat timer
         heartbeat_ref = start_timer(gc_interval, heartbeat_ref)
