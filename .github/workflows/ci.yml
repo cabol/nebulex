@@ -32,9 +32,6 @@ jobs:
             otp: 23.x
             os: 'ubuntu-20.04'
             inch-report: true
-          - elixir: 1.9.x
-            otp: 22.x
-            os: 'ubuntu-20.04'
 
     env:
       GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
@@ -107,7 +104,7 @@ jobs:
         id: plt-cache
         with:
           path: priv/plts
-          key: ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plt-v1
+          key: ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plt-v3-1
         if: ${{ matrix.dialyzer }}
 
       - name: Create PLTs

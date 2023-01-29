@@ -1,9 +1,10 @@
-# Cache Usage Patterns via Nebulex.Caching
+# Cache Usage Patterns via Nebulex.Caching.Decorators
 
 There are several common access patterns when using a cache. **Nebulex**
-supports most of these patterns by means of [Nebulex.Caching][nbx_caching].
+supports most of these patterns by means of
+[Nebulex.Caching.Decorators][nbx_caching].
 
-[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
+[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.Decorators.html
 
 > Most of the following documentation about caching patterns it based on
   [EHCache Docs][EHCache]

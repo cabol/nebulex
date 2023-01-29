@@ -54,6 +54,7 @@ defmodule Nebulex.Cluster do
 
   defp allow_boot(host) do
     {:ok, ipv4} = :inet.parse_ipv4_address(host)
+
     :erl_boot_server.add_slave(ipv4)
   end
 

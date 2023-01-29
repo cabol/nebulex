@@ -9,14 +9,18 @@ defmodule Nebulex.Cache.Supervisor do
   @doc """
   Starts the cache manager supervisor.
   """
+  @spec start_link(module, atom, module, keyword) :: Supervisor.on_start()
   def start_link(cache, otp_app, adapter, opts) do
-    sup_opts = if name = Keyword.get(opts, :name, cache), do: [name: name], else: []
-    Supervisor.start_link(__MODULE__, {cache, otp_app, adapter, opts}, sup_opts)
+    name = Keyword.get(opts, :name, cache)
+    sup_opts = if name, do: [name: name], else: []
+
+    Supervisor.start_link(__MODULE__, {name, cache, otp_app, adapter, opts}, sup_opts)
   end
 
   @doc """
   Retrieves the runtime configuration.
   """
+  @spec runtime_config(module, atom, keyword) :: {:ok, keyword} | :ignore
   def runtime_config(cache, otp_app, opts) do
     config =
       otp_app
@@ -40,6 +44,7 @@ defmodule Nebulex.Cache.Supervisor do
   @doc """
   Retrieves the compile time configuration.
   """
+  @spec compile_config(keyword) :: {atom, module, [module]}
   def compile_config(opts) do
     otp_app = opts[:otp_app] || raise ArgumentError, "expected otp_app: to be given as argument"
     adapter = opts[:adapter] || raise ArgumentError, "expected adapter: to be given as argument"
@@ -57,33 +62,46 @@ defmodule Nebulex.Cache.Supervisor do
   ## Supervisor Callbacks
 
   @impl true
-  def init({cache, otp_app, adapter, opts}) do
+  def init({name, cache, otp_app, adapter, opts}) do
+    # Normalize name to atom, ignore via/global names
+    name = if is_atom(name), do: name, else: nil
+
     case runtime_config(cache, otp_app, opts) do
       {:ok, opts} ->
-        Telemetry.execute(
-          [:nebulex, :cache, :init],
-          %{system_time: System.system_time()},
-          %{cache: cache, opts: opts}
-        )
+        # Dispatch Telemetry event notifying the cache is started
+        :ok =
+          Telemetry.execute(
+            [:nebulex, :cache, :init],
+            %{system_time: System.system_time()},
+            %{name: name, cache: cache, opts: opts}
+          )
 
+        # Init the adapter
         {:ok, child, meta} = adapter.init([cache: cache] ++ opts)
-        meta = Map.put(meta, :cache, cache)
-        child_spec = wrap_child_spec(child, [adapter, meta])
+
+        # Build child spec
+        child_spec = wrap_child_spec(child, [name, cache, adapter, meta])
+
+        # Init the cache supervisor
         Supervisor.init([child_spec], strategy: :one_for_one, max_restarts: 0)
 
-      other ->
-        other
+      :ignore ->
+        :ignore
     end
   end
 
   ## Helpers
 
   @doc false
-  def start_child({mod, fun, args}, adapter, meta) do
+  def start_child({mod, fun, args}, name, cache, adapter, meta) do
     case apply(mod, fun, args) do
       {:ok, pid} ->
-        meta = Map.put(meta, :pid, pid)
-        :ok = Nebulex.Cache.Registry.register(self(), {adapter, meta})
+        # Add the pid and the adapter to the meta
+        meta = Map.merge(meta, %{pid: pid, cache: cache, adapter: adapter})
+
+        # Register the started cache's pid
+        :ok = Nebulex.Cache.Registry.register(self(), name, meta)
+
         {:ok, pid}
 
       other ->

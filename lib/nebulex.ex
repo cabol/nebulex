@@ -63,6 +63,6 @@ defmodule Nebulex do
 
   ## Declarative annotation-based caching
 
-  See [Nebulex.Caching](http://hexdocs.pm/nebulex/Nebulex.Caching.html).
+  See [Nebulex.Caching.Decorators](http://hexdocs.pm/nebulex/Nebulex.Caching.Decorators.html).
   """
 end

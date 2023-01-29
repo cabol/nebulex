@@ -28,7 +28,7 @@ for more information.
 [cachex]: https://github.com/whitfin/cachex
 [redis]: https://redis.io/
 [memcached]: https://memcached.org/
-[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
+[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.Decorators.html
 [cache_patterns]: http://hexdocs.pm/nebulex/cache-usage-patterns.html
 [cache_topologies]: https://docs.oracle.com/middleware/1221/coherence/develop-applications/cache_intro.htm
 
@@ -47,8 +47,8 @@ Partitioned | [Nebulex.Adapters.Partitioned][pa] | Built-In
 Replicated | [Nebulex.Adapters.Replicated][ra] | Built-In
 Multilevel | [Nebulex.Adapters.Multilevel][ma] | Built-In
 Nil (special adapter that disables the cache) | [Nebulex.Adapters.Nil][nil] | Built-In
-Cachex | Nebulex.Adapters.Cachex | [nebulex_adapters_cachex][nbx_cachex]
 Redis | NebulexRedisAdapter | [nebulex_redis_adapter][nbx_redis]
+Cachex | Nebulex.Adapters.Cachex | [nebulex_adapters_cachex][nbx_cachex]
 Distributed with Horde | Nebulex.Adapters.Horde | [nebulex_adapters_horde][nbx_horde]
 Multilevel with cluster broadcasting | NebulexLocalMultilevelAdapter | [nebulex_local_multilevel_adapter][nbx_local_multilevel]
 
@@ -57,11 +57,10 @@ Multilevel with cluster broadcasting | NebulexLocalMultilevelAdapter | [nebulex_
 [ra]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Replicated.html
 [ma]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Multilevel.html
 [nil]: http://hexdocs.pm/nebulex/Nebulex.Adapters.Nil.html
-[nbx_cachex]: https://github.com/cabol/nebulex_adapters_cachex
 [nbx_redis]: https://github.com/cabol/nebulex_redis_adapter
+[nbx_cachex]: https://github.com/cabol/nebulex_adapters_cachex
 [nbx_horde]: https://github.com/eliasdarruda/nebulex_adapters_horde
 [nbx_local_multilevel]: https://github.com/slab/nebulex_local_multilevel_adapter
-
 
 For example, if you want to use a built-in cache, add to your `mix.exs` file:
 

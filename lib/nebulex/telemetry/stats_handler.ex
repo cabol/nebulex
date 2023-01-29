@@ -26,26 +26,30 @@ defmodule Nebulex.Telemetry.StatsHandler do
 
   defp update_stats(%{
          function_name: action,
-         result: :"$expired",
+         result: {:error, %Nebulex.KeyError{reason: :expired}},
          adapter_meta: %{stats_counter: ref}
        })
-       when action in [:get, :take, :ttl] do
+       when action in [:fetch, :take, :ttl] do
     :ok = Stats.incr(ref, :misses)
     :ok = Stats.incr(ref, :evictions)
     :ok = Stats.incr(ref, :expirations)
   end
 
-  defp update_stats(%{function_name: action, result: nil, adapter_meta: %{stats_counter: ref}})
-       when action in [:get, :take, :ttl] do
+  defp update_stats(%{
+         function_name: action,
+         result: {:error, %Nebulex.KeyError{reason: :not_found}},
+         adapter_meta: %{stats_counter: ref}
+       })
+       when action in [:fetch, :take, :ttl] do
     :ok = Stats.incr(ref, :misses)
   end
 
-  defp update_stats(%{function_name: action, result: _, adapter_meta: %{stats_counter: ref}})
-       when action in [:get, :ttl] do
+  defp update_stats(%{function_name: action, result: {:ok, _}, adapter_meta: %{stats_counter: ref}})
+       when action in [:fetch, :ttl] do
     :ok = Stats.incr(ref, :hits)
   end
 
-  defp update_stats(%{function_name: :take, result: _, adapter_meta: %{stats_counter: ref}}) do
+  defp update_stats(%{function_name: :take, result: {:ok, _}, adapter_meta: %{stats_counter: ref}}) do
     :ok = Stats.incr(ref, :hits)
     :ok = Stats.incr(ref, :evictions)
   end
@@ -53,39 +57,47 @@ defmodule Nebulex.Telemetry.StatsHandler do
   defp update_stats(%{
          function_name: :put,
          args: [_, _, _, :replace, _],
-         result: true,
+         result: {:ok, true},
          adapter_meta: %{stats_counter: ref}
        }) do
     :ok = Stats.incr(ref, :updates)
   end
 
-  defp update_stats(%{function_name: :put, result: true, adapter_meta: %{stats_counter: ref}}) do
+  defp update_stats(%{function_name: :put, result: {:ok, true}, adapter_meta: %{stats_counter: ref}}) do
     :ok = Stats.incr(ref, :writes)
   end
 
   defp update_stats(%{
          function_name: :put_all,
-         result: true,
+         result: {:ok, true},
          args: [entries | _],
          adapter_meta: %{stats_counter: ref}
        }) do
     :ok = Stats.incr(ref, :writes, Enum.count(entries))
   end
 
-  defp update_stats(%{function_name: :delete, result: _, adapter_meta: %{stats_counter: ref}}) do
+  defp update_stats(%{
+         function_name: :delete,
+         result: :ok,
+         adapter_meta: %{stats_counter: ref}
+       }) do
     :ok = Stats.incr(ref, :evictions)
   end
 
   defp update_stats(%{
          function_name: :execute,
          args: [:delete_all | _],
-         result: result,
+         result: {:ok, result},
          adapter_meta: %{stats_counter: ref}
        }) do
     :ok = Stats.incr(ref, :evictions, result)
   end
 
-  defp update_stats(%{function_name: action, result: true, adapter_meta: %{stats_counter: ref}})
+  defp update_stats(%{
+         function_name: action,
+         result: {:ok, true},
+         adapter_meta: %{stats_counter: ref}
+       })
        when action in [:expire, :touch] do
     :ok = Stats.incr(ref, :updates)
   end
@@ -93,7 +105,7 @@ defmodule Nebulex.Telemetry.StatsHandler do
   defp update_stats(%{
          function_name: :update_counter,
          args: [_, amount, _, default, _],
-         result: result,
+         result: {:ok, result},
          adapter_meta: %{stats_counter: ref}
        }) do
     offset = if amount >= 0, do: -1, else: 1

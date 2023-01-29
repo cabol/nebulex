@@ -55,7 +55,7 @@ makes all its dependencies as optional. For example:
   * If you want to use an external adapter (e.g: Cachex or Redis adapter), you
     have to add the adapter dependency too.
 
-[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
+[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.Decorators.html
 [telemetry]: http://hexdocs.pm/nebulex/telemetry.html
 
 To install these dependencies, we will run this command:
@@ -672,5 +672,5 @@ To learn more about how multilevel-cache works, please check
 
 ## Next
 
- * [Cache Usage Patterns via Nebulex.Caching](http://hexdocs.pm/nebulex/cache-usage-patterns.html) -
-   Annotations-based DSL to implement different cache usage patterns.
+ * [Cache Usage Patterns via Nebulex.Caching.Decorators](http://hexdocs.pm/nebulex/cache-usage-patterns.html)
+   - Annotations-based DSL to implement different cache usage patterns.

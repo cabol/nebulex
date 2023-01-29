@@ -6,7 +6,7 @@ defmodule Nebulex.Adapters.Supervisor do
   Builds a supervisor spec with the given `options` for wrapping up the
   adapter's children.
   """
-  @spec child_spec(Keyword.t()) :: Supervisor.child_spec()
+  @spec child_spec(keyword) :: Supervisor.child_spec()
   def child_spec(options) do
     {children, options} = Keyword.pop(options, :children, [])
 

@@ -1,3 +1,14 @@
+# Mocks
+[
+  Nebulex.TestCache.Multilevel.L1,
+  Nebulex.TestCache.StatsCache.L1,
+  Nebulex.Cache.Registry,
+  Nebulex.Cache.Cluster,
+  Nebulex.RPC,
+  Mix.Project
+]
+|> Enum.each(&Mimic.copy/1)
+
 # Start Telemetry
 _ = Application.start(:telemetry)
 

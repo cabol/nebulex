@@ -15,26 +15,36 @@ defmodule Nebulex.Adapter.Stats do
   """
 
   @doc """
-  Returns `Nebulex.Stats.t()` with the current stats values.
+  Returns current stats values.
 
-  If the stats are disabled for the cache, then `nil` is returned.
+  This function returns:
+
+    * `{:ok, Nebulex.Stats.t()}` - stats are enabled and available
+      for the cache.
+
+    * `{:ok, nil}` - the stats are disabled for the cache.
+
+    * `{:error, reason}` - an error occurred while executing the command.
 
   The adapter may also include additional custom measurements,
   as well as metadata.
 
-  See `c:Nebulex.Cache.stats/0`.
+  See `c:Nebulex.Cache.stats/1`.
   """
-  @callback stats(Nebulex.Adapter.adapter_meta()) :: Nebulex.Stats.t() | nil
+  @callback stats(Nebulex.Adapter.adapter_meta()) ::
+              Nebulex.Cache.ok_error_tuple(Nebulex.Stats.t() | nil)
 
   @doc false
   defmacro __using__(_opts) do
     quote do
       @behaviour Nebulex.Adapter.Stats
 
+      import Nebulex.Helpers
+
       @impl true
       def stats(adapter_meta) do
         if counter_ref = adapter_meta[:stats_counter] do
-          %Nebulex.Stats{
+          stats = %Nebulex.Stats{
             measurements: %{
               hits: :counters.get(counter_ref, 1),
               misses: :counters.get(counter_ref, 2),
@@ -47,14 +57,17 @@ defmodule Nebulex.Adapter.Stats do
               cache: adapter_meta[:name] || adapter_meta[:cache]
             }
           }
+
+          {:ok, stats}
+        else
+          wrap_error Nebulex.Error,
+            reason: {:stats_error, adapter_meta[:name] || adapter_meta[:cache]}
         end
       end
 
       defoverridable stats: 1
     end
   end
-
-  import Nebulex.Helpers
 
   @doc """
   Initializes the Erlang's counter to be used by the adapter. See the module
@@ -73,9 +86,9 @@ defmodule Nebulex.Adapter.Stats do
 
   See adapters documentation for more information about stats implementation.
   """
-  @spec init(Keyword.t()) :: :counters.counters_ref() | nil
+  @spec init(keyword) :: :counters.counters_ref() | nil
   def init(opts) do
-    case get_boolean_option(opts, :stats, false) do
+    case Keyword.get(opts, :stats, false) do
       true -> :counters.new(6, [:write_concurrency])
       false -> nil
     end

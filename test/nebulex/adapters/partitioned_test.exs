@@ -1,8 +1,9 @@
 defmodule Nebulex.Adapters.PartitionedTest do
   use Nebulex.NodeCase
+
+  # Inherit tests
   use Nebulex.CacheTest
 
-  import Nebulex.CacheCase
   import Nebulex.Helpers
 
   alias Nebulex.Adapter
@@ -11,8 +12,10 @@ defmodule Nebulex.Adapters.PartitionedTest do
   @primary :"primary@127.0.0.1"
   @cache_name :partitioned_cache
 
-  # Set config
-  :ok = Application.put_env(:nebulex, Partitioned, primary: [backend: :shards])
+  setup_all do
+    # Set config
+    :ok = Application.put_env(:nebulex, Partitioned, primary: [backend: :shards])
+  end
 
   setup do
     cluster = :lists.usort([@primary | Application.get_env(:nebulex, :nodes, [])])
@@ -31,17 +34,25 @@ defmodule Nebulex.Adapters.PartitionedTest do
 
     on_exit(fn ->
       _ = Partitioned.put_dynamic_cache(default_dynamic_cache)
+
       :ok = Process.sleep(100)
+
       stop_caches(node_pid_list)
     end)
 
-    {:ok, cache: Partitioned, name: @cache_name, cluster: cluster}
+    {:ok, cache: Partitioned, name: @cache_name, cluster: cluster, on_error: &assert_query_error/1}
+  end
+
+  defp assert_query_error(%Nebulex.Error{reason: {:rpc_multicall_error, errors}}) do
+    for {_node, {:error, reason}} <- errors do
+      assert %Nebulex.QueryError{} = reason
+    end
   end
 
   describe "c:init/1" do
     test "initializes the primary store metadata" do
-      Adapter.with_meta(PartitionedCache.Primary, fn adapter, meta ->
-        assert adapter == Nebulex.Adapters.Local
+      Adapter.with_meta(PartitionedCache.Primary, fn meta ->
+        assert meta.adapter == Nebulex.Adapters.Local
         assert meta.backend == :shards
       end)
     end
@@ -86,7 +97,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
                  keyslot: "invalid"
                )
 
-      assert Regex.match?(~r"expected keyslot: to be an atom, got: \"invalid\"", msg)
+      assert Regex.match?(~r/invalid value for :keyslot/, msg)
     end
   end
 
@@ -104,27 +115,27 @@ defmodule Nebulex.Adapters.PartitionedTest do
       end
 
       test_with_dynamic_cache(Partitioned, [name: :custom_keyslot, keyslot: Keyslot], fn ->
-        refute Partitioned.get("foo")
+        refute Partitioned.get!("foo")
         assert Partitioned.put("foo", "bar") == :ok
-        assert Partitioned.get("foo") == "bar"
+        assert Partitioned.get!("foo") == "bar"
       end)
     end
 
     test "get_and_update" do
-      assert Partitioned.get_and_update(1, &Partitioned.get_and_update_fun/1) == {nil, 1}
-      assert Partitioned.get_and_update(1, &Partitioned.get_and_update_fun/1) == {1, 2}
-      assert Partitioned.get_and_update(1, &Partitioned.get_and_update_fun/1) == {2, 4}
+      assert Partitioned.get_and_update!(1, &Partitioned.get_and_update_fun/1) == {nil, 1}
+      assert Partitioned.get_and_update!(1, &Partitioned.get_and_update_fun/1) == {1, 2}
+      assert Partitioned.get_and_update!(1, &Partitioned.get_and_update_fun/1) == {2, 4}
 
       assert_raise ArgumentError, fn ->
-        Partitioned.get_and_update(1, &Partitioned.get_and_update_bad_fun/1)
+        Partitioned.get_and_update!(1, &Partitioned.get_and_update_bad_fun/1)
       end
     end
 
     test "incr raises when the counter is not an integer" do
       :ok = Partitioned.put(:counter, "string")
 
-      assert_raise ArgumentError, fn ->
-        Partitioned.incr(:counter, 10)
+      assert_raise Nebulex.Error, ~r"RPC call failed on node", fn ->
+        Partitioned.incr!(:counter, 10)
       end
     end
   end
@@ -137,11 +148,13 @@ defmodule Nebulex.Adapters.PartitionedTest do
 
       Partitioned.with_dynamic_cache(name, fn ->
         :ok = Partitioned.leave_cluster()
+
         assert Partitioned.nodes() == cluster -- [node()]
       end)
 
       Partitioned.with_dynamic_cache(name, fn ->
         :ok = Partitioned.join_cluster()
+
         assert Partitioned.nodes() == cluster
       end)
     end
@@ -150,7 +163,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
       assert Partitioned.nodes() == cluster
 
       assert Partitioned.put(1, 1) == :ok
-      assert Partitioned.get(1) == 1
+      assert Partitioned.get!(1) == 1
 
       node = teardown_cache(1)
 
@@ -158,17 +171,18 @@ defmodule Nebulex.Adapters.PartitionedTest do
         assert Partitioned.nodes() == cluster -- [node]
       end)
 
-      refute Partitioned.get(1)
+      refute Partitioned.get!(1)
 
       assert :ok == Partitioned.put_all([{4, 44}, {2, 2}, {1, 1}])
 
-      assert Partitioned.get(4) == 44
-      assert Partitioned.get(2) == 2
-      assert Partitioned.get(1) == 1
+      assert Partitioned.get!(4) == 44
+      assert Partitioned.get!(2) == 2
+      assert Partitioned.get!(1) == 1
     end
 
-    test "bootstrap leaves cache from the cluster when terminated and then rejoins when restarted",
-         %{name: name} do
+    test "cache leaves the cluster when terminated and then rejoins when restarted", %{
+      name: name
+    } do
       prefix = [:nebulex, :test_cache, :partitioned, :bootstrap]
       started = prefix ++ [:started]
       stopped = prefix ++ [:stopped]
@@ -206,50 +220,48 @@ defmodule Nebulex.Adapters.PartitionedTest do
   describe "rpc" do
     test "timeout error" do
       assert Partitioned.put_all(for(x <- 1..100_000, do: {x, x}), timeout: 60_000) == :ok
-      assert Partitioned.get(1, timeout: 1000) == 1
+      assert Partitioned.get!(1, timeout: 1000) == 1
 
-      msg = ~r"RPC error while executing action :all\n\nSuccessful responses:"
+      assert_raise Nebulex.Error, ~r"RPC multicall failed with errors", fn ->
+        Partitioned.all!(nil, timeout: 0)
+      end
 
-      assert_raise Nebulex.RPCMultiCallError, msg, fn ->
-        Partitioned.all(nil, timeout: 1)
+      assert {:error, %Nebulex.Error{reason: {:rpc_multicall_error, errors}}} =
+               Partitioned.all(nil, timeout: 0)
+
+      for {_node, error} <- errors do
+        assert error == {:error, {:erpc, :timeout}}
       end
     end
 
     test "runtime error" do
       _ = Process.flag(:trap_exit, true)
 
-      assert [1, 2] |> PartitionedMock.get_all(timeout: 10) |> map_size() == 0
+      assert {:error, %Nebulex.Error{reason: {:rpc_multicall_error, errors}}} =
+               PartitionedMock.get_all([1, 2], timeout: 10)
 
-      assert PartitionedMock.put_all(a: 1, b: 2) == :ok
-
-      assert [1, 2] |> PartitionedMock.get_all() |> map_size() == 0
-
-      assert_raise ArgumentError, fn ->
-        PartitionedMock.get(1)
+      for {_node, {error, _call}} <- errors do
+        assert error == {:error, {:erpc, :timeout}}
       end
 
-      msg = ~r"RPC error while executing action :count_all\n\nSuccessful responses:"
+      assert {:error, %Nebulex.Error{reason: {:rpc_multicall_error, errors}}} =
+               PartitionedMock.put_all(a: 1, b: 2)
 
-      assert_raise Nebulex.RPCMultiCallError, msg, fn ->
-        PartitionedMock.count_all()
+      for {_node, {error, _call}} <- errors do
+        assert error == {:exit, {:signal, :normal}}
       end
-    end
-  end
 
-  if Code.ensure_loaded?(:erpc) do
-    describe ":erpc" do
-      test "timeout error" do
-        assert Partitioned.put(1, 1) == :ok
-        assert Partitioned.get(1, timeout: 1000) == 1
+      assert {:error, %Nebulex.Error{reason: {:rpc_error, {node, {:EXIT, {reason, _}}}}}} =
+               PartitionedMock.get(1)
 
-        node = "#{inspect(Partitioned.get_node(1))}"
-        reason = "#{inspect({:erpc, :timeout})}"
+      assert node == :"node3@127.0.0.1"
+      assert reason == %ArgumentError{message: "Error"}
 
-        msg = ~r"The RPC operation failed on node #{node} with reason:\n\n#{reason}"
+      assert {:error, %Nebulex.Error{reason: {:rpc_multicall_error, errors}}} =
+               PartitionedMock.count_all()
 
-        assert_raise Nebulex.RPCError, msg, fn ->
-          Partitioned.get(1, timeout: 0)
-        end
+      for {_node, error} <- errors do
+        assert error == {:exit, {:signal, :normal}}
       end
     end
   end
@@ -260,6 +272,7 @@ defmodule Nebulex.Adapters.PartitionedTest do
     node = Partitioned.get_node(key)
     remote_pid = :rpc.call(node, Process, :whereis, [@cache_name])
     :ok = :rpc.call(node, Supervisor, :stop, [remote_pid])
+
     node
   end
 end

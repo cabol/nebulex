@@ -4,7 +4,7 @@ defmodule Nebulex.Helpers do
 
   ## API
 
-  @spec get_option(Keyword.t(), atom, binary, (any -> boolean), term) :: term
+  @spec get_option(keyword, atom, binary, (any -> boolean), term) :: term
   def get_option(opts, key, expected, valid?, default \\ nil)
       when is_list(opts) and is_atom(key) do
     value = Keyword.get(opts, key, default)
@@ -13,18 +13,6 @@ defmodule Nebulex.Helpers do
       value
     else
       raise ArgumentError, "expected #{key}: to be #{expected}, got: #{inspect(value)}"
-    end
-  end
-
-  @spec get_boolean_option(Keyword.t(), atom, boolean) :: term
-  def get_boolean_option(opts, key, default \\ false)
-      when is_list(opts) and is_atom(key) and is_boolean(default) do
-    value = Keyword.get(opts, key, default)
-
-    if is_boolean(value) do
-      value
-    else
-      raise ArgumentError, "expected #{key}: to be boolean, got: #{inspect(value)}"
     end
   end
 
@@ -57,4 +45,35 @@ defmodule Nebulex.Helpers do
     |> Enum.map(&Macro.camelize("#{&1}"))
     |> Module.concat()
   end
+
+  @doc false
+  defmacro unwrap_or_raise(call) do
+    quote do
+      case unquote(call) do
+        {:ok, value} -> value
+        {:error, reason} when is_exception(reason) -> raise reason
+        {:error, reason} -> raise Nebulex.Error, reason: reason
+        other -> other
+      end
+    end
+  end
+
+  # FIXME: this is because coveralls does not mark this as covered
+  # coveralls-ignore-start
+
+  @doc false
+  defmacro wrap_ok(call) do
+    quote do
+      {:ok, unquote(call)}
+    end
+  end
+
+  @doc false
+  defmacro wrap_error(exception, opts) do
+    quote do
+      {:error, unquote(exception).exception(unquote(opts))}
+    end
+  end
+
+  # coveralls-ignore-stop
 end

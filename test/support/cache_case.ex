@@ -1,6 +1,8 @@
 defmodule Nebulex.CacheCase do
   @moduledoc false
 
+  use ExUnit.CaseTemplate
+
   alias Nebulex.Telemetry
 
   @doc false
@@ -44,6 +46,7 @@ defmodule Nebulex.CacheCase do
         on_exit(fn ->
           try do
             :ok = Process.sleep(20)
+
             if Process.alive?(pid), do: Supervisor.stop(pid, :normal, 5000)
           catch
             :exit, _ -> :noop
@@ -65,11 +68,13 @@ defmodule Nebulex.CacheCase do
 
         default_dynamic_cache = cache.get_dynamic_cache()
         {:ok, pid} = cache.start_link([name: name] ++ opts)
+
         _ = cache.put_dynamic_cache(name)
 
         on_exit(fn ->
           try do
             :ok = Process.sleep(20)
+
             if Process.alive?(pid), do: Supervisor.stop(pid, :normal, 5000)
           catch
             :exit, _ -> :noop
@@ -86,13 +91,16 @@ defmodule Nebulex.CacheCase do
   @doc false
   def test_with_dynamic_cache(cache, opts \\ [], callback) do
     default_dynamic_cache = cache.get_dynamic_cache()
+
     {:ok, pid} = cache.start_link(opts)
 
     try do
       _ = cache.put_dynamic_cache(pid)
+
       callback.()
     after
       _ = cache.put_dynamic_cache(default_dynamic_cache)
+
       Supervisor.stop(pid)
     end
   end
@@ -107,6 +115,7 @@ defmodule Nebulex.CacheCase do
   rescue
     _ ->
       :ok = Process.sleep(delay)
+
       wait_until(retries - 1, delay, fun)
   end
 
@@ -114,7 +123,9 @@ defmodule Nebulex.CacheCase do
   def cache_put(cache, lst, fun \\ & &1, opts \\ []) do
     for key <- lst do
       value = fun.(key)
+
       :ok = cache.put(key, value, opts)
+
       value
     end
   end
@@ -137,5 +148,19 @@ defmodule Nebulex.CacheCase do
   @doc false
   def handle_event(event, measurements, metadata, %{pid: pid}) do
     send(pid, {event, measurements, metadata})
+  end
+
+  @doc false
+  def assert_error_module(ctx, error_module) do
+    fun = Map.get(ctx, :error_module, fn m -> assert m == Nebulex.Error end)
+
+    fun.(error_module)
+  end
+
+  @doc false
+  def assert_error_reason(ctx, error_reason) do
+    fun = Map.get(ctx, :error_reason, fn r -> assert r == :error end)
+
+    fun.(error_reason)
   end
 end

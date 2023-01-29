@@ -4,6 +4,7 @@
   },
 
   "skip_files": [
+    "lib/nebulex/cache/options.ex",
     "test/support/*",
     "test/dialyzer/*"
   ]

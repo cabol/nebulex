@@ -14,14 +14,17 @@ defmodule Nebulex.Adapter do
   @typedoc """
   The metadata returned by the adapter `c:init/1`.
 
-  It must be a map and Nebulex itself will always inject two keys into
-  the meta:
+  It must be a map and Nebulex itself will always inject
+  the following keys into the meta:
 
     * `:cache` - The cache module.
-    * `:pid` - The PID returned by the child spec returned in `c:init/1`
+    * `:pid` - The PID returned by the child spec returned in `c:init/1`.
+    * `:adapter` - The defined cache adapter.
 
   """
   @type adapter_meta :: metadata
+
+  ## Callbacks
 
   @doc """
   The callback invoked in case the adapter needs to inject code.
@@ -31,7 +34,28 @@ defmodule Nebulex.Adapter do
   @doc """
   Initializes the adapter supervision tree by returning the children.
   """
-  @callback init(config :: Keyword.t()) :: {:ok, :supervisor.child_spec(), adapter_meta}
+  @callback init(config :: keyword) :: {:ok, :supervisor.child_spec(), adapter_meta}
+
+  # Define optional callbacks
+  @optional_callbacks __before_compile__: 1
+
+  ## API
+
+  # Inline common instructions
+  @compile {:inline, lookup_meta: 1}
+
+  @doc """
+  Returns the adapter metadata from its `c:init/1` callback.
+
+  It expects a process name of the cache. The name is either
+  an atom or a PID. For a given cache, you often want to call
+  this function based on the dynamic cache:
+
+      Nebulex.Adapter.lookup_meta(cache.get_dynamic_cache())
+
+  """
+  @spec lookup_meta(atom | pid) :: {:ok, adapter_meta} | {:error, Nebulex.Error.t()}
+  defdelegate lookup_meta(name_or_pid), to: Nebulex.Cache.Registry, as: :lookup
 
   @doc """
   Executes the function `fun` passing as parameters the adapter and metadata
@@ -39,10 +63,11 @@ defmodule Nebulex.Adapter do
 
   It expects a name or a PID representing the cache.
   """
-  @spec with_meta(atom | pid, (module, adapter_meta -> term)) :: term
+  @spec with_meta(atom | pid, (adapter_meta -> term)) :: term | {:error, Nebulex.Error.t()}
   def with_meta(name_or_pid, fun) do
-    {adapter, adapter_meta} = Nebulex.Cache.Registry.lookup(name_or_pid)
-    fun.(adapter, adapter_meta)
+    with {:ok, adapter_meta} <- lookup_meta(name_or_pid) do
+      fun.(adapter_meta)
+    end
   end
 
   # FIXME: ExCoveralls does not mark most of this section as covered

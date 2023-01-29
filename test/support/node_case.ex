@@ -10,6 +10,7 @@ defmodule Nebulex.NodeCase do
     quote do
       use ExUnit.Case, async: true
       import unquote(__MODULE__)
+
       @moduletag :clustered
 
       @timeout unquote(@timeout)
@@ -19,6 +20,7 @@ defmodule Nebulex.NodeCase do
   def start_caches(nodes, caches) do
     for node <- nodes, {cache, opts} <- caches do
       {:ok, pid} = start_cache(node, cache, opts)
+
       {node, cache, pid}
     end
   end

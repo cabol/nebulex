@@ -52,28 +52,43 @@ defmodule Nebulex.Adapter.Transaction do
   @doc """
   Runs the given function inside a transaction.
 
-  A successful transaction returns the value returned by the function.
+  A successful transaction returns the value returned by the function wrapped
+  in a tuple as `{:ok, value}`.
+
+  In case the transaction cannot be executed, then `{:error, reason}` is
+  returned.
+
+  If an unhandled error/exception occurs, the error will bubble up from the
+  transaction function.
+
+  If `transaction/2` is called inside another transaction, the function is
+  simply executed without wrapping the new transaction call in any way.
 
   See `c:Nebulex.Cache.transaction/2`.
   """
   @callback transaction(Nebulex.Adapter.adapter_meta(), Nebulex.Cache.opts(), fun) :: any
 
   @doc """
-  Returns `true` if the given process is inside a transaction.
+  Returns `{:ok, true}` if the current process is inside a transaction,
+  otherwise, `{:ok, false}` is returned.
 
-  See `c:Nebulex.Cache.in_transaction?/0`.
+  Returns `{:error, reason}` if an error occurs.
+
+  See `c:Nebulex.Cache.in_transaction?/1`.
   """
-  @callback in_transaction?(Nebulex.Adapter.adapter_meta()) :: boolean
+  @callback in_transaction?(Nebulex.Adapter.adapter_meta()) :: Nebulex.Cache.ok_error_tuple(boolean)
 
   @doc false
   defmacro __using__(_opts) do
     quote do
       @behaviour Nebulex.Adapter.Transaction
 
+      import Nebulex.Helpers
+
       @impl true
       def transaction(%{cache: cache, pid: pid} = adapter_meta, opts, fun) do
         adapter_meta
-        |> in_transaction?()
+        |> do_in_transaction?()
         |> do_transaction(
           pid,
           adapter_meta[:name] || cache,
@@ -85,16 +100,20 @@ defmodule Nebulex.Adapter.Transaction do
       end
 
       @impl true
-      def in_transaction?(%{pid: pid}) do
-        !!Process.get({pid, self()})
+      def in_transaction?(adapter_meta) do
+        wrap_ok do_in_transaction?(adapter_meta)
       end
 
       defoverridable transaction: 3, in_transaction?: 1
 
       ## Helpers
 
+      defp do_in_transaction?(%{pid: pid}) do
+        !!Process.get({pid, self()})
+      end
+
       defp do_transaction(true, _pid, _name, _keys, _nodes, _retries, fun) do
-        fun.()
+        {:ok, fun.()}
       end
 
       defp do_transaction(false, pid, name, keys, nodes, retries, fun) do
@@ -105,7 +124,7 @@ defmodule Nebulex.Adapter.Transaction do
             try do
               _ = Process.put({pid, self()}, %{keys: keys, nodes: nodes})
 
-              fun.()
+              {:ok, fun.()}
             after
               _ = Process.delete({pid, self()})
 
@@ -113,7 +132,7 @@ defmodule Nebulex.Adapter.Transaction do
             end
 
           false ->
-            raise "transaction aborted"
+            wrap_error Nebulex.Error, reason: {:transaction_aborted, name, nodes}
         end
       end
 

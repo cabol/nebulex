@@ -4,33 +4,6 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v2.4.2](https://github.com/cabol/nebulex/tree/v2.4.2) (2022-11-04)
-
-[Full Changelog](https://github.com/cabol/nebulex/compare/v2.4.1...v2.4.2)
-
-**Closed issues:**
-
-- Adapter configuration per-env?
-  [#171](https://github.com/cabol/nebulex/issues/171)
-- On-change handler for write-through decorators
-  [#165](https://github.com/cabol/nebulex/issues/165)
-- Document test env setup with decorators?
-  [#155](https://github.com/cabol/nebulex/issues/155)
-- Managing Failovers in the cluster
-  [#131](https://github.com/cabol/nebulex/issues/131)
-
-**Merged pull requests:**
-
-- Make Multilevel adapter apply deletes in reverse order
-  [#174](https://github.com/cabol/nebulex/pull/174)
-  ([martosaur](https://github.com/martosaur))
-- Use import Bitwise instead of use Bitwise
-  [#172](https://github.com/cabol/nebulex/pull/172)
-  ([ryvasquez](https://github.com/ryvasquez))
-- Fix result of getting value by non existent key
-  [#166](https://github.com/cabol/nebulex/pull/166)
-  ([fuelen](https://github.com/fuelen))
-
 ## [v2.4.1](https://github.com/cabol/nebulex/tree/v2.4.1) (2022-07-10)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.4.0...v2.4.1)

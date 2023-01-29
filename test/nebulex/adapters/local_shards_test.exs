@@ -1,18 +1,20 @@
 defmodule Nebulex.Adapters.LocalWithShardsTest do
   use ExUnit.Case, async: true
+
+  # Inherit tests
   use Nebulex.LocalTest
   use Nebulex.CacheTest
 
-  import Nebulex.CacheCase
+  import Nebulex.CacheCase, only: [setup_with_dynamic_cache: 3]
 
   alias Nebulex.Adapter
   alias Nebulex.TestCache.Cache
 
-  setup_with_dynamic_cache(Cache, :local_with_shards, backend: :shards)
+  setup_with_dynamic_cache Cache, :local_with_shards, backend: :shards
 
   describe "shards" do
     test "backend", %{name: name} do
-      Adapter.with_meta(name, fn _, meta ->
+      Adapter.with_meta(name, fn meta ->
         assert meta.backend == :shards
       end)
     end

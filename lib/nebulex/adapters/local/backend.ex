@@ -4,8 +4,6 @@ defmodule Nebulex.Adapters.Local.Backend do
   @doc false
   defmacro __using__(_opts) do
     quote do
-      import Nebulex.Helpers
-
       alias Nebulex.Adapters.Local.Generation
 
       defp generation_spec(opts) do
@@ -24,10 +22,10 @@ defmodule Nebulex.Adapters.Local.Backend do
       end
 
       defp parse_opts(opts, extra \\ []) do
-        type = get_option(opts, :backend_type, "an atom", &is_atom/1, :set)
+        type = Keyword.fetch!(opts, :backend_type)
 
         compressed =
-          case get_option(opts, :compressed, "boolean", &is_boolean/1, false) do
+          case Keyword.fetch!(opts, :compressed) do
             true -> [:compressed]
             false -> []
           end
@@ -37,10 +35,8 @@ defmodule Nebulex.Adapters.Local.Backend do
             type,
             :public,
             {:keypos, 2},
-            {:read_concurrency,
-             get_option(opts, :read_concurrency, "boolean", &is_boolean/1, true)},
-            {:write_concurrency,
-             get_option(opts, :write_concurrency, "boolean", &is_boolean/1, true)},
+            {:read_concurrency, Keyword.fetch!(opts, :read_concurrency)},
+            {:write_concurrency, Keyword.fetch!(opts, :write_concurrency)},
             compressed,
             extra
           ]

@@ -154,9 +154,6 @@ defmodule Nebulex.Adapters.Partitioned do
     * `:keyslot` - Defines the module implementing `Nebulex.Adapter.Keyslot`
       behaviour.
 
-    * `:task_supervisor_opts` - Start-time options passed to
-      `Task.Supervisor.start_link/1` when the adapter is initialized.
-
     * `:join_timeout` - Interval time in milliseconds for joining the
       running partitioned cache to the cluster. This is to ensure it is
       always joined. Defaults to `:timer.seconds(180)`.
@@ -352,7 +349,7 @@ defmodule Nebulex.Adapters.Partitioned do
       A convenience function to get the node of the given `key`.
       """
       def get_node(key) do
-        with_meta(get_dynamic_cache(), fn _adapter, %{name: name, keyslot: keyslot} ->
+        with_meta(get_dynamic_cache(), fn %{name: name, keyslot: keyslot} ->
           Cluster.get_node(name, key, keyslot)
         end)
       end
@@ -375,6 +372,9 @@ defmodule Nebulex.Adapters.Partitioned do
 
   @impl true
   def init(opts) do
+    # Validate options
+    opts = __MODULE__.Options.validate!(opts)
+
     # Required options
     telemetry_prefix = Keyword.fetch!(opts, :telemetry_prefix)
     telemetry = Keyword.fetch!(opts, :telemetry)
@@ -382,7 +382,7 @@ defmodule Nebulex.Adapters.Partitioned do
     name = opts[:name] || cache
 
     # Maybe use stats
-    stats = get_boolean_option(opts, :stats)
+    stats = Keyword.fetch!(opts, :stats)
 
     # Primary cache options
     primary_opts =
@@ -400,11 +400,8 @@ defmodule Nebulex.Adapters.Partitioned do
     # Keyslot module for selecting nodes
     keyslot =
       opts
-      |> get_option(:keyslot, "an atom", &is_atom/1, __MODULE__)
+      |> Keyword.get(:keyslot, __MODULE__)
       |> assert_behaviour(Nebulex.Adapter.Keyslot, "keyslot")
-
-    # Maybe task supervisor for distributed tasks
-    {task_sup_name, children} = task_sup_child_spec(name, opts)
 
     # Prepare metadata
     adapter_meta = %{
@@ -412,7 +409,6 @@ defmodule Nebulex.Adapters.Partitioned do
       telemetry: telemetry,
       name: name,
       primary_name: primary_opts[:name],
-      task_sup: task_sup_name,
       keyslot: keyslot,
       stats: stats
     }
@@ -425,65 +421,39 @@ defmodule Nebulex.Adapters.Partitioned do
         children: [
           {cache.__primary__, primary_opts},
           {__MODULE__.Bootstrap, {Map.put(adapter_meta, :cache, cache), opts}}
-          | children
         ]
       )
 
     {:ok, child_spec, adapter_meta}
   end
 
-  if Code.ensure_loaded?(:erpc) do
-    defp task_sup_child_spec(_name, _opts) do
-      {nil, []}
-    end
-  else
-    defp task_sup_child_spec(name, opts) do
-      # task supervisor to execute parallel and/or remote commands
-      task_sup_name = normalize_module_name([name, TaskSupervisor])
-      task_sup_opts = Keyword.get(opts, :task_supervisor_opts, [])
-
-      children = [
-        {Task.Supervisor, [name: task_sup_name] ++ task_sup_opts}
-      ]
-
-      {task_sup_name, children}
-    end
-  end
-
   ## Nebulex.Adapter.Entry
 
   @impl true
-  defspan get(adapter_meta, key, opts) do
-    call(adapter_meta, key, :get, [key, opts], opts)
+  defspan fetch(adapter_meta, key, opts) do
+    adapter_meta
+    |> call(key, :fetch, [key, opts], opts)
+    |> handle_key_error(adapter_meta.name)
   end
 
   @impl true
   defspan get_all(adapter_meta, keys, opts) do
-    map_reduce(
-      keys,
-      adapter_meta,
-      :get_all,
-      [opts],
-      Keyword.get(opts, :timeout),
-      {
-        %{},
-        fn
-          {:ok, res}, _, acc when is_map(res) ->
-            Map.merge(acc, res)
+    case map_reduce(keys, adapter_meta, :get_all, [opts], Keyword.get(opts, :timeout)) do
+      {res, []} ->
+        {:ok, Enum.reduce(res, %{}, &Map.merge(&2, &1))}
 
-          _, _, acc ->
-            acc
-        end
-      }
-    )
+      {_ok, errors} ->
+        wrap_error Nebulex.Error, reason: {:rpc_multicall_error, errors}, module: RPC
+    end
   end
 
   @impl true
   defspan put(adapter_meta, key, value, _ttl, on_write, opts) do
     case on_write do
       :put ->
-        :ok = call(adapter_meta, key, :put, [key, value, opts], opts)
-        true
+        with :ok <- call(adapter_meta, key, :put, [key, value, opts], opts) do
+          {:ok, true}
+        end
 
       :put_new ->
         call(adapter_meta, key, :put_new, [key, value, opts], opts)
@@ -505,38 +475,15 @@ defmodule Nebulex.Adapters.Partitioned do
   end
 
   def do_put_all(action, adapter_meta, entries, opts) do
-    reducer = {
-      {true, []},
-      fn
-        {:ok, :ok}, {_, {_, _, [_, _, [kv, _]]}}, {bool, acc} ->
-          {bool, Enum.reduce(kv, acc, &[elem(&1, 0) | &2])}
+    case {action, map_reduce(entries, adapter_meta, action, [opts], Keyword.get(opts, :timeout))} do
+      {:put_all, {_res, []}} ->
+        {:ok, true}
 
-        {:ok, true}, {_, {_, _, [_, _, [kv, _]]}}, {bool, acc} ->
-          {bool, Enum.reduce(kv, acc, &[elem(&1, 0) | &2])}
+      {:put_new_all, {res, []}} ->
+        {:ok, Enum.reduce(res, true, &(&1 and &2))}
 
-        {:ok, false}, _, {_, acc} ->
-          {false, acc}
-
-        {:error, _}, _, {_, acc} ->
-          {false, acc}
-      end
-    }
-
-    entries
-    |> map_reduce(
-      adapter_meta,
-      action,
-      [opts],
-      Keyword.get(opts, :timeout),
-      reducer
-    )
-    |> case do
-      {true, _} ->
-        true
-
-      {false, keys} ->
-        :ok = Enum.each(keys, &delete(adapter_meta, &1, []))
-        action == :put_all
+      {_, {_ok, errors}} ->
+        wrap_error Nebulex.Error, reason: {:rpc_multicall_error, errors}, module: RPC
     end
   end
 
@@ -547,12 +494,14 @@ defmodule Nebulex.Adapters.Partitioned do
 
   @impl true
   defspan take(adapter_meta, key, opts) do
-    call(adapter_meta, key, :take, [key, opts], opts)
+    adapter_meta
+    |> call(key, :take, [key, opts], opts)
+    |> handle_key_error(adapter_meta.name)
   end
 
   @impl true
-  defspan has_key?(adapter_meta, key) do
-    call(adapter_meta, key, :has_key?, [key])
+  defspan has_key?(adapter_meta, key, opts) do
+    call(adapter_meta, key, :has_key?, [key, opts])
   end
 
   @impl true
@@ -561,18 +510,20 @@ defmodule Nebulex.Adapters.Partitioned do
   end
 
   @impl true
-  defspan ttl(adapter_meta, key) do
-    call(adapter_meta, key, :ttl, [key])
+  defspan ttl(adapter_meta, key, opts) do
+    adapter_meta
+    |> call(key, :ttl, [key, opts])
+    |> handle_key_error(adapter_meta.name)
   end
 
   @impl true
-  defspan expire(adapter_meta, key, ttl) do
-    call(adapter_meta, key, :expire, [key, ttl])
+  defspan expire(adapter_meta, key, ttl, opts) do
+    call(adapter_meta, key, :expire, [key, ttl, opts])
   end
 
   @impl true
-  defspan touch(adapter_meta, key) do
-    call(adapter_meta, key, :touch, [key])
+  defspan touch(adapter_meta, key, opts) do
+    call(adapter_meta, key, :touch, [key, opts])
   end
 
   ## Nebulex.Adapter.Queryable
@@ -585,19 +536,21 @@ defmodule Nebulex.Adapters.Partitioned do
         _ -> &Enum.sum/1
       end
 
-    adapter_meta.task_sup
-    |> RPC.multi_call(
-      Cluster.get_nodes(adapter_meta.name),
+    adapter_meta.name
+    |> Cluster.get_nodes()
+    |> RPC.multicall(
       __MODULE__,
       :with_dynamic_cache,
       [adapter_meta, operation, [query, opts]],
       opts
     )
-    |> handle_rpc_multi_call(operation, reducer)
+    |> handle_rpc_multicall(reducer)
   end
 
   @impl true
   defspan stream(adapter_meta, query, opts) do
+    timeout = opts[:timeout] || 5000
+
     Stream.resource(
       fn ->
         Cluster.get_nodes(adapter_meta.name)
@@ -608,19 +561,19 @@ defmodule Nebulex.Adapters.Partitioned do
 
         [node | nodes] ->
           elements =
-            rpc_call(
-              adapter_meta.task_sup,
-              node,
-              __MODULE__,
-              :eval_stream,
-              [adapter_meta, query, opts],
-              opts
-            )
+            unwrap_or_raise RPC.call(
+                              node,
+                              __MODULE__,
+                              :eval_stream,
+                              [adapter_meta, query, opts],
+                              timeout
+                            )
 
           {elements, nodes}
       end,
       & &1
     )
+    |> wrap_ok()
   end
 
   ## Nebulex.Adapter.Persistence
@@ -639,7 +592,9 @@ defmodule Nebulex.Adapters.Partitioned do
 
   @impl true
   defspan transaction(adapter_meta, opts, fun) do
-    super(adapter_meta, Keyword.put(opts, :nodes, Cluster.get_nodes(adapter_meta.name)), fun)
+    nodes = Keyword.put_new_lazy(opts, :nodes, fn -> Cluster.get_nodes(adapter_meta.name) end)
+
+    super(adapter_meta, nodes, fun)
   end
 
   @impl true
@@ -674,12 +629,20 @@ defmodule Nebulex.Adapters.Partitioned do
   Helper to perform `stream/3` locally.
   """
   def eval_stream(meta, query, opts) do
-    meta
-    |> with_dynamic_cache(:stream, [query, opts])
-    |> Enum.to_list()
+    with {:ok, stream} <- with_dynamic_cache(meta, :stream, [query, opts]) do
+      {:ok, Enum.to_list(stream)}
+    end
   end
 
   ## Private Functions
+
+  defp handle_key_error({:error, %Nebulex.KeyError{} = e}, name) do
+    {:error, %{e | cache: name}}
+  end
+
+  defp handle_key_error(other, _name) do
+    other
+  end
 
   defp get_node(%{name: name, keyslot: keyslot}, key) do
     Cluster.get_node(name, key, keyslot)
@@ -691,62 +654,39 @@ defmodule Nebulex.Adapters.Partitioned do
     |> rpc_call(adapter_meta, action, args, opts)
   end
 
-  defp rpc_call(node, %{task_sup: task_sup} = meta, fun, args, opts) do
-    rpc_call(task_sup, node, __MODULE__, :with_dynamic_cache, [meta, fun, args], opts)
-  end
-
-  if Code.ensure_loaded?(:erpc) do
-    defp rpc_call(supervisor, node, mod, fun, args, opts) do
-      RPC.call(supervisor, node, mod, fun, args, opts[:timeout] || 5000)
-    end
-  else
-    defp rpc_call(supervisor, node, mod, fun, args, opts) do
-      case RPC.call(supervisor, node, mod, fun, args, opts[:timeout] || 5000) do
-        {:badrpc, remote_ex} ->
-          raise remote_ex
-
-        response ->
-          response
-      end
-    end
+  defp rpc_call(node, meta, fun, args, opts) do
+    RPC.call(node, __MODULE__, :with_dynamic_cache, [meta, fun, args], opts[:timeout] || 5000)
   end
 
   defp group_keys_by_node(enum, adapter_meta) do
     Enum.reduce(enum, %{}, fn
       {key, _} = entry, acc ->
         node = get_node(adapter_meta, key)
+
         Map.put(acc, node, [entry | Map.get(acc, node, [])])
 
       key, acc ->
         node = get_node(adapter_meta, key)
+
         Map.put(acc, node, [key | Map.get(acc, node, [])])
     end)
   end
 
-  defp map_reduce(
-         enum,
-         %{task_sup: task_sup} = meta,
-         action,
-         args,
-         timeout,
-         reducer
-       ) do
-    groups =
-      enum
-      |> group_keys_by_node(meta)
-      |> Enum.map(fn {node, group} ->
-        {node, {__MODULE__, :with_dynamic_cache, [meta, action, [group | args]]}}
-      end)
-
-    RPC.multi_call(task_sup, groups, timeout: timeout, reducer: reducer)
+  defp map_reduce(enum, meta, action, args, timeout) do
+    enum
+    |> group_keys_by_node(meta)
+    |> Enum.map(fn {node, group} ->
+      {node, {__MODULE__, :with_dynamic_cache, [meta, action, [group | args]]}}
+    end)
+    |> RPC.multicall(timeout: timeout)
   end
 
-  defp handle_rpc_multi_call({res, []}, _action, fun) do
-    fun.(res)
+  defp handle_rpc_multicall({res, []}, fun) do
+    {:ok, fun.(res)}
   end
 
-  defp handle_rpc_multi_call({responses, errors}, action, _) do
-    raise Nebulex.RPCMultiCallError, action: action, responses: responses, errors: errors
+  defp handle_rpc_multicall({_ok, errors}, _) do
+    wrap_error Nebulex.Error, reason: {:rpc_multicall_error, errors}, module: RPC
   end
 end
 
@@ -758,9 +698,6 @@ defmodule Nebulex.Adapters.Partitioned.Bootstrap do
 
   alias Nebulex.Cache.Cluster
   alias Nebulex.Telemetry
-
-  # Default join timeout
-  @join_timeout :timer.seconds(180)
 
   # State
   defstruct [:adapter_meta, :join_timeout]
@@ -832,14 +769,7 @@ defmodule Nebulex.Adapters.Partitioned.Bootstrap do
 
   defp build_state(adapter_meta, opts) do
     # Join timeout to ensure it is always joined to the cluster
-    join_timeout =
-      get_option(
-        opts,
-        :join_timeout,
-        "an integer > 0",
-        &(is_integer(&1) and &1 > 0),
-        @join_timeout
-      )
+    join_timeout = Keyword.fetch!(opts, :join_timeout)
 
     %__MODULE__{adapter_meta: adapter_meta, join_timeout: join_timeout}
   end

@@ -1,11 +1,12 @@
 defmodule Nebulex.Adapters.MultilevelExclusiveTest do
-  use ExUnit.Case, async: true
   use Nebulex.NodeCase
+
+  # Inherit tests
   use Nebulex.MultilevelTest
   use Nebulex.Cache.QueryableTest
   use Nebulex.Cache.TransactionTest
 
-  import Nebulex.CacheCase
+  import Nebulex.CacheCase, only: [setup_with_dynamic_cache: 3]
 
   alias Nebulex.Adapters.Local.Generation
   alias Nebulex.Cache.Cluster
@@ -30,10 +31,10 @@ defmodule Nebulex.Adapters.MultilevelExclusiveTest do
     }
   ]
 
-  setup_with_dynamic_cache(Multilevel, :multilevel_exclusive,
-    model: :exclusive,
-    levels: @levels
-  )
+  setup_with_dynamic_cache Multilevel,
+                           :multilevel_exclusive,
+                           model: :exclusive,
+                           levels: @levels
 
   describe "multilevel exclusive" do
     test "returns partitions for L1 with shards backend", %{name: name} do
@@ -48,15 +49,15 @@ defmodule Nebulex.Adapters.MultilevelExclusiveTest do
       :ok = Multilevel.put(2, 2, level: 2)
       :ok = Multilevel.put(3, 3, level: 3)
 
-      assert Multilevel.get(1) == 1
-      assert Multilevel.get(2, return: :key) == 2
-      assert Multilevel.get(3) == 3
-      refute Multilevel.get(2, level: 1)
-      refute Multilevel.get(3, level: 1)
-      refute Multilevel.get(1, level: 2)
-      refute Multilevel.get(3, level: 2)
-      refute Multilevel.get(1, level: 3)
-      refute Multilevel.get(2, level: 3)
+      assert Multilevel.get!(1) == 1
+      assert Multilevel.get!(2, return: :key) == 2
+      assert Multilevel.get!(3) == 3
+      refute Multilevel.get!(2, nil, level: 1)
+      refute Multilevel.get!(3, nil, level: 1)
+      refute Multilevel.get!(1, nil, level: 2)
+      refute Multilevel.get!(3, nil, level: 2)
+      refute Multilevel.get!(1, nil, level: 3)
+      refute Multilevel.get!(2, nil, level: 3)
     end
   end
 
@@ -84,7 +85,7 @@ defmodule Nebulex.Adapters.MultilevelExclusiveTest do
         assert Multilevel.put_all(kv_pairs) == :ok
 
         for k <- 1..100 do
-          assert Multilevel.get(k) == k
+          assert Multilevel.get!(k) == k
         end
       end)
 

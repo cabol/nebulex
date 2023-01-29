@@ -6,13 +6,13 @@ defmodule Nebulex.CacheTest do
   defmacro __using__(_opts) do
     quote do
       use Nebulex.Cache.EntryTest
+      use Nebulex.Cache.EntryBooleanValuesTest
       use Nebulex.Cache.EntryExpirationTest
       use Nebulex.Cache.EntryPropTest
       use Nebulex.Cache.QueryableTest
       use Nebulex.Cache.TransactionTest
       use Nebulex.Cache.PersistenceTest
       use Nebulex.Cache.PersistenceErrorTest
-      use Nebulex.Cache.DeprecatedTest
     end
   end
 end

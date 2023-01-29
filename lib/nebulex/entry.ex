@@ -9,7 +9,7 @@ defmodule Nebulex.Entry do
   defstruct key: nil,
             value: nil,
             touched: nil,
-            ttl: :infinity,
+            exp: :infinity,
             time_unit: :millisecond
 
   @typedoc """
@@ -22,7 +22,7 @@ defmodule Nebulex.Entry do
           key: any,
           value: any,
           touched: integer,
-          ttl: timeout,
+          exp: timeout,
           time_unit: System.time_unit()
         }
 
@@ -73,18 +73,14 @@ defmodule Nebulex.Entry do
       iex> Nebulex.Entry.expired?(%Nebulex.Entry{})
       false
 
-      iex> Nebulex.Entry.expired?(
-      ...>   %Nebulex.Entry{touched: Nebulex.Time.now() - 10, ttl: 1}
-      ...> )
+      iex> now = Nebulex.Time.now()
+      iex> Nebulex.Entry.expired?(%Nebulex.Entry{touched: now, exp: now - 10})
       true
 
   """
   @spec expired?(t) :: boolean
-  def expired?(%__MODULE__{ttl: :infinity}), do: false
-
-  def expired?(%__MODULE__{touched: touched, ttl: ttl, time_unit: unit}) do
-    Time.now(unit) - touched >= ttl
-  end
+  def expired?(%__MODULE__{exp: :infinity}), do: false
+  def expired?(%__MODULE__{exp: exp, time_unit: unit}), do: Time.now(unit) >= exp
 
   @doc """
   Returns the remaining time-to-live.
@@ -94,18 +90,13 @@ defmodule Nebulex.Entry do
       iex> Nebulex.Entry.ttl(%Nebulex.Entry{})
       :infinity
 
-      iex> ttl =
-      ...>   Nebulex.Entry.ttl(
-      ...>     %Nebulex.Entry{touched: Nebulex.Time.now(), ttl: 100}
-      ...>   )
+      iex> now = Nebulex.Time.now()
+      iex> ttl = Nebulex.Entry.ttl(%Nebulex.Entry{touched: now, exp: now + 10})
       iex> ttl > 0
       true
 
   """
   @spec ttl(t) :: timeout
-  def ttl(%__MODULE__{ttl: :infinity}), do: :infinity
-
-  def ttl(%__MODULE__{ttl: ttl, touched: touched, time_unit: unit}) do
-    ttl - (Time.now(unit) - touched)
-  end
+  def ttl(%__MODULE__{exp: :infinity}), do: :infinity
+  def ttl(%__MODULE__{exp: exp, time_unit: unit}), do: exp - Time.now(unit)
 end

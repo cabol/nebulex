@@ -45,9 +45,9 @@ defmodule Nebulex.Adapters.Local do
       internally, this option is used when a new table is created; see
       `:ets.new/2`. Defaults to `true`.
 
-    * `:compressed` - (boolean) This option is used when a new ETS table is
-      created and it defines whether or not it includes X as an option; see
-      `:ets.new/2`. Defaults to `false`.
+    * `:compressed` - (boolean) Since this adapter uses ETS tables internally,
+      this option is used when a new table is created; see `:ets.new/2`.
+      Defaults to `false`.
 
     * `:backend_type` - This option defines the type of ETS to be used
       (Defaults to `:set`). However, it is highly recommended to keep the
@@ -334,14 +334,11 @@ defmodule Nebulex.Adapters.Local do
     key: nil,
     value: nil,
     touched: nil,
-    ttl: nil
+    exp: nil
   )
 
-  # Supported Backends
-  @backends ~w(ets shards)a
-
   # Inline common instructions
-  @compile {:inline, list_gen: 1, newer_gen: 1, test_ms: 0}
+  @compile {:inline, list_gen: 1, newer_gen: 1, fetch_entry: 3, pop_entry: 3}
 
   ## Nebulex.Adapter
 
@@ -380,6 +377,9 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   def init(opts) do
+    # Validate options
+    opts = __MODULE__.Options.validate!(opts)
+
     # Required options
     cache = Keyword.fetch!(opts, :cache)
     telemetry = Keyword.fetch!(opts, :telemetry)
@@ -392,37 +392,21 @@ defmodule Nebulex.Adapters.Local do
     stats_counter = Stats.init(opts)
 
     # Resolve the backend to be used
-    backend =
-      opts
-      |> Keyword.get(:backend, :ets)
-      |> case do
-        val when val in @backends ->
-          val
-
-        val ->
-          raise "expected backend: option to be one of the supported backends " <>
-                  "#{inspect(@backends)}, got: #{inspect(val)}"
-      end
+    backend = Keyword.fetch!(opts, :backend)
 
     # Internal option for max nested match specs based on number of keys
-    purge_batch_size =
-      get_option(
-        opts,
-        :purge_batch_size,
-        "an integer > 0",
-        &(is_integer(&1) and &1 > 0),
-        100
-      )
+    purge_chunk_size = Keyword.fetch!(opts, :purge_chunk_size)
 
     # Build adapter metadata
     adapter_meta = %{
       cache: cache,
+      name: opts[:name] || cache,
       telemetry: telemetry,
       telemetry_prefix: telemetry_prefix,
       meta_tab: meta_tab,
       stats_counter: stats_counter,
       backend: backend,
-      purge_batch_size: purge_batch_size,
+      purge_chunk_size: purge_chunk_size,
       started_at: DateTime.utc_now()
     }
 
@@ -435,62 +419,46 @@ defmodule Nebulex.Adapters.Local do
   ## Nebulex.Adapter.Entry
 
   @impl true
-  def get(adapter_meta, key, _opts) do
-    adapter_meta
-    |> get_(key)
-    |> handle_expired()
-  end
-
-  defspan get_(adapter_meta, key), as: :get do
+  defspan fetch(adapter_meta, key, _opts) do
     adapter_meta.meta_tab
     |> list_gen()
-    |> do_get(key, adapter_meta.backend)
+    |> do_fetch(key, adapter_meta)
     |> return(:value)
   end
 
-  defp do_get([newer], key, backend) do
-    gen_fetch(newer, key, backend)
+  defp do_fetch([newer], key, adapter_meta) do
+    fetch_entry(newer, key, adapter_meta)
   end
 
-  defp do_get([newer, older], key, backend) do
-    with nil <- gen_fetch(newer, key, backend),
-         entry(key: ^key) = cached <- gen_fetch(older, key, backend, &pop_entry/4) do
-      true = backend.insert(newer, cached)
-      cached
+  defp do_fetch([newer, older], key, adapter_meta) do
+    with {:error, _} <- fetch_entry(newer, key, adapter_meta),
+         {:ok, cached} <- pop_entry(older, key, adapter_meta) do
+      true = adapter_meta.backend.insert(newer, cached)
+
+      {:ok, cached}
     end
   end
 
-  defp gen_fetch(gen, key, backend, fun \\ &get_entry/4) do
-    gen
-    |> fun.(key, nil, backend)
-    |> validate_ttl(gen, backend)
-  end
-
   @impl true
-  defspan get_all(adapter_meta, keys, _opts) do
+  defspan get_all(adapter_meta, keys, opts) do
     adapter_meta = %{adapter_meta | telemetry: Map.get(adapter_meta, :in_span?, false)}
 
-    Enum.reduce(keys, %{}, fn key, acc ->
-      case get(adapter_meta, key, []) do
-        nil -> acc
-        obj -> Map.put(acc, key, obj)
+    keys
+    |> Enum.reduce(%{}, fn key, acc ->
+      case fetch(adapter_meta, key, opts) do
+        {:ok, val} -> Map.put(acc, key, val)
+        {:error, _} -> acc
       end
     end)
+    |> wrap_ok()
   end
 
   @impl true
   defspan put(adapter_meta, key, value, ttl, on_write, _opts) do
-    do_put(
-      on_write,
-      adapter_meta.meta_tab,
-      adapter_meta.backend,
-      entry(
-        key: key,
-        value: value,
-        touched: Time.now(),
-        ttl: ttl
-      )
-    )
+    now = Time.now()
+    entry = entry(key: key, value: value, touched: now, exp: exp(now, ttl))
+
+    wrap_ok do_put(on_write, adapter_meta.meta_tab, adapter_meta.backend, entry)
   end
 
   defp do_put(:put, meta_tab, backend, entry) do
@@ -507,26 +475,30 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   defspan put_all(adapter_meta, entries, ttl, on_write, _opts) do
+    now = Time.now()
+    exp = exp(now, ttl)
+
     entries =
-      for {key, value} <- entries, value != nil do
-        entry(key: key, value: value, touched: Time.now(), ttl: ttl)
+      for {key, value} <- entries do
+        entry(key: key, value: value, touched: now, exp: exp)
       end
 
     do_put_all(
       on_write,
       adapter_meta.meta_tab,
       adapter_meta.backend,
-      adapter_meta.purge_batch_size,
+      adapter_meta.purge_chunk_size,
       entries
     )
+    |> wrap_ok()
   end
 
-  defp do_put_all(:put, meta_tab, backend, batch_size, entries) do
-    put_entries(meta_tab, backend, entries, batch_size)
+  defp do_put_all(:put, meta_tab, backend, chunk_size, entries) do
+    put_entries(meta_tab, backend, entries, chunk_size)
   end
 
-  defp do_put_all(:put_new, meta_tab, backend, batch_size, entries) do
-    put_new_entries(meta_tab, backend, entries, batch_size)
+  defp do_put_all(:put_new, meta_tab, backend, chunk_size, entries) do
+    put_new_entries(meta_tab, backend, entries, chunk_size)
   end
 
   @impl true
@@ -537,33 +509,22 @@ defmodule Nebulex.Adapters.Local do
   end
 
   @impl true
-  def take(adapter_meta, key, _opts) do
-    adapter_meta
-    |> take_(key)
-    |> handle_expired()
-  end
-
-  defspan take_(adapter_meta, key), as: :take do
+  defspan take(adapter_meta, key, _opts) do
     adapter_meta.meta_tab
     |> list_gen()
-    |> Enum.reduce_while(nil, fn gen, acc ->
-      case pop_entry(gen, key, nil, adapter_meta.backend) do
-        nil ->
-          {:cont, acc}
-
-        res ->
-          value =
-            res
-            |> validate_ttl(gen, adapter_meta.backend)
-            |> return(:value)
-
-          {:halt, value}
+    |> Enum.reduce_while(nil, fn gen, _acc ->
+      case pop_entry(gen, key, adapter_meta) do
+        {:ok, res} -> {:halt, return({:ok, res}, :value)}
+        error -> {:cont, error}
       end
     end)
   end
 
   @impl true
   defspan update_counter(adapter_meta, key, amount, ttl, default, _opts) do
+    # Current time
+    now = Time.now()
+
     # Get needed metadata
     meta_tab = adapter_meta.meta_tab
     backend = adapter_meta.backend
@@ -572,7 +533,7 @@ defmodule Nebulex.Adapters.Local do
     _ =
       meta_tab
       |> list_gen()
-      |> do_get(key, backend)
+      |> do_fetch(key, adapter_meta)
 
     # Run the counter operation
     meta_tab
@@ -580,47 +541,50 @@ defmodule Nebulex.Adapters.Local do
     |> backend.update_counter(
       key,
       {3, amount},
-      entry(key: key, value: default, touched: Time.now(), ttl: ttl)
+      entry(key: key, value: default, touched: now, exp: exp(now, ttl))
     )
+    |> wrap_ok()
   end
 
   @impl true
-  def has_key?(adapter_meta, key) do
-    case get(adapter_meta, key, []) do
-      nil -> false
-      _ -> true
+  def has_key?(adapter_meta, key, _opts) do
+    case fetch(adapter_meta, key, []) do
+      {:ok, _} -> {:ok, true}
+      {:error, _} -> {:ok, false}
     end
   end
 
   @impl true
-  defspan ttl(adapter_meta, key) do
-    adapter_meta.meta_tab
-    |> list_gen()
-    |> do_get(key, adapter_meta.backend)
-    |> return()
-    |> entry_ttl()
+  defspan ttl(adapter_meta, key, _opts) do
+    with {:ok, res} <- adapter_meta.meta_tab |> list_gen() |> do_fetch(key, adapter_meta) do
+      {:ok, entry_ttl(res)}
+    end
   end
 
-  defp entry_ttl(nil), do: nil
-  defp entry_ttl(:"$expired"), do: nil
-  defp entry_ttl(entry(ttl: :infinity)), do: :infinity
+  defp entry_ttl(entry(exp: :infinity)), do: :infinity
 
-  defp entry_ttl(entry(ttl: ttl, touched: touched)) do
-    ttl - (Time.now() - touched)
+  defp entry_ttl(entry(exp: exp)) do
+    exp - Time.now()
   end
 
   defp entry_ttl(entries) when is_list(entries) do
-    for entry <- entries, do: entry_ttl(entry)
+    Enum.map(entries, &entry_ttl/1)
   end
 
   @impl true
-  defspan expire(adapter_meta, key, ttl) do
-    update_entry(adapter_meta.meta_tab, adapter_meta.backend, key, [{4, Time.now()}, {5, ttl}])
+  defspan expire(adapter_meta, key, ttl, _opts) do
+    now = Time.now()
+
+    adapter_meta.meta_tab
+    |> update_entry(adapter_meta.backend, key, [{4, now}, {5, exp(now, ttl)}])
+    |> wrap_ok()
   end
 
   @impl true
-  defspan touch(adapter_meta, key) do
-    update_entry(adapter_meta.meta_tab, adapter_meta.backend, key, [{4, Time.now()}])
+  defspan touch(adapter_meta, key, _opts) do
+    adapter_meta.meta_tab
+    |> update_entry(adapter_meta.backend, key, [{4, Time.now()}])
+    |> wrap_ok()
   end
 
   ## Nebulex.Adapter.Queryable
@@ -638,10 +602,14 @@ defmodule Nebulex.Adapters.Local do
       |> backend.info(:size)
       |> Kernel.+(acc)
     end)
+    |> wrap_ok()
   end
 
-  defp do_execute(%{meta_tab: meta_tab}, :delete_all, nil, _opts) do
-    Generation.delete_all(meta_tab)
+  defp do_execute(%{meta_tab: meta_tab} = adapter_meta, :delete_all, nil, _opts) do
+    with {:ok, count_all} <- do_execute(adapter_meta, :count_all, nil, []) do
+      :ok = Generation.delete_all(meta_tab)
+      {:ok, count_all}
+    end
   end
 
   defp do_execute(%{meta_tab: meta_tab} = adapter_meta, :delete_all, {:in, keys}, _opts)
@@ -649,36 +617,38 @@ defmodule Nebulex.Adapters.Local do
     meta_tab
     |> list_gen()
     |> Enum.reduce(0, fn gen, acc ->
-      do_delete_all(adapter_meta.backend, gen, keys, adapter_meta.purge_batch_size) + acc
+      do_delete_all(adapter_meta.backend, gen, keys, adapter_meta.purge_chunk_size) + acc
     end)
   end
 
   defp do_execute(%{meta_tab: meta_tab, backend: backend}, operation, query, opts) do
-    query =
-      query
-      |> validate_match_spec(opts)
-      |> maybe_match_spec_return_true(operation)
+    with {:ok, query} <- validate_match_spec(query, opts) do
+      query = maybe_match_spec_return_true(query, operation)
 
-    {reducer, acc_in} =
-      case operation do
-        :all -> {&(backend.select(&1, query) ++ &2), []}
-        :count_all -> {&(backend.select_count(&1, query) + &2), 0}
-        :delete_all -> {&(backend.select_delete(&1, query) + &2), 0}
-      end
+      {reducer, acc_in} =
+        case operation do
+          :all -> {&(backend.select(&1, query) ++ &2), []}
+          :count_all -> {&(backend.select_count(&1, query) + &2), 0}
+          :delete_all -> {&(backend.select_delete(&1, query) + &2), 0}
+        end
 
-    meta_tab
-    |> list_gen()
-    |> Enum.reduce(acc_in, reducer)
+      meta_tab
+      |> list_gen()
+      |> Enum.reduce(acc_in, reducer)
+      |> wrap_ok()
+    end
   end
 
   @impl true
   defspan stream(adapter_meta, query, opts) do
-    query
-    |> validate_match_spec(opts)
-    |> do_stream(adapter_meta, Keyword.get(opts, :page_size, 20))
+    with {:ok, query} <- validate_match_spec(query, opts) do
+      adapter_meta
+      |> do_stream(query, Keyword.get(opts, :page_size, 20))
+      |> wrap_ok()
+    end
   end
 
-  defp do_stream(match_spec, %{meta_tab: meta_tab, backend: backend}, page_size) do
+  defp do_stream(%{meta_tab: meta_tab, backend: backend}, match_spec, page_size) do
     Stream.resource(
       fn ->
         [newer | _] = generations = list_gen(meta_tab)
@@ -732,12 +702,15 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   defspan stats(adapter_meta) do
-    if stats = super(adapter_meta) do
-      %{stats | metadata: Map.put(stats.metadata, :started_at, adapter_meta.started_at)}
+    with {:ok, %Nebulex.Stats{} = stats} <- super(adapter_meta) do
+      {:ok, %{stats | metadata: Map.put(stats.metadata, :started_at, adapter_meta.started_at)}}
     end
   end
 
   ## Helpers
+
+  defp exp(_now, :infinity), do: :infinity
+  defp exp(now, ttl), do: now + ttl
 
   defp list_gen(meta_tab) do
     Metadata.fetch!(meta_tab, :generations)
@@ -749,35 +722,72 @@ defmodule Nebulex.Adapters.Local do
     |> hd()
   end
 
-  defp get_entry(tab, key, default, backend) do
-    case backend.lookup(tab, key) do
-      [] -> default
-      [entry] -> entry
-      entries -> entries
+  defmacrop backend_call(adapter_meta, fun, tab, key) do
+    quote do
+      case unquote(adapter_meta).backend.unquote(fun)(unquote(tab), unquote(key)) do
+        [] ->
+          wrap_error Nebulex.KeyError, key: unquote(key), cache: unquote(adapter_meta).name
+
+        [entry(exp: :infinity) = entry] ->
+          {:ok, entry}
+
+        [entry() = entry] ->
+          validate_exp(entry, unquote(tab), unquote(adapter_meta))
+
+        entries when is_list(entries) ->
+          now = Time.now()
+
+          {:ok, for(entry(touched: touched, exp: exp) = e <- entries, now < exp, do: e)}
+      end
     end
   end
 
-  defp pop_entry(tab, key, default, backend) do
-    case backend.take(tab, key) do
-      [] -> default
-      [entry] -> entry
-      entries -> entries
+  defp validate_exp(entry(key: key, exp: exp) = entry, tab, adapter_meta) do
+    if Time.now() >= exp do
+      true = adapter_meta.backend.delete(tab, key)
+
+      wrap_error Nebulex.KeyError, key: key, cache: adapter_meta.name, reason: :expired
+    else
+      {:ok, entry}
     end
   end
 
-  defp put_entries(meta_tab, backend, entries, batch_size \\ 0)
+  defp fetch_entry(tab, key, adapter_meta) do
+    backend_call(adapter_meta, :lookup, tab, key)
+  end
 
-  defp put_entries(meta_tab, backend, entries, batch_size) when is_list(entries) do
+  defp pop_entry(tab, key, adapter_meta) do
+    backend_call(adapter_meta, :take, tab, key)
+  end
+
+  defp put_entries(meta_tab, backend, entries, chunk_size \\ 0)
+
+  defp put_entries(
+         meta_tab,
+         backend,
+         entry(key: key, value: val, touched: touched, exp: exp) = entry,
+         _chunk_size
+       ) do
+    case list_gen(meta_tab) do
+      [newer_gen] ->
+        backend.insert(newer_gen, entry)
+
+      [newer_gen, older_gen] ->
+        changes = [{3, val}, {4, touched}, {5, exp}]
+
+        with false <- backend.update_element(newer_gen, key, changes) do
+          true = backend.delete(older_gen, key)
+
+          backend.insert(newer_gen, entry)
+        end
+    end
+  end
+
+  defp put_entries(meta_tab, backend, entries, chunk_size) when is_list(entries) do
     do_put_entries(meta_tab, backend, entries, fn older_gen ->
       keys = Enum.map(entries, fn entry(key: key) -> key end)
 
-      do_delete_all(backend, older_gen, keys, batch_size)
-    end)
-  end
-
-  defp put_entries(meta_tab, backend, entry(key: key) = entry, _batch_size) do
-    do_put_entries(meta_tab, backend, entry, fn older_gen ->
-      true = backend.delete(older_gen, key)
+      do_delete_all(backend, older_gen, keys, chunk_size)
     end)
   end
 
@@ -793,26 +803,26 @@ defmodule Nebulex.Adapters.Local do
     end
   end
 
-  defp put_new_entries(meta_tab, backend, entries, batch_size \\ 0)
+  defp put_new_entries(meta_tab, backend, entries, chunk_size \\ 0)
 
-  defp put_new_entries(meta_tab, backend, entries, batch_size) when is_list(entries) do
-    do_put_new_entries(meta_tab, backend, entries, fn newer_gen, older_gen ->
-      with true <- backend.insert_new(older_gen, entries) do
-        keys = Enum.map(entries, fn entry(key: key) -> key end)
-
-        _ = do_delete_all(backend, older_gen, keys, batch_size)
-
-        backend.insert_new(newer_gen, entries)
-      end
-    end)
-  end
-
-  defp put_new_entries(meta_tab, backend, entry(key: key) = entry, _batch_size) do
+  defp put_new_entries(meta_tab, backend, entry(key: key) = entry, _chunk_size) do
     do_put_new_entries(meta_tab, backend, entry, fn newer_gen, older_gen ->
       with true <- backend.insert_new(older_gen, entry) do
         true = backend.delete(older_gen, key)
 
         backend.insert_new(newer_gen, entry)
+      end
+    end)
+  end
+
+  defp put_new_entries(meta_tab, backend, entries, chunk_size) when is_list(entries) do
+    do_put_new_entries(meta_tab, backend, entries, fn newer_gen, older_gen ->
+      with true <- backend.insert_new(older_gen, entries) do
+        keys = Enum.map(entries, fn entry(key: key) -> key end)
+
+        _ = do_delete_all(backend, older_gen, keys, chunk_size)
+
+        backend.insert_new(newer_gen, entries)
       end
     end)
   end
@@ -834,30 +844,33 @@ defmodule Nebulex.Adapters.Local do
 
       [newer_gen, older_gen] ->
         with false <- backend.update_element(newer_gen, key, updates),
-             entry() = entry <- pop_entry(older_gen, key, false, backend) do
+             [entry() = entry] <- backend.take(older_gen, key) do
           entry =
             Enum.reduce(updates, entry, fn
               {3, value}, acc -> entry(acc, value: value)
               {4, value}, acc -> entry(acc, touched: value)
-              {5, value}, acc -> entry(acc, ttl: value)
+              {5, value}, acc -> entry(acc, exp: value)
             end)
 
           backend.insert(newer_gen, entry)
+        else
+          [] -> false
+          other -> other
         end
     end
   end
 
-  defp do_delete_all(backend, tab, keys, batch_size) do
-    do_delete_all(backend, tab, keys, batch_size, 0)
+  defp do_delete_all(backend, tab, keys, chunk_size) do
+    do_delete_all(backend, tab, keys, chunk_size, 0)
   end
 
-  defp do_delete_all(backend, tab, [key], _batch_size, deleted) do
+  defp do_delete_all(backend, tab, [key], _chunk_size, deleted) do
     true = backend.delete(tab, key)
 
     deleted + 1
   end
 
-  defp do_delete_all(backend, tab, [k1, k2 | keys], batch_size, deleted) do
+  defp do_delete_all(backend, tab, [k1, k2 | keys], chunk_size, deleted) do
     k1 = if is_tuple(k1), do: {k1}, else: k1
     k2 = if is_tuple(k2), do: {k2}, else: k2
 
@@ -865,87 +878,82 @@ defmodule Nebulex.Adapters.Local do
       backend,
       tab,
       keys,
-      batch_size,
+      chunk_size,
       deleted,
       2,
       {:orelse, {:==, :"$1", k1}, {:==, :"$1", k2}}
     )
   end
 
-  defp do_delete_all(backend, tab, [], _batch_size, deleted, _count, acc) do
+  defp do_delete_all(backend, tab, [], _chunk_size, deleted, _count, acc) do
     backend.select_delete(tab, delete_all_match_spec(acc)) + deleted
   end
 
-  defp do_delete_all(backend, tab, keys, batch_size, deleted, count, acc)
-       when count >= batch_size do
+  defp do_delete_all(backend, tab, keys, chunk_size, deleted, count, acc)
+       when count >= chunk_size do
     deleted = backend.select_delete(tab, delete_all_match_spec(acc)) + deleted
 
-    do_delete_all(backend, tab, keys, batch_size, deleted)
+    do_delete_all(backend, tab, keys, chunk_size, deleted)
   end
 
-  defp do_delete_all(backend, tab, [k | keys], batch_size, deleted, count, acc) do
+  defp do_delete_all(backend, tab, [k | keys], chunk_size, deleted, count, acc) do
     k = if is_tuple(k), do: {k}, else: k
 
     do_delete_all(
       backend,
       tab,
       keys,
-      batch_size,
+      chunk_size,
       deleted,
       count + 1,
       {:orelse, acc, {:==, :"$1", k}}
     )
   end
 
-  defp return(entry_or_entries, field \\ nil)
-
-  defp return(nil, _field), do: nil
-  defp return(:"$expired", _field), do: :"$expired"
-  defp return(entry(value: value), :value), do: value
-  defp return(entry(key: _) = entry, _field), do: entry
-
-  defp return(entries, field) when is_list(entries) do
-    Enum.map(entries, &return(&1, field))
+  defp return({:ok, entry(value: value)}, :value) do
+    {:ok, value}
   end
 
-  defp validate_ttl(nil, _, _), do: nil
-  defp validate_ttl(entry(ttl: :infinity) = entry, _, _), do: entry
-
-  defp validate_ttl(entry(key: key, touched: touched, ttl: ttl) = entry, gen, backend) do
-    if Time.now() - touched >= ttl do
-      true = backend.delete(gen, key)
-      :"$expired"
-    else
-      entry
-    end
+  defp return({:ok, entries}, :value) when is_list(entries) do
+    {:ok, for(entry(value: value) <- entries, do: value)}
   end
 
-  defp validate_ttl(entries, gen, backend) when is_list(entries) do
-    Enum.filter(entries, fn entry ->
-      not is_nil(validate_ttl(entry, gen, backend))
-    end)
+  defp return(other, _field) do
+    other
   end
-
-  defp handle_expired(:"$expired"), do: nil
-  defp handle_expired(result), do: result
 
   defp validate_match_spec(spec, opts) when spec in [nil, :unexpired, :expired] do
     [
       {
-        entry(key: :"$1", value: :"$2", touched: :"$3", ttl: :"$4"),
+        entry(key: :"$1", value: :"$2", touched: :"$3", exp: :"$4"),
         if(spec = comp_match_spec(spec), do: [spec], else: []),
         ret_match_spec(opts)
       }
     ]
+    |> wrap_ok()
   end
 
   defp validate_match_spec(spec, _opts) do
     case :ets.test_ms(test_ms(), spec) do
       {:ok, _result} ->
-        spec
+        {:ok, spec}
 
       {:error, _result} ->
-        raise Nebulex.QueryError, message: "invalid match spec", query: spec
+        msg = """
+        expected query to be one of:
+
+        - `nil` - match all entries
+        - `:unexpired` - match only unexpired entries
+        - `:expired` - match only expired entries
+        - `{:in, list_of_keys}` - special form only available for delete_all
+        - `:ets.match_spec()` - ETS match spec
+
+        but got:
+
+        #{inspect(spec, pretty: true)}
+        """
+
+        wrap_error Nebulex.QueryError, message: msg, query: spec
     end
   end
 
@@ -953,7 +961,7 @@ defmodule Nebulex.Adapters.Local do
     do: nil
 
   defp comp_match_spec(:unexpired),
-    do: {:orelse, {:==, :"$4", :infinity}, {:<, {:-, Time.now(), :"$3"}, :"$4"}}
+    do: {:orelse, {:==, :"$4", :infinity}, {:<, Time.now(), :"$4"}}
 
   defp comp_match_spec(:expired),
     do: {:not, comp_match_spec(:unexpired)}
@@ -963,7 +971,7 @@ defmodule Nebulex.Adapters.Local do
       :key -> [:"$1"]
       :value -> [:"$2"]
       {:key, :value} -> [{{:"$1", :"$2"}}]
-      :entry -> [%Entry{key: :"$1", value: :"$2", touched: :"$3", ttl: :"$4"}]
+      :entry -> [%Entry{key: :"$1", value: :"$2", touched: :"$3", exp: :"$4"}]
     end
   end
 
@@ -979,12 +987,12 @@ defmodule Nebulex.Adapters.Local do
   defp delete_all_match_spec(conds) do
     [
       {
-        entry(key: :"$1", value: :"$2", touched: :"$3", ttl: :"$4"),
+        entry(key: :"$1", value: :"$2", touched: :"$3", exp: :"$4"),
         [conds],
         [true]
       }
     ]
   end
 
-  defp test_ms, do: entry(key: 1, value: 1, touched: Time.now(), ttl: 1000)
+  defp test_ms, do: entry(key: 1, value: 1, touched: Time.now(), exp: 1000)
 end

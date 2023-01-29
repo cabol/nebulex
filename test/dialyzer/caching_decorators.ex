@@ -19,7 +19,12 @@ defmodule Nebulex.Dialyzer.CachingDecorators do
   end
 
   @spec get_account_by_username(binary) :: Account.t()
-  @decorate cacheable(cache: Cache, key: {Account, username}, opts: [ttl: @ttl])
+  @decorate cacheable(
+              cache: Cache,
+              key: {Account, username},
+              references: & &1.id,
+              opts: [ttl: @ttl]
+            )
   def get_account_by_username(username) do
     %Account{username: username}
   end
@@ -47,20 +52,20 @@ defmodule Nebulex.Dialyzer.CachingDecorators do
     acct
   end
 
-  @spec delete_all_accounts(term) :: :ok
+  @spec delete_all_accounts(term) :: term
   @decorate cache_evict(cache: Cache, all_entries: true)
   def delete_all_accounts(filter) do
     filter
   end
 
-  @spec get_user_key(integer) :: binary
+  @spec get_user_key(binary) :: binary
   @decorate cacheable(
               cache: {__MODULE__, :dynamic_cache, [:dynamic]},
               key_generator: {__MODULE__, [id]}
             )
   def get_user_key(id), do: id
 
-  @spec update_user_key(integer) :: binary
+  @spec update_user_key(binary) :: binary
   @decorate cacheable(cache: Cache, key_generator: {__MODULE__, :generate_key, [id]})
   def update_user_key(id), do: id
 

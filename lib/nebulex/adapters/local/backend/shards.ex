@@ -20,6 +20,7 @@ if Code.ensure_loaded?(:shards) do
       @impl true
       def init(meta_tab) do
         :ok = Metadata.put(meta_tab, :shards_sup, self())
+
         DynamicSupervisor.init(strategy: :one_for_one)
       end
     end
@@ -32,14 +33,7 @@ if Code.ensure_loaded?(:shards) do
 
     @doc false
     def child_spec(opts) do
-      partitions =
-        get_option(
-          opts,
-          :partitions,
-          "an integer > 0",
-          &(is_integer(&1) and &1 > 0),
-          System.schedulers_online()
-        )
+      partitions = Keyword.get_lazy(opts, :partitions, &System.schedulers_online/0)
 
       meta_tab =
         opts
@@ -73,6 +67,7 @@ if Code.ensure_loaded?(:shards) do
     def start_table(opts) do
       tab = :shards.new(__MODULE__, opts)
       pid = :shards_meta.tab_pid(tab)
+
       {:ok, pid, tab}
     end
 

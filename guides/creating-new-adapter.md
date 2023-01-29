@@ -231,10 +231,10 @@ mix test
  54) test put_all/2 puts the given entries using different data types at once (NebulexMemoryAdapterTest)
      test/nebulex_memory_adapter_test.exs:128
      ** (UndefinedFunctionError) function NebulexMemoryAdapter.TestCache.delete_all/0 is undefined or private. Did you mean:
-     
+
            * delete/1
            * delete/2
-     
+
      stacktrace:
        (nebulex_memory_adapter 0.1.0) NebulexMemoryAdapter.TestCache.delete_all()
        test/nebulex_memory_adapter_test.exs:9: NebulexMemoryAdapterTest.__ex_unit_setup_0/1
@@ -256,21 +256,25 @@ defmodule NebulexMemoryAdapter do
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Queryable
 
+  import Nebulex.Helpers
+
   @impl Nebulex.Adapter
   defmacro __before_compile__(_env), do: :ok
 
   @impl Nebulex.Adapter
   def init(_opts) do
     child_spec = Supervisor.child_spec({Agent, fn -> %{} end}, id: {Agent, 1})
+
     {:ok, child_spec, %{}}
   end
 
   @impl Nebulex.Adapter.Queryable
   def execute(adapter_meta, :delete_all, query, opts) do
     deleted = Agent.get(adapter_meta.pid, &map_size/1)
+
     Agent.update(adapter_meta.pid, fn _state -> %{} end)
 
-    deleted
+    wrap_ok deleted
   end
 end
 ```
@@ -304,23 +308,26 @@ defmodule NebulexMemoryAdapter do
   @behaviour Nebulex.Adapter.Entry
   @behaviour Nebulex.Adapter.Queryable
 
+  import Nebulex.Helpers
+
   @impl Nebulex.Adapter
   defmacro __before_compile__(_env), do: :ok
 
   @impl Nebulex.Adapter
   def init(_opts) do
     child_spec = Supervisor.child_spec({Agent, fn -> %{} end}, id: {Agent, 1})
+
     {:ok, child_spec, %{}}
   end
 
   @impl Nebulex.Adapter.Entry
-  def get(adapter_meta, key, _opts) do
-    Agent.get(adapter_meta.pid, &Map.get(&1, key))
+  def fetch(adapter_meta, key, _opts) do
+    wrap_ok Agent.get(adapter_meta.pid, &Map.get(&1, key))
   end
 
   @impl Nebulex.Adapter.Entry
   def get_all(adapter_meta, keys, _opts) do
-    Agent.get(adapter_meta.pid, &Map.take(&1, keys))
+    wrap_ok Agent.get(adapter_meta.pid, &Map.take(&1, keys))
   end
 
   @impl Nebulex.Adapter.Entry
@@ -331,48 +338,58 @@ defmodule NebulexMemoryAdapter do
       put(adapter_meta, key, value, ttl, :put, opts)
       true
     end
+    |> wrap_ok()
   end
 
   def put(adapter_meta, key, value, ttl, :replace, opts) do
     if get(adapter_meta, key, []) do
       put(adapter_meta, key, value, ttl, :put, opts)
+
       true
     else
       false
     end
+    |> wrap_ok()
   end
 
   def put(adapter_meta, key, value, _ttl, _on_write, _opts) do
     Agent.update(adapter_meta.pid, &Map.put(&1, key, value))
-    true
+
+    wrap_ok true
   end
 
   @impl Nebulex.Adapter.Entry
   def put_all(adapter_meta, entries, ttl, :put_new, opts) do
     if get_all(adapter_meta, Map.keys(entries), []) == %{} do
       put_all(adapter_meta, entries, ttl, :put, opts)
+
       true
     else
       false
     end
+    |> wrap_ok()
   end
 
   def put_all(adapter_meta, entries, _ttl, _on_write, _opts) do
     entries = Map.new(entries)
+
     Agent.update(adapter_meta.pid, &Map.merge(&1, entries))
-    true
+
+    wrap_ok true
   end
 
   @impl Nebulex.Adapter.Entry
   def delete(adapter_meta, key, _opts) do
-    Agent.update(adapter_meta.pid, &Map.delete(&1, key))
+    wrap_ok Agent.update(adapter_meta.pid, &Map.delete(&1, key))
   end
 
   @impl Nebulex.Adapter.Entry
   def take(adapter_meta, key, _opts) do
     value = get(adapter_meta, key, [])
+
     delete(adapter_meta, key, [])
-    value
+
+    wrap_ok value
   end
 
   @impl Nebulex.Adapter.Entry
@@ -381,48 +398,51 @@ defmodule NebulexMemoryAdapter do
       Map.update(state, key, default + amount, fn v -> v + amount end)
     end)
 
-    get(adapter_meta, key, [])
+    wrap_ok get(adapter_meta, key, [])
   end
 
   @impl Nebulex.Adapter.Entry
-  def has_key?(adapter_meta, key) do
-    Agent.get(adapter_meta.pid, &Map.has_key?(&1, key))
+  def has_key?(adapter_meta, key, _opts) do
+    wrap_ok Agent.get(adapter_meta.pid, &Map.has_key?(&1, key))
   end
 
   @impl Nebulex.Adapter.Entry
-  def ttl(_adapter_meta, _key) do
-    nil
+  def ttl(_adapter_meta, _key, _opts) do
+    wrap_ok nil
   end
 
   @impl Nebulex.Adapter.Entry
-  def expire(_adapter_meta, _key, _ttl) do
-    true
+  def expire(_adapter_meta, _key, _ttl, _opts) do
+    wrap_ok true
   end
 
   @impl Nebulex.Adapter.Entry
-  def touch(_adapter_meta, _key) do
-    true
+  def touch(_adapter_meta, _key, _opts) do
+    wrap_ok true
   end
 
   @impl Nebulex.Adapter.Queryable
   def execute(adapter_meta, :delete_all, _query, _opts) do
     deleted = execute(adapter_meta, :count_all, nil, [])
+
     Agent.update(adapter_meta.pid, fn _state -> %{} end)
 
-    deleted
+    wrap_ok deleted
   end
 
   def execute(adapter_meta, :count_all, _query, _opts) do
-    Agent.get(adapter_meta.pid, &map_size/1)
+    wrap_ok Agent.get(adapter_meta.pid, &map_size/1)
   end
 
   def execute(adapter_meta, :all, _query, _opts) do
-    Agent.get(adapter_meta.pid, &Map.values/1)
+    wrap_ok Agent.get(adapter_meta.pid, &Map.values/1)
   end
 
   @impl Nebulex.Adapter.Queryable
   def stream(_adapter_meta, :invalid_query, _opts) do
     raise Nebulex.QueryError, message: "foo", query: :invalid_query
+
+    wrap_error Nebulex.QueryError, message: "foo", query: :invalid_query
   end
 
   def stream(adapter_meta, _query, opts) do
@@ -438,7 +458,7 @@ defmodule NebulexMemoryAdapter do
           &Map.keys/1
       end
 
-    Agent.get(adapter_meta.pid, fun)
+    wrap_ok Agent.get(adapter_meta.pid, fun)
   end
 end
 ```

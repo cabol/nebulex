@@ -81,7 +81,7 @@ defmodule Nebulex.TelemetryTest do
   ## Tests
 
   describe "span/3" do
-    setup_with_cache(Cache, @config)
+    setup_with_cache Cache, @config
 
     test "ok: emits start and stop events" do
       with_telemetry_handler(__MODULE__, @start_events ++ @stop_events, fn ->
@@ -98,7 +98,7 @@ defmodule Nebulex.TelemetryTest do
           assert measurements[:duration] > 0
           assert metadata[:adapter_meta][:cache] == cache
           assert metadata[:args] == ["foo", "bar", :infinity, :put, []]
-          assert metadata[:result] == true
+          assert metadata[:result] == {:ok, true}
           assert metadata[:telemetry_span_context] |> is_reference()
         end
       end)
@@ -106,7 +106,7 @@ defmodule Nebulex.TelemetryTest do
 
     test "raise: emits start and exception events" do
       with_telemetry_handler(__MODULE__, @exception_events, fn ->
-        Adapter.with_meta(Cache.L3.Primary, fn _, meta ->
+        Adapter.with_meta(Cache.L3.Primary, fn meta ->
           true = :ets.delete(meta.meta_tab)
         end)
 
@@ -153,11 +153,11 @@ defmodule Nebulex.TelemetryTest do
   end
 
   describe "span/3 bypassed" do
-    setup_with_cache(Cache, Keyword.put(@config, :telemetry, false))
+    setup_with_cache Cache, Keyword.put(@config, :telemetry, false)
 
     test "telemetry set to false" do
       for cache <- @caches do
-        Adapter.with_meta(cache, fn _, meta ->
+        Adapter.with_meta(cache, fn meta ->
           assert meta.telemetry == false
         end)
       end

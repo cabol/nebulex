@@ -30,11 +30,11 @@ defmodule Nebulex.Adapters.Local.Generation do
       the check to release memory is not performed (the default).
 
     * `:allocated_memory` - If it is set, an integer > 0 is expected defining
-      the max size in bytes allocated for a cache generation. When this option
-      is set and the configured value is reached, a new cache generation is
-      created so the oldest is deleted and force releasing memory space.
-      If it is not set (`nil`), the cleanup check to release memory is
-      not performed (the default).
+      the max size in bytes for the cache storage. When this option is set
+      and the configured value is reached, a new cache generation is created
+      so the oldest is deleted and force releasing memory space. If it is not
+      set (`nil`), the cleanup check to release memory is not performed
+      (the default).
 
     * `:gc_cleanup_min_timeout` - An integer > 0 defining the min timeout in
       milliseconds for triggering the next cleanup and memory check. This will
@@ -73,8 +73,7 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   alias Nebulex.Adapter
   alias Nebulex.Adapter.Stats
-  alias Nebulex.Adapters.Local
-  alias Nebulex.Adapters.Local.{Backend, Metadata}
+  alias Nebulex.Adapters.Local.{Backend, Metadata, Options}
   alias Nebulex.Telemetry
   alias Nebulex.Telemetry.StatsHandler
 
@@ -107,11 +106,14 @@ defmodule Nebulex.Adapters.Local.Generation do
       Nebulex.Adapters.Local.Generation.new(MyCache)
 
       Nebulex.Adapters.Local.Generation.new(MyCache, reset_timer: false)
+
   """
   @spec new(server_ref, opts) :: [atom]
   def new(server_ref, opts \\ []) do
-    reset_timer? = get_option(opts, :reset_timer, "boolean", &is_boolean/1, true)
-    do_call(server_ref, {:new_generation, reset_timer?})
+    # Validate options
+    opts = Options.validate!(opts)
+
+    do_call(server_ref, {:new_generation, Keyword.fetch!(opts, :reset_timer)})
   end
 
   @doc """
@@ -120,8 +122,9 @@ defmodule Nebulex.Adapters.Local.Generation do
   ## Example
 
       Nebulex.Adapters.Local.Generation.delete_all(MyCache)
+
   """
-  @spec delete_all(server_ref) :: integer
+  @spec delete_all(server_ref) :: :ok
   def delete_all(server_ref) do
     do_call(server_ref, :delete_all)
   end
@@ -134,6 +137,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   ## Example
 
       Nebulex.Adapters.Local.Generation.realloc(MyCache, 1_000_000)
+
   """
   @spec realloc(server_ref, pos_integer) :: :ok
   def realloc(server_ref, size) do
@@ -146,6 +150,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   ## Example
 
       Nebulex.Adapters.Local.Generation.memory_info(MyCache)
+
   """
   @spec memory_info(server_ref) :: {used_mem :: non_neg_integer, total_mem :: non_neg_integer}
   def memory_info(server_ref) do
@@ -158,6 +163,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   ## Example
 
       Nebulex.Adapters.Local.Generation.reset_timer(MyCache)
+
   """
   def reset_timer(server_ref) do
     server_ref
@@ -171,6 +177,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   ## Example
 
       Nebulex.Adapters.Local.Generation.list(MyCache)
+
   """
   @spec list(server_ref) :: [:ets.tid()]
   def list(server_ref) do
@@ -185,6 +192,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   ## Example
 
       Nebulex.Adapters.Local.Generation.newer(MyCache)
+
   """
   @spec newer(server_ref) :: :ets.tid()
   def newer(server_ref) do
@@ -200,6 +208,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   ## Example
 
       Nebulex.Adapters.Local.Generation.server(MyCache)
+
   """
   @spec server(server_ref) :: pid
   def server(server_ref) do
@@ -225,9 +234,7 @@ defmodule Nebulex.Adapters.Local.Generation do
   end
 
   defp get_meta_tab(server_ref) when is_atom(server_ref) or is_pid(server_ref) do
-    Adapter.with_meta(server_ref, fn _, %{meta_tab: meta_tab} ->
-      meta_tab
-    end)
+    unwrap_or_raise Adapter.with_meta(server_ref, & &1.meta_tab)
   end
 
   defp get_meta_tab(server_ref), do: server_ref
@@ -267,19 +274,25 @@ defmodule Nebulex.Adapters.Local.Generation do
     meta_tab = Map.fetch!(adapter_meta, :meta_tab)
     :ok = Metadata.put(meta_tab, :gc_pid, self())
 
-    # Common validators
-    pos_integer = &(is_integer(&1) and &1 > 0)
-    pos_integer_or_nil = &((is_integer(&1) and &1 > 0) or is_nil(&1))
+    gc_opts =
+      opts
+      |> Keyword.take([
+        :gc_interval,
+        :max_size,
+        :allocated_memory,
+        :gc_cleanup_min_timeout,
+        :gc_cleanup_max_timeout,
+        :reset_timer
+      ])
+      |> Options.validate!()
 
     Map.merge(adapter_meta, %{
       backend_opts: Keyword.get(opts, :backend_opts, []),
-      gc_interval: get_option(opts, :gc_interval, "an integer > 0", pos_integer_or_nil),
-      max_size: get_option(opts, :max_size, "an integer > 0", pos_integer_or_nil),
-      allocated_memory: get_option(opts, :allocated_memory, "an integer > 0", pos_integer_or_nil),
-      gc_cleanup_min_timeout:
-        get_option(opts, :gc_cleanup_min_timeout, "an integer > 0", pos_integer, 10_000),
-      gc_cleanup_max_timeout:
-        get_option(opts, :gc_cleanup_max_timeout, "an integer > 0", pos_integer, 600_000)
+      gc_interval: Keyword.get(gc_opts, :gc_interval),
+      max_size: Keyword.get(gc_opts, :max_size),
+      allocated_memory: Keyword.get(gc_opts, :allocated_memory),
+      gc_cleanup_min_timeout: Keyword.get(gc_opts, :gc_cleanup_min_timeout),
+      gc_cleanup_max_timeout: Keyword.get(gc_opts, :gc_cleanup_max_timeout)
     })
   end
 
@@ -307,22 +320,14 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   @impl true
   def handle_call(:delete_all, _from, %__MODULE__{} = state) do
-    # Get current size
-    size =
-      state
-      |> Map.from_struct()
-      |> Local.execute(:count_all, nil, [])
-
-    # Create new generation
     :ok = new_gen(state)
 
-    # Delete all objects
     :ok =
       state.meta_tab
       |> list()
       |> Enum.each(&state.backend.delete_all_objects(&1))
 
-    {:reply, size, %{state | gc_heartbeat_ref: maybe_reset_timer(true, state)}}
+    {:reply, :ok, %{state | gc_heartbeat_ref: maybe_reset_timer(true, state)}}
   end
 
   def handle_call({:new_generation, reset_timer?}, _from, state) do
@@ -479,7 +484,7 @@ defmodule Nebulex.Adapters.Local.Generation do
         :ok = Metadata.put(meta_tab, :generations, [gen_tab, newer])
 
       [] ->
-        # Update generations
+        # update generations
         :ok = Metadata.put(meta_tab, :generations, [gen_tab])
     end
   end
@@ -504,10 +509,13 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   defp start_timer(time, ref \\ nil, event \\ :heartbeat)
 
-  defp start_timer(nil, _, _), do: nil
+  defp start_timer(nil, _, _) do
+    nil
+  end
 
   defp start_timer(time, ref, event) do
     _ = if ref, do: Process.cancel_timer(ref)
+
     Process.send_after(self(), event, time)
   end
 
