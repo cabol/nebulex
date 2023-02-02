@@ -1,4 +1,4 @@
-defmodule Nebulex.Adapters.Local.GenerationNewTest do
+defmodule GenerationNewTest do
   use ExUnit.Case, async: true
 
   defmodule LocalWithSizeLimit do
@@ -10,14 +10,14 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
 
   import Nebulex.CacheCase
 
+  alias GenerationNewTest.LocalWithSizeLimit
   alias Nebulex.Adapters.Local.Generation
-  alias Nebulex.Adapters.Local.GenerationNewTest.LocalWithSizeLimit
 
   describe "generation_new init" do
     test "ok: with default options" do
       assert {:ok, _pid} = LocalWithSizeLimit.start_link()
 
-      assert %Nebulex.Adapters.Local.Generation{
+      assert %Generation{
                allocated_memory: nil,
                backend: :ets,
                backend_opts: [
@@ -50,7 +50,7 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
                  generation_allocated_memory: 1000
                )
 
-      assert %Nebulex.Adapters.Local.Generation{
+      assert %Generation{
                allocated_memory: 1000,
                backend: :ets,
                backend_opts: [
@@ -202,7 +202,7 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
       _ = cache_put(LocalWithSizeLimit, 1..2)
 
       # Manually trigger cleanup
-      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+      :ok = Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
       assert generations_len(LocalWithSizeLimit) == 1
 
@@ -212,7 +212,7 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
       assert LocalWithSizeLimit.count_all() == 4
 
       # Manually trigger cleanup
-      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+      :ok = Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
       # There should be 2 generation now
       assert generations_len(LocalWithSizeLimit) == 2
@@ -221,7 +221,7 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
       assert LocalWithSizeLimit.count_all() == 4
 
       # Manually trigger cleanup, no cleanup
-      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+      :ok = Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
       # The entries should be still in the older generation
       assert LocalWithSizeLimit.count_all() == 4
@@ -233,7 +233,7 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
       assert LocalWithSizeLimit.count_all() == 9
 
       # Manually trigger cleanup
-      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+      :ok = Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
       # The entries should be in the older generation yet
       assert LocalWithSizeLimit.count_all() == 5
@@ -241,7 +241,7 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
       _ = cache_put(LocalWithSizeLimit, 11..12)
 
       # Manually trigger cleanup
-      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+      :ok = Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
       # The entries should be in the older generation yet
       assert LocalWithSizeLimit.count_all() == 7
@@ -250,13 +250,13 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
       _ = cache_put(LocalWithSizeLimit, 13..16)
 
       # Manually trigger cleanup
-      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+      :ok = Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
       # The entries should be in the older generation yet
       assert LocalWithSizeLimit.count_all() == 6
 
       # Manually trigger cleanup
-      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+      :ok = Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
       # Cache should be empty now
       assert LocalWithSizeLimit.count_all() == 6
@@ -274,23 +274,23 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
       _ = cache_put(LocalWithSizeLimit, 1..4)
 
       # Manually trigger cleanup
-      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+      :ok = Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
       assert generations_len(LocalWithSizeLimit) == 2
 
       _ = cache_put(LocalWithSizeLimit, 5..8)
 
-      :ok = Nebulex.Adapters.Local.Generation.enable_gc(LocalWithSizeLimit, false)
-      :ok = Nebulex.Adapters.Local.Generation.enable_gc(LocalWithSizeLimit, false)
+      :ok = Generation.enable_gc(LocalWithSizeLimit, false)
+      :ok = Generation.enable_gc(LocalWithSizeLimit, false)
 
-      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+      :ok = Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
       assert 8 == LocalWithSizeLimit.count_all()
 
-      :ok = Nebulex.Adapters.Local.Generation.enable_gc(LocalWithSizeLimit, true)
-      :ok = Nebulex.Adapters.Local.Generation.enable_gc(LocalWithSizeLimit, true)
+      :ok = Generation.enable_gc(LocalWithSizeLimit, true)
+      :ok = Generation.enable_gc(LocalWithSizeLimit, true)
 
-      :ok = Nebulex.Adapters.Local.Generation.maybe_generation_cleanup(LocalWithSizeLimit)
+      :ok = Generation.maybe_generation_cleanup(LocalWithSizeLimit)
 
       assert 4 == LocalWithSizeLimit.count_all()
 
