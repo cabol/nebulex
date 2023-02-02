@@ -295,7 +295,6 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
       assert 4 == LocalWithSizeLimit.count_all()
 
       LocalWithSizeLimit.stop()
-
     end
   end
 

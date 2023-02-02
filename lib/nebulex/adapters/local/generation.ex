@@ -428,6 +428,7 @@ defmodule Nebulex.Adapters.Local.Generation do
         not enable and generation_cleanup_ref != nil ->
           Process.cancel_timer(generation_cleanup_ref)
           nil
+
         true ->
           generation_cleanup_ref
       end
@@ -516,8 +517,9 @@ defmodule Nebulex.Adapters.Local.Generation do
     # IO.puts("size: #{size} memory: #{memory} diff: #{now - generation_created_at}")
     # IO.inspect(state, label: "state")
 
-    if generation_cleanup_ref != nil and (size > generation_max_size or memory > generation_allocated_memory or
-         now - generation_created_at > generation_start_timeout) do
+    if generation_cleanup_ref != nil and
+         (size > generation_max_size or memory > generation_allocated_memory or
+            now - generation_created_at > generation_start_timeout) do
       new_gen(state)
       %{state | generation_created_at: now}
     else
