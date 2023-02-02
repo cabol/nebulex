@@ -42,7 +42,7 @@ defmodule Nebulex.Adapters.Local.GenerationNewTest do
       :ok = LocalWithSizeLimit.stop()
     end
 
-    test "ok: with custom options" do
+    test "ok:  with custom options" do
       assert {:ok, _pid} =
                LocalWithSizeLimit.start_link(
                  generation_cleanup_timeout: 3_000,
