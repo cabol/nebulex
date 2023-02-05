@@ -27,16 +27,12 @@ defmodule Nebulex.Cache.Stats do
     """
     def dispatch_stats(name, opts \\ []) do
       Adapter.with_meta(name, fn %{adapter: adapter} = meta ->
-        with true <- is_list(meta.telemetry_prefix),
-             {:ok, %Nebulex.Stats{} = info} <- adapter.stats(meta) do
+        with {:ok, %Nebulex.Stats{} = info} <- adapter.stats(meta) do
           :telemetry.execute(
             meta.telemetry_prefix ++ [:stats],
             info.measurements,
             Map.merge(info.metadata, opts[:metadata] || %{})
           )
-        else
-          {:error, _} = error -> error
-          _ -> :ok
         end
       end)
     end

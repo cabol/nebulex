@@ -24,6 +24,7 @@ defmodule Mix.Tasks.Nbx do
 
   defp general do
     _ = Application.ensure_all_started(:nebulex)
+
     Mix.shell().info("Nebulex v#{Application.spec(:nebulex, :vsn)}")
     Mix.shell().info("In-Process and Distributed Cache Toolkit for Elixir.")
 

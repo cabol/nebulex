@@ -115,11 +115,11 @@ defmodule Nebulex.Adapter do
 
   ## Private Functions
 
-  defp build_defspan(fun, opts) when is_list(opts) do
+  defp build_defspan(ast, opts) when is_list(opts) do
     {name, args} =
-      case Macro.decompose_call(fun) do
-        {_, _} = pair -> pair
-        _ -> raise ArgumentError, "invalid syntax in defspan #{Macro.to_string(fun)}"
+      case Macro.decompose_call(ast) do
+        {_, _} = parts -> parts
+        _ -> raise ArgumentError, "invalid syntax in defspan #{Macro.to_string(ast)}"
       end
 
     as = Keyword.get(opts, :as, name)

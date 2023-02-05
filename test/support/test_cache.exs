@@ -18,90 +18,16 @@ defmodule Nebulex.TestCache do
     @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
+      adapter: Nebulex.TestAdapter
 
     use Nebulex.TestCache.Common
-  end
-
-  defmodule Partitioned do
-    @moduledoc false
-    use Nebulex.Cache,
-      otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Partitioned
-
-    use Nebulex.TestCache.Common
-  end
-
-  defmodule Replicated do
-    @moduledoc false
-    use Nebulex.Cache,
-      otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Replicated
-
-    use Nebulex.TestCache.Common
-  end
-
-  defmodule Multilevel do
-    @moduledoc false
-    use Nebulex.Cache,
-      otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Multilevel
-
-    defmodule L1 do
-      @moduledoc false
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Local
-    end
-
-    defmodule L2 do
-      @moduledoc false
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Partitioned
-    end
-
-    defmodule L3 do
-      @moduledoc false
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Replicated
-    end
   end
 
   defmodule StatsCache do
     @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Multilevel
-
-    defmodule L1 do
-      @moduledoc false
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Local
-    end
-
-    defmodule L2 do
-      @moduledoc false
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Replicated
-    end
-
-    defmodule L3 do
-      @moduledoc false
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Partitioned
-    end
-
-    defmodule L4 do
-      @moduledoc false
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Local
-    end
+      adapter: Nebulex.TestAdapter
   end
 
   ## Mocks
@@ -193,21 +119,5 @@ defmodule Nebulex.TestCache do
 
     @impl true
     def stream(_, _, _), do: {:ok, 1..10}
-  end
-
-  defmodule PartitionedMock do
-    @moduledoc false
-    use Nebulex.Cache,
-      otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Partitioned,
-      primary_storage_adapter: Nebulex.TestCache.AdapterMock
-  end
-
-  defmodule ReplicatedMock do
-    @moduledoc false
-    use Nebulex.Cache,
-      otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Replicated,
-      primary_storage_adapter: Nebulex.TestCache.AdapterMock
   end
 end

@@ -1,4 +1,4 @@
-defmodule Nebulex.CacheTest do
+defmodule Nebulex.CacheTestCase do
   @moduledoc """
   Shared Tests
   """
@@ -6,7 +6,6 @@ defmodule Nebulex.CacheTest do
   defmacro __using__(_opts) do
     quote do
       use Nebulex.Cache.EntryTest
-      use Nebulex.Cache.EntryBooleanValuesTest
       use Nebulex.Cache.EntryExpirationTest
       use Nebulex.Cache.EntryPropTest
       use Nebulex.Cache.QueryableTest

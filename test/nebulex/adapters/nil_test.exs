@@ -36,7 +36,7 @@ defmodule Nebulex.Adapters.NilTest do
     end
 
     test "get_all", %{cache: cache} do
-      assert cache.get_all("foo") == {:ok, %{}}
+      assert cache.get_all(["foo"]) == {:ok, %{}}
     end
 
     test "delete", %{cache: cache} do

@@ -1,4 +1,4 @@
-defmodule Nebulex.Adapters.LocalErrorTest do
+defmodule Nebulex.CacheErrorTest do
   use ExUnit.Case, async: true
   use Mimic
 
@@ -10,7 +10,7 @@ defmodule Nebulex.Adapters.LocalErrorTest do
     Nebulex.Cache.Registry
     |> expect(:lookup, fn _ -> {:ok, %{adapter: Nebulex.FakeAdapter}} end)
 
-    {:ok, cache: Nebulex.TestCache.Cache, name: :local_error_cache}
+    {:ok, cache: Nebulex.TestCache.Cache, name: :test_cache_local_error}
   end
 
   describe "put!/3" do

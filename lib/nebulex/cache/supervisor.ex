@@ -94,18 +94,14 @@ defmodule Nebulex.Cache.Supervisor do
 
   @doc false
   def start_child({mod, fun, args}, name, cache, adapter, meta) do
-    case apply(mod, fun, args) do
-      {:ok, pid} ->
-        # Add the pid and the adapter to the meta
-        meta = Map.merge(meta, %{pid: pid, cache: cache, adapter: adapter})
+    with {:ok, pid} <- apply(mod, fun, args) do
+      # Add to the metadata: pid, name, cache, and adapter
+      meta = Map.merge(meta, %{pid: pid, name: name, cache: cache, adapter: adapter})
 
-        # Register the started cache's pid
-        :ok = Nebulex.Cache.Registry.register(self(), name, meta)
+      # Register the started cache's pid
+      :ok = Nebulex.Cache.Registry.register(self(), name, meta)
 
-        {:ok, pid}
-
-      other ->
-        other
+      {:ok, pid}
     end
   end
 

@@ -12,14 +12,14 @@ defmodule Nebulex.CachingTest do
     @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
+      adapter: Nebulex.TestAdapter
   end
 
   defmodule CacheWithDefaultKeyGenerator do
     @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local,
+      adapter: Nebulex.TestAdapter,
       default_key_generator: __MODULE__
 
     @behaviour Nebulex.Caching.KeyGenerator
@@ -32,7 +32,7 @@ defmodule Nebulex.CachingTest do
     @moduledoc false
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
+      adapter: Nebulex.TestAdapter
   end
 
   defmodule Meta do

@@ -4,7 +4,7 @@ defmodule Nebulex.Cache.SupervisorTest do
   defmodule MyCache do
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Local
+      adapter: Nebulex.TestAdapter
 
     @impl true
     def init(opts) do

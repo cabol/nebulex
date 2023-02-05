@@ -20,6 +20,14 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.fetch("foo") == {:ok, nil}
       end
 
+      test "puts a boolean value", %{cache: cache} do
+        assert cache.put(:boolean, true) == :ok
+        assert cache.fetch(:boolean) == {:ok, true}
+
+        assert cache.put(:boolean, false) == :ok
+        assert cache.fetch(:boolean) == {:ok, false}
+      end
+
       test "raises when invalid option is given", %{cache: cache} do
         assert_raise ArgumentError, ~r"expected ttl: to be a valid timeout", fn ->
           cache.put("hello", "world", ttl: "1")
@@ -73,6 +81,14 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.fetch(:mykey) == {:ok, nil}
       end
 
+      test "puts a boolean value", %{cache: cache} do
+        assert cache.put_new(true, true) == {:ok, true}
+        assert cache.fetch(true) == {:ok, true}
+
+        assert cache.put_new(false, false) == {:ok, true}
+        assert cache.fetch(false) == {:ok, false}
+      end
+
       test "raises when invalid option is given", %{cache: cache} do
         assert_raise ArgumentError, ~r"expected ttl: to be a valid timeout", fn ->
           cache.put_new("hello", "world", ttl: "1")
@@ -110,6 +126,16 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.fetch("hello") == {:ok, nil}
       end
 
+      test "existing boolean value", %{cache: cache} do
+        :ok = cache.put(:boolean, true)
+
+        assert cache.replace(:boolean, false) == {:ok, true}
+        assert cache.fetch(:boolean) == {:ok, false}
+
+        assert cache.replace(:boolean, true) == {:ok, true}
+        assert cache.fetch(:boolean) == {:ok, true}
+      end
+
       test "raises when invalid option is given", %{cache: cache} do
         assert_raise ArgumentError, ~r"expected ttl: to be a valid timeout", fn ->
           cache.replace("hello", "world", ttl: "1")
@@ -142,6 +168,7 @@ defmodule Nebulex.Cache.EntryTest do
       test "empty list or map has not any effect", %{cache: cache} do
         assert cache.put_all([]) == :ok
         assert cache.put_all(%{}) == :ok
+
         assert count = cache.count_all()
         assert cache.delete_all() == count
       end
@@ -155,7 +182,9 @@ defmodule Nebulex.Cache.EntryTest do
               "#{elem}" => elem,
               {:tuple, elem} => elem,
               <<100, elem>> => elem,
-              [elem] => elem
+              [elem] => elem,
+              true => true,
+              false => false
             }
 
             Map.merge(acc, sample)
@@ -194,6 +223,12 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.fetch!("apples") == 1
         assert cache.fetch!("bananas") == 3
         refute cache.get!("oranges")
+      end
+
+      test "puts a boolean values", %{cache: cache} do
+        assert cache.put_new_all(%{true => true, false => false}) == {:ok, true}
+        assert cache.fetch!(true) == true
+        assert cache.fetch!(false) == false
       end
 
       test "raises when invalid option is given", %{cache: cache} do
@@ -324,6 +359,22 @@ defmodule Nebulex.Cache.EntryTest do
         assert cache.delete(:non_existent) == :ok
         refute cache.get!(:non_existent)
       end
+
+      test "deletes boolean and nil values", %{cache: cache} do
+        :ok = cache.put_all(true: true, false: false, nil: nil)
+
+        assert cache.fetch!(true) == true
+        assert cache.fetch!(false) == false
+        assert cache.fetch!(nil) == nil
+
+        assert cache.delete(true) == :ok
+        assert cache.delete(false) == :ok
+        assert cache.delete(nil) == :ok
+
+        refute cache.get!(true)
+        refute cache.get!(false)
+        refute cache.get!(nil)
+      end
     end
 
     describe "delete!/2" do
@@ -344,6 +395,18 @@ defmodule Nebulex.Cache.EntryTest do
           assert cache.take(x) == {:ok, x}
           assert {:error, %Nebulex.KeyError{key: ^x}} = cache.take(x)
         end
+      end
+
+      test "returns boolean and nil values", %{cache: cache} do
+        :ok = cache.put_all(true: true, false: false, nil: nil)
+
+        assert cache.take(true) == {:ok, true}
+        assert cache.take(false) == {:ok, false}
+        assert cache.take(nil) == {:ok, nil}
+
+        refute cache.get!(true)
+        refute cache.get!(false)
+        refute cache.get!(nil)
       end
 
       test "returns nil if the key does not exist in cache", %{cache: cache} do
@@ -375,6 +438,14 @@ defmodule Nebulex.Cache.EntryTest do
 
           assert cache.has_key?(x) == {:ok, true}
         end
+      end
+
+      test "returns boolean and nil values", %{cache: cache} do
+        :ok = cache.put_all(true: true, false: false, nil: nil)
+
+        assert cache.has_key?(true) == {:ok, true}
+        assert cache.has_key?(false) == {:ok, true}
+        assert cache.has_key?(nil) == {:ok, true}
       end
 
       test "returns false if key does not exist in cache", %{cache: cache} do

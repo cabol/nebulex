@@ -8,7 +8,7 @@ defmodule Nebulex.MixProject do
     [
       app: :nebulex,
       version: @version,
-      elixir: "~> 1.9",
+      elixir: "~> 1.11",
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
       deps: deps(),
@@ -36,7 +36,7 @@ defmodule Nebulex.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support", "test/dialyzer"]
+  defp elixirc_paths(:test), do: ["lib", "test/dialyzer"]
   defp elixirc_paths(_), do: ["lib"]
 
   def application do
@@ -48,18 +48,16 @@ defmodule Nebulex.MixProject do
 
   defp deps do
     [
-      {:nimble_options, "~> 0.4"},
-      {:shards, "~> 1.0", optional: true},
+      {:nimble_options, "~> 0.5"},
       {:decorator, "~> 1.4", optional: true},
-      {:telemetry, "~> 0.4 or ~> 1.0", optional: true},
+      {:telemetry, "~> 1.2", optional: true},
 
       # Test & Code Analysis
-      {:excoveralls, "~> 0.14", only: :test},
+      {:excoveralls, "~> 0.15", only: :test},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.11", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 0.5", only: [:dev, :test]},
-      {:ex2ms, "~> 1.6", only: :test},
       {:mimic, "~> 1.7", only: :test},
 
       # Benchmark Test
@@ -67,7 +65,7 @@ defmodule Nebulex.MixProject do
       {:benchee_html, "~> 1.0", only: [:dev, :test]},
 
       # Docs
-      {:ex_doc, "~> 0.28", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.29", only: [:dev, :test], runtime: false},
       {:inch_ex, "~> 2.0", only: :docs}
     ]
   end
@@ -130,7 +128,7 @@ defmodule Nebulex.MixProject do
 
   defp dialyzer do
     [
-      plt_add_apps: [:shards, :mix, :telemetry, :ex_unit],
+      plt_add_apps: [:mix, :telemetry, :ex_unit],
       plt_file: {:no_warn, "priv/plts/" <> plt_file_name()},
       flags: [
         :unmatched_returns,

@@ -79,7 +79,7 @@ defmodule Nebulex.Adapters.Nil do
 
   @impl true
   def init(_opts) do
-    child_spec = Supervisor.child_spec({Agent, fn -> :ok end}, id: {Agent, 1})
+    child_spec = Supervisor.child_spec({Agent, fn -> :ok end}, id: Agent)
 
     {:ok, child_spec, %{}}
   end
