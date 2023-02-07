@@ -83,7 +83,7 @@ defmodule GenerationNewTest do
     test "no sleep" do
       assert {:ok, _pid} =
                LocalWithSizeLimit.start_link(
-                 # 1 is very small and means every manual cleanup will trigger new generation
+                 # 1  is very small and means every manual cleanup will trigger new generation
                  generation_start_timeout: 1
                )
 
