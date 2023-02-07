@@ -514,8 +514,6 @@ defmodule Nebulex.Adapters.Local.Generation do
     size = backend.info(newest, :size)
     memory = backend.info(newest, :memory) * :erlang.system_info(:wordsize)
     now = System.monotonic_time(:millisecond)
-    # IO.puts("size: #{size} memory: #{memory} diff: #{now - generation_created_at}")
-    # IO.inspect(state, label: "state")
 
     if generation_cleanup_ref != nil and
          (size > generation_max_size or memory > generation_allocated_memory or
