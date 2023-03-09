@@ -496,7 +496,7 @@ defmodule Nebulex.Adapters.Local.Generation do
     end
 
     # Flush older generation to release space so it can be marked for deletion
-    true = backend.delete_all_objects(older)
+    spawn(fn -> true = backend.delete_all_objects(older) end)
 
     # Keep alive older generation reference into the metadata
     Metadata.put(meta_tab, :deprecated, older)
