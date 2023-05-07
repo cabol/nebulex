@@ -49,8 +49,8 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     The default key generator is provided by the cache via the callback
     `c:Nebulex.Cache.__default_key_generator__/0` and it is applied only
-    if the option `key:` or `keys:` is not configured. By default it is
-    `Nebulex.unquote(__MODULE__).SimpleKeyGenerator`. But you can change the default
+    if the option `key:` or `keys:` is not configured. Defaults to
+    `Nebulex.Caching.SimpleKeyGenerator`. You can change the default
     key generator at compile time with the option `:default_key_generator`.
     For example, one can define a cache with a default key generator as:
 
@@ -60,18 +60,18 @@ if Code.ensure_loaded?(Decorator.Define) do
             adapter: Nebulex.Adapters.Local,
             default_key_generator: __MODULE__
 
-          @behaviour Nebulex.unquote(__MODULE__).KeyGenerator
+          @behaviour Nebulex.Caching.KeyGenerator
 
           @impl true
           def generate(mod, fun, args), do: :erlang.phash2({mod, fun, args})
         end
 
-    The key generator module must implement the `Nebulex.unquote(__MODULE__).KeyGenerator`
+    The key generator module must implement the `Nebulex.Caching.KeyGenerator`
     behaviour.
 
     > **IMPORTANT:** There are some caveats to keep in mind when using
       the key generator, therefore, it is highly recommended to review
-      `Nebulex.unquote(__MODULE__).KeyGenerator` behaviour documentation before.
+      `Nebulex.Caching.KeyGenerator` behaviour documentation before.
 
     Also, you can provide a different key generator at any time
     (overriding the default one) when using any caching annotation
@@ -235,13 +235,20 @@ if Code.ensure_loaded?(Decorator.Define) do
       * `:opts` - Defines the cache options that will be passed as argument
         to the invoked cache function (optional).
 
-      * `:match` - Match function `(term -> boolean | {true, term})` (optional).
-        This function is for matching and decide whether the code-block
-        evaluation result is cached or not. If `true` the code-block evaluation
-        result is cached as it is (the default). If `{true, value}` is returned,
-        then the `value` is what is cached (useful to control what is meant to
-        be cached). Returning `false` will cause that nothing is stored in the
-        cache. The default match function looks like this:
+      * `:match` - Match function `t:match_fun/0`. This function is for matching
+        and deciding whether the code-block evaluation result (which is received
+        as an argument) is cached or not. The function should return:
+
+          * `true` - the code-block evaluation result is cached as it is
+            (the default).
+          * `{true, value}` - `value` is cached. This is useful to set what
+            exactly must be cached.
+          * `{true, value, opts}` - `value` is cached with the options given by
+            `opts`. This return allows us to set the value to be cached, as well
+            as the runtime options for storing it (e.g.: the `ttl`).
+          * `false` - Nothing is cached.
+
+        The default match function looks like this:
 
         ```elixir
         fn
@@ -302,7 +309,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     The possible values for the `:key_generator` are:
 
-      * A module implementing the `Nebulex.unquote(__MODULE__).KeyGenerator` behaviour.
+      * A module implementing the `Nebulex.Caching.KeyGenerator` behaviour.
 
       * A MFA tuple `{module, function, args}` for a function to call to
         generate the key before the cache is invoked. A shorthand value of
@@ -409,16 +416,16 @@ if Code.ensure_loaded?(Decorator.Define) do
     defrecordp(:keyref, :"$nbx_cache_ref", cache: nil, key: nil)
 
     @typedoc "Type spec for a key reference"
-    @type keyref :: record(:keyref, cache: Nebulex.Cache.t(), key: term)
+    @type keyref :: record(:keyref, cache: Nebulex.Cache.t(), key: any)
 
     @typedoc "Type for :on_error option"
     @type on_error_opt :: :raise | :nothing
 
     @typedoc "Match function type"
-    @type match_fun :: (term -> boolean | {true, term})
+    @type match_fun :: (any -> boolean | {true, any} | {true, any, Keyword.t()})
 
     @typedoc "Type spec for the option :references"
-    @type references :: (term -> term) | nil | term
+    @type references :: (any -> any) | nil | any
 
     ## API
 
@@ -1045,7 +1052,6 @@ if Code.ensure_loaded?(Decorator.Define) do
       case run_cmd(cache, :get, [key, opts], on_error) do
         nil ->
           result = block.()
-
           ref_key = eval_cacheable_ref(references, result)
 
           with true <-
@@ -1116,6 +1122,11 @@ if Code.ensure_loaded?(Decorator.Define) do
       case match.(result) do
         {true, value} ->
           :ok = cache_put(cache, key, value, opts)
+
+          true
+
+        {true, value, match_opts} ->
+          :ok = cache_put(cache, key, value, Keyword.merge(opts, match_opts))
 
           true
 
