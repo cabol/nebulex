@@ -743,6 +743,9 @@ defmodule Nebulex.Cache do
   time to live associated with the key is discarded on successful
   `put` operation.
 
+  By default, `nil` values are skipped, which means they are not stored;
+  the call to the adapter is bypassed.
+
   ## Options
 
     * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
@@ -813,6 +816,9 @@ defmodule Nebulex.Cache do
 
   Returns `true` if a value was set, otherwise, `false` is returned.
 
+  By default, `nil` values are skipped, which means they are not stored;
+  the call to the adapter is bypassed.
+
   ## Options
 
     * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
@@ -841,13 +847,7 @@ defmodule Nebulex.Cache do
   Similar to `c:put_new/3` but raises `Nebulex.KeyAlreadyExistsError` if the
   key already exists.
 
-  ## Options
-
-    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
-      (or expiry time) for the given key  in **milliseconds**. Defaults
-      to `:infinity`.
-
-  See the configured adapter documentation for more runtime options.
+  See `c:put_new/3` for general considerations and options.
 
   ## Example
 
@@ -893,6 +893,9 @@ defmodule Nebulex.Cache do
 
   Returns `true` if a value was set, otherwise, `false` is returned.
 
+  By default, `nil` values are skipped, which means they are not stored;
+  the call to the adapter is bypassed.
+
   ## Options
 
     * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
@@ -923,13 +926,7 @@ defmodule Nebulex.Cache do
   @doc """
   Similar to `c:replace/3` but raises `KeyError` if `key` is not found.
 
-  ## Options
-
-    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
-      (or expiry time) for the given key  in **milliseconds**. Defaults
-      to `:infinity`.
-
-  See the configured adapter documentation for more runtime options.
+  See `c:replace/3` for general considerations and options.
 
   ## Example
 
@@ -965,6 +962,8 @@ defmodule Nebulex.Cache do
   Returns and removes the value associated with `key` in the Cache.
   If the `key` does not exist, then `nil` is returned.
 
+  If `key` is `nil`, the call to the adapter is bypassed, and `nil` is returned.
+
   See the configured adapter documentation for runtime options.
 
   ## Examples
@@ -984,7 +983,7 @@ defmodule Nebulex.Cache do
   @doc """
   Similar to `c:take/2` but raises `KeyError` if `key` is not found.
 
-  See the configured adapter documentation for runtime options.
+  See `c:take/2` for general considerations and options.
 
   ## Example
 
