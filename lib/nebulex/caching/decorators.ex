@@ -413,7 +413,7 @@ if Code.ensure_loaded?(Decorator.Define) do
     ## Types
 
     # Key reference spec
-    defrecordp(:keyref, :"$nbx_cache_ref", cache: nil, key: nil)
+    defrecordp(:keyref, :"$nbx_cache_keyref", cache: nil, key: nil)
 
     @typedoc "Type spec for a key reference"
     @type keyref :: record(:keyref, cache: Nebulex.Cache.t(), key: any)
@@ -452,7 +452,7 @@ if Code.ensure_loaded?(Decorator.Define) do
           want to reference a key located in an external/different cache than
           the one defined with the options `:key` or `:key_generator`. In this
           scenario, you must return a special type `t:keyref/0`, which can be
-          build with the macro [`cache_ref/2`](`Nebulex.Caching.cache_ref/2`).
+          build with the macro [`keyref/2`](`Nebulex.Caching.keyref/2`).
           See the "External referenced keys" section below.
         * `any` - It could be an explicit term or value, for example, a fixed
           value or a function argument.
@@ -611,7 +611,7 @@ if Code.ensure_loaded?(Decorator.Define) do
           @decorate cacheable(
                       cache: LocalCache,
                       key: email,
-                      references: &cache_ref(RedisCache, &1.id)
+                      references: &keyref(RedisCache, &1.id)
                     )
           def get_user_account_by_email(email) do
             # your logic ...
@@ -620,7 +620,7 @@ if Code.ensure_loaded?(Decorator.Define) do
           @decorate cacheable(
                       cache: LocalCache,
                       key: token,
-                      references: &cache_ref(RedisCache, &1.id)
+                      references: &keyref(RedisCache, &1.id)
                     )
           def get_user_account_by_token(token) do
             # your logic ...
@@ -636,11 +636,10 @@ if Code.ensure_loaded?(Decorator.Define) do
     `RedisCache` to store the real value in Redis while
     `get_user_account_by_email/1` and `get_user_account_by_token/1` use
     `LocalCache` to store the referenced keys. Then, with the option
-    `references: &cache_ref(RedisCache, &1.id)` we are telling the `cacheable`
+    `references: &keyref(RedisCache, &1.id)` we are telling the `cacheable`
     decorator the referenced key given by `&1.id` is located in the cache
-    `RedisCache`; underneath, the macro
-    [`cache_ref/2`](`Nebulex.Caching.cache_ref/2`) builds the
-    special return type for the external cache reference.
+    `RedisCache`; underneath, the macro [`keyref/2`](`Nebulex.Caching.keyref/2`)
+    builds the special return type for the external cache reference.
     """
     def cacheable(attrs, block, context) do
       caching_action(:cacheable, attrs, block, context)
@@ -781,20 +780,20 @@ if Code.ensure_loaded?(Decorator.Define) do
     cache provided via `:key` or `:key_generator` options (internal reference).
 
     **NOTE:** In case you need to build a reference, consider using the macro
-    `Nebulex.Caching.cache_ref/2` instead.
+    `Nebulex.Caching.keyref/2` instead.
 
     See `cacheable/3` decorator for more information about external references.
 
     ## Examples
 
-        iex> Nebulex.Caching.Decorators.cache_ref("my-key")
-        {:"$nbx_cache_ref", nil, "my-key"}
-        iex> Nebulex.Caching.Decorators.cache_ref(MyCache, "my-key")
-        {:"$nbx_cache_ref", MyCache, "my-key"}
+        iex> Nebulex.Caching.Decorators.build_keyref("my-key")
+        {:"$nbx_cache_keyref", nil, "my-key"}
+        iex> Nebulex.Caching.Decorators.build_keyref(MyCache, "my-key")
+        {:"$nbx_cache_keyref", MyCache, "my-key"}
 
     """
-    @spec cache_ref(Nebulex.Cache.t(), term) :: keyref()
-    def cache_ref(cache \\ nil, key) do
+    @spec build_keyref(Nebulex.Cache.t(), term) :: keyref()
+    def build_keyref(cache \\ nil, key) do
       keyref(cache: cache, key: key)
     end
 

@@ -29,16 +29,16 @@ if Code.ensure_loaded?(Decorator.Define) do
     alias Nebulex.Caching.Decorators
 
     @doc """
-    A wrapper macro for `Nebulex.Caching.Decorators.cache_ref/2`.
+    A wrapper macro for `Nebulex.Caching.Decorators.build_keyref/2`.
 
-    This macro is imported automatically with `use Nebulex.Caching` which means
-    you don't need to do any additional `alias` or `import`.
+    This macro is imported automatically with `use Nebulex.Caching`,
+    which means you don't need to do any additional `alias` or `import`.
 
     See `cacheable/3` decorator for more information about its usage.
     """
-    defmacro cache_ref(cache \\ nil, key) do
+    defmacro keyref(cache \\ nil, key) do
       quote do
-        Decorators.cache_ref(unquote(cache), unquote(key))
+        Decorators.build_keyref(unquote(cache), unquote(key))
       end
     end
   end

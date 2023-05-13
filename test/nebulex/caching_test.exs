@@ -219,7 +219,7 @@ defmodule Nebulex.CachingTest do
 
     test "with referenced key" do
       # Expected values
-      referenced_key = cache_ref("referenced_id")
+      referenced_key = keyref "referenced_id"
       result = %{id: "referenced_id", name: "referenced_name"}
 
       # Nothing is cached yet
@@ -268,7 +268,7 @@ defmodule Nebulex.CachingTest do
 
     test "with referenced key from args" do
       # Expected values
-      referenced_key = cache_ref("id")
+      referenced_key = keyref "id"
       result = %{attrs: %{id: "id"}, name: "name"}
 
       # Nothing is cached yet
@@ -291,7 +291,7 @@ defmodule Nebulex.CachingTest do
 
     test "returns fixed referenced" do
       # Expected values
-      referenced_key = cache_ref("fixed_id")
+      referenced_key = keyref "fixed_id"
       result = %{id: "fixed_id", name: "name"}
 
       # Nothing is cached yet
@@ -314,7 +314,7 @@ defmodule Nebulex.CachingTest do
 
     test "returns referenced key by calling referenced cache" do
       # Expected values
-      referenced_key = cache_ref(YetAnotherCache, "referenced_id")
+      referenced_key = keyref YetAnotherCache, "referenced_id"
       result = %{id: "referenced_id", name: "referenced_name"}
 
       # Nothing is cached yet
@@ -935,7 +935,7 @@ defmodule Nebulex.CachingTest do
     %{id: "fixed_id", name: name}
   end
 
-  @decorate cacheable(cache: Cache, key: name, references: &cache_ref(YetAnotherCache, &1.id))
+  @decorate cacheable(cache: Cache, key: name, references: &keyref(YetAnotherCache, &1.id))
   def get_with_ref_key_with_cache(name) do
     %{id: "referenced_id", name: name}
   end

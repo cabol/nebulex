@@ -39,7 +39,7 @@ defmodule Nebulex.Adapters.MultilevelExclusiveTest do
     test "returns partitions for L1 with shards backend", %{name: name} do
       assert :"#{name}_l1"
              |> Generation.newer()
-             |> :shards.meta()
+             |> :shards.table_meta()
              |> :shards_meta.partitions() == 2
     end
 
