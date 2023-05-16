@@ -12,7 +12,7 @@ defmodule Mix.Tasks.Nbx.Gen.Cache do
 
   Besides, you can also specify the adapter you want to use, like so:
 
-      mix nbx.gen.cache -c MyApp.PartitionedCache -a Nebulex.Adapters.Local
+      mix nbx.gen.cache -c MyApp.LocalCache -a Nebulex.Adapters.Local
       mix nbx.gen.cache -c MyApp.PartitionedCache -a Nebulex.Adapters.Partitioned
       mix nbx.gen.cache -c MyApp.ReplicatedCache -a Nebulex.Adapters.Replicated
       mix nbx.gen.cache -c MyApp.MultilevelCache -a Nebulex.Adapters.Multilevel
