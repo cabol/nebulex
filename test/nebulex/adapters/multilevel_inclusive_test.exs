@@ -68,6 +68,14 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
       assert Multilevel.get(3, level: 2) == 3
     end
 
+    test "get boolean" do
+      :ok = Multilevel.put(1, true, level: 1)
+      :ok = Multilevel.put(2, false, level: 1)
+
+      assert Multilevel.get(1) == true
+      assert Multilevel.get(2) == false
+    end
+
     test "fetched value is replicated with TTL on previous levels" do
       assert Multilevel.put(:a, 1, ttl: 1000) == :ok
       assert Multilevel.ttl(:a) > 0
