@@ -313,10 +313,12 @@ defmodule Nebulex.Adapters.Multilevel do
   @impl true
   defspan get(adapter_meta, key, opts) do
     fun = fn level, {default, prev} ->
-      if value = with_dynamic_cache(level, :get, [key, opts]) do
-        {:halt, {value, [level | prev]}}
-      else
+      value = with_dynamic_cache(level, :get, [key, opts])
+
+      if is_nil(value) do
         {:cont, {default, [level | prev]}}
+      else
+        {:halt, {value, [level | prev]}}
       end
     end
 
