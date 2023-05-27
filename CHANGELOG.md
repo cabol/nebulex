@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.5.1](https://github.com/cabol/nebulex/tree/v2.5.1) (2023-05-27)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.5.0...v2.5.1)
+
+**Merged pull requests:**
+
+- Fix `nil` check in `Nebulex.Adapters.Multilevel.get/3`
+  [#205](https://github.com/cabol/nebulex/pull/205)
+  ([1100x1100](https://github.com/1100x1100))
+- `mix nbx.gen.cache` example fixed
+  [#204](https://github.com/cabol/nebulex/pull/204)
+  ([hissssst](https://github.com/hissssst))
+
 ## [v2.5.0](https://github.com/cabol/nebulex/tree/v2.5.0) (2023-05-13)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.4.2...v2.5.0)
