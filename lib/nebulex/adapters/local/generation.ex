@@ -10,6 +10,16 @@ defmodule Nebulex.Adapters.Local.Generation do
   (triggered by `:gc_interval` timeout), a new cache generation is created
   and the oldest one is deleted.
 
+  The deletion of the oldest generation happens in two steps. First, the
+  underlying ets table is flushed to release space and only marked for deletion
+  as there may still be processes referencing it. The actual deletion of the
+  ets table happens at next GC run.
+
+  However, flushing is a blocking operation, once started, processes wanting
+  to access the table will need to wait until it finishes. To circumvent this,
+  flushing can be delayed by configuring `:gc_flush_delay` to allow time for
+  these processes to finish their work without being accidentally blocked.
+
   The only way to create new generations is through this module (this server
   is the metadata owner) calling `new/2` function. When a Cache is created,
   a generational garbage collector is attached to it automatically,
@@ -46,6 +56,10 @@ defmodule Nebulex.Adapters.Local.Generation do
       the timeout used when the cache starts and there are few entries or the
       consumed memory is near to `0`. Defaults to `600_000` (10 minutes).
 
+    * `:gc_flush_delay` - If it is set, an integer > 0 is expected defining the
+      delay in milliseconds before objects from the oldest generation are
+      flushed. Defaults to `10_000` (10 seconds).
+
   """
 
   # State
@@ -64,7 +78,8 @@ defmodule Nebulex.Adapters.Local.Generation do
     :allocated_memory,
     :gc_cleanup_min_timeout,
     :gc_cleanup_max_timeout,
-    :gc_cleanup_ref
+    :gc_cleanup_ref,
+    :gc_flush_delay
   ]
 
   use GenServer
@@ -279,7 +294,8 @@ defmodule Nebulex.Adapters.Local.Generation do
       gc_cleanup_min_timeout:
         get_option(opts, :gc_cleanup_min_timeout, "an integer > 0", pos_integer, 10_000),
       gc_cleanup_max_timeout:
-        get_option(opts, :gc_cleanup_max_timeout, "an integer > 0", pos_integer, 600_000)
+        get_option(opts, :gc_cleanup_max_timeout, "an integer > 0", pos_integer, 600_000),
+      gc_flush_delay: get_option(opts, :gc_flush_delay, "an integer > 0", pos_integer, 10_000)
     })
   end
 
@@ -384,6 +400,20 @@ defmodule Nebulex.Adapters.Local.Generation do
     {:noreply, state}
   end
 
+  def handle_info(
+        :flush_older_gen,
+        %__MODULE__{
+          meta_tab: meta_tab,
+          backend: backend
+        } = state
+      ) do
+    if deprecated = Metadata.get(meta_tab, :deprecated) do
+      true = backend.delete_all_objects(deprecated)
+    end
+
+    {:noreply, state}
+  end
+
   defp check_size(%__MODULE__{max_size: max_size} = state) when not is_nil(max_size) do
     maybe_cleanup(:size, state)
   end
@@ -454,7 +484,8 @@ defmodule Nebulex.Adapters.Local.Generation do
          meta_tab: meta_tab,
          backend: backend,
          backend_opts: backend_opts,
-         stats_counter: stats_counter
+         stats_counter: stats_counter,
+         gc_flush_delay: gc_flush_delay
        }) do
     # Create new generation
     gen_tab = Backend.new(backend, meta_tab, backend_opts)
@@ -472,7 +503,7 @@ defmodule Nebulex.Adapters.Local.Generation do
         # - Delete previously stored deprecated generation
         # - Flush the older generation
         # - Deprecate it (mark it for deletion)
-        :ok = process_older_gen(meta_tab, backend, older)
+        :ok = process_older_gen(meta_tab, backend, older, gc_flush_delay)
 
       [newer] ->
         # Update generations
@@ -489,14 +520,14 @@ defmodule Nebulex.Adapters.Local.Generation do
   # Hence, the idea is to keep it alive till a new generation is pushed, but
   # flushing its data before so that we release memory space. By the time a new
   # generation is pushed, then it is safe to delete it completely.
-  defp process_older_gen(meta_tab, backend, older) do
+  defp process_older_gen(meta_tab, backend, older, gc_flush_delay) do
     if deprecated = Metadata.get(meta_tab, :deprecated) do
       # Delete deprecated generation if it does exist
       _ = Backend.delete(backend, meta_tab, deprecated)
     end
 
     # Flush older generation to release space so it can be marked for deletion
-    true = backend.delete_all_objects(older)
+    Process.send_after(self(), :flush_older_gen, gc_flush_delay)
 
     # Keep alive older generation reference into the metadata
     Metadata.put(meta_tab, :deprecated, older)
