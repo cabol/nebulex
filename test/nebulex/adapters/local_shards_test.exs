@@ -28,7 +28,7 @@ defmodule Nebulex.Adapters.LocalWithShardsTest do
       {:ok, _pid} = CustomPartitions.start_link()
 
       assert CustomPartitions.newer_generation()
-             |> :shards.meta()
+             |> :shards.table_meta()
              |> :shards_meta.partitions() == 2
 
       :ok = CustomPartitions.stop()

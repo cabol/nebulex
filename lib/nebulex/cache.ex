@@ -689,9 +689,7 @@ defmodule Nebulex.Cache do
 
   Returns `nil` if no result was found.
 
-  ## Options
-
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for runtime options.
 
   ## Example
 
@@ -710,9 +708,7 @@ defmodule Nebulex.Cache do
   @doc """
   Similar to `c:get/2` but raises `KeyError` if `key` is not found.
 
-  ## Options
-
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for runtime options.
 
   ## Example
 
@@ -727,9 +723,7 @@ defmodule Nebulex.Cache do
 
   If `keys` contains keys that are not in the Cache, they're simply ignored.
 
-  ## Options
-
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for runtime options.
 
   ## Example
 
@@ -749,13 +743,16 @@ defmodule Nebulex.Cache do
   time to live associated with the key is discarded on successful
   `put` operation.
 
+  By default, `nil` values are skipped, which means they are not stored;
+  the call to the adapter is bypassed.
+
   ## Options
 
     * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
       (or expiry time) for the given key  in **milliseconds**. Defaults
       to `:infinity`.
 
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for more runtime options.
 
   ## Example
 
@@ -796,7 +793,7 @@ defmodule Nebulex.Cache do
       (or expiry time) for the given key  in **milliseconds**. Defaults
       to `:infinity`.
 
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for more runtime options.
 
   ## Example
 
@@ -819,13 +816,16 @@ defmodule Nebulex.Cache do
 
   Returns `true` if a value was set, otherwise, `false` is returned.
 
+  By default, `nil` values are skipped, which means they are not stored;
+  the call to the adapter is bypassed.
+
   ## Options
 
     * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
       (or expiry time) for the given key  in **milliseconds**. Defaults
       to `:infinity`.
 
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for more runtime options.
 
   ## Example
 
@@ -847,13 +847,7 @@ defmodule Nebulex.Cache do
   Similar to `c:put_new/3` but raises `Nebulex.KeyAlreadyExistsError` if the
   key already exists.
 
-  ## Options
-
-    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
-      (or expiry time) for the given key  in **milliseconds**. Defaults
-      to `:infinity`.
-
-  See the "Shared options" section at the module documentation for more options.
+  See `c:put_new/3` for general considerations and options.
 
   ## Example
 
@@ -876,7 +870,7 @@ defmodule Nebulex.Cache do
       (or expiry time) for the given key  in **milliseconds**. Defaults
       to `:infinity`.
 
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for more runtime options.
 
   ## Example
 
@@ -899,13 +893,16 @@ defmodule Nebulex.Cache do
 
   Returns `true` if a value was set, otherwise, `false` is returned.
 
+  By default, `nil` values are skipped, which means they are not stored;
+  the call to the adapter is bypassed.
+
   ## Options
 
     * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
       (or expiry time) for the given key  in **milliseconds**. Defaults
       to `:infinity`.
 
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for more runtime options.
 
   ## Example
 
@@ -929,13 +926,7 @@ defmodule Nebulex.Cache do
   @doc """
   Similar to `c:replace/3` but raises `KeyError` if `key` is not found.
 
-  ## Options
-
-    * `:ttl` - (positive integer or `:infinity`) Defines the time-to-live
-      (or expiry time) for the given key  in **milliseconds**. Defaults
-      to `:infinity`.
-
-  See the "Shared options" section at the module documentation for more options.
+  See `c:replace/3` for general considerations and options.
 
   ## Example
 
@@ -948,9 +939,7 @@ defmodule Nebulex.Cache do
   @doc """
   Deletes the entry in Cache for a specific `key`.
 
-  ## Options
-
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for runtime options.
 
   ## Example
 
@@ -973,9 +962,9 @@ defmodule Nebulex.Cache do
   Returns and removes the value associated with `key` in the Cache.
   If the `key` does not exist, then `nil` is returned.
 
-  ## Options
+  If `key` is `nil`, the call to the adapter is bypassed, and `nil` is returned.
 
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for runtime options.
 
   ## Examples
 
@@ -994,9 +983,7 @@ defmodule Nebulex.Cache do
   @doc """
   Similar to `c:take/2` but raises `KeyError` if `key` is not found.
 
-  ## Options
-
-  See the "Shared options" section at the module documentation for more options.
+  See `c:take/2` for general considerations and options.
 
   ## Example
 
@@ -1040,7 +1027,7 @@ defmodule Nebulex.Cache do
       (or expiry time) for the given key  in **milliseconds**. Defaults
       to `:infinity`.
 
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for more runtime options.
 
   ## Examples
 
@@ -1088,7 +1075,7 @@ defmodule Nebulex.Cache do
       (or expiry time) for the given key  in **milliseconds**. Defaults
       to `:infinity`.
 
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for more runtime options.
 
   ## Examples
 
@@ -1117,7 +1104,7 @@ defmodule Nebulex.Cache do
       inserted as initial value of key before the it is incremented.
       Defaults to `0`.
 
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for more runtime options.
 
   ## Examples
 
@@ -1152,7 +1139,7 @@ defmodule Nebulex.Cache do
       inserted as initial value of key before the it is incremented.
       Defaults to `0`.
 
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for more runtime options.
 
   ## Examples
 
@@ -1307,7 +1294,7 @@ defmodule Nebulex.Cache do
       adapters, but it is recommended to see the adapter's documentation
       to confirm its compatibility with this option.
 
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for more runtime options.
 
   ## Query return option
 
@@ -1417,7 +1404,7 @@ defmodule Nebulex.Cache do
       back from the cache's backend. Defaults to `20`; it's unlikely
       this will ever need changing.
 
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for more runtime options.
 
   ## Query return option
 
@@ -1492,13 +1479,11 @@ defmodule Nebulex.Cache do
 
   May raise `Nebulex.QueryError` if query validation fails.
 
+  See the configured adapter documentation for runtime options.
+
   ## Query values
 
   See `c:all/2` callback for more information about the query values.
-
-  ## Options
-
-  See the "Shared options" section at the module documentation for more options.
 
   ## Example
 
@@ -1646,9 +1631,7 @@ defmodule Nebulex.Cache do
 
   A successful transaction returns the value returned by the function.
 
-  ## Options
-
-  See the "Shared options" section at the module documentation for more options.
+  See the configured adapter documentation for runtime options.
 
   ## Examples
 

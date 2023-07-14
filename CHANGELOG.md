@@ -4,6 +4,88 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.5.1](https://github.com/cabol/nebulex/tree/v2.5.1) (2023-05-27)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.5.0...v2.5.1)
+
+**Merged pull requests:**
+
+- Fix `nil` check in `Nebulex.Adapters.Multilevel.get/3`
+  [#205](https://github.com/cabol/nebulex/pull/205)
+  ([1100x1100](https://github.com/1100x1100))
+- `mix nbx.gen.cache` example fixed
+  [#204](https://github.com/cabol/nebulex/pull/204)
+  ([hissssst](https://github.com/hissssst))
+
+## [v2.5.0](https://github.com/cabol/nebulex/tree/v2.5.0) (2023-05-13)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.4.2...v2.5.0)
+
+**Implemented enhancements:**
+
+- Support for functions that can set TTL in Decorator similar to Match
+  [#200](https://github.com/cabol/nebulex/issues/200)
+- Improve default match function in decorators to cover more scenarios
+  [#177](https://github.com/cabol/nebulex/issues/177)
+- Adapters implementation guide
+  [#96](https://github.com/cabol/nebulex/issues/96)
+
+**Fixed bugs:**
+
+- Issue with keys set to `false` when calling `get_all` in local adapter
+  [#187](https://github.com/cabol/nebulex/issues/187)
+
+**Closed issues:**
+
+- Is there any way to get the size of the cache?
+  [#203](https://github.com/cabol/nebulex/issues/203)
+- Where to use load/2, dump/2
+  [#201](https://github.com/cabol/nebulex/issues/201)
+- `Nebulex.Cache` callbacks mention "Shared Options" section that do not exist
+  [#199](https://github.com/cabol/nebulex/issues/199)
+- Errors when storing nil values
+  [#195](https://github.com/cabol/nebulex/issues/195)
+- Unregistering cache in registry happens after cache shuts down
+  [#194](https://github.com/cabol/nebulex/issues/194)
+- Is there a good way to evict multiple caches at once by some conditions?
+  [#192](https://github.com/cabol/nebulex/issues/192)
+- Unable to use module attributes when specifying a MFA cache within the decorator
+  [#191](https://github.com/cabol/nebulex/issues/191)
+- Nebulex crash when `gc_interval` is not set
+  [#182](https://github.com/cabol/nebulex/issues/182)
+- `ArgumentError` * 1st argument: the table identifier does not refer to an existing ETS table
+  [#181](https://github.com/cabol/nebulex/issues/181)
+- Feedback for `NebulexLocalDistributedAdapter`
+  [#180](https://github.com/cabol/nebulex/issues/180)
+- Multilevel invalidation
+  [#179](https://github.com/cabol/nebulex/issues/179)
+- External cache-key references on `cacheable` decorator
+  [#178](https://github.com/cabol/nebulex/issues/178)
+- [multiple clause functions] Cannot use ignored variables in decorator keys
+  [#173](https://github.com/cabol/nebulex/issues/173)
+- Ability for referencing a key in the `cacheable` decorator via `:references` option
+  [#169](https://github.com/cabol/nebulex/issues/169)
+- Multi level caching suggestion?
+  [#168](https://github.com/cabol/nebulex/issues/168)
+
+**Merged pull requests:**
+
+- Fix `Local.get_all` with false values
+  [#186](https://github.com/cabol/nebulex/pull/186)
+  ([renatoaguiar](https://github.com/renatoaguiar))
+- Add NebulexLocalMultilevelAdapter to the list
+  [#185](https://github.com/cabol/nebulex/pull/185)
+  ([martosaur](https://github.com/martosaur))
+- Fix the crash when `gc_interval` is not set
+  [#183](https://github.com/cabol/nebulex/pull/183)
+  ([dongfuye](https://github.com/dongfuye))
+- [#169] Reference a key in `cacheable` decorator via `:references` option
+  [#176](https://github.com/cabol/nebulex/pull/176)
+  ([cabol](https://github.com/cabol))
+- Creating New Adapter guide
+  [#175](https://github.com/cabol/nebulex/pull/175)
+  ([martosaur](https://github.com/martosaur))
+
 ## [v2.4.2](https://github.com/cabol/nebulex/tree/v2.4.2) (2022-11-04)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.4.1...v2.4.2)

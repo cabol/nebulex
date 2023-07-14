@@ -56,27 +56,21 @@ defmodule Nebulex.Adapters.Local.Backend do
   Helper function for returning the child spec for the given backend.
   """
   def child_spec(backend, opts) do
-    backend
-    |> get_mod()
-    |> apply(:child_spec, [opts])
+    get_mod(backend).child_spec(opts)
   end
 
   @doc """
   Helper function for creating a new table for the given backend.
   """
   def new(backend, meta_tab, tab_opts) do
-    backend
-    |> get_mod()
-    |> apply(:new, [meta_tab, tab_opts])
+    get_mod(backend).new(meta_tab, tab_opts)
   end
 
   @doc """
   Helper function for deleting a table for the given backend.
   """
   def delete(backend, meta_tab, gen_tab) do
-    backend
-    |> get_mod()
-    |> apply(:delete, [meta_tab, gen_tab])
+    get_mod(backend).delete(meta_tab, gen_tab)
   end
 
   defp get_mod(:ets), do: Nebulex.Adapters.Local.Backend.ETS

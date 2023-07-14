@@ -236,6 +236,7 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       end
 
       for task <- tasks, do: Task.shutdown(task)
+
       :ok = LocalWithSizeLimit.stop()
     end
   end
@@ -324,6 +325,9 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
 
       # assert not crashed
       assert LocalWithSizeLimit.count_all() == 4
+
+      # Stop the cache
+      :ok = LocalWithSizeLimit.stop()
     end
   end
 

@@ -23,7 +23,7 @@ Now let's modify `mix.exs` so that we could fetch Nebulex repository.
 defmodule NebulexMemoryAdapter.MixProject do
   use Mix.Project
 
-  @nbx_vsn "2.4.2"
+  @nbx_vsn "2.5.0"
   @version "0.1.0"
 
   def project do
@@ -231,10 +231,10 @@ mix test
  54) test put_all/2 puts the given entries using different data types at once (NebulexMemoryAdapterTest)
      test/nebulex_memory_adapter_test.exs:128
      ** (UndefinedFunctionError) function NebulexMemoryAdapter.TestCache.delete_all/0 is undefined or private. Did you mean:
-     
+
            * delete/1
            * delete/2
-     
+
      stacktrace:
        (nebulex_memory_adapter 0.1.0) NebulexMemoryAdapter.TestCache.delete_all()
        test/nebulex_memory_adapter_test.exs:9: NebulexMemoryAdapterTest.__ex_unit_setup_0/1
