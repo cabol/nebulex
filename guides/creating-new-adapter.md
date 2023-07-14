@@ -23,7 +23,7 @@ Now let's modify `mix.exs` so that we could fetch Nebulex repository.
 defmodule NebulexMemoryAdapter.MixProject do
   use Mix.Project
 
-  @nbx_vsn "2.5.0"
+  @nbx_vsn "2.5.2"
   @version "0.1.0"
 
   def project do

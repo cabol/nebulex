@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.5.2](https://github.com/cabol/nebulex/tree/v2.5.2) (2023-07-14)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.5.1...v2.5.2)
+
+**Closed issues:**
+
+- Replicated adapter syncing during rolling deployment.
+  [#209](https://github.com/cabol/nebulex/issues/209)
+- Ambiguity regarding ttl and `gc_interval` relation.
+  [#208](https://github.com/cabol/nebulex/issues/208)
+- Seeing Nebulex.RPCError during deployments with partitioned adapter.
+  [#206](https://github.com/cabol/nebulex/issues/206)
+- Random `:erpc`, `:timeout` with partitioned get.
+  [#202](https://github.com/cabol/nebulex/issues/202)
+- Processes reading from cache blocked by generational gc process.
+  [#197](https://github.com/cabol/nebulex/issues/197)
+
+**Merged pull requests:**
+
+- Delay flushing ets table to avoid blocking processes using it.
+  [#210](https://github.com/cabol/nebulex/pull/210)
+  ([szajbus](https://github.com/szajbus))
+
 ## [v2.5.1](https://github.com/cabol/nebulex/tree/v2.5.1) (2023-05-27)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.5.0...v2.5.1)
