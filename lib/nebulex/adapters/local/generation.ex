@@ -12,12 +12,13 @@ defmodule Nebulex.Adapters.Local.Generation do
 
   The deletion of the oldest generation happens in two steps. First, the
   underlying ets table is flushed to release space and only marked for deletion
-  as there may still be processes referencing it. Flushing is a blocking
-  operation, once started, such processes will need to wait until it finishes
-  before they can access the table. Flushing can be delayed by configuring
-  `:gc_flush_delay` to allow time for these processes to finish their work
-  without being accidentally blocked. The actual deletion of the ets table
-  happens at next GC run.
+  as there may still be processes referencing it. The actual deletion of the
+  ets table happens at next GC run.
+
+  However, flushing is a blocking operation, once started, processes wanting
+  to access the table will need to wait until it finishes. To circumvent this,
+  flushing can be delayed by configuring `:gc_flush_delay` to allow time for
+  these processes to finish their work without being accidentally blocked.
 
   The only way to create new generations is through this module (this server
   is the metadata owner) calling `new/2` function. When a Cache is created,
