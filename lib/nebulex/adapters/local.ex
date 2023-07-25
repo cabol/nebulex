@@ -87,6 +87,10 @@ defmodule Nebulex.Adapters.Local do
       the timeout used when the cache starts and there are few entries or the
       consumed memory is near to `0`. Defaults to `600_000` (10 minutes).
 
+    * `:gc_flush_delay` - If it is set, an integer > 0 is expected defining the
+      delay in milliseconds before objects from the oldest generation are
+      flushed. Defaults to `10_000` (10 seconds).
+
   ## Usage
 
   `Nebulex.Cache` is the wrapper around the cache. We can define a

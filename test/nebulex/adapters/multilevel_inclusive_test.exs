@@ -39,7 +39,7 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
     test "returns partitions for L1 with shards backend", %{name: name} do
       assert :"#{name}_l1"
              |> Generation.newer()
-             |> :shards.meta()
+             |> :shards.table_meta()
              |> :shards_meta.partitions() == 2
     end
 
@@ -66,6 +66,14 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
       assert Multilevel.get(3, level: 1) == 3
       assert Multilevel.get(3, level: 2) == 3
       assert Multilevel.get(3, level: 2) == 3
+    end
+
+    test "get boolean" do
+      :ok = Multilevel.put(1, true, level: 1)
+      :ok = Multilevel.put(2, false, level: 1)
+
+      assert Multilevel.get(1) == true
+      assert Multilevel.get(2) == false
     end
 
     test "fetched value is replicated with TTL on previous levels" do

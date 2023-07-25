@@ -160,6 +160,15 @@ defmodule Nebulex.CachingTest do
       refute Cache.get({:ok, "hello"})
     end
 
+    test "with match function and custom opts" do
+      refute Cache.get(300)
+      assert get_with_custom_ttl(300) == {:ok, %{ttl: 300}}
+      assert Cache.get(300) == {:ok, %{ttl: 300}}
+
+      :ok = Process.sleep(400)
+      refute Cache.get(300)
+    end
+
     test "with default key" do
       assert get_with_default_key(123, {:foo, "bar"}) == :ok
       assert [123, {:foo, "bar"}] |> :erlang.phash2() |> Cache.get() == :ok
@@ -210,7 +219,7 @@ defmodule Nebulex.CachingTest do
 
     test "with referenced key" do
       # Expected values
-      referenced_key = cache_ref("referenced_id")
+      referenced_key = keyref "referenced_id"
       result = %{id: "referenced_id", name: "referenced_name"}
 
       # Nothing is cached yet
@@ -259,7 +268,7 @@ defmodule Nebulex.CachingTest do
 
     test "with referenced key from args" do
       # Expected values
-      referenced_key = cache_ref("id")
+      referenced_key = keyref "id"
       result = %{attrs: %{id: "id"}, name: "name"}
 
       # Nothing is cached yet
@@ -282,7 +291,7 @@ defmodule Nebulex.CachingTest do
 
     test "returns fixed referenced" do
       # Expected values
-      referenced_key = cache_ref("fixed_id")
+      referenced_key = keyref "fixed_id"
       result = %{id: "fixed_id", name: "name"}
 
       # Nothing is cached yet
@@ -305,7 +314,7 @@ defmodule Nebulex.CachingTest do
 
     test "returns referenced key by calling referenced cache" do
       # Expected values
-      referenced_key = cache_ref(YetAnotherCache, "referenced_id")
+      referenced_key = keyref YetAnotherCache, "referenced_id"
       result = %{id: "referenced_id", name: "referenced_name"}
 
       # Nothing is cached yet
@@ -926,9 +935,14 @@ defmodule Nebulex.CachingTest do
     %{id: "fixed_id", name: name}
   end
 
-  @decorate cacheable(cache: Cache, key: name, references: &cache_ref(YetAnotherCache, &1.id))
+  @decorate cacheable(cache: Cache, key: name, references: &keyref(YetAnotherCache, &1.id))
   def get_with_ref_key_with_cache(name) do
     %{id: "referenced_id", name: name}
+  end
+
+  @decorate cacheable(cache: Cache, key: ttl, match: &match_fun/1)
+  def get_with_custom_ttl(ttl) do
+    {:ok, %{ttl: ttl}}
   end
 
   ## Helpers
@@ -948,6 +962,7 @@ defmodule Nebulex.CachingTest do
   ## Private Functions
 
   defp match_fun({:ok, "true"}), do: true
+  defp match_fun({:ok, %{ttl: ttl}} = ok), do: {true, ok, [ttl: ttl]}
   defp match_fun({:ok, val}), do: {true, val}
   defp match_fun(_), do: false
 

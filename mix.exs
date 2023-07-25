@@ -2,7 +2,7 @@ defmodule Nebulex.MixProject do
   use Mix.Project
 
   @source_url "https://github.com/cabol/nebulex"
-  @version "2.4.2"
+  @version "2.5.2"
 
   def project do
     [
@@ -48,7 +48,7 @@ defmodule Nebulex.MixProject do
 
   defp deps do
     [
-      {:shards, "~> 1.0", optional: true},
+      {:shards, "~> 1.1", optional: true},
       {:decorator, "~> 1.4", optional: true},
       {:telemetry, "~> 0.4 or ~> 1.0", optional: true},
 
