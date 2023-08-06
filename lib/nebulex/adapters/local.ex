@@ -862,8 +862,8 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp do_delete_all(backend, tab, [k1, k2 | keys], batch_size, deleted) do
-    k1 = if is_tuple(k1), do: {k1}, else: k1
-    k2 = if is_tuple(k2), do: {k2}, else: k2
+    k1 = if is_tuple(k1), do: tuple_to_match_spec(k1), else: k1
+    k2 = if is_tuple(k2), do: tuple_to_match_spec(k2), else: k2
 
     do_delete_all(
       backend,
@@ -888,7 +888,7 @@ defmodule Nebulex.Adapters.Local do
   end
 
   defp do_delete_all(backend, tab, [k | keys], batch_size, deleted, count, acc) do
-    k = if is_tuple(k), do: {k}, else: k
+    k = if is_tuple(k), do: tuple_to_match_spec(k), else: k
 
     do_delete_all(
       backend,
@@ -899,6 +899,22 @@ defmodule Nebulex.Adapters.Local do
       count + 1,
       {:orelse, acc, {:==, :"$1", k}}
     )
+  end
+
+  defp tuple_to_match_spec(data) do
+    data
+    |> :erlang.tuple_to_list()
+    |> tuple_to_match_spec([])
+  end
+
+  defp tuple_to_match_spec([], acc) do
+    {acc |> Enum.reverse() |> :erlang.list_to_tuple()}
+  end
+
+  defp tuple_to_match_spec([e | tail], acc) do
+    e = if is_tuple(e), do: tuple_to_match_spec(e), else: e
+
+    tuple_to_match_spec(tail, [e | acc])
   end
 
   defp return(entry_or_entries, field \\ nil)

@@ -191,7 +191,7 @@ defmodule Nebulex.LocalTest do
         assert cache.all() |> Enum.sort() == Enum.sort(rem)
       end
 
-      test "delete all entries given by a list of keys", %{cache: cache} do
+      test "delete all entries with special query {:in, keys}", %{cache: cache} do
         entries = for x <- 1..10, into: %{}, do: {x, x}
 
         :ok = cache.put_all(entries)
@@ -202,6 +202,24 @@ defmodule Nebulex.LocalTest do
 
         assert cache.count_all() == 5
         assert cache.all() |> Enum.sort() == [1, 3, 5, 7, 9]
+      end
+
+      test "delete all entries with special query {:in, keys} (nested tuples)", %{cache: cache} do
+        [
+          {1, {:foo, "bar"}},
+          {2, {nil, nil}},
+          {3, {nil, {nil, nil}}},
+          {4, {nil, {nil, nil, {nil, nil}}}},
+          {5, {:a, {:b, {:c, {:d, {:e, "f"}}}}}},
+          {6, {:a, :b, {:c, :d, {:e, :f, {:g, :h, {:i, :j, "k"}}}}}}
+        ]
+        |> Enum.each(fn {k, v} ->
+          :ok = cache.put(k, v)
+
+          assert cache.count_all() == 1
+          assert cache.delete_all({:in, [k]}) == 1
+          assert cache.count_all() == 0
+        end)
       end
     end
 
