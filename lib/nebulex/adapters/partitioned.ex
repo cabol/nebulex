@@ -711,15 +711,21 @@ defmodule Nebulex.Adapters.Partitioned do
     end
   end
 
-  defp group_keys_by_node(enum, adapter_meta) do
+  defp group_keys_by_node(enum, adapter_meta, :get_all) do
+    Enum.reduce(enum, %{}, fn
+      key, acc ->
+        node = get_node(adapter_meta, key)
+        Map.put(acc, node, [key | Map.get(acc, node, [])])
+    end)
+  end
+
+  @put_all_actions [:put_all, :put_new_all]
+  defp group_keys_by_node(enum, adapter_meta, put_all_action)
+       when put_all_action in @put_all_actions do
     Enum.reduce(enum, %{}, fn
       {key, _} = entry, acc ->
         node = get_node(adapter_meta, key)
         Map.put(acc, node, [entry | Map.get(acc, node, [])])
-
-      key, acc ->
-        node = get_node(adapter_meta, key)
-        Map.put(acc, node, [key | Map.get(acc, node, [])])
     end)
   end
 
@@ -733,7 +739,7 @@ defmodule Nebulex.Adapters.Partitioned do
        ) do
     groups =
       enum
-      |> group_keys_by_node(meta)
+      |> group_keys_by_node(meta, action)
       |> Enum.map(fn {node, group} ->
         {node, {__MODULE__, :with_dynamic_cache, [meta, action, [group | args]]}}
       end)

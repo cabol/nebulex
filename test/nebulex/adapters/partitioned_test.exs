@@ -110,6 +110,28 @@ defmodule Nebulex.Adapters.PartitionedTest do
       end)
     end
 
+    test "custom keyslot supports two item tuple keys for get_all" do
+      defmodule TupleKeyslot do
+        @behaviour Nebulex.Adapter.Keyslot
+
+        @impl true
+        def hash_slot({_, _} = key, range) do
+          key
+          |> :erlang.phash2()
+          |> rem(range)
+        end
+      end
+
+      test_with_dynamic_cache(
+        Partitioned,
+        [name: :custom_keyslot_with_tuple_keys, keyslot: TupleKeyslot],
+        fn ->
+          assert Partitioned.put_all([{{"foo", 1}, "bar"}]) == :ok
+          assert Partitioned.get_all([{"foo", 1}]) == %{{"foo", 1} => "bar"}
+        end
+      )
+    end
+
     test "get_and_update" do
       assert Partitioned.get_and_update(1, &Partitioned.get_and_update_fun/1) == {nil, 1}
       assert Partitioned.get_and_update(1, &Partitioned.get_and_update_fun/1) == {1, 2}
