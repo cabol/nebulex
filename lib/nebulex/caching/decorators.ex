@@ -1027,7 +1027,7 @@ if Code.ensure_loaded?(Decorator.Define) do
             Keyword.t(),
             on_error_opt,
             match_fun,
-            (() -> term)
+            (-> term)
           ) :: term
     def eval_cacheable(cache, key, references, opts, on_error, match, block)
 
