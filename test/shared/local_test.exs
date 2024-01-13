@@ -9,6 +9,8 @@ defmodule Nebulex.LocalTest do
 
     describe "error" do
       test "on init because invalid backend", %{cache: cache} do
+        _ = Process.flag(:trap_exit, true)
+
         assert {:error, {%RuntimeError{message: msg}, _}} =
                  cache.start_link(name: :invalid_backend, backend: :xyz)
 

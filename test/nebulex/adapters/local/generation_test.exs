@@ -177,14 +177,16 @@ defmodule Nebulex.Adapters.Local.GenerationTest do
       {mem_size, _} = Generation.memory_info(LocalWithSizeLimit)
       :ok = Generation.realloc(LocalWithSizeLimit, mem_size * 2)
 
-      # triggers the cleanup event
+      # Trigger the cleanup event
       :ok = check_cache_size(LocalWithSizeLimit)
 
-      :ok = flood_cache(mem_size, mem_size * 2)
       assert generations_len(LocalWithSizeLimit) == 1
+
+      :ok = flood_cache(mem_size, mem_size * 2)
+
       assert_mem_size(:>)
 
-      # wait until the cleanup event is triggered
+      # Wait until the cleanup event is triggered
       :ok = Process.sleep(3100)
 
       wait_until(fn ->

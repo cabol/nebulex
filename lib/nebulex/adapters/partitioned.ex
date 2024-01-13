@@ -660,6 +660,8 @@ defmodule Nebulex.Adapters.Partitioned do
   Helper function to use dynamic cache for internal primary cache storage
   when needed.
   """
+  def with_dynamic_cache(adapter_meta, action, args)
+
   def with_dynamic_cache(%{cache: cache, primary_name: nil}, action, args) do
     apply(cache.__primary__, action, args)
   end

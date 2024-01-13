@@ -3,7 +3,6 @@
 
 ![CI](https://github.com/cabol/nebulex/workflows/CI/badge.svg)
 [![Coverage Status](https://img.shields.io/coveralls/cabol/nebulex.svg)](https://coveralls.io/github/cabol/nebulex)
-[![Inline docs](http://inch-ci.org/github/cabol/nebulex.svg)](http://inch-ci.org/github/cabol/nebulex)
 [![Hex Version](https://img.shields.io/hexpm/v/nebulex.svg)](https://hex.pm/packages/nebulex)
 [![Docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/nebulex)
 [![License](https://img.shields.io/hexpm/l/nebulex.svg)](LICENSE)

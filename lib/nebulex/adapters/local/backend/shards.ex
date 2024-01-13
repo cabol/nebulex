@@ -2,7 +2,7 @@ if Code.ensure_loaded?(:shards) do
   defmodule Nebulex.Adapters.Local.Backend.Shards do
     @moduledoc false
 
-    defmodule __MODULE__.DynamicSupervisor do
+    defmodule ShardsDynamicSupervisor do
       @moduledoc false
       use DynamicSupervisor
 
@@ -47,7 +47,7 @@ if Code.ensure_loaded?(:shards) do
         |> Map.fetch!(:meta_tab)
 
       sup_spec([
-        {__MODULE__.DynamicSupervisor, meta_tab},
+        {ShardsDynamicSupervisor, meta_tab},
         generation_spec(parse_opts(opts, partitions: partitions))
       ])
     end

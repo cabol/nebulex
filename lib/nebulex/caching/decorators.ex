@@ -843,7 +843,7 @@ if Code.ensure_loaded?(Decorator.Define) do
       walk(ast, acc)
     end
 
-    defp walk({var, [line: _], nil} = ast, acc) do
+    defp walk({var, [{:line, _} | _], nil} = ast, acc) do
       case "#{var}" do
         "_" <> _ -> acc
         _ -> [ast | acc]
@@ -1027,7 +1027,7 @@ if Code.ensure_loaded?(Decorator.Define) do
             Keyword.t(),
             on_error_opt,
             match_fun,
-            (() -> term)
+            (-> term)
           ) :: term
     def eval_cacheable(cache, key, references, opts, on_error, match, block)
 

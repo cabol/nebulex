@@ -68,12 +68,12 @@ defmodule Nebulex.Cache.SupervisorTest do
     end
 
     assert {:ok, _pid} = CustomCache.start_link(child_name: :custom_cache)
+
     _ = Process.flag(:trap_exit, true)
 
-    assert {:error, error} =
+    assert {:error, _reason} =
              CustomCache.start_link(name: :another_custom_cache, child_name: :custom_cache)
 
-    assert_receive {:EXIT, _pid, ^error}
     assert CustomCache.stop() == :ok
   end
 

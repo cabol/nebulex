@@ -58,6 +58,8 @@ defmodule Nebulex.Adapters.PartitionedTest do
     end
 
     test "fails because unloaded keyslot module" do
+      _ = Process.flag(:trap_exit, true)
+
       assert {:error, {%ArgumentError{message: msg}, _}} =
                Partitioned.start_link(
                  name: :unloaded_keyslot,
@@ -68,6 +70,8 @@ defmodule Nebulex.Adapters.PartitionedTest do
     end
 
     test "fails because keyslot module does not implement expected behaviour" do
+      _ = Process.flag(:trap_exit, true)
+
       assert {:error, {%ArgumentError{message: msg}, _}} =
                Partitioned.start_link(
                  name: :invalid_keyslot,
@@ -80,6 +84,8 @@ defmodule Nebulex.Adapters.PartitionedTest do
     end
 
     test "fails because invalid keyslot option" do
+      _ = Process.flag(:trap_exit, true)
+
       assert {:error, {%ArgumentError{message: msg}, _}} =
                Partitioned.start_link(
                  name: :invalid_keyslot,
