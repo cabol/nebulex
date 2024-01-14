@@ -90,9 +90,19 @@ defmodule Nebulex.Adapters.Multilevel do
       defaults to `:inclusive`. In an inclusive cache, the same data can be
       present in all caches/levels. In an exclusive cache, data can be present
       in only one cache/level and a key cannot be found in the rest of caches
-      at the same time. This option affects `get` operation only; if
-      `:cache_model` is `:inclusive`, when the key is found in a level N,
+      at the same time. This option applies to the `get` callabck only; if the
+      cache `:model` is `:inclusive`, when the key is found in a level N,
       that entry is duplicated backwards (to all previous levels: 1..N-1).
+      However, when the mode is set to `:inclusive`, the `get_all` operation
+      is translated into multiple `get` calls underneath (which may be a
+      significant performance penalty) since is required to replicate the
+      entries properly with their current TTLs. It is possible to skip the
+      replication when calling `get_all` using the option `:replicate`.
+
+    * `:replicate` - This option applies only to the `get_all` callback.
+      Determines whether the entries should be replicated to the backward
+      levels or not. Defaults to `true`.
+
 
   ## Shared options
 
@@ -312,7 +322,9 @@ defmodule Nebulex.Adapters.Multilevel do
 
   @impl true
   defspan get(adapter_meta, key, opts) do
-    fun = fn level, {default, prev} ->
+    opts
+    |> levels(adapter_meta.levels)
+    |> Enum.reduce_while({nil, []}, fn level, {default, prev} ->
       value = with_dynamic_cache(level, :get, [key, opts])
 
       if is_nil(value) do
@@ -320,17 +332,29 @@ defmodule Nebulex.Adapters.Multilevel do
       else
         {:halt, {value, [level | prev]}}
       end
-    end
-
-    opts
-    |> levels(adapter_meta.levels)
-    |> Enum.reduce_while({nil, []}, fun)
+    end)
     |> maybe_replicate(key, adapter_meta.model)
   end
 
   @impl true
   defspan get_all(adapter_meta, keys, opts) do
-    fun = fn level, {keys_acc, map_acc} ->
+    {replicate?, opts} = Keyword.pop(opts, :replicate, true)
+
+    do_get_all(adapter_meta, keys, replicate?, opts)
+  end
+
+  defp do_get_all(%{model: :inclusive} = adapter_meta, keys, true, opts) do
+    Enum.reduce(keys, %{}, fn key, acc ->
+      if obj = get(adapter_meta, key, opts),
+        do: Map.put(acc, key, obj),
+        else: acc
+    end)
+  end
+
+  defp do_get_all(%{levels: levels}, keys, _replicate?, opts) do
+    opts
+    |> levels(levels)
+    |> Enum.reduce_while({keys, %{}}, fn level, {keys_acc, map_acc} ->
       map = with_dynamic_cache(level, :get_all, [keys_acc, opts])
       map_acc = Map.merge(map_acc, map)
 
@@ -338,11 +362,7 @@ defmodule Nebulex.Adapters.Multilevel do
         [] -> {:halt, {[], map_acc}}
         keys_acc -> {:cont, {keys_acc, map_acc}}
       end
-    end
-
-    opts
-    |> levels(adapter_meta.levels)
-    |> Enum.reduce_while({keys, %{}}, fun)
+    end)
     |> elem(1)
   end
 
@@ -591,7 +611,9 @@ defmodule Nebulex.Adapters.Multilevel do
     end
   end
 
-  defp maybe_replicate({nil, _}, _, _), do: nil
+  defp maybe_replicate({nil, _}, _, _) do
+    nil
+  end
 
   defp maybe_replicate({value, [level_meta | [_ | _] = levels]}, key, :inclusive) do
     ttl = with_dynamic_cache(level_meta, :ttl, [key]) || :infinity

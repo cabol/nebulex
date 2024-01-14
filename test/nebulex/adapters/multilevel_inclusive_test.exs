@@ -65,7 +65,57 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
       assert Multilevel.get(3) == 3
       assert Multilevel.get(3, level: 1) == 3
       assert Multilevel.get(3, level: 2) == 3
+      assert Multilevel.get(3, level: 3) == 3
+    end
+
+    test "get_all [replicate: true]" do
+      :ok = Process.sleep(2000)
+      :ok = Multilevel.put(1, 1, level: 1)
+      :ok = Multilevel.put(2, 2, level: 2)
+      :ok = Multilevel.put(3, 3, level: 3)
+
+      assert Multilevel.get_all([1]) == %{1 => 1}
+      refute Multilevel.get(1, level: 2)
+      refute Multilevel.get(1, level: 3)
+
+      assert Multilevel.get_all([1, 2]) == %{1 => 1, 2 => 2}
+      assert Multilevel.get(2, level: 1) == 2
+      assert Multilevel.get(2, level: 2) == 2
+      refute Multilevel.get(2, level: 3)
+
+      assert Multilevel.get(3, level: 3) == 3
+      refute Multilevel.get(3, level: 1)
+      refute Multilevel.get(3, level: 2)
+
+      assert Multilevel.get_all([1, 2, 3]) == %{1 => 1, 2 => 2, 3 => 3}
+      assert Multilevel.get(3, level: 1) == 3
       assert Multilevel.get(3, level: 2) == 3
+      assert Multilevel.get(3, level: 3) == 3
+    end
+
+    test "get_all [replicate: false]" do
+      :ok = Process.sleep(2000)
+      :ok = Multilevel.put(1, 1, level: 1)
+      :ok = Multilevel.put(2, 2, level: 2)
+      :ok = Multilevel.put(3, 3, level: 3)
+
+      assert Multilevel.get_all([1], replicate: false) == %{1 => 1}
+      refute Multilevel.get(1, level: 2)
+      refute Multilevel.get(1, level: 3)
+
+      assert Multilevel.get_all([1, 2], replicate: false) == %{1 => 1, 2 => 2}
+      refute Multilevel.get(2, level: 1)
+      assert Multilevel.get(2, level: 2) == 2
+      refute Multilevel.get(2, level: 3)
+
+      assert Multilevel.get(3, level: 3) == 3
+      refute Multilevel.get(3, level: 1)
+      refute Multilevel.get(3, level: 2)
+
+      assert Multilevel.get_all([1, 2, 3], replicate: false) == %{1 => 1, 2 => 2, 3 => 3}
+      refute Multilevel.get(3, level: 1)
+      refute Multilevel.get(3, level: 2)
+      assert Multilevel.get(3, level: 3) == 3
     end
 
     test "get boolean" do
