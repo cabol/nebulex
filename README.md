@@ -69,7 +69,7 @@ For example, if you want to use a built-in cache, add to your `mix.exs` file:
 ```elixir
 def deps do
   [
-    {:nebulex, "~> 2.5"},
+    {:nebulex, "~> 2.6"},
     {:shards, "~> 1.1"},     #=> When using :shards as backend
     {:decorator, "~> 1.4"},  #=> When using Caching Annotations
     {:telemetry, "~> 1.0"}   #=> When using the Telemetry events (Nebulex stats)
