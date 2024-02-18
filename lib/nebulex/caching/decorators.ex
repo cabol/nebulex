@@ -578,25 +578,37 @@ if Code.ensure_loaded?(Decorator.Define) do
     then get the user record under the referenced key.
 
     On the other hand, in the eviction function `update_user_account/1`, since
-    the user record is stored only once under the user id, we just need to set
-    the user id in the option `:key`; no need to specify multiple keys like in
-    the previous case.
+    the user record is stored only once under the user's ID, we could set the
+    option `:key` to the user's ID, without specifying multiple keys like in the
+    previous case. However, there is a caveat: _"the `cache_evict` decorator
+    doesn't evict the references automatically"_. See the
+    ["CAVEATS"](#cacheable/3-caveats) section below.
 
-    ## External referenced keys
+    ### External referenced keys
 
-    Previously we saw how to work with referenced keys but on the same cache,
-    like "internal references". Despite this could be the common case scenario,
-    there could be situations where you may want to reference a key that is
-    stored in a different and/or external cache. You may be wondering, but why
-    would I want to reference a key located in a different cache? Well, let's
-    give an example for that.
+    Previously, we saw how to work with referenced keys but on the same cache,
+    like "internal references." Despite this being the typical case scenario,
+    there could be situations where you may want to reference a key stored in a
+    different or external cache. Why would I want to reference a key located in
+    a separate cache? There may be multiple reasons, but let's give a few
+    examples.
 
-    For the previous example, let's assume you have a Redis cache (using the
-    `NebulexRedisAdapter`), and you want to optimize the calls to Redis as much
-    as possible. Therefore, you would like to store the referenced keys in a
-    local cache and the actual values in Redis. This way, we only hit Redis for
-    accessing the keys with the actual values, and the referenced keys will be
-    resolved locally. But let us modify the example based on this new scenario:
+      * One example is when you have a Redis cache; in such case, you likely
+        want to optimize the calls to Redis as much as possible. Therefore, you
+        should store the referenced keys in a local cache and the values in
+        Redis. This way, we only hit Redis to access the keys with the actual
+        values, and the decorator resolves the referenced keys locally.
+
+      * Another example is for keeping the cache key references isolated,
+        preferably locally. Then, apply a different eviction (or garbage
+        collection) policy for the references; one may want to expire the
+        references more often to avoid having dangling keys since the
+        `cache_evict` decorator doesn't remove the references automatically,
+        just the defined key (or keys). See the
+        ["CAVEATS"](#cacheable/3-caveats) section below.
+
+    Let us modify the previous _"user accounts"_ example based on the Redis
+    scenario:
 
         defmodule MyApp.UserAccounts do
           use Nebulex.Caching
@@ -640,6 +652,37 @@ if Code.ensure_loaded?(Decorator.Define) do
     decorator the referenced key given by `&1.id` is located in the cache
     `RedisCache`; underneath, the macro [`keyref/2`](`Nebulex.Caching.keyref/2`)
     builds the special return type for the external cache reference.
+
+    ### CAVEATS
+
+    * When the `cache_evict` decorator annotates a key (or keys) to evict, the
+      decorator removes only the entry associated with that key. Therefore, if
+      the key has references, those are not automatically removed, which means
+      dangling keys. However, there are multiple ways to address dangling keys
+      (or references):
+
+      * The first (and the simplest) sets a TTL to the reference. For example:
+        `cacheable(key: name, references: & &1.id, opts: [ttl: @ttl])`. You can
+        also specify a different TTL for the referenced key:
+        `references: &keyref(&1.id, ttl: @another_ttl)`.
+
+      * The second alternative, perhaps the most recommended, is having a
+        separate cache to keep the references (e.g., a cache using the local
+        adapter). This way, you could provide a different eviction or GC
+        configuration to run the GC more often and keep the references cache
+        clean. See
+        ["External referenced keys"](#cacheable/3-external-referenced-keys).
+
+      * The third alternative uses the `:keys` option for specifying a key and
+        its references. For example, if you have
+        `@decorate cacheable(key: email, references: & &1.id)`, the eviction
+        may look like this `@decorate cache_evict(keys: [user.id, user.email])`.
+        This one is perhaps the least ideal option because it is cumbersome;
+        you have to know and specify the key and all its references, and at the
+        same time, you will need to have access to the key and references in the
+        arguments, which sometimes is not possible because you may receive only
+        the ID, but not the email.
+
     """
     def cacheable(attrs, block, context) do
       caching_action(:cacheable, attrs, block, context)
