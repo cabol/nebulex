@@ -888,7 +888,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
     defp walk({var, _meta, context} = ast, acc) when is_atom(context) and is_atom(var) do
       cond do
-        matching?("_" <> _, "#{var}") ->
+        match?("_" <> _, "#{var}") ->
           acc
 
         Macro.special_form?(var, 0) ->
