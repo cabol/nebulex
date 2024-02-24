@@ -21,14 +21,14 @@ jobs:
           - elixir: 1.16.x
             otp: 26.x
             os: 'ubuntu-latest'
-          - elixir: 1.15.x
-            otp: 26.x
-            os: 'ubuntu-latest'
             style: true
             coverage: true
             sobelow: true
             dialyzer: true
             doctor: true
+          - elixir: 1.15.x
+            otp: 26.x
+            os: 'ubuntu-latest'
           - elixir: 1.14.x
             otp: 25.x
             os: 'ubuntu-latest'
