@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.6.1](https://github.com/cabol/nebulex/tree/v2.6.1) (2024-02-24)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.6.0...v2.6.1)
+
+**Merged pull requests:**
+
+- Improve variable handing in key generators
+  [#221](https://github.com/cabol/nebulex/pull/221)
+  ([hissssst](https://github.com/hissssst))
+
 ## [v2.6.0](https://github.com/cabol/nebulex/tree/v2.6.0) (2024-01-21)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.5.2...v2.6.0)
