@@ -886,10 +886,16 @@ if Code.ensure_loaded?(Decorator.Define) do
       walk(ast, acc)
     end
 
-    defp walk({var, [{:line, _} | _], nil} = ast, acc) do
-      case "#{var}" do
-        "_" <> _ -> acc
-        _ -> [ast | acc]
+    defp walk({var, _meta, context} = ast, acc) when is_atom(context) and is_atom(var) do
+      cond do
+        match?("_" <> _, "#{var}") ->
+          acc
+
+        Macro.special_form?(var, 0) ->
+          acc
+
+        true ->
+          [ast | acc]
       end
     end
 
