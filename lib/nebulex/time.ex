@@ -44,7 +44,7 @@ defmodule Nebulex.Time do
       false
 
   """
-  @spec timeout?(term) :: boolean
+  @spec timeout?(any()) :: boolean()
   def timeout?(timeout) do
     (is_integer(timeout) and timeout >= 0) or timeout == :infinity
   end
