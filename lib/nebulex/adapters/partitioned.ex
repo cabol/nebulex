@@ -423,7 +423,7 @@ defmodule Nebulex.Adapters.Partitioned do
         name: normalize_module_name([name, Supervisor]),
         strategy: :rest_for_one,
         children: [
-          {cache.__primary__, primary_opts},
+          {cache.__primary__(), primary_opts},
           {__MODULE__.Bootstrap, {Map.put(adapter_meta, :cache, cache), opts}}
           | children
         ]
@@ -663,7 +663,7 @@ defmodule Nebulex.Adapters.Partitioned do
   def with_dynamic_cache(adapter_meta, action, args)
 
   def with_dynamic_cache(%{cache: cache, primary_name: nil}, action, args) do
-    apply(cache.__primary__, action, args)
+    apply(cache.__primary__(), action, args)
   end
 
   def with_dynamic_cache(%{cache: cache, primary_name: primary_name}, action, args) do
