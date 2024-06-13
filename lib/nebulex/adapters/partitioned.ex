@@ -663,11 +663,11 @@ defmodule Nebulex.Adapters.Partitioned do
   def with_dynamic_cache(adapter_meta, action, args)
 
   def with_dynamic_cache(%{cache: cache, primary_name: nil}, action, args) do
-    apply(cache.__primary__(), action, args)
+    apply(cache.__primary__, action, args)
   end
 
   def with_dynamic_cache(%{cache: cache, primary_name: primary_name}, action, args) do
-    cache.__primary__.with_dynamic_cache(primary_name, fn ->
+    cache.__primary__().with_dynamic_cache(primary_name, fn ->
       apply(cache.__primary__, action, args)
     end)
   end

@@ -363,7 +363,7 @@ defmodule Nebulex.Adapters.Replicated do
         name: normalize_module_name([name, Supervisor]),
         strategy: :rest_for_one,
         children: [
-          {cache.__primary__, primary_opts},
+          {cache.__primary__(), primary_opts},
           {__MODULE__.Bootstrap, Map.put(adapter_meta, :cache, cache)}
           | children
         ]
@@ -524,7 +524,7 @@ defmodule Nebulex.Adapters.Replicated do
   end
 
   def with_dynamic_cache(%{cache: cache, primary_name: primary_name}, action, args) do
-    cache.__primary__.with_dynamic_cache(primary_name, fn ->
+    cache.__primary__().with_dynamic_cache(primary_name, fn ->
       apply(cache.__primary__, action, args)
     end)
   end
@@ -773,7 +773,7 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
   end
 
   defp maybe_run_on_nodes(%{cache: cache} = adapter_meta, nodes, fun) do
-    if cache.__primary__.__adapter__() == Nebulex.Adapters.Local do
+    if cache.__primary__().__adapter__() == Nebulex.Adapters.Local do
       nodes
       |> :rpc.multicall(Replicated, :with_dynamic_cache, [adapter_meta, fun, []])
       |> handle_multicall(adapter_meta)
