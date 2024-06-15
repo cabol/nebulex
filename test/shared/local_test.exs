@@ -282,6 +282,11 @@ defmodule Nebulex.LocalTest do
         assert cache.replace("foo", "bar bar") == false
       end
 
+      test "put_all/2 skips nil values", %{cache: cache} do
+        assert cache.put_all(a: 1, b: nil, nil: nil) == :ok
+        assert cache.get_all([:a, :b]) == %{a: 1}
+      end
+
       test "put_all/2 (keys are removed from older generation)", %{cache: cache, name: name} do
         entries = Enum.map(1..100, &{{:key, &1}, &1})
 

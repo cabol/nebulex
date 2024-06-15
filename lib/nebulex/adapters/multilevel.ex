@@ -507,7 +507,7 @@ defmodule Nebulex.Adapters.Multilevel do
     nodes =
       adapter_meta.levels
       |> Enum.reduce([node()], fn %{name: name, cache: cache}, acc ->
-        if cache.__adapter__ in [Nebulex.Adapters.Partitioned, Nebulex.Adapters.Replicated] do
+        if cache.__adapter__() in [Nebulex.Adapters.Partitioned, Nebulex.Adapters.Replicated] do
           Cluster.get_nodes(name || cache) ++ acc
         else
           acc

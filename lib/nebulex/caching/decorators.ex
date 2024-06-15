@@ -1000,7 +1000,7 @@ if Code.ensure_loaded?(Decorator.Define) do
 
       eviction = eviction_block(attrs, keygen)
 
-      if is_boolean(before_invocation?) && before_invocation? do
+      if before_invocation? == true do
         quote do
           unquote(eviction)
           unquote(block)
@@ -1021,7 +1021,7 @@ if Code.ensure_loaded?(Decorator.Define) do
       all_entries? = attrs[:all_entries] || false
 
       cond do
-        is_boolean(all_entries?) && all_entries? ->
+        all_entries? == true ->
           quote(do: unquote(__MODULE__).run_cmd(cache, :delete_all, [], on_error, 0))
 
         is_list(keys) and length(keys) > 0 ->

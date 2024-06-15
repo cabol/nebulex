@@ -511,10 +511,15 @@ defmodule Nebulex.Adapters.Local do
 
   @impl true
   defspan put_all(adapter_meta, entries, ttl, on_write, _opts) do
+    # FIXME: Coveralls complaining about the `for` despite being covered
+    # coveralls-ignore-start
+
     entries =
-      for {key, value} <- entries, value != nil do
+      for {key, value} <- entries, not is_nil(value) do
         entry(key: key, value: value, touched: Time.now(), ttl: ttl)
       end
+
+    # coveralls-ignore-stop
 
     do_put_all(
       on_write,

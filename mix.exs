@@ -59,7 +59,7 @@ defmodule Nebulex.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
-      {:stream_data, "~> 0.6", only: [:dev, :test]},
+      {:stream_data, "~> 1.1", only: [:dev, :test]},
       {:doctor, "~> 0.21", only: [:dev, :test]},
 
       # Benchmark Test
@@ -67,7 +67,7 @@ defmodule Nebulex.MixProject do
       {:benchee_html, "~> 1.0", only: [:dev, :test]},
 
       # Docs
-      {:ex_doc, "~> 0.31", only: [:dev, :test], runtime: false}
+      {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false}
     ]
   end
 

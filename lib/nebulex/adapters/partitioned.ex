@@ -667,8 +667,8 @@ defmodule Nebulex.Adapters.Partitioned do
   end
 
   def with_dynamic_cache(%{cache: cache, primary_name: primary_name}, action, args) do
-    cache.__primary__.with_dynamic_cache(primary_name, fn ->
-      apply(cache.__primary__, action, args)
+    cache.__primary__().with_dynamic_cache(primary_name, fn ->
+      apply(cache.__primary__(), action, args)
     end)
   end
 
