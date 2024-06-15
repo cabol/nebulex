@@ -1,5 +1,21 @@
 locals_without_parens = [
+  # Nebulex.Utils
+  unwrap_or_raise: 1,
+  wrap_ok: 1,
+  wrap_error: 1,
+  wrap_error: 2,
+
+  # Nebulex.Cache.Utils
+  defcacheapi: 2,
+
+  # Nebulex.Adapter
+  defcommand: 1,
+  defcommand: 2,
+  defcommandp: 1,
+  defcommandp: 2,
+
   # Nebulex.Caching
+  dynamic_cache: 2,
   keyref: 1,
   keyref: 2,
 
