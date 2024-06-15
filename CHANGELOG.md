@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.6.2](https://github.com/cabol/nebulex/tree/v2.6.2) (2024-06-15)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.6.1...v2.6.2)
+
+**Closed issues:**
+
+- Having a cache per user ID
+  [#224](https://github.com/cabol/nebulex/issues/224)
+
+**Merged pull requests:**
+
+- Fix some compiler warnings in Elixir 1.17
+  [#222](https://github.com/cabol/nebulex/pull/222)
+  ([peaceful-james](https://github.com/peaceful-james))
+
 ## [v2.6.1](https://github.com/cabol/nebulex/tree/v2.6.1) (2024-02-24)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.6.0...v2.6.1)
