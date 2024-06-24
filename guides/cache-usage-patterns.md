@@ -1,9 +1,10 @@
-# Cache Usage Patterns via Nebulex.Caching
+# Cache Usage Patterns via Nebulex.Caching.Decorators
 
 There are several common access patterns when using a cache. **Nebulex**
-supports most of these patterns by means of [Nebulex.Caching][nbx_caching].
+supports most of these patterns by means of
+[Nebulex.Caching.Decorators][nbx_caching].
 
-[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
+[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.Decorators.html
 
 > Most of the following documentation about caching patterns it based on
   [EHCache Docs][EHCache]
@@ -24,11 +25,9 @@ the system-of-record.
 ### Reading values
 
 ```elixir
-if value = MyCache.get(key) do
-  value
-else
-  value = SoR.get(key) # maybe Ecto?
-  :ok = MyCache.put(key, value)
+with {:error, _reason_} <- MyCache.fetch(key) do
+  value = SoR.get(key) # maybe Ecto.Repo
+  MyCache.put(key, value)
   value
 end
 ```
@@ -36,8 +35,8 @@ end
 ### Writing values
 
 ```elixir
-:ok = MyCache.put(key, value)
-SoR.insert(key, value) # maybe Ecto?
+MyCache.put(key, value)
+SoR.insert(key, value) # maybe Ecto.Repo
 ```
 
 As you may have noticed, this is the default behavior for most of the caches,
@@ -71,11 +70,11 @@ A disadvantage of using the cache-as-SoR pattern is:
 
  * Less directly visible code-path
 
-But how to get all this out-of-box? This is where declarative annotation-based
+But how to get all this out-of-box? This is where declarative decorator-based
 caching comes in. Nebulex provides a set of annotation to abstract most of the
 logic behind **Read-through** and **Write-through** patterns and make the
 implementation extremely easy. But let's go over these patterns more in detail
-and how to implement them by using [Nebulex annotations][nbx_caching].
+and how to implement them by using [Nebulex decorators][nbx_caching].
 
 ## Read-through
 
@@ -90,27 +89,26 @@ The next time the cache is asked for the value for the same key it can be
 returned from the cache without using the loader (unless the entry has been
 evicted or expired).
 
-This pattern can be easily implemented using `cache` decorator as follows:
+This pattern can be easily implemented using the `cacheable` decorator
+as follows:
 
 ```elixir
 defmodule MyApp.Example do
-  use Nebulex.Caching
-
-  alias MyApp.Cache
+  use Nebulex.Caching, cache: MyApp.Cache
 
   @ttl :timer.hours(1)
 
-  @decorate cacheable(cache: Cache, key: name)
+  @decorate cacheable(key: name)
   def get_by_name(name) do
     # your logic (the loader to retrieve the value from the SoR)
   end
 
-  @decorate cacheable(cache: Cache, key: age, opts: [ttl: @ttl])
+  @decorate cacheable(key: age, opts: [ttl: @ttl])
   def get_by_age(age) do
     # your logic (the loader to retrieve the value from the SoR)
   end
 
-  @decorate cacheable(cache: Cache)
+  @decorate cacheable()
   def all(query) do
     # your logic (the loader to retrieve the value from the SoR)
   end
@@ -128,25 +126,23 @@ that knows how to write data to the system-of-record (SoR).
 When the cache is asked to store a value for a key, the cache invokes the writer
 to store the value in the SoR, as well as updating (or deleting) the cache.
 
-This pattern can be implemented using `defevict` or `defupdatable`. When the
-data is written to the system-of-record (SoR), you can update the cached value
-associated with the given key using `defupdatable`, or just delete it using
-`defevict`.
+This pattern can be implemented using `cache_evict` or `cache_put` decorators.
+When the data is written to the system-of-record (SoR), you can update the
+cached value associated with the given key using `cache_put`, or just delete
+it using `cache_evict`.
 
 ```elixir
 defmodule MyApp.Example do
-  use Nebulex.Caching
-
-  alias MyApp.Cache
+  use Nebulex.Caching, cache: MyApp.Cache
 
   # When the data is written to the SoR, it is updated in the cache
-  @decorate cache_put(cache: Cache, key: something)
+  @decorate cache_put(key: something)
   def update(something) do
     # Write data to the SoR (most likely the Database)
   end
 
   # When the data is written to the SoR, it is deleted (evicted) from the cache
-  @decorate cache_evict(cache: Cache, key: something)
+  @decorate cache_evict(key: something)
   def update_something(something) do
     # Write data to the SoR (most likely the Database)
   end

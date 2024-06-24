@@ -35,9 +35,6 @@ jobs:
           - elixir: 1.15.x
             otp: 25.x
             os: 'ubuntu-latest'
-          - elixir: 1.14.x
-            otp: 24.x
-            os: 'ubuntu-latest'
           - elixir: 1.12.x
             otp: 23.x
             os: 'ubuntu-20.04'
@@ -93,19 +90,15 @@ jobs:
         if: ${{ matrix.style }}
 
       - name: Run tests
-        run: |
-          epmd -daemon
-          mix test --trace
+        run: mix test
         if: ${{ !matrix.coverage }}
 
       - name: Run tests with coverage
-        run: |
-          epmd -daemon
-          mix coveralls.github
+        run: mix coveralls.github
         if: ${{ matrix.coverage }}
 
       - name: Run sobelow
-        run: mix sobelow --exit --skip
+        run: mix sobelow --skip --exit Low
         if: ${{ matrix.sobelow }}
 
       - name: Restore PLT Cache
@@ -113,7 +106,7 @@ jobs:
         id: plt-cache
         with:
           path: priv/plts
-          key: ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plt-v1
+          key: ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plt-v3-1
         if: ${{ matrix.dialyzer }}
 
       - name: Create PLTs
@@ -125,10 +118,6 @@ jobs:
       - name: Run dialyzer
         run: mix dialyzer --format github
         if: ${{ matrix.dialyzer && steps.plt-cache.outputs.cache-hit != 'true' }}
-
-      - name: Doc coverage report
-        run: MIX_ENV=docs mix inch.report
-        if: ${{ matrix.inch-report }}
 
       - name: Run documentation health check
         run: mix doctor

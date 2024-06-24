@@ -3,25 +3,27 @@ defmodule Nebulex.Adapter do
   Specifies the minimal API required from adapters.
   """
 
+  alias Nebulex.Cache.Options
   alias Nebulex.Telemetry
 
   @typedoc "Adapter"
   @type t :: module
 
-  @typedoc "Metadata type"
-  @type metadata :: %{optional(atom) => term}
-
   @typedoc """
   The metadata returned by the adapter `c:init/1`.
 
-  It must be a map and Nebulex itself will always inject two keys into
-  the meta:
+  It must be a map and Nebulex itself will always inject
+  the following keys into the meta:
 
     * `:cache` - The cache module.
-    * `:pid` - The PID returned by the child spec returned in `c:init/1`
+    * `:name` - The name of the cache supervisor process.
+    * `:pid` - The PID returned by the child spec returned in `c:init/1`.
+    * `:adapter` - The defined cache adapter.
 
   """
-  @type adapter_meta :: metadata
+  @type adapter_meta() :: %{optional(term) => term}
+
+  ## Callbacks
 
   @doc """
   The callback invoked in case the adapter needs to inject code.
@@ -29,9 +31,31 @@ defmodule Nebulex.Adapter do
   @macrocallback __before_compile__(env :: Macro.Env.t()) :: Macro.t()
 
   @doc """
-  Initializes the adapter supervision tree by returning the children.
+  Initializes the adapter supervision tree by returning the children
+  and adapter metadata.
   """
-  @callback init(config :: Keyword.t()) :: {:ok, :supervisor.child_spec(), adapter_meta}
+  @callback init(config :: keyword()) :: {:ok, :supervisor.child_spec(), adapter_meta()}
+
+  # Define optional callbacks
+  @optional_callbacks __before_compile__: 1
+
+  ## API
+
+  # Inline common instructions
+  @compile {:inline, lookup_meta: 1}
+
+  @doc """
+  Returns the adapter metadata from its `c:init/1` callback.
+
+  It expects a process name of the cache. The name is either
+  an atom or a PID. For a given cache, you often want to call
+  this function based on the dynamic cache:
+
+      Nebulex.Adapter.lookup_meta(cache.get_dynamic_cache())
+
+  """
+  @spec lookup_meta(atom() | pid()) :: {:ok, adapter_meta()} | {:error, Nebulex.Error.t()}
+  defdelegate lookup_meta(name_or_pid), to: Nebulex.Cache.Registry, as: :lookup
 
   @doc """
   Executes the function `fun` passing as parameters the adapter and metadata
@@ -39,81 +63,116 @@ defmodule Nebulex.Adapter do
 
   It expects a name or a PID representing the cache.
   """
-  @spec with_meta(atom | pid, (module, adapter_meta -> term)) :: term
+  @spec with_meta(atom() | pid(), (adapter_meta() -> any())) :: any() | {:error, Nebulex.Error.t()}
   def with_meta(name_or_pid, fun) do
-    {adapter, adapter_meta} = Nebulex.Cache.Registry.lookup(name_or_pid)
-    fun.(adapter, adapter_meta)
+    with {:ok, adapter_meta} <- lookup_meta(name_or_pid) do
+      fun.(adapter_meta)
+    end
   end
 
-  # FIXME: ExCoveralls does not mark most of this section as covered
-  # coveralls-ignore-start
+  ## Helpers
 
   @doc """
-  Helper macro for the adapters so they can add the logic for emitting the
-  recommended Telemetry events.
+  Builds up a public wrapper function for invoking an adapter command.
 
-  See the built-in adapters for more information on how to use this macro.
+  **NOTE:** Internal purposes only.
   """
-  defmacro defspan(fun, opts \\ [], do: block) do
-    {name, [adapter_meta | args_tl], as, [_ | as_args_tl] = as_args} = build_defspan(fun, opts)
+  defmacro defcommand(fun, opts \\ []) do
+    build_defcommand(:public, fun, opts)
+  end
 
-    quote do
-      def unquote(name)(unquote_splicing(as_args))
+  @doc """
+  Builds up a private wrapper function for invoking an adapter command.
 
-      def unquote(name)(%{telemetry: false} = unquote(adapter_meta), unquote_splicing(args_tl)) do
-        unquote(block)
+  **NOTE:** Internal purposes only.
+  """
+  defmacro defcommandp(fun, opts \\ []) do
+    build_defcommand(:private, fun, opts)
+  end
+
+  defp build_defcommand(public_or_private, fun, opts) do
+    # Decompose the function call
+    {function_name, [name_or_pid | args_tl] = args} = Macro.decompose_call(fun)
+
+    # Get the command or action
+    command = Keyword.get(opts, :command, function_name)
+
+    # Split the arguments to get the last one (options argument)
+    {args_tl, opts_arg} =
+      with {trimmed_args_tl, [value]} <- Enum.split(args_tl, -1) do
+        {trimmed_args_tl, value}
       end
 
-      def unquote(name)(unquote_splicing(as_args)) do
-        metadata = %{
-          adapter_meta: unquote(adapter_meta),
-          function_name: unquote(as),
-          args: unquote(as_args_tl)
-        }
-
-        Telemetry.span(
-          unquote(adapter_meta).telemetry_prefix ++ [:command],
-          metadata,
-          fn ->
-            result =
-              unquote(name)(
-                Map.merge(unquote(adapter_meta), %{telemetry: false, in_span?: true}),
-                unquote_splicing(as_args_tl)
-              )
-
-            {result, Map.put(metadata, :result, result)}
+    # Build the function
+    case public_or_private do
+      :public ->
+        quote do
+          def unquote(function_name)(unquote_splicing(args)) do
+            unquote(command_call(name_or_pid, command, args_tl, opts_arg))
           end
+        end
+
+      :private ->
+        quote do
+          defp unquote(function_name)(unquote_splicing(args)) do
+            unquote(command_call(name_or_pid, command, args_tl, opts_arg))
+          end
+        end
+    end
+  end
+
+  defp command_call(name_or_pid, command, args, opts_arg) do
+    quote do
+      with {:ok, adapter_meta} <- unquote(__MODULE__).lookup_meta(unquote(name_or_pid)) do
+        unquote(__MODULE__).run_command(
+          adapter_meta,
+          unquote(command),
+          unquote(args),
+          unquote(opts_arg)
         )
       end
     end
   end
 
-  ## Private Functions
+  @doc """
+  Convenience function for invoking the adapter running a command.
 
-  defp build_defspan(fun, opts) when is_list(opts) do
-    {name, args} =
-      case Macro.decompose_call(fun) do
-        {_, _} = pair -> pair
-        _ -> raise ArgumentError, "invalid syntax in defspan #{Macro.to_string(fun)}"
-      end
+  **NOTE:** Internal purposes only.
+  """
+  @spec run_command(adapter_meta(), atom(), [any()], keyword()) :: any()
+  def run_command(
+        %{
+          telemetry: telemetry?,
+          telemetry_prefix: telemetry_prefix,
+          adapter: adapter
+        } = adapter_meta,
+        command,
+        args,
+        opts
+      ) do
+    opts = Options.validate_telemetry_opts!(opts)
+    args = args ++ [opts]
 
-    as = Keyword.get(opts, :as, name)
-    as_args = build_as_args(args)
+    if telemetry? do
+      metadata = %{
+        adapter_meta: adapter_meta,
+        command: command,
+        args: args,
+        extra_metadata: Keyword.get(opts, :telemetry_metadata, %{})
+      }
 
-    {name, args, as, as_args}
-  end
+      opts
+      |> Keyword.get(:telemetry_event, telemetry_prefix ++ [:command])
+      |> Telemetry.span(
+        metadata,
+        fn ->
+          result = apply(adapter, command, [adapter_meta | args])
 
-  defp build_as_args(args) do
-    for {arg, idx} <- Enum.with_index(args) do
-      arg
-      |> Macro.to_string()
-      |> build_as_arg({arg, idx})
+          {result, Map.put(metadata, :result, result)}
+        end
+      )
+    else
+      apply(adapter, command, [adapter_meta | args])
     end
   end
-
-  # sobelow_skip ["DOS.BinToAtom"]
-  defp build_as_arg("_" <> _, {{_e1, e2, e3}, idx}), do: {:"var#{idx}", e2, e3}
-  defp build_as_arg(_, {arg, _idx}), do: arg
-
-  # coveralls-ignore-stop
 end
