@@ -12,8 +12,8 @@ Elixir application. Similar to [Ecto][ecto], the caching abstraction allows
 consistent use of various caching solutions with minimal impact on the code.
 
 Nebulex cache abstraction shields developers from directly dealing with the
-underlying caching implementations, such as [Redis][redis],
-[Memcached][memcached], or even other Elixir cache implementations like
+underlying caching implementations, such as [Redis][redis]
+or even other Elixir cache implementations like
 [Cachex][cachex]. Additionally, it provides totally out-of-box features such as
 [cache usage patterns][cache_patterns],
 [declarative annotation-based caching][nbx_caching], and
@@ -26,7 +26,6 @@ for more information.
 [ecto]: https://github.com/elixir-ecto/ecto
 [cachex]: https://github.com/whitfin/cachex
 [redis]: https://redis.io/
-[memcached]: https://memcached.org/
 [nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
 [cache_patterns]: http://hexdocs.pm/nebulex/cache-usage-patterns.html
 [cache_topologies]: https://docs.oracle.com/middleware/1221/coherence/develop-applications/cache_intro.htm
