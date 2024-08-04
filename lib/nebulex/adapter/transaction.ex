@@ -1,6 +1,6 @@
 defmodule Nebulex.Adapter.Transaction do
   @moduledoc """
-  Specifies the adapter transactions API.
+  Specifies the adapter Transaction API.
 
   ## Default implementation
 
@@ -9,22 +9,7 @@ defmodule Nebulex.Adapter.Transaction do
 
   This implementation accepts the following options:
 
-    * `:keys` - The list of the keys that will be locked. Since the lock id is
-      generated based on the key, if this option is not set, a fixed/constant
-      lock id is used to perform the transaction, then all further transactions
-      (without this option set) are serialized and the performance is affected
-      significantly. For that reason it is recommended to pass the list of keys
-      involved in the transaction.
-
-    * `:nodes` - The list of the nodes where the lock will be set, or on
-      all nodes if none are specified.
-
-    * `:retries` - If the key has been locked by other process already, and
-      `:retries` is not equal to 0, the process sleeps for a while and tries
-      to execute the action later. When `:retries` attempts have been made,
-      an exception is raised. If `:retries` is `:infinity` (the default),
-      the function will eventually be executed (unless the lock is never
-      released).
+  #{Nebulex.Adapter.Transaction.Options.options_docs()}
 
   Let's see an example:
 
@@ -35,66 +20,93 @@ defmodule Nebulex.Adapter.Transaction do
 
   Locking only the involved key (recommended):
 
-      MyCache.transaction [keys: [:counter]], fn ->
-        counter = MyCache.get(:counter)
-        MyCache.set(:counter, counter + 1)
-      end
+      MyCache.transaction(
+        fn ->
+          counter = MyCache.get(:counter)
+          MyCache.set(:counter, counter + 1)
+        end,
+        [keys: [:counter]]
+      )
 
-      MyCache.transaction [keys: [:alice, :bob]], fn ->
-        alice = MyCache.get(:alice)
-        bob = MyCache.get(:bob)
-        MyCache.set(:alice, %{alice | balance: alice.balance + 100})
-        MyCache.set(:bob, %{bob | balance: bob.balance + 100})
-      end
+      MyCache.transaction(
+        fn ->
+          alice = MyCache.get(:alice)
+          bob = MyCache.get(:bob)
+          MyCache.set(:alice, %{alice | balance: alice.balance + 100})
+          MyCache.set(:bob, %{bob | balance: bob.balance + 100})
+        end,
+        [keys: [:alice, :bob]]
+      )
 
   """
 
   @doc """
   Runs the given function inside a transaction.
 
-  A successful transaction returns the value returned by the function.
+  If an Elixir exception occurs, the exception will bubble up from the
+  transaction function. If the cache aborts the transaction, it returns
+  `{:error, reason}`.
+
+  A successful transaction returns the value returned by the function wrapped
+  in a tuple as `{:ok, value}`.
 
   See `c:Nebulex.Cache.transaction/2`.
   """
-  @callback transaction(Nebulex.Adapter.adapter_meta(), Nebulex.Cache.opts(), fun) :: any
+  @callback transaction(Nebulex.Adapter.adapter_meta(), fun(), Nebulex.Cache.opts()) ::
+              Nebulex.Cache.ok_error_tuple(any())
 
   @doc """
-  Returns `true` if the given process is inside a transaction.
+  Returns `{:ok, true}` if the current process is inside a transaction;
+  otherwise, `{:ok, false}` is returned.
 
-  See `c:Nebulex.Cache.in_transaction?/0`.
+  If there's an error with executing the command, `{:error, reason}`
+  is returned, where `reason` is the cause of the error.
+
+  See `c:Nebulex.Cache.in_transaction?/1`.
   """
-  @callback in_transaction?(Nebulex.Adapter.adapter_meta()) :: boolean
+  @callback in_transaction?(Nebulex.Adapter.adapter_meta(), Nebulex.Cache.opts()) ::
+              Nebulex.Cache.ok_error_tuple(boolean())
 
   @doc false
   defmacro __using__(_opts) do
     quote do
       @behaviour Nebulex.Adapter.Transaction
 
+      import Nebulex.Utils, only: [wrap_ok: 1, wrap_error: 2]
+
+      alias Nebulex.Adapter.Transaction.Options
+
       @impl true
-      def transaction(%{cache: cache, pid: pid} = adapter_meta, opts, fun) do
+      def transaction(%{cache: cache, pid: pid} = adapter_meta, fun, opts) do
+        opts = Options.validate!(opts)
+
         adapter_meta
-        |> in_transaction?()
+        |> do_in_transaction?()
         |> do_transaction(
           pid,
           adapter_meta[:name] || cache,
-          Keyword.get(opts, :keys, []),
+          Keyword.fetch!(opts, :keys),
           Keyword.get(opts, :nodes, [node()]),
-          Keyword.get(opts, :retries, :infinity),
+          Keyword.fetch!(opts, :retries),
           fun
         )
       end
 
       @impl true
-      def in_transaction?(%{pid: pid}) do
-        !!Process.get({pid, self()})
+      def in_transaction?(adapter_meta, _opts) do
+        wrap_ok do_in_transaction?(adapter_meta)
       end
 
-      defoverridable transaction: 3, in_transaction?: 1
+      defoverridable transaction: 3, in_transaction?: 2
 
       ## Helpers
 
+      defp do_in_transaction?(%{pid: pid}) do
+        !!Process.get({pid, self()})
+      end
+
       defp do_transaction(true, _pid, _name, _keys, _nodes, _retries, fun) do
-        fun.()
+        {:ok, fun.()}
       end
 
       defp do_transaction(false, pid, name, keys, nodes, retries, fun) do
@@ -105,7 +117,7 @@ defmodule Nebulex.Adapter.Transaction do
             try do
               _ = Process.put({pid, self()}, %{keys: keys, nodes: nodes})
 
-              fun.()
+              {:ok, fun.()}
             after
               _ = Process.delete({pid, self()})
 
@@ -113,7 +125,11 @@ defmodule Nebulex.Adapter.Transaction do
             end
 
           false ->
-            raise "transaction aborted"
+            wrap_error Nebulex.Error,
+              reason: :transaction_aborted,
+              cache: name,
+              nodes: nodes,
+              cache: name
         end
       end
 
