@@ -581,7 +581,7 @@ defmodule Nebulex.Adapters.Partitioned do
   defspan execute(adapter_meta, operation, query, opts) do
     reducer =
       case operation do
-        :all -> &List.flatten/1
+        :all -> &Enum.flat_map(&1, fn item -> item end)
         _ -> &Enum.sum/1
       end
 
