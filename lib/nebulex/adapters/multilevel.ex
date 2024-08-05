@@ -90,7 +90,7 @@ defmodule Nebulex.Adapters.Multilevel do
       defaults to `:inclusive`. In an inclusive cache, the same data can be
       present in all caches/levels. In an exclusive cache, data can be present
       in only one cache/level and a key cannot be found in the rest of caches
-      at the same time. This option applies to the `get` callabck only; if the
+      at the same time. This option applies to the `get` callback only; if the
       cache `:model` is `:inclusive`, when the key is found in a level N,
       that entry is duplicated backwards (to all previous levels: 1..N-1).
       However, when the mode is set to `:inclusive`, the `get_all` operation

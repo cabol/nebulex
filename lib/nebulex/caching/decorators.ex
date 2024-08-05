@@ -402,7 +402,7 @@ if Code.ensure_loaded?(Decorator.Define) do
           end
         end
 
-    See [Cache Usage Patters Guide](http://hexdocs.pm/nebulex/cache-usage-patterns.html).
+    See [Cache Usage Patterns Guide](http://hexdocs.pm/nebulex/cache-usage-patterns.html).
     """
 
     use Decorator.Define, cacheable: 1, cache_evict: 1, cache_put: 1

@@ -758,7 +758,7 @@ defmodule Nebulex.Adapters.Replicated.Bootstrap do
         # 1. Push a new generation on all cluster nodes to make the newer one
         #    empty.
         # 2. Copy cached data from one of the cluster nodes; entries will be
-        #    stremed from the older generation since the newer one should be
+        #    streamed from the older generation since the newer one should be
         #    empty.
         # 3. Push a new generation on the current/new node to make it a mirror
         #    of the other cluster nodes.
