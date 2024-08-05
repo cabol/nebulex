@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.6.3](https://github.com/cabol/nebulex/tree/v2.6.3) (2024-08-05)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.6.2...v2.6.3)
+
+**Closed issues:**
+
+- `Cache.all(nil, return: :value)` with a partitioned cache gives incorrect
+  results
+  [#228](https://github.com/cabol/nebulex/issues/228)
+- 2.6.2 is missing from tags and releases on github
+  [#227](https://github.com/cabol/nebulex/issues/227)
+
+**Merged pull requests:**
+
+- `Cache.all(nil, return: :value)` did not correctly handle values that are
+  lists.
+  [#229](https://github.com/cabol/nebulex/pull/229)
+  ([jweinkam](https://github.com/jweinkam))
+
 ## [v2.6.2](https://github.com/cabol/nebulex/tree/v2.6.2) (2024-06-15)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.6.1...v2.6.2)
