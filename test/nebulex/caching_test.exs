@@ -214,7 +214,7 @@ defmodule Nebulex.CachingTest do
     end
   end
 
-  describe "cachable with references" do
+  describe "cacheable with references" do
     setup_with_cache(YetAnotherCache)
 
     test "with referenced key" do
