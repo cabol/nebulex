@@ -616,12 +616,18 @@ defmodule Nebulex.Adapters.Multilevel do
   end
 
   defp maybe_replicate({value, [level_meta | [_ | _] = levels]}, key, :inclusive) do
-    ttl = with_dynamic_cache(level_meta, :ttl, [key]) || :infinity
-
     :ok =
-      Enum.each(levels, fn l_meta ->
-        _ = with_dynamic_cache(l_meta, :put, [key, value, [ttl: ttl]])
-      end)
+      case with_dynamic_cache(level_meta, :ttl, [key]) do
+        nil ->
+          # the cache entry expired between the `get` and `ttl` calls
+          # don't replicate the entry
+          :ok
+
+        ttl ->
+          Enum.each(levels, fn l_meta ->
+            _ = with_dynamic_cache(l_meta, :put, [key, value, [ttl: ttl]])
+          end)
+      end
 
     value
   end
