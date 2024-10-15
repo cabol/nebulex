@@ -9,6 +9,7 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
 
   alias Nebulex.Adapters.Local.Generation
   alias Nebulex.Cache.Cluster
+  alias Nebulex.TestCache.DelayedReadAdapter
   alias Nebulex.TestCache.Multilevel
   alias Nebulex.TestCache.Multilevel.{L1, L2, L3}
   alias Nebulex.TestCache.MultilevelWithDelay
@@ -175,7 +176,7 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
 
     test "does not replicate the data if the cache expires during replication" do
       # reading from L2 will take 500ms
-      Nebulex.TestCache.DelayedReadAdapter.put_read_delay(500)
+      DelayedReadAdapter.put_read_delay(500)
 
       # since we call both `get` and `ttl` the total read time will be 1000ms
       :ok = MultilevelWithDelay.put(:key, :data, ttl: 700, level: 2)
