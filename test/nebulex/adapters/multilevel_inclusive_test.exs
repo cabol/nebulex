@@ -9,8 +9,10 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
 
   alias Nebulex.Adapters.Local.Generation
   alias Nebulex.Cache.Cluster
+  alias Nebulex.TestCache.DelayedReadAdapter
   alias Nebulex.TestCache.Multilevel
   alias Nebulex.TestCache.Multilevel.{L1, L2, L3}
+  alias Nebulex.TestCache.MultilevelWithDelay
 
   @gc_interval :timer.hours(1)
 
@@ -152,6 +154,39 @@ defmodule Nebulex.Adapters.MultilevelInclusiveTest do
       refute Multilevel.get(:b, level: 1)
       refute Multilevel.get(:b, level: 2)
       refute Multilevel.get(:b, level: 3)
+    end
+  end
+
+  describe "delayed multilevel" do
+    setup_with_dynamic_cache(MultilevelWithDelay, :multilevel_inclusive_with_delay,
+      model: :inclusive,
+      levels: [
+        {MultilevelWithDelay.L1,
+         name: :multilevel_inclusive_with_delay_l1,
+         gc_interval: @gc_interval,
+         backend: :shards,
+         partitions: 2},
+        {MultilevelWithDelay.L2,
+         name: :multilevel_inclusive_with_delay_l2,
+         gc_interval: @gc_interval,
+         backend: :shards,
+         partitions: 2}
+      ]
+    )
+
+    test "does not replicate the data if the cache expires during replication" do
+      # reading from L2 will take 500ms
+      DelayedReadAdapter.put_read_delay(500)
+
+      # since we call both `get` and `ttl` the total read time will be 1000ms
+      :ok = MultilevelWithDelay.put(:key, :data, ttl: 700, level: 2)
+
+      # the key should expire between the `get` and `tl` calls, so the data
+      # should be returned but not replicated
+      assert MultilevelWithDelay.get(:key) == :data
+      assert MultilevelWithDelay.get(:key, level: 1) == nil
+
+      assert MultilevelWithDelay.ttl(:key) == nil
     end
   end
 

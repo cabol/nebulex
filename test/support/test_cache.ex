@@ -113,6 +113,114 @@ defmodule Nebulex.TestCache do
     end
   end
 
+  defmodule DelayedReadAdapter do
+    @moduledoc false
+
+    require Nebulex.Adapters.Local
+
+    @behaviour Nebulex.Adapter
+    @behaviour Nebulex.Adapter.Entry
+    @behaviour Nebulex.Adapter.Queryable
+
+    @fallback_adapter Nebulex.Adapters.Local
+
+    @impl true
+    defmacro __before_compile__(opts) do
+      quote do
+        require unquote(@fallback_adapter)
+
+        unquote(@fallback_adapter).__before_compile__(unquote(Macro.escape(opts)))
+      end
+    end
+
+    @impl true
+    defdelegate init(opts), to: @fallback_adapter
+
+    @impl true
+    def get(adapter_meta, key, opts) do
+      delay()
+      @fallback_adapter.get(adapter_meta, key, opts)
+    end
+
+    @impl true
+    def get_all(adapter_meta, list, opts) do
+      delay()
+      @fallback_adapter.get_all(adapter_meta, list, opts)
+    end
+
+    @impl true
+    defdelegate put(adapter_meta, key, value, ttl, on_write, opts), to: @fallback_adapter
+
+    @impl true
+    defdelegate put_all(adapter_meta, entries, ttl, on_write, opts), to: @fallback_adapter
+
+    @impl true
+    defdelegate delete(adapter_meta, key, opts), to: @fallback_adapter
+
+    @impl true
+    defdelegate take(adapter_meta, key, opts), to: @fallback_adapter
+
+    @impl true
+    def has_key?(adapter_meta, key) do
+      delay()
+      @fallback_adapter.has_key?(adapter_meta, key)
+    end
+
+    @impl true
+    def ttl(adapter_meta, key) do
+      delay()
+      @fallback_adapter.ttl(adapter_meta, key)
+    end
+
+    @impl true
+    defdelegate expire(adapter_meta, key, ttl), to: @fallback_adapter
+
+    @impl true
+    defdelegate touch(adapter_meta, key), to: @fallback_adapter
+
+    @impl true
+    defdelegate update_counter(adapter_meta, key, amount, ttl, default, opts), to: @fallback_adapter
+
+    @impl true
+    defdelegate execute(adapter_meta, command, args, opts), to: @fallback_adapter
+
+    @impl true
+    defdelegate stream(adapter_meta, query, opts), to: @fallback_adapter
+
+    @read_delay_key {__MODULE__, :read_delay}
+
+    def put_read_delay(delay) when is_integer(delay) do
+      Process.put(@read_delay_key, delay)
+    end
+
+    defp delay do
+      delay = Process.get(@read_delay_key, 1000)
+
+      Process.sleep(delay)
+    end
+  end
+
+  defmodule MultilevelWithDelay do
+    @moduledoc false
+    use Nebulex.Cache,
+      otp_app: :nebulex,
+      adapter: Nebulex.Adapters.Multilevel
+
+    defmodule L1 do
+      @moduledoc false
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.Adapters.Local
+    end
+
+    defmodule L2 do
+      @moduledoc false
+      use Nebulex.Cache,
+        otp_app: :nebulex,
+        adapter: Nebulex.TestCache.DelayedReadAdapter
+    end
+  end
+
   ## Mocks
 
   defmodule AdapterMock do
