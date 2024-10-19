@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.6.4](https://github.com/cabol/nebulex/tree/v2.6.4) (2024-10-19)
+
+[Full Changelog](https://github.com/cabol/nebulex/compare/v2.6.3...v2.6.4)
+
+**Closed issues:**
+
+- [Proposal] A New GC Strategy for Local Generation
+  [#184](https://github.com/cabol/nebulex/issues/184)
+
+**Merged pull requests:**
+
+- Fix race condition in multilevel cache replication
+  [#232](https://github.com/cabol/nebulex/pull/232)
+  ([costaraphael](https://github.com/costaraphael))
+- Fix typos again
+  [#230](https://github.com/cabol/nebulex/pull/230)
+  ([kianmeng](https://github.com/kianmeng))
+
 ## [v2.6.3](https://github.com/cabol/nebulex/tree/v2.6.3) (2024-08-05)
 
 [Full Changelog](https://github.com/cabol/nebulex/compare/v2.6.2...v2.6.3)
