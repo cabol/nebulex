@@ -10,166 +10,95 @@ defmodule Nebulex.TelemetryTest do
   defmodule Cache do
     use Nebulex.Cache,
       otp_app: :nebulex,
-      adapter: Nebulex.Adapters.Multilevel
-
-    defmodule L1 do
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Local
-    end
-
-    defmodule L2 do
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Replicated
-    end
-
-    defmodule L3 do
-      use Nebulex.Cache,
-        otp_app: :nebulex,
-        adapter: Nebulex.Adapters.Partitioned
-    end
+      adapter: Nebulex.TestAdapter
   end
 
   ## Shared constants
 
-  @prefix [:nebulex, :telemetry_test, :cache]
-
+  @prefix Telemetry.default_event_prefix()
   @start @prefix ++ [:command, :start]
   @stop @prefix ++ [:command, :stop]
-
-  @start_events [
-    @prefix ++ [:command, :start],
-    @prefix ++ [:l1, :command, :start],
-    @prefix ++ [:l2, :command, :start],
-    @prefix ++ [:l2, :primary, :command, :start],
-    @prefix ++ [:l3, :command, :start],
-    @prefix ++ [:l3, :primary, :command, :start]
-  ]
-
-  @stop_events [
-    @prefix ++ [:command, :stop],
-    @prefix ++ [:l1, :command, :stop],
-    @prefix ++ [:l2, :command, :stop],
-    @prefix ++ [:l2, :primary, :command, :stop],
-    @prefix ++ [:l3, :command, :stop],
-    @prefix ++ [:l3, :primary, :command, :stop]
-  ]
-
-  @exception_events [
-    @prefix ++ [:command, :exception],
-    @prefix ++ [:l1, :command, :exception],
-    @prefix ++ [:l2, :command, :exception],
-    @prefix ++ [:l2, :primary, :command, :exception],
-    @prefix ++ [:l3, :command, :stop],
-    @prefix ++ [:l3, :primary, :command, :exception]
-  ]
-
-  @caches [Cache, Cache.L1, Cache.L2, Cache.L2.Primary, Cache.L3, Cache.L3.Primary]
-
-  @events Enum.zip([@caches, @start_events, @stop_events])
-
-  @config [
-    model: :inclusive,
-    levels: [
-      {Cache.L1, gc_interval: :timer.hours(1)},
-      {Cache.L2, primary: [gc_interval: :timer.hours(1)]},
-      {Cache.L3, primary: [gc_interval: :timer.hours(1)]}
-    ]
-  ]
+  @exception @prefix ++ [:command, :exception]
+  @test_adapter_start [:nebulex, :test_adapter, :start]
+  @events [@start, @stop, @exception, @test_adapter_start]
 
   ## Tests
 
   describe "span/3" do
-    setup_with_cache(Cache, @config)
+    setup_with_cache Cache
 
     test "ok: emits start and stop events" do
-      with_telemetry_handler(__MODULE__, @start_events ++ @stop_events, fn ->
+      with_telemetry_handler @events, fn ->
         assert Cache.put("foo", "bar") == :ok
 
-        for {cache, start, stop} <- @events do
-          assert_receive {^start, measurements, %{function_name: :put} = metadata}
-          assert measurements[:system_time] |> DateTime.from_unix!(:native)
-          assert metadata[:adapter_meta][:cache] == cache
-          assert metadata[:args] == ["foo", "bar", :infinity, :put, []]
-          assert metadata[:telemetry_span_context] |> is_reference()
+        assert_receive {@start, measurements, %{command: :put} = metadata}
+        assert measurements[:system_time] |> DateTime.from_unix!(:native)
+        assert metadata[:adapter_meta][:cache] == Cache
+        assert metadata[:adapter_meta][:name] == Cache
+        assert metadata[:args] == ["foo", "bar", :put, :infinity, false, []]
+        assert metadata[:telemetry_span_context] |> is_reference()
+        assert metadata[:extra_metadata] == %{}
 
-          assert_receive {^stop, measurements, %{function_name: :put} = metadata}
-          assert measurements[:duration] > 0
-          assert metadata[:adapter_meta][:cache] == cache
-          assert metadata[:args] == ["foo", "bar", :infinity, :put, []]
-          assert metadata[:result] == true
-          assert metadata[:telemetry_span_context] |> is_reference()
-        end
-      end)
+        assert_receive {@stop, measurements, %{command: :put} = metadata}
+        assert measurements[:duration] > 0
+        assert metadata[:adapter_meta][:cache] == Cache
+        assert metadata[:adapter_meta][:name] == Cache
+        assert metadata[:args] == ["foo", "bar", :put, :infinity, false, []]
+        assert metadata[:result] == {:ok, true}
+        assert metadata[:telemetry_span_context] |> is_reference()
+        assert metadata[:extra_metadata] == %{}
+      end
     end
 
     test "raise: emits start and exception events" do
-      with_telemetry_handler(__MODULE__, @exception_events, fn ->
-        Adapter.with_meta(Cache.L3.Primary, fn _, meta ->
-          true = :ets.delete(meta.meta_tab)
-        end)
+      with_telemetry_handler @events, fn ->
+        key = {:eval, fn -> raise ArgumentError, "error" end}
 
         assert_raise ArgumentError, fn ->
-          Cache.get("foo")
+          Cache.fetch(key)
         end
 
-        ex_events = [
-          @prefix ++ [:command, :exception],
-          @prefix ++ [:l3, :command, :exception],
-          @prefix ++ [:l3, :primary, :command, :exception]
-        ]
-
-        for {cache, exception} <- ex_events do
-          assert_receive {^exception, measurements, %{function_name: :get} = metadata}
-          assert measurements[:duration] > 0
-          assert metadata[:adapter_meta][:cache] == cache
-          assert metadata[:args] == ["foo", []]
-          assert metadata[:kind] == :error
-          assert metadata[:reason] == :badarg
-          assert metadata[:stacktrace]
-          assert metadata[:telemetry_span_context] |> is_reference()
-        end
-      end)
+        assert_receive {@exception, measurements, %{command: :fetch} = metadata}
+        assert measurements[:duration] > 0
+        assert metadata[:adapter_meta][:cache] == Cache
+        assert metadata[:adapter_meta][:name] == Cache
+        assert metadata[:args] == [key, []]
+        assert metadata[:kind] == :error
+        assert metadata[:reason] == %ArgumentError{message: "error"}
+        assert metadata[:stacktrace]
+        assert metadata[:telemetry_span_context] |> is_reference()
+        assert metadata[:extra_metadata] == %{}
+      end
     end
 
     test "ok: emits start and stop events with custom telemetry_span_context" do
-      with_telemetry_handler(__MODULE__, [@start, @stop], fn ->
-        event_prefix = [:nebulex, :telemetry_test, :cache, :command]
-
-        Telemetry.span(event_prefix, %{telemetry_span_context: 1}, fn ->
+      with_telemetry_handler [@start, @stop], fn ->
+        Telemetry.span(@prefix ++ [:command], %{telemetry_span_context: 1}, fn ->
           {"test", %{telemetry_span_context: 1}}
         end)
 
-        assert_receive {@start, measurements, metadata}
+        assert_receive {@start, measurements, %{telemetry_span_context: 1}}
         assert measurements[:system_time] |> DateTime.from_unix!(:native)
-        assert metadata[:telemetry_span_context] == 1
 
-        assert_receive {@stop, measurements, metadata}
+        assert_receive {@stop, measurements, %{telemetry_span_context: 1}}
         assert measurements[:duration] > 0
-        assert metadata[:telemetry_span_context] == 1
-      end)
+      end
     end
   end
 
   describe "span/3 bypassed" do
-    setup_with_cache(Cache, Keyword.put(@config, :telemetry, false))
+    setup_with_cache Cache, telemetry: false
 
     test "telemetry set to false" do
-      for cache <- @caches do
-        Adapter.with_meta(cache, fn _, meta ->
-          assert meta.telemetry == false
-        end)
-      end
+      assert Adapter.lookup_meta(Cache).telemetry == false
     end
 
     test "ok: does not emit start and stop events" do
-      with_telemetry_handler(__MODULE__, @start_events ++ @stop_events, fn ->
+      with_telemetry_handler @events, fn ->
         commands = [
           put: ["foo", "bar"],
           put_all: [%{"foo foo" => "bar bar"}],
           get: ["foo"],
-          get_all: [["foo", "foo foo"]],
           delete: ["unknown"],
           take: ["foo foo"],
           has_key?: ["foo foo"],
@@ -177,35 +106,99 @@ defmodule Nebulex.TelemetryTest do
           ttl: ["foo"],
           expire: ["foo", 60_000],
           touch: ["foo"],
-          all: [],
+          get_all: [[in: ["foo", "foo foo"]]],
+          get_all: [],
           stream: [],
           transaction: [fn -> :ok end],
           in_transaction?: [],
-          dump: ["/invalid/path"],
-          load: ["wrong_file"],
-          stats: []
+          info: []
         ]
 
         for {command, args} <- commands do
-          _ = apply(Cache.L1, command, args)
-          _ = apply(Cache.L2, command, args)
-          _ = apply(Cache.L3, command, args)
+          _ = apply(Cache, command, args)
 
-          for {_cache, start, stop} <- @events do
-            refute_received {^start, _, %{function_name: :command}}
-            refute_received {^stop, _, %{function_name: :command}}
-          end
+          refute_received {@start, _, %{command: :command}}
+          refute_received {@stop, _, %{command: :command}}
         end
 
         for {command, args} <- Keyword.drop(commands, [:dump, :load]) do
           _ = apply(Cache, command, args)
 
-          for {_cache, start, stop} <- @events do
-            refute_received {^start, _, %{function_name: :command}}
-            refute_received {^stop, _, %{function_name: :command}}
-          end
+          refute_received {@start, _, %{command: :command}}
+          refute_received {@stop, _, %{command: :command}}
         end
-      end)
+      end
+    end
+  end
+
+  describe "span/3 with custom event and metadata" do
+    @custom_prefix [:my, :custom, :event]
+    @custom_start @custom_prefix ++ [:start]
+    @custom_stop @custom_prefix ++ [:stop]
+    @custom_exception @custom_prefix ++ [:exception]
+    @custom_events [@custom_start, @custom_stop, @custom_exception]
+
+    @custom_opts [
+      telemetry_event: @custom_prefix,
+      telemetry_metadata: %{foo: "bar"}
+    ]
+
+    setup_with_cache Cache
+
+    test "ok: emits start and stop events" do
+      with_telemetry_handler @custom_events, fn ->
+        :ok = Cache.put("foo", "bar", @custom_opts)
+
+        assert_receive {@custom_start, measurements, %{command: :put} = metadata}
+        assert measurements[:system_time] |> DateTime.from_unix!(:native)
+        assert metadata[:adapter_meta][:cache] == Cache
+        assert metadata[:adapter_meta][:name] == Cache
+        assert metadata[:args] == ["foo", "bar", :put, :infinity, false, @custom_opts]
+        assert metadata[:telemetry_span_context] |> is_reference()
+        assert metadata[:extra_metadata] == %{foo: "bar"}
+
+        assert_receive {@custom_stop, measurements, %{command: :put} = metadata}
+        assert measurements[:duration] > 0
+        assert metadata[:adapter_meta][:cache] == Cache
+        assert metadata[:adapter_meta][:name] == Cache
+        assert metadata[:args] == ["foo", "bar", :put, :infinity, false, @custom_opts]
+        assert metadata[:result] == {:ok, true}
+        assert metadata[:telemetry_span_context] |> is_reference()
+        assert metadata[:extra_metadata] == %{foo: "bar"}
+      end
+    end
+
+    test "raise: emits start and exception events" do
+      with_telemetry_handler @custom_events, fn ->
+        key = {:eval, fn -> raise ArgumentError, "error" end}
+
+        assert_raise ArgumentError, fn ->
+          Cache.fetch(key, @custom_opts)
+        end
+
+        assert_receive {@custom_exception, measurements, %{command: :fetch} = metadata}
+        assert measurements[:duration] > 0
+        assert metadata[:adapter_meta][:cache] == Cache
+        assert metadata[:adapter_meta][:name] == Cache
+        assert metadata[:args] == [key, @custom_opts]
+        assert metadata[:kind] == :error
+        assert metadata[:reason] == %ArgumentError{message: "error"}
+        assert metadata[:stacktrace]
+        assert metadata[:telemetry_span_context] |> is_reference()
+        assert metadata[:extra_metadata] == %{foo: "bar"}
+      end
+    end
+
+    test "error: invalid telemetry_event" do
+      assert_raise NimbleOptions.ValidationError, ~r"invalid value for :telemetry_event", fn ->
+        Cache.fetch(:invalid, telemetry_event: :invalid)
+      end
+    end
+
+    test "error: invalid telemetry_metadata" do
+      assert_raise NimbleOptions.ValidationError, ~r"invalid value for :telemetry_metadata", fn ->
+        Cache.fetch(:invalid, telemetry_metadata: :invalid)
+      end
     end
   end
 end

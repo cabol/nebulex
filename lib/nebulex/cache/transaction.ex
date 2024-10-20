@@ -1,19 +1,20 @@
 defmodule Nebulex.Cache.Transaction do
   @moduledoc false
 
-  alias Nebulex.Adapter
+  import Nebulex.Adapter, only: [defcommand: 1, defcommandp: 2]
 
   @doc """
   Implementation for `c:Nebulex.Cache.transaction/2`.
   """
-  def transaction(name, fun, opts) do
-    Adapter.with_meta(name, & &1.transaction(&2, fun, opts))
+  def transaction(name, fun, opts) when is_function(fun, 0) do
+    do_transaction(name, fun, opts)
   end
 
+  @compile {:inline, do_transaction: 3}
+  defcommandp do_transaction(name, fun, opts), command: :transaction
+
   @doc """
-  Implementation for `c:Nebulex.Cache.in_transaction?/0`.
+  Implementation for `c:Nebulex.Cache.in_transaction?/1`.
   """
-  def in_transaction?(name) do
-    Adapter.with_meta(name, & &1.in_transaction?(&2))
-  end
+  defcommand in_transaction?(name, opts)
 end

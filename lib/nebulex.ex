@@ -1,23 +1,33 @@
 defmodule Nebulex do
   @moduledoc ~S"""
-  Nebulex is split into 2 main components:
+  Nebulex is split into two main components:
 
-    * `Nebulex.Cache` - caches are wrappers around the in-memory data store.
-      Via the cache, we can put, get, update, delete and query existing entries.
-      A cache needs an adapter to communicate to the in-memory data store.
+    * `Nebulex.Cache` - Defines a standard Cache API for caching data.
+      This API implementation is intended to create a way for different
+      technologies to provide a common caching interface. It defines the
+      mechanism for creating, accessing, updating, and removing information
+      from a cache. This common interface makes it easier for software
+      developers to leverage various technologies as caches since the
+      software they write using the Nebulex Cache API does not need
+      to be rewritten to work with different underlying technologies.
 
-    * `Nebulex.Caching` - Declarative annotation-based caching via
-      **`Nebulex.Caching.Decorators`**. Decorators provide n elegant way of
-      annotating functions to be cached or evicted. Caching decorators also
-      enable the usage and/or implementation of cache usage patterns like
-      **Read-through**, **Write-through**, **Cache-as-SoR**, etc.
-      See [Cache Usage Patterns Guide](http://hexdocs.pm/nebulex/cache-usage-patterns.html).
+    * `Nebulex.Caching` - Defines a Cache Abstraction for transparently adding
+      caching into an existing Elixir application. The caching abstraction
+      allows consistent use of various caching solutions with minimal impact
+      on the code. This Cache Abstraction enables declarative decorator-based
+      caching via **`Nebulex.Caching.Decorators`**. Decorators provide an
+      elegant way of annotating functions to be cached or evicted. Caching
+      decorators also enable the adoption or implementation of cache usage
+      patterns such as **Read-through**, **Write-through**, **Cache-as-SoR**,
+      etc. See the [Cache Usage Patterns][cache-patterns] guide.
 
-  In the following sections, we will provide an overview of those components and
-  how they interact with each other. Feel free to access their respective module
-  documentation for more specific examples, options and configuration.
+  [cache-patterns]: http://hexdocs.pm/nebulex/cache-usage-patterns.html
 
-  If you want to quickly check a sample application using Nebulex, please check
+  The following sections will provide an overview of those components and their
+  usage. Feel free to access their respective module documentation for more
+  specific examples, options, and configurations.
+
+  If you want to check a sample application using Nebulex quickly, please check
   the [getting started guide](http://hexdocs.pm/nebulex/getting-started.html).
 
   ## Caches
@@ -35,7 +45,7 @@ defmodule Nebulex do
   environment, usually defined in your `config/config.exs`:
 
       config :my_app, MyApp.MyCache,
-        gc_interval: 3_600_000, #=> 1 hr
+        gc_interval: :timer.hours(1),
         backend: :shards,
         partitions: 2
 
@@ -61,8 +71,19 @@ defmodule Nebulex do
   Otherwise, you can start and stop the cache directly at any time by calling
   `MyApp.Cache.start_link/1` and `MyApp.Cache.stop/1`.
 
-  ## Declarative annotation-based caching
+  ## Declarative decorator-based caching
 
   See [Nebulex.Caching](http://hexdocs.pm/nebulex/Nebulex.Caching.html).
   """
+
+  ## API
+
+  @doc """
+  Returns the current Nebulex version.
+  """
+  @spec vsn() :: binary()
+  def vsn do
+    Application.spec(:nebulex, :vsn)
+    |> to_string()
+  end
 end
