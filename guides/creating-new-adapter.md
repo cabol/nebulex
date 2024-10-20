@@ -23,14 +23,14 @@ Now let's modify `mix.exs` so that we could fetch Nebulex repository.
 defmodule NebulexMemoryAdapter.MixProject do
   use Mix.Project
 
-  @nbx_vsn "2.5.2"
+  @nbx_vsn "3.0.0"
   @version "0.1.0"
 
   def project do
     [
       app: :nebulex_memory_adapter,
       version: @version,
-      elixir: "~> 1.13",
+      elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
       deps: deps(),
@@ -108,7 +108,7 @@ end
 We won't be writing tests ourselves. Instead, we will use shared tests from the
 Nebulex parent repo. To do so, we will create a helper module in
 `test/shared/cache_test.exs` that will `use` test suites for behaviour we are
-going to implement. The minimal set of behaviours is `Entry` and `Queryable` so
+going to implement. The minimal set of behaviours is `KV` and `Queryable` so
 we'll go with them.
 
 ```elixir
@@ -119,7 +119,7 @@ defmodule NebulexMemoryAdapter.CacheTest do
 
   defmacro __using__(_opts) do
     quote do
-      use Nebulex.Cache.EntryTest
+      use Nebulex.Cache.KVTest
       use Nebulex.Cache.QueryableTest
     end
   end
@@ -143,12 +143,15 @@ defmodule NebulexMemoryAdapterTest do
     Cache.delete_all()
     :ok
 
-    on_exit(fn ->
-      :ok = Process.sleep(100)
-      if Process.alive?(pid), do: Cache.stop(pid)
-    end)
+    on_exit(fn -> safe_stop(pid) end)
 
     {:ok, cache: Cache, name: Cache}
+  end
+
+  defp safe_stop(pid) do
+    Cache.stop(pid)
+  catch
+    :exit, _ -> :ok
   end
 end
 ```
@@ -187,7 +190,7 @@ Another try
 ```console
 mix test
 == Compilation error in file test/nebulex_memory_adapter_test.exs ==
-** (CompileError) test/nebulex_memory_adapter_test.exs:3: module Nebulex.Cache.EntryTest is not loaded and could not be found
+** (CompileError) test/nebulex_memory_adapter_test.exs:3: module Nebulex.Cache.KVTest is not loaded and could not be found
     (elixir 1.13.2) expanding macro: Kernel.use/1
     test/nebulex_memory_adapter_test.exs:3: NebulexMemoryAdapterTest (module)
     expanding macro: NebulexMemoryAdapter.CacheTest.__using__/1
@@ -256,21 +259,25 @@ defmodule NebulexMemoryAdapter do
   @behaviour Nebulex.Adapter
   @behaviour Nebulex.Adapter.Queryable
 
+  import Nebulex.Utils
+
   @impl Nebulex.Adapter
   defmacro __before_compile__(_env), do: :ok
 
   @impl Nebulex.Adapter
   def init(_opts) do
     child_spec = Supervisor.child_spec({Agent, fn -> %{} end}, id: {Agent, 1})
+
     {:ok, child_spec, %{}}
   end
 
   @impl Nebulex.Adapter.Queryable
-  def execute(adapter_meta, :delete_all, query, opts) do
+  def execute(adapter_meta, %{op: :delete_all} = query_meta, opts) do
     deleted = Agent.get(adapter_meta.pid, &map_size/1)
+
     Agent.update(adapter_meta.pid, fn _state -> %{} end)
 
-    deleted
+    wrap_ok deleted
   end
 end
 ```
@@ -301,8 +308,10 @@ one-by-one or define them all in bulk. For posterity, we put a complete
 ```elixir
 defmodule NebulexMemoryAdapter do
   @behaviour Nebulex.Adapter
-  @behaviour Nebulex.Adapter.Entry
+  @behaviour Nebulex.Adapter.KV
   @behaviour Nebulex.Adapter.Queryable
+
+  import Nebulex.Utils
 
   @impl Nebulex.Adapter
   defmacro __before_compile__(_env), do: :ok
@@ -310,20 +319,18 @@ defmodule NebulexMemoryAdapter do
   @impl Nebulex.Adapter
   def init(_opts) do
     child_spec = Supervisor.child_spec({Agent, fn -> %{} end}, id: {Agent, 1})
+
     {:ok, child_spec, %{}}
   end
 
-  @impl Nebulex.Adapter.Entry
-  def get(adapter_meta, key, _opts) do
-    Agent.get(adapter_meta.pid, &Map.get(&1, key))
+  @impl Nebulex.Adapter.KV
+  def fetch(adapter_meta, key, _opts) do
+    wrap_ok Agent.get(adapter_meta.pid, &Map.get(&1, key))
   end
 
-  @impl Nebulex.Adapter.Entry
-  def get_all(adapter_meta, keys, _opts) do
-    Agent.get(adapter_meta.pid, &Map.take(&1, keys))
-  end
+  @impl Nebulex.Adapter.KV
+  def put(adapter_meta, key, value, ttl, op, opts)
 
-  @impl Nebulex.Adapter.Entry
   def put(adapter_meta, key, value, ttl, :put_new, opts) do
     if get(adapter_meta, key, []) do
       false
@@ -331,103 +338,128 @@ defmodule NebulexMemoryAdapter do
       put(adapter_meta, key, value, ttl, :put, opts)
       true
     end
+    |> wrap_ok()
   end
 
   def put(adapter_meta, key, value, ttl, :replace, opts) do
     if get(adapter_meta, key, []) do
       put(adapter_meta, key, value, ttl, :put, opts)
+
       true
     else
       false
     end
+    |> wrap_ok()
   end
 
   def put(adapter_meta, key, value, _ttl, _on_write, _opts) do
     Agent.update(adapter_meta.pid, &Map.put(&1, key, value))
-    true
+
+    {:ok, true}
   end
 
-  @impl Nebulex.Adapter.Entry
+  @impl Nebulex.Adapter.KV
+  def put_all(adapter_meta, entries, ttl, op, opts)
+
   def put_all(adapter_meta, entries, ttl, :put_new, opts) do
     if get_all(adapter_meta, Map.keys(entries), []) == %{} do
       put_all(adapter_meta, entries, ttl, :put, opts)
+
       true
     else
       false
     end
+    |> wrap_ok()
   end
 
   def put_all(adapter_meta, entries, _ttl, _on_write, _opts) do
     entries = Map.new(entries)
+
     Agent.update(adapter_meta.pid, &Map.merge(&1, entries))
-    true
+
+    {:ok, true}
   end
 
-  @impl Nebulex.Adapter.Entry
+  @impl Nebulex.Adapter.KV
   def delete(adapter_meta, key, _opts) do
-    Agent.update(adapter_meta.pid, &Map.delete(&1, key))
+    wrap_ok Agent.update(adapter_meta.pid, &Map.delete(&1, key))
   end
 
-  @impl Nebulex.Adapter.Entry
+  @impl Nebulex.Adapter.KV
   def take(adapter_meta, key, _opts) do
     value = get(adapter_meta, key, [])
+
     delete(adapter_meta, key, [])
-    value
+
+    {:ok, value}
   end
 
-  @impl Nebulex.Adapter.Entry
+  @impl Nebulex.Adapter.KV
   def update_counter(adapter_meta, key, amount, _ttl, default, _opts) do
     Agent.update(adapter_meta.pid, fn state ->
       Map.update(state, key, default + amount, fn v -> v + amount end)
     end)
 
-    get(adapter_meta, key, [])
+    wrap_ok get(adapter_meta, key, [])
   end
 
-  @impl Nebulex.Adapter.Entry
-  def has_key?(adapter_meta, key) do
-    Agent.get(adapter_meta.pid, &Map.has_key?(&1, key))
+  @impl Nebulex.Adapter.KV
+  def has_key?(adapter_meta, key, _opts) do
+    wrap_ok Agent.get(adapter_meta.pid, &Map.has_key?(&1, key))
   end
 
-  @impl Nebulex.Adapter.Entry
-  def ttl(_adapter_meta, _key) do
-    nil
+  @impl Nebulex.Adapter.KV
+  def ttl(_adapter_meta, _key, _opts) do
+    {:ok, nil}
   end
 
-  @impl Nebulex.Adapter.Entry
-  def expire(_adapter_meta, _key, _ttl) do
-    true
+  @impl Nebulex.Adapter.KV
+  def expire(_adapter_meta, _key, _ttl, _opts) do
+    {:ok, true}
   end
 
-  @impl Nebulex.Adapter.Entry
-  def touch(_adapter_meta, _key) do
-    true
+  @impl Nebulex.Adapter.KV
+  def touch(_adapter_meta, _key, _opts) do
+    {:ok, true}
   end
 
   @impl Nebulex.Adapter.Queryable
-  def execute(adapter_meta, :delete_all, _query, _opts) do
-    deleted = execute(adapter_meta, :count_all, nil, [])
+  def execute(adapter_meta, query_meta, _opts) do
+    do_execute(adapter_meta.pid, query_meta)
+  end
+
+  def do_execute(pid, %{op: :delete_all} = query_meta) do
+    deleted = do_execute(pid, %{query_meta | op: :count_all})
+
     Agent.update(adapter_meta.pid, fn _state -> %{} end)
 
-    deleted
+    {:ok, deleted}
   end
 
-  def execute(adapter_meta, :count_all, _query, _opts) do
-    Agent.get(adapter_meta.pid, &map_size/1)
+  def do_execute(pid, %{op: :count_all}) do
+    wrap_ok Agent.get(pid, &map_size/1)
   end
 
-  def execute(adapter_meta, :all, _query, _opts) do
-    Agent.get(adapter_meta.pid, &Map.values/1)
+  def do_execute(pid, %{op: :get_all, query: {:q, nil}}) do
+    wrap_ok Agent.get(pid, &Map.values/1)
+  end
+
+  # Fetching multiple keys
+  def do_execute(pid, %{op: :get_all, query: {:in, keys}}) do
+    pid
+    |> Agent.get(&Map.take(&1, keys))
+    |> Map.to_list()
+    |> wrap_ok()
   end
 
   @impl Nebulex.Adapter.Queryable
-  def stream(_adapter_meta, :invalid_query, _opts) do
-    raise Nebulex.QueryError, message: "foo", query: :invalid_query
+  def stream(adapter_meta, query_meta, _opts) do
+    do_stream(adapter_meta.pid, query_meta)
   end
 
-  def stream(adapter_meta, _query, opts) do
+  def stream(pid, %{query: {:q, q}, select: select}) when q in [nil, :all] do
     fun =
-      case Keyword.get(opts, :return) do
+      case Keyword.get(opts, :select) do
         :value ->
           &Map.values/1
 
@@ -438,7 +470,11 @@ defmodule NebulexMemoryAdapter do
           &Map.keys/1
       end
 
-    Agent.get(adapter_meta.pid, fun)
+    wrap_ok Agent.get(pid, fun)
+  end
+
+  def stream(_pid_, query) do
+    wrap_error Nebulex.QueryError, query: query
   end
 end
 ```

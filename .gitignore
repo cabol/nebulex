@@ -37,3 +37,4 @@ erl_crash.dump
 /priv
 .sobelow*
 /config
+Elixir*
