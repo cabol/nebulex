@@ -3,25 +3,35 @@ defmodule Nebulex.Adapter do
   Specifies the minimal API required from adapters.
   """
 
+  import Nebulex.Utils, only: [is_nebulex_wrappable_exception: 1]
+
+  alias Nebulex.Cache.Options
+  alias Nebulex.Error, as: NbxError
   alias Nebulex.Telemetry
 
   @typedoc "Adapter"
-  @type t :: module
-
-  @typedoc "Metadata type"
-  @type metadata :: %{optional(atom) => term}
+  @type t() :: module()
 
   @typedoc """
   The metadata returned by the adapter `c:init/1`.
 
-  It must be a map and Nebulex itself will always inject two keys into
-  the meta:
+  It must be a map and Nebulex itself will always inject
+  the following keys into the meta:
 
-    * `:cache` - The cache module.
-    * `:pid` - The PID returned by the child spec returned in `c:init/1`
+    * `:cache` - The defined cache module.
+    * `:name` - The name of the cache supervisor process.
+    * `:pid` - The PID returned by the child spec returned in `c:init/1`.
+    * `:adapter` - The defined cache adapter.
+    * `:telemetry` - Whether Telemetry is enabled or not.
+    * `:telemetry_prefix` – The Telemetry prefix.
 
   """
-  @type adapter_meta :: metadata
+  @type adapter_meta() :: %{optional(atom()) => any()}
+
+  @typedoc "Nebulex wrappable error types"
+  @type nbx_error() :: Nebulex.Error.t() | Nebulex.KeyError.t()
+
+  ## Callbacks
 
   @doc """
   The callback invoked in case the adapter needs to inject code.
@@ -29,91 +39,179 @@ defmodule Nebulex.Adapter do
   @macrocallback __before_compile__(env :: Macro.Env.t()) :: Macro.t()
 
   @doc """
-  Initializes the adapter supervision tree by returning the children.
+  Initializes the adapter supervision tree by returning the children
+  and adapter metadata.
   """
-  @callback init(config :: Keyword.t()) :: {:ok, :supervisor.child_spec(), adapter_meta}
+  @callback init(config :: keyword()) :: {:ok, :supervisor.child_spec(), adapter_meta()}
+
+  # Define optional callbacks
+  @optional_callbacks __before_compile__: 1
+
+  ## API
+
+  # Inline common instructions
+  @compile {:inline, lookup_meta: 1}
 
   @doc """
-  Executes the function `fun` passing as parameters the adapter and metadata
-  (from the `c:init/1` callback) associated with the given cache `name_or_pid`.
+  Returns the adapter metadata from its `c:init/1` callback.
 
-  It expects a name or a PID representing the cache.
+  It expects a process name of the cache. The name is either
+  an atom or a PID. For a given cache, you often want to call
+  this function based on the dynamic cache:
+
+      Nebulex.Adapter.lookup_meta(cache.get_dynamic_cache())
+
   """
-  @spec with_meta(atom | pid, (module, adapter_meta -> term)) :: term
-  def with_meta(name_or_pid, fun) do
-    {adapter, adapter_meta} = Nebulex.Cache.Registry.lookup(name_or_pid)
-    fun.(adapter, adapter_meta)
+  @spec lookup_meta(atom() | pid()) :: adapter_meta()
+  defdelegate lookup_meta(name_or_pid), to: Nebulex.Cache.Registry, as: :lookup
+
+  ## Helpers
+
+  @doc """
+  Builds up a public wrapper function for invoking an adapter command.
+
+  **NOTE:** Internal purposes only.
+  """
+  defmacro defcommand(fun, opts \\ []) do
+    build_defcommand(:public, fun, opts)
   end
 
-  # FIXME: ExCoveralls does not mark most of this section as covered
-  # coveralls-ignore-start
-
   @doc """
-  Helper macro for the adapters so they can add the logic for emitting the
-  recommended Telemetry events.
+  Builds up a private wrapper function for invoking an adapter command.
 
-  See the built-in adapters for more information on how to use this macro.
+  **NOTE:** Internal purposes only.
   """
-  defmacro defspan(fun, opts \\ [], do: block) do
-    {name, [adapter_meta | args_tl], as, [_ | as_args_tl] = as_args} = build_defspan(fun, opts)
+  defmacro defcommandp(fun, opts \\ []) do
+    build_defcommand(:private, fun, opts)
+  end
 
-    quote do
-      def unquote(name)(unquote_splicing(as_args))
+  defp build_defcommand(public_or_private, fun, opts) do
+    # Decompose the function call
+    {function_name, [name_or_pid | args_tl] = args} = Macro.decompose_call(fun)
 
-      def unquote(name)(%{telemetry: false} = unquote(adapter_meta), unquote_splicing(args_tl)) do
-        unquote(block)
+    # Get the command or action
+    command = Keyword.get(opts, :command, function_name)
+
+    # Split the arguments to get the last one (options argument)
+    {args_tl, opts_arg} =
+      with {trimmed_args_tl, [value]} <- Enum.split(args_tl, -1) do
+        {trimmed_args_tl, value}
       end
 
-      def unquote(name)(unquote_splicing(as_args)) do
-        metadata = %{
-          adapter_meta: unquote(adapter_meta),
-          function_name: unquote(as),
-          args: unquote(as_args_tl)
-        }
-
-        Telemetry.span(
-          unquote(adapter_meta).telemetry_prefix ++ [:command],
-          metadata,
-          fn ->
-            result =
-              unquote(name)(
-                Map.merge(unquote(adapter_meta), %{telemetry: false, in_span?: true}),
-                unquote_splicing(as_args_tl)
-              )
-
-            {result, Map.put(metadata, :result, result)}
+    # Build the function
+    case public_or_private do
+      :public ->
+        quote do
+          def unquote(function_name)(unquote_splicing(args)) do
+            unquote(command_call(name_or_pid, command, args_tl, opts_arg))
           end
-        )
-      end
+        end
+
+      :private ->
+        quote do
+          defp unquote(function_name)(unquote_splicing(args)) do
+            unquote(command_call(name_or_pid, command, args_tl, opts_arg))
+          end
+        end
     end
   end
 
-  ## Private Functions
-
-  defp build_defspan(fun, opts) when is_list(opts) do
-    {name, args} =
-      case Macro.decompose_call(fun) do
-        {_, _} = pair -> pair
-        _ -> raise ArgumentError, "invalid syntax in defspan #{Macro.to_string(fun)}"
-      end
-
-    as = Keyword.get(opts, :as, name)
-    as_args = build_as_args(args)
-
-    {name, args, as, as_args}
-  end
-
-  defp build_as_args(args) do
-    for {arg, idx} <- Enum.with_index(args) do
-      arg
-      |> Macro.to_string()
-      |> build_as_arg({arg, idx})
+  defp command_call(name_or_pid, command, args, opts_arg) do
+    quote do
+      unquote(name_or_pid)
+      |> unquote(__MODULE__).lookup_meta()
+      |> unquote(__MODULE__).run_command(
+        unquote(command),
+        unquote(args),
+        unquote(opts_arg)
+      )
+      |> unquote(__MODULE__).handle_command_response()
     end
   end
 
-  # sobelow_skip ["DOS.BinToAtom"]
-  defp build_as_arg("_" <> _, {{_e1, e2, e3}, idx}), do: {:"var#{idx}", e2, e3}
-  defp build_as_arg(_, {arg, _idx}), do: arg
+  @doc """
+  Convenience function for invoking the adapter running a command.
 
-  # coveralls-ignore-stop
+  **NOTE:** Internal purposes only.
+  """
+  @spec run_command(adapter_meta(), atom(), [any()], keyword()) :: any()
+  def run_command(
+        %{
+          telemetry: telemetry?,
+          telemetry_prefix: telemetry_prefix,
+          adapter: adapter
+        } = adapter_meta,
+        command,
+        args,
+        opts
+      ) do
+    opts = Options.validate_telemetry_opts!(opts)
+    args = args ++ [opts]
+
+    if telemetry? do
+      metadata = %{
+        adapter_meta: adapter_meta,
+        command: command,
+        args: args,
+        extra_metadata: Keyword.get(opts, :telemetry_metadata, %{})
+      }
+
+      opts
+      |> Keyword.get(:telemetry_event, telemetry_prefix ++ [:command])
+      |> Telemetry.span(
+        metadata,
+        fn ->
+          result = apply(adapter, command, [adapter_meta | args])
+
+          {result, Map.put(metadata, :result, result)}
+        end
+      )
+    else
+      apply(adapter, command, [adapter_meta | args])
+    end
+  end
+
+  @doc """
+  Helper function for handling a Nebulex command response.
+
+  ## Examples
+
+      iex> Nebulex.Adapter.handle_command_response({:ok, "ok"})
+      {:ok, "ok"}
+
+      iex> Nebulex.Adapter.handle_command_response(:ok)
+      :ok
+
+      iex> Nebulex.Adapter.handle_command_response(
+      ...>   {:error, %Nebulex.Error{reason: :error}}
+      ...> )
+      {:error, %Nebulex.Error{reason: :error}}
+
+      iex> Nebulex.Adapter.handle_command_response({:error, :error})
+      {:error, %Nebulex.Error{reason: :error}}
+
+      iex> Nebulex.Adapter.handle_command_response({:error, %RuntimeError{}})
+      {:error, %Nebulex.Error{reason: %RuntimeError{}}}
+
+  """
+  @spec handle_command_response(ok | {:error, any()}) :: ok | {:error, nbx_error()}
+        when ok: :ok | {:ok, any()}
+  def handle_command_response(response)
+
+  def handle_command_response({:ok, _} = ok) do
+    ok
+  end
+
+  def handle_command_response(:ok) do
+    :ok
+  end
+
+  def handle_command_response({:error, reason} = error)
+      when is_nebulex_wrappable_exception(reason) do
+    error
+  end
+
+  def handle_command_response({:error, reason}) do
+    {:error, NbxError.exception(reason: reason)}
+  end
 end

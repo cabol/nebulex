@@ -4,57 +4,65 @@ defmodule Nebulex.Cache.TransactionTest do
   deftests do
     describe "transaction" do
       test "ok: single transaction", %{cache: cache} do
-        refute cache.transaction(fn ->
-                 with :ok <- cache.put(1, 11),
-                      11 <- cache.get!(1),
-                      :ok <- cache.delete(1) do
-                   cache.get(1)
-                 end
-               end)
+        assert cache.transaction(fn ->
+                 :ok = cache.put!(1, 11)
+
+                 11 = cache.fetch!(1)
+
+                 :ok = cache.delete!(1)
+
+                 cache.get!(1)
+               end) == {:ok, nil}
       end
 
       test "ok: nested transaction", %{cache: cache} do
-        refute cache.transaction(
-                 [keys: [1]],
+        assert cache.transaction(
                  fn ->
                    cache.transaction(
-                     [keys: [2]],
                      fn ->
-                       with :ok <- cache.put(1, 11),
-                            11 <- cache.get!(1),
-                            :ok <- cache.delete(1) do
-                         cache.get(1)
-                       end
-                     end
+                       :ok = cache.put!(1, 11)
+
+                       11 = cache.fetch!(1)
+
+                       :ok = cache.delete!(1)
+
+                       cache.get!(1)
+                     end,
+                     keys: [2]
                    )
-                 end
-               )
+                 end,
+                 keys: [1]
+               ) == {:ok, {:ok, nil}}
       end
 
       test "ok: single transaction with read and write operations", %{cache: cache} do
         assert cache.put(:test, ["old value"]) == :ok
-        assert cache.get(:test) == ["old value"]
+        assert cache.fetch!(:test) == ["old value"]
 
         assert cache.transaction(
-                 [keys: [:test]],
                  fn ->
-                   ["old value"] = value = cache.get(:test)
-                   :ok = cache.put(:test, ["new value" | value])
-                   cache.get(:test)
-                 end
-               ) == ["new value", "old value"]
+                   ["old value"] = value = cache.fetch!(:test)
 
-        assert cache.get(:test) == ["new value", "old value"]
+                   :ok = cache.put!(:test, ["new value" | value])
+
+                   cache.fetch!(:test)
+                 end,
+                 keys: [:test]
+               ) == {:ok, ["new value", "old value"]}
+
+        assert cache.fetch!(:test) == ["new value", "old value"]
       end
 
-      test "raises exception", %{cache: cache} do
+      test "error: exception is raised", %{cache: cache} do
         assert_raise MatchError, fn ->
           cache.transaction(fn ->
-            with :ok <- cache.put(1, 11),
-                 11 <- cache.get!(1),
-                 :ok <- cache.delete(1) do
-              :ok = cache.get(1)
-            end
+            :ok = cache.put!(1, 11)
+
+            11 = cache.fetch!(1)
+
+            :ok = cache.delete!(1)
+
+            :ok = cache.get(1)
           end)
         end
       end
@@ -66,34 +74,39 @@ defmodule Nebulex.Cache.TransactionTest do
           _ = cache.put_dynamic_cache(name)
 
           cache.transaction(
-            [keys: [key], retries: 1],
             fn ->
               :ok = cache.put(key, true)
-              Process.sleep(2000)
-            end
+
+              Process.sleep(1100)
+            end,
+            keys: [key],
+            retries: 1
           )
         end)
 
         :ok = Process.sleep(200)
 
-        assert_raise RuntimeError, "transaction aborted", fn ->
-          cache.transaction(
-            [keys: [key], retries: 1],
-            fn ->
-              cache.get(key)
-            end
-          )
+        assert_raise Nebulex.Error, ~r/transaction aborted\n\nError metadata:/, fn ->
+          {:error, %Nebulex.Error{} = reason} =
+            cache.transaction(
+              fn -> cache.get(key) end,
+              keys: [key],
+              retries: 1
+            )
+
+          raise reason
         end
       end
     end
 
     describe "in_transaction?" do
       test "returns true if calling process is already within a transaction", %{cache: cache} do
-        refute cache.in_transaction?()
+        assert cache.in_transaction?() == {:ok, false}
 
         cache.transaction(fn ->
-          :ok = cache.put(1, 11, return: :key)
-          true = cache.in_transaction?()
+          :ok = cache.put(1, 11)
+
+          assert cache.in_transaction?() == {:ok, true}
         end)
       end
     end

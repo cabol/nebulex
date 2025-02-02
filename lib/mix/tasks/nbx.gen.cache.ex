@@ -83,6 +83,8 @@ defmodule Mix.Tasks.Nbx.Gen.Cache do
 
         {#{inspect(cache)}, []}
 
+    And for more information about configuration options, check
+    adapters documentation and Nebulex.Cache shared options.
     """)
   end
 

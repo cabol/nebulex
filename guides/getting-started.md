@@ -3,8 +3,8 @@
 This guide is an introduction to [Nebulex](https://github.com/cabol/nebulex),
 a local and distributed caching toolkit for Elixir. Nebulex API is pretty much
 inspired by [Ecto](https://github.com/elixir-ecto/ecto), taking advantage of
-its simplicity, flexibility and pluggable architecture. In the same way
-as Ecto, developers can provide their own cache (adapter) implementations.
+its simplicity, flexibility and pluggable architecture. Same as Ecto,
+developers can provide their own cache (adapter) implementations.
 
 In this guide, we're going to learn some basics about Nebulex, such as insert,
 retrieve and destroy cache entries.
@@ -23,39 +23,39 @@ which will be needed by Nebulex later on.
 
 To add Nebulex to this application, there are a few steps that we need to take.
 
-The first step will be adding Nebulex to our `mix.exs` file, which we'll do by
-changing the `deps` definition in that file to this:
+The first step will be adding both Nebulex and the cache adapter as a dependency
+to our `mix.exs` file, which we'll do by changing the `deps` definition in that
+file to this:
 
 ```elixir
 defp deps do
   [
-    {:nebulex, "~> 2.6"},
-    {:shards, "~> 1.0"},      #=> When using :shards as backend
-    {:decorator, "~> 1.4"},   #=> When using Caching Annotations
-    {:telemetry, "~> 1.0"}    #=> When using the Telemetry events (Nebulex stats)
+    {:nebulex, "~> 3.0"},
+    {:nebulex_adapters_local, "~> 3.0"},
+    #=> When using :shards as backend for local adapter
+    {:shards, "~> 1.1"},
+    #=> When using Caching decorators (recommended adding it)
+    {:decorator, "~> 1.4"},
+    #=> When using the Telemetry events (recommended adding it)
+    {:telemetry, "~> 1.0"}
   ]
 end
 ```
 
-In order to give more flexibility and loading only needed dependencies, Nebulex
-makes all its dependencies as optional. For example:
+To give more flexibility and load only needed dependencies, Nebulex makes all
+dependencies optional, including the adapters. For example:
 
-  * For intensive workloads, you may want to use `:shards` as the backend for
-    the local adapter and having partitioned tables. In such a case, you have
-    to add `:shards` to the dependency list.
+  * For intensive workloads when using `Nebulex.Adapters.Local` adapter, you may
+    want to use `:shards` as the backend for partitioned ETS tables. In such a
+    case, you have to add `:shards` to the dependency list.
 
-  * For enabling the usage of
-    [declarative annotation-based caching via decorators][nbx_caching],
-    you have to add `:decorator` to the dependency list.
+  * For enabling [declarative decorator-based caching][nbx_caching], you have
+    to add `:decorator` to the dependency list.
 
-  * For enabling Telemetry events to be dispatched when using Nebulex,
-    you have to add `:telemetry` to the dependency list.
-    See [telemetry guide][telemetry].
+  * For enabling Telemetry events dispatched by Nebulex, you have to add
+    `:telemetry` to the dependency list. See [telemetry guide][telemetry].
 
-  * If you want to use an external adapter (e.g: Cachex or Redis adapter), you
-    have to add the adapter dependency too.
-
-[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.html
+[nbx_caching]: http://hexdocs.pm/nebulex/Nebulex.Caching.Decorators.html
 [telemetry]: http://hexdocs.pm/nebulex/telemetry.html
 
 To install these dependencies, we will run this command:
@@ -92,8 +92,7 @@ config :blog, Blog.Cache,
   gc_cleanup_max_timeout: :timer.minutes(10)
 ```
 
-Assuming we will use `:shards` as backend, can add uncomment the first line in
-the config
+Assuming you want to use `:shards` as backend, uncomment the `backend:` option:
 
 ```elixir
 config :blog, Blog.Cache,
@@ -156,9 +155,8 @@ against our cache.
 
 **IMPORTANT:** Make sure the cache is put in first place within the children
 list, or at least before the process or processes using it. Otherwise, there
-could be race conditions causing `Nebulex.RegistryLookupError` errors;
-processes attempting to use the cache and this one hasn't been even
-started.
+could be race conditions causing exceptions; processes attempting to use
+the cache and this one hasn't been even started.
 
 ## Inserting entries
 
@@ -200,13 +198,14 @@ Let's try `put_new` and `put_new!` functions:
 ```elixir
 iex> new_user = %{id: 4, first_name: "John", last_name: "Doe"}
 iex> Blog.Cache.put_new(new_user.id, new_user, ttl: 900)
-true
+{:ok, true}
 
 iex> Blog.Cache.put_new(new_user.id, new_user)
-false
+{:ok, false}
 
-# same as previous one but raises `Nebulex.KeyAlreadyExistsError`
+# same as previous one but raises `Nebulex.Error` in case of error
 iex> Blog.Cache.put_new!(new_user.id, new_user)
+false
 ```
 
 Now `replace` and `replace!` functions:
@@ -214,16 +213,20 @@ Now `replace` and `replace!` functions:
 ```elixir
 iex> existing_user = %{id: 5, first_name: "John", last_name: "Doe2"}
 iex> Blog.Cache.replace(existing_user.id, existing_user)
-false
+{:ok, false}
 
 iex> Blog.Cache.put_new(existing_user.id, existing_user)
-true
+{:ok, true}
 
 iex> Blog.Cache.replace(existing_user.id, existing_user, ttl: 900)
+{:ok, true}
+
+# same as previous one but raises `Nebulex.Error` in case of error
+iex> Blog.Cache.replace!(existing_user.id, existing_user)
 true
 
-# same as previous one but raises `KeyError`
-iex> Blog.Cache.replace!(100, existing_user)
+iex> Blog.Cache.replace!("unknown", existing_user)
+false
 ```
 
 It is also possible to insert multiple new entries at once:
@@ -234,10 +237,14 @@ iex> new_users = %{
 ...>   7 => %{id: 7, first_name: "Marie", last_name: "Curie"}
 ...> }
 iex> Blog.Cache.put_new_all(new_users)
-true
+{:ok, true}
 
 # none of the entries is inserted if at least one key already exists
 iex> Blog.Cache.put_new_all(new_users)
+{:ok, false}
+
+# same as previous one but raises `Nebulex.Error` in case of error
+iex> Blog.Cache.put_new_all!(new_users)
 false
 ```
 
@@ -247,11 +254,43 @@ Let’s start off with fetching data by the key, which is the most basic and
 common operation to retrieve data from a cache.
 
 ```elixir
-iex> Blog.Cache.get(1)
-_user_1
+# Using `fetch` callback
+iex> {:ok, user1} = Blog.Cache.fetch(1)
+iex> user1.id
+1
+
+# If the key doesn't exist an error tuple is returned
+iex> {:error, %Nebulex.KeyError{} = e} = Blog.Cache.fetch("unknown")
+iex> e.key
+"unknown"
+
+# Using `fetch!` (same as `fetch` but raises an exception in case of error)
+iex> user1 = Blog.Cache.fetch!(1)
+iex> user1.id
+1
+
+# Using `get` callback (returns the default in case the key doesn't exist)
+iex> {:ok, user1} = Blog.Cache.get(1)
+iex> user1.id
+1
+
+# Returns the default because the key doesn't exist
+iex> Blog.Cache.get("unknown")
+{:ok, nil}
+iex> Blog.Cache.get("unknown", "default")
+{:ok, "default"}
+
+# Using `get!` (same as `get` but raises an exception in case of error)
+iex> user1 = Blog.Cache.get!(1)
+iex> user1.id
+1
+iex> Blog.Cache.get!("unknown")
+nil
+iex> Blog.Cache.get!("unknown", "default")
+"default"
 
 iex> for key <- 1..3 do
-...>   user = Blog.Cache.get(key)
+...>   user = Blog.Cache.get!(key)
 ...>   user.first_name
 ...> end
 ["Galileo", "Charles", "Albert"]
@@ -261,17 +300,10 @@ There is a function `has_key?` to check if a key exist in cache:
 
 ```elixir
 iex> Blog.Cache.has_key?(1)
-true
+{:ok, true}
 
 iex> Blog.Cache.has_key?(10)
-false
-```
-
-Retrieving multiple entries
-
-```elixir
-iex> Blog.Cache.get_all([1, 2, 3])
-_users
+{:ok, false}
 ```
 
 ## Updating entries
@@ -286,12 +318,15 @@ iex> initial = %{id: 1, first_name: "", last_name: ""}
 iex> Blog.Cache.get_and_update(1, fn v ->
 ...>   if v, do: {v, %{v | first_name: "X"}}, else: {v, initial}
 ...> iex> end)
-{_old, _updated}
+{:ok, {_old, _updated}}
 
 # using `update`
 iex> Blog.Cache.update(1, initial, &(%{&1 | first_name: "Y"}))
-_updated
+{:ok, _updated}
 ```
+
+> You can also use the version with the trailing bang (`!`) `get_and_update!`
+> and `!update`.
 
 ## Counters
 
@@ -301,15 +336,19 @@ a counter is initialized to `0`. Let's see how counters works:
 ```elixir
 # by default, the counter is incremented by 1
 iex> Blog.Cache.incr(:my_counter)
-1
+{:ok, 1}
 
 # but we can also provide a custom increment value
 iex> Blog.Cache.incr(:my_counter, 5)
-6
+{:ok, 6}
 
 # to decrement the counter, just pass a negative value
 iex> Blog.Cache.incr(:my_counter, -5)
-1
+{:ok, 1}
+
+# using `incr!`
+iex> Blog.Cache.incr!(:my_counter)
+2
 ```
 
 ## Deleting entries
@@ -320,6 +359,10 @@ delete an entry using Nebulex.
 ```elixir
 iex> Blog.Cache.delete(1)
 :ok
+
+# or `delete!`
+iex> Blog.Cache.delete!(1)
+:ok
 ```
 
 ### Take
@@ -329,29 +372,49 @@ before its delete it:
 
 ```elixir
 iex> Blog.Cache.take(1)
-_entry
+{:ok, _entry}
 
-# returns `nil` if `key` doesn't exist
-iex> Blog.Cache.take("nonexistent")
-nil
+# If the key doesn't exist an error tuple is returned
+iex> {:error, %Nebulex.KeyError{} = e} = Blog.Cache.take("nonexistent")
+iex> e.key
+"nonexistent"
 
-# same as previous one but raises `KeyError`
+# same as previous one but raises `Nebulex.KeyError`
 iex> Blog.Cache.take!("nonexistent")
 ```
 
-## Info
+## Entry expiration
 
-The last thing we’ll cover in this guide is how to retrieve information about
-cached objects or the cache itself.
-
-### Remaining TTL
+You can get the remaining TTL or expiration time for a key like so:
 
 ```elixir
+# If no TTL is set when the entry is created, `:infinity` is set by default
 iex> Blog.Cache.ttl(1)
-_remaining_ttl
+{:ok, :infinity}
 
-iex> Blog.Cache.ttl("nonexistent")
-nil
+# If the key doesn't exist an error tuple is returned
+iex> {:error, %Nebulex.KeyError{} = e} = Blog.Cache.ttl("nonexistent")
+iex> e.key
+"nonexistent"
+
+# Same as `ttl` but an exception is raised if an error occurs
+iex> Blog.Cache.ttl!(1)
+:infinity
+```
+
+You could also change or update the expiration time using `expire`, like so:
+
+```elixir
+iex> Blog.Cache.expire(1, :timer.hours(1))
+{:ok, true}
+
+# When the key doesn't exist false is returned
+iex> Blog.Cache.expire("nonexistent", :timer.hours(1))
+{:ok, false}
+
+# Same as `expire` but an exception is raised if an error occurs
+iex> Blog.Cache.expire!(1, :timer.hours(1))
+true
 ```
 
 ## Query and/or Stream entries
@@ -362,34 +425,49 @@ cache matching the given query.
 ### Fetch all entries from cache matching the given query
 
 ```elixir
-# by default, returns all keys
-iex> Blog.Cache.all()
-_all_entries
+# by default, returns all entries
+iex> Blog.Cache.get_all() #=> The query is set to nil by default
+{:ok, _all_entries}
 
 # fetch all entries and return the keys
-iex> Blog.Cache.all(nil, return: :key)
-_keys
+iex> Blog.Cache.get_all(select: :key)
+{:ok, _all_keys}
+
+# fetch all entries and return the values
+iex> Blog.Cache.get_all(select: :value)
+{:ok, _all_values}
+
+# fetch entries associated to the requested keys
+iex> Blog.Cache.get_all(in: [1, 2])
+{:ok, _fetched_entries}
+
+# raises an exception in case of error
+iex> Blog.Cache.get_all!()
+_all_entries
+
+# raises an exception in case of error
+iex> Blog.Cache.get_all!(in: [1, 2])
+_fetched_entries
 
 # built-in queries in `Nebulex.Adapters.Local` adapter
-iex> Blog.Cache.all(nil)
-iex> Blog.Cache.all(:unexpired)
-iex> Blog.Cache.all(:expired)
+iex> Blog.Cache.get_all() #=> Equivalent to Blog.Cache.get_all(query: nil)
+iex> Blog.Cache.get_all(query: :expired)
 
 # if we are using `Nebulex.Adapters.Local` adapter, the stored entry
 # is a tuple `{:entry, key, value, touched, ttl}`, then the match spec
 # could be something like:
-iex> spec = [{{:_, :"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
-iex> Blog.Cache.all(spec)
-_all_matched
+iex> spec = [{{:_, :"$1", :"$2", :_, :_}, [{:>, :"$1", 10}], [{{:"$1", :"$2"}}]}]
+iex> Blog.Cache.get_all(query: spec)
+{:ok, _all_matched}
 
 # using Ex2ms
 iex> import Ex2ms
 iex> spec =
 ...>   fun do
-...>     {_, key, value, _, _} when value > 10 -> {key, value}
+...>     {_, key, value, _, _} when key > 10 -> {key, value}
 ...>   end
-iex> Blog.Cache.all(spec)
-_all_matched
+iex> Blog.Cache.get_all(query: spec)
+{:ok, _all_matched}
 ```
 
 ### Count all entries from cache matching the given query
@@ -397,36 +475,17 @@ _all_matched
 For example, to get the total number of cached objects (cache size):
 
 ```elixir
-iex> Blog.Cache.count_all()
+# by default, counts all entries
+iex> Blog.Cache.count_all() #=> The query is set to nil by default
+{:ok, _num_cached_entries}
+
+# raises an exception in case of error
+iex> Blog.Cache.count_all!()
 _num_cached_entries
 ```
 
-> By default, since none query is given to `count_all/2`, all entries
-  in cache match.
-
-In the same way as `all/2`, you can pass a query to count only the matched
-entries:
-
-```elixir
-# using Ex2ms
-iex> import Ex2ms
-iex> spec =
-...>   fun do
-...>     {_, value, _, _} when rem(value, 2) == 0 -> true
-...>   end
-iex> Blog.Cache.count_all(spec)
-_num_of_matched_entries
-```
-
-> The previous example assumes you are using the built-in local adapter.
-
-Also, if you are using the built-in local adapter, you can use the queries
-`:expired` and `:unexpired` too, like so:
-
-```elixir
-iex> expired_entries = Blog.Cache.count_all(:expired)
-iex> unexpired_entries = Blog.Cache.count_all(:unexpired)
-```
+Similar to `get_all`, you can pass a query to count only the matched entries.
+For example, `Blog.Cache.count_all(query: query)`.
 
 ### Delete all entries from cache matching the given query
 
@@ -439,66 +498,94 @@ the default behavior when none query is provided):
 
 ```elixir
 iex> Blog.Cache.delete_all()
+{:ok, _num_of_removed_entries}
+
+# raises an exception in case of error
+iex> Blog.Cache.delete_all!()
 _num_of_removed_entries
 ```
 
-And just like `count_all/2`, you can also provide a custom query to delete only
-the matched entries, or if you are using the built-in local adapter you can also
-use the queries `:expired` and `:unexpired`. For example:
+One may also delete a list of keys at once (like a bulk delete):
 
 ```elixir
-iex> expired_entries = Blog.Cache.delete_all(:expired)
-iex> unexpired_entries = Blog.Cache.delete_all(:unexpired)
+iex> Blog.Cache.delete_all(in: ["k1", "k2"])
+{:ok, _num_of_removed_entries}
 
-# using Ex2ms
-iex> import Ex2ms
-iex> spec =
-...>   fun do
-...>     {_, value, _, _} when rem(value, 2) == 0 -> true
-...>   end
-iex> Blog.Cache.delete_all(spec)
-_num_of_matched_entries
+# raises an exception in case of error
+iex> Blog.Cache.delete_all!(in: ["k1", "k2"])
+_num_of_removed_entries
 ```
-
-> These examples assumes you are using the built-in local adapter.
 
 ### Stream all entries from cache matching the given query
 
-Similar to `all/2` but returns a lazy enumerable that emits all entries from the
-cache matching the provided query.
+Similar to `get_all` but returns a lazy enumerable that emits all entries from
+the cache matching the provided query.
 
 If the query is `nil`, then all entries in cache match and are returned when the
-stream is evaluated; based on the `:return` option.
+stream is evaluated (based on the `:select` option).
 
 ```elixir
-iex> Blog.Cache.stream()
-iex> Blog.Cache.stream(nil, page_size: 100, return: :value)
-iex> Blog.Cache.stream(nil, page_size: 100, return: :entry)
+iex> {:ok, stream} = Blog.Cache.stream()
+iex> Enum.to_list(stream)
+_all_matched
+
+iex> {:ok, stream} = Blog.Cache.stream(select: :key)
+iex> Enum.to_list(stream)
+_all_matched
+
+iex> {:ok, stream} = Blog.Cache.stream([select: :value], max_entries: 100)
+iex> Enum.to_list(stream)
+_all_matched
+
+# raises an exception in case of error
+iex> stream = Blog.Cache.stream!()
+iex> Enum.to_list(stream)
+_all_matched
 
 # using `Nebulex.Adapters.Local` adapter
-iex> spec = [{{:"$1", :"$2", :_, :_}, [{:>, :"$2", 10}], [{{:"$1", :"$2"}}]}]
-iex> Blog.Cache.stream(spec)
+iex> spec = [{{:entry, :"$1", :"$2", :_, :_}, [{:<, :"$1", 3}], [{{:"$1", :"$2"}}]}]
+iex> {:ok, stream} = Blog.Cache.stream(query: spec)
+iex> Enum.to_list(stream)
 _all_matched
 
 # using Ex2ms
 iex> import Ex2ms
 iex> spec =
 ...>   fun do
-...>     {key, value, _, _} when value > 10 -> {key, value}
+...>     {:entry, key, value, _, _} when key < 3 -> {key, value}
 ...>   end
-iex> Blog.Cache.stream(spec)
+iex> {:ok, stream} = Blog.Cache.stream(query: spec)
+iex> Enum.to_list(stream)
 _all_matched
 ```
 
 ## Partitioned Cache
 
 Nebulex provides the adapter `Nebulex.Adapters.Partitioned`, which allows to
-set up a partitioned cache topology.
+set up a partitioned cache topology. First of all, we need to add
+`:nebulex_adapters_partitioned` to the dependencies in the `mix.exs`:
 
-Let's set up the partitioned cache by using the `mix` task `mix nbx.gen.cache`:
+```elixir
+defp deps do
+  [
+    {:nebulex, "~> 3.0"},
+    {:nebulex_adapters_local, "~> 3.0"},
+    {:nebulex_adapters_partitioned, "~> 3.0"},
+    #=> When using :shards as backend for local adapter
+    {:shards, "~> 1.0"},
+    #=> When using Caching decorators (recommended adding it)
+    {:decorator, "~> 1.4"},
+    #=> When using the Telemetry events (recommended adding it)
+    {:telemetry, "~> 1.0"}
+  ]
+end
+```
+
+Let's set up the partitioned cache by using the `mix` task
+`mix nbx.gen.cache.partitioned`:
 
 ```
-mix nbx.gen.cache -c Blog.PartitionedCache -a Nebulex.Adapters.Partitioned
+mix nbx.gen.cache.partitioned -c Blog.PartitionedCache
 ```
 
 As we saw previously, this command will generate the cache in
@@ -558,11 +645,11 @@ milliseconds for the command that will be executed.
 
 ```elixir
 iex> Blog.PartitionedCache.get("foo", timeout: 10)
-_value
+#=> {:ok, value}
 
-# if the timeout is exceeded, then the current process will exit
+# when the command's call timed out an error is returned
 iex> Blog.PartitionedCache.put("foo", "bar", timeout: 10)
-# ** (EXIT) time out
+#=> {:error, %Nebulex.Error{reason: :timeout}}
 ```
 
 To learn more about how partitioned cache works, please check
@@ -574,16 +661,36 @@ To learn more about how partitioned cache works, please check
 Nebulex also provides the adapter `Nebulex.Adapters.Multilevel`, which allows to
 setup a multi-level caching hierarchy.
 
-First, let's set up the multi-level cache by using the `mix` task
-`mix nbx.gen.cache`:
+Same as any other adapter, we have to add `:nebulex_adapters_multilevel` to the
+dependencies in the `mix.exs`:
+
+```elixir
+defp deps do
+  [
+    {:nebulex, "~> 3.0"},
+    {:nebulex_adapters_local, "~> 3.0"},
+    {:nebulex_adapters_partitioned, "~> 3.0"},
+    {:nebulex_adapters_multilevel, "~> 3.0"},
+    #=> When using :shards as backend for local adapter
+    {:shards, "~> 1.0"},
+    #=> When using Caching decorators (recommended adding it)
+    {:decorator, "~> 1.4"},
+    #=> When using the Telemetry events (recommended adding it)
+    {:telemetry, "~> 1.0"}
+  ]
+end
+```
+
+Let's set up the multilevel cache by using the `mix` task
+`mix nbx.gen.cache.multilevel`:
 
 ```
-mix nbx.gen.cache -c Blog.NearCache -a Nebulex.Adapters.Multilevel
+mix nbx.gen.cache.multilevel -c Blog.NearCache
 ```
 
 By default, the command generates a 2-level near-cache topology. The first
-level or `L1` using the built-in local adapter, and the second one or `L2`
-using the built-in partitioned adapter.
+level or `L1` using `Nebulex.Adapters.Local` adapter, and the second one or `L2`
+using `Nebulex.Adapters.Partitioned` adapter.
 
 The generated cache module `lib/blog/near_cache.ex`:
 
@@ -660,9 +767,9 @@ Let's try it out!
 
 ```elixir
 iex> Blog.NearCache.put("foo", "bar", ttl: :timer.hours(1))
-"bar"
+:ok
 
-iex> Blog.NearCache.get("foo")
+iex> Blog.NearCache.get!("foo")
 "bar"
 ```
 
@@ -672,5 +779,6 @@ To learn more about how multilevel-cache works, please check
 
 ## Next
 
- * [Cache Usage Patterns via Nebulex.Caching](http://hexdocs.pm/nebulex/cache-usage-patterns.html) -
-   Annotations-based DSL to implement different cache usage patterns.
+* [Decorators-based DSL for cache usage patterns][cache-usage-patterns].
+
+[cache-usage-patterns]: http://hexdocs.pm/nebulex/cache-usage-patterns.html
