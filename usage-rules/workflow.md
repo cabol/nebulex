@@ -130,7 +130,8 @@ mix docs
 ```
 
 Before pushing for review, the canonical gate is `mix precommit`. It runs
-tests, coverage, Credo (strict), Dialyzer, Sobelow, and `mix doctor`.
+tests, coverage, Credo (strict), Dialyzer, Sobelow, `mix deps.audit`, and
+`mix doctor`.
 Green CI is a requirement, not a courtesy check (see
 `usage-rules/architecture.md` Non-Negotiable #5).
 

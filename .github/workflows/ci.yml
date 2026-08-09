@@ -90,6 +90,10 @@ jobs:
         run: mix deps.unlock --check-unused
         if: ${{ matrix.lint }}
 
+      - name: Audit dependencies for security advisories
+        run: mix deps.audit
+        if: ${{ matrix.lint }}
+
       - name: Compile lint
         run: mix compile --warnings-as-errors
         if: ${{ matrix.lint }}

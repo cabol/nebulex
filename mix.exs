@@ -70,6 +70,7 @@ defmodule Nebulex.MixProject do
       {:stream_data, "~> 1.3", only: [:dev, :test]},
       {:mimic, "~> 2.3", only: :test},
       {:doctor, "~> 0.22", only: [:dev, :test]},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
 
       # Benchmark Test
       {:benchee, "~> 1.5", only: [:dev, :test]},
@@ -86,6 +87,7 @@ defmodule Nebulex.MixProject do
       bench: "run benchmarks/benchmark.exs",
       precommit: [
         "deps.unlock --check-unused",
+        "deps.audit",
         "compile --warnings-as-errors",
         "format --check-formatted",
         "credo --strict",

@@ -233,7 +233,8 @@ All changes must pass the full CI suite locally before opening a PR:
 mix precommit
 ```
 
-This runs tests, coverage, Credo (strict), Dialyzer, Sobelow, and `mix doctor`.
+This runs tests, coverage, Credo (strict), Dialyzer, Sobelow, `mix deps.audit`,
+and `mix doctor`.
 Green CI on the PR is a requirement, not a courtesy check.
 
 ### 6. Keep this document up to date
