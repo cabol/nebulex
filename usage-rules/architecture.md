@@ -225,12 +225,12 @@ macro so the shared test suite covers all adapters consistently. For
 core-only changes, tests belong in `test/nebulex/`. A PR without tests for
 new behaviour will not be merged.
 
-### 5. `mix test.ci` must pass
+### 5. `mix precommit` must pass
 
 All changes must pass the full CI suite locally before opening a PR:
 
 ```bash
-mix test.ci
+mix precommit
 ```
 
 This runs tests, coverage, Credo (strict), Dialyzer, Sobelow, and `mix doctor`.

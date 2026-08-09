@@ -247,10 +247,10 @@ $ mix test
 Additionally, to run all Nebulex checks:
 
 ```bash
-$ mix test.ci
+$ mix precommit
 ```
 
-The `mix test.ci` command will run the tests, coverage, credo, dialyzer,
+The `mix precommit` command will run the tests, coverage, credo, dialyzer,
 and more. This is the recommended way to test Nebulex.
 
 ---

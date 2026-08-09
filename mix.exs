@@ -41,7 +41,7 @@ defmodule Nebulex.MixProject do
         "coveralls.post": :test,
         "coveralls.html": :test,
         "coveralls.json": :test,
-        "test.ci": :test
+        precommit: :test
       ]
     ]
   end
@@ -84,7 +84,7 @@ defmodule Nebulex.MixProject do
   defp aliases do
     [
       bench: "run benchmarks/benchmark.exs",
-      "test.ci": [
+      precommit: [
         "deps.unlock --check-unused",
         "compile --warnings-as-errors",
         "format --check-formatted",

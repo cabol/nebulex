@@ -70,7 +70,7 @@ requesting review:
 mix test path/to/changed_test.exs
 
 # full validation
-mix test.ci
+mix precommit
 ```
 
 ## Commit Message Convention

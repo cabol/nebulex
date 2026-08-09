@@ -55,7 +55,7 @@ When relevant to the task:
 4. Verify code follows `usage-rules/` conventions (architectural
    non-negotiables first, then Nebulex-specific rules, Elixir
    patterns, and style guidelines).
-5. Rely on green CI for the canonical gate; re-run `mix test.ci`
+5. Rely on green CI for the canonical gate; re-run `mix precommit`
    locally only if you doubt CI's result. Use the fast-iteration
    commands (see below) for spot checks.
 6. Provide constructive feedback referencing specific lines and
@@ -71,7 +71,7 @@ When relevant to the task:
    (e.g., `fix/some-bug`, `feat/cache-warming-support`).
 2. Do not update `CHANGELOG.md` directly. Include release-note context
    in the PR description for maintainers to fold into the next release.
-3. Run `mix test.ci` before pushing (canonical gate; see below).
+3. Run `mix precommit` before pushing (canonical gate; see below).
 4. Reference related GitHub issues in the PR description
    (e.g., "Closes #123").
 5. Use `gh pr create` with a clear title and description.
@@ -129,11 +129,11 @@ mix credo --strict
 mix docs
 ```
 
-Before pushing for review, the canonical gate is `mix test.ci`. It runs
+Before pushing for review, the canonical gate is `mix precommit`. It runs
 tests, coverage, Credo (strict), Dialyzer, Sobelow, and `mix doctor`.
 Green CI is a requirement, not a courtesy check (see
 `usage-rules/architecture.md` Non-Negotiable #5).
 
 ```bash
-mix test.ci
+mix precommit
 ```
