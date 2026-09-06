@@ -78,6 +78,9 @@ defmodule Nebulex.Adapters.Nil do
   # Inherit default observable implementation
   use Nebulex.Adapter.Observable
 
+  # Inherit default composite KV implementation
+  use Nebulex.Adapter.CompositeKV
+
   import Nebulex.Utils, only: [wrap_error: 2]
 
   alias __MODULE__.Options

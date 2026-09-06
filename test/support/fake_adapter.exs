@@ -8,6 +8,9 @@ defmodule Nebulex.FakeAdapter do
   @behaviour Nebulex.Adapter.Transaction
   @behaviour Nebulex.Adapter.Info
 
+  # Inherit default composite KV implementation
+  use Nebulex.Adapter.CompositeKV
+
   ## Nebulex.Adapter
 
   @impl true

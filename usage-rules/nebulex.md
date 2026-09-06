@@ -149,7 +149,12 @@ config :my_app, MyApp.NearCache,
 - Adapter functions MUST return `{:ok, value}` or `{:error, reason}` tuples.
 - Use `wrap_error/2` from `Nebulex.Utils` to wrap errors consistently.
 - Implement optional behaviours as needed: `Nebulex.Adapter.KV`,
-  `Nebulex.Adapter.Queryable`, etc.
+  `Nebulex.Adapter.CompositeKV`, `Nebulex.Adapter.Queryable`, etc.
+- Adapters that should expose `get_and_update/3`, `update/4`,
+  `fetch_or_store/3`, and `get_or_store/3` MUST implement
+  `Nebulex.Adapter.CompositeKV`. Add `use Nebulex.Adapter.CompositeKV` to
+  inherit the default implementation, or implement the callbacks to change
+  the execution model (e.g., run the given function on a remote node).
 
 ### Command Pattern
 
@@ -226,6 +231,11 @@ end)
   caching.
 - `get_or_store/3` - Simpler variant that stores the direct return value from
   the fallback function.
+
+> **Note**: `fetch_or_store/3` and `get_or_store/3` (like `get_and_update/3`
+> and `update/4`) are composite operations. They are defined on the cache
+> module only when the adapter implements `Nebulex.Adapter.CompositeKV`. If
+> they are undefined on your cache, the adapter has not opted in yet.
 
 ## Options and Validation
 
@@ -736,6 +746,11 @@ end
 - **Do NOT** skip telemetry support in adapter implementations.
 - **Do NOT** use pattern matching in test assertions when the full value is
   known.
+- **Do NOT** assume `get_and_update/3`, `update/4`, `fetch_or_store/3`, and
+  `get_or_store/3` are available on every cache; they require the adapter to
+  implement `Nebulex.Adapter.CompositeKV`. Adapters written before that
+  behaviour existed must add `use Nebulex.Adapter.CompositeKV` (or implement
+  its callbacks) to keep exposing them.
 
 ## Backward Compatibility
 

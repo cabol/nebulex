@@ -131,6 +131,7 @@ defmodule Nebulex.MixProject do
         group_for_function("User callbacks"),
         group_for_function("Runtime API"),
         group_for_function("KV API"),
+        group_for_function("Composite KV API"),
         group_for_function("Query API"),
         group_for_function("Transaction API"),
         group_for_function("Info API"),
@@ -150,6 +151,7 @@ defmodule Nebulex.MixProject do
         "Adapter specification": [
           Nebulex.Adapter,
           Nebulex.Adapter.KV,
+          Nebulex.Adapter.CompositeKV,
           Nebulex.Adapter.Queryable,
           Nebulex.Adapter.Transaction,
           Nebulex.Adapter.Info,

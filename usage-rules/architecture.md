@@ -72,7 +72,8 @@ Nebulex is organized into three distinct layers:
 |            v                                               |
 |  +-------------------------------------------------------+ |
 |  |           Nebulex.Adapter behaviours                  | |
-|  |  (KV, Queryable, Transaction, Observable, Info)       | |
+|  |  (KV, CompositeKV, Queryable, Transaction,            | |
+|  |   Observable, Info)                                   | |
 |  +-------------------------------------------------------+ |
 +------------------------------------------------------------+
                            |
@@ -92,6 +93,7 @@ implementation; all storage logic lives in adapters.
 |---|---|
 | `Nebulex.Cache` | Public API macro — `use Nebulex.Cache` generates the full cache API for a module |
 | `Nebulex.Cache.KV` | Key-value operations: `fetch`, `get`, `put`, `delete`, `take`, etc. |
+| `Nebulex.Cache.CompositeKV` | Composite KV operations (`get_and_update`, `update`, `fetch_or_store`, `get_or_store`) when the adapter implements `Nebulex.Adapter.CompositeKV` |
 | `Nebulex.Cache.Queryable` | Query-based operations: `get_all`, `count_all`, `delete_all` |
 | `Nebulex.Cache.Transaction` | Optimistic locking and transactional operations |
 | `Nebulex.Cache.Observable` | Event streaming for cache entry changes |
@@ -101,6 +103,7 @@ implementation; all storage logic lives in adapters.
 | `Nebulex.Cache.Registry` | Registry for dynamic caches |
 | `Nebulex.Adapter` | Adapter behaviour definition and shared macros |
 | `Nebulex.Adapter.KV` | Callback spec for KV operations |
+| `Nebulex.Adapter.CompositeKV` | Callback spec for composite KV operations (optional) and their default implementation |
 | `Nebulex.Adapter.Queryable` | Callback spec for query operations |
 | `Nebulex.Adapter.Transaction` | Callback spec for transaction operations |
 | `Nebulex.Adapter.Observable` | Callback spec for event streaming |

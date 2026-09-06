@@ -56,10 +56,14 @@ defmodule Nebulex.Cache do
 
   The functions `c:get_and_update/3`, `c:update/4`, `c:fetch_or_store/3`, and
   `c:get_or_store/3` receive a function as an argument. They are composite
-  operations: by default, Nebulex builds them on top of the primitive adapter
-  commands (`fetch`, `put`, and `delete`), and the given function runs in the
-  calling process, on the local node. This holds even when the adapter
-  performs the underlying read and write commands on remote nodes.
+  operations, specified by the optional `Nebulex.Adapter.CompositeKV`
+  behaviour, and are available only when the adapter implements it.
+
+  By default (`use Nebulex.Adapter.CompositeKV`), they are built on top of the
+  primitive adapter commands (`fetch`, `put`, and `delete`), and the given
+  function runs in the calling process, on the local node. This holds even
+  when the adapter performs the underlying read and write commands on remote
+  nodes.
 
   Because they are composite, the default implementation is **not atomic**:
 
@@ -74,13 +78,6 @@ defmodule Nebulex.Cache do
   call in `c:transaction/2` locking the key with the `:keys` option. Only
   writers that also go through `c:transaction/2` on the same keys are
   excluded; plain writes are not.
-
-  > #### Adapter-specific behavior {: .info}
-  >
-  > An adapter may provide its own implementation of these functions (see
-  > `c:Nebulex.Adapter.__before_compile__/1`), which can change where the
-  > given function runs and the atomicity guarantees. Check the adapter's
-  > documentation for its execution model.
 
   ## Telemetry events
 
@@ -400,6 +397,13 @@ defmodule Nebulex.Cache do
   @typedoc "Ok/Error type"
   @type ok_error_tuple(ok, error) :: {:ok, ok} | {:error, error}
 
+  @typedoc "Get and update function"
+  @type get_and_update_fun() ::
+          (value() -> {current_value :: value(), new_value :: value()} | :pop)
+
+  @typedoc "Update function"
+  @type update_fun() :: (value() -> value())
+
   @typedoc "Fetch or store function"
   @type fetch_or_store_fun() :: (-> {:ok, value()} | {:error, any()})
 
@@ -416,6 +420,10 @@ defmodule Nebulex.Cache do
       unquote(prelude(opts))
       unquote(base_defs())
       unquote(kv_defs())
+
+      if Nebulex.Adapter.CompositeKV in behaviours do
+        unquote(composite_kv_defs())
+      end
 
       if Nebulex.Adapter.Queryable in behaviours do
         unquote(queryable_defs())
@@ -580,22 +588,28 @@ defmodule Nebulex.Cache do
       defcacheapi decr(key, amount \\ 1, opts \\ []), to: KV
 
       defcacheapi decr!(key, amount \\ 1, opts \\ []), to: KV
+    end
+  end
 
-      defcacheapi get_and_update(key, fun, opts \\ []), to: KV
+  defp composite_kv_defs do
+    quote do
+      alias Nebulex.Cache.CompositeKV
 
-      defcacheapi get_and_update!(key, fun, opts \\ []), to: KV
+      defcacheapi get_and_update(key, fun, opts \\ []), to: CompositeKV
 
-      defcacheapi update(key, initial, fun, opts \\ []), to: KV
+      defcacheapi get_and_update!(key, fun, opts \\ []), to: CompositeKV
 
-      defcacheapi update!(key, initial, fun, opts \\ []), to: KV
+      defcacheapi update(key, initial, fun, opts \\ []), to: CompositeKV
 
-      defcacheapi fetch_or_store(key, fun, opts \\ []), to: KV
+      defcacheapi update!(key, initial, fun, opts \\ []), to: CompositeKV
 
-      defcacheapi fetch_or_store!(key, fun, opts \\ []), to: KV
+      defcacheapi fetch_or_store(key, fun, opts \\ []), to: CompositeKV
 
-      defcacheapi get_or_store(key, fun, opts \\ []), to: KV
+      defcacheapi fetch_or_store!(key, fun, opts \\ []), to: CompositeKV
 
-      defcacheapi get_or_store!(key, fun, opts \\ []), to: KV
+      defcacheapi get_or_store(key, fun, opts \\ []), to: CompositeKV
+
+      defcacheapi get_or_store!(key, fun, opts \\ []), to: CompositeKV
     end
   end
 
@@ -1843,8 +1857,8 @@ defmodule Nebulex.Cache do
       {:ok, {nil, nil}}
 
   """
-  @doc group: "KV API"
-  @callback get_and_update(key(), (value() -> {current_value, new_value} | :pop), opts()) ::
+  @doc group: "Composite KV API"
+  @callback get_and_update(key(), get_and_update_fun(), opts()) ::
               ok_error_tuple({current_value, new_value})
             when current_value: value(), new_value: value()
 
@@ -1861,11 +1875,11 @@ defmodule Nebulex.Cache do
       {:ok, {nil, "value!"}}
 
   """
-  @doc group: "KV API"
+  @doc group: "Composite KV API"
   @callback get_and_update(
               dynamic_cache(),
               key(),
-              (value() -> {current_value, new_value} | :pop),
+              get_and_update_fun(),
               opts()
             ) :: ok_error_tuple({current_value, new_value})
             when current_value: value(), new_value: value()
@@ -1879,19 +1893,19 @@ defmodule Nebulex.Cache do
       {nil, "value!"}
 
   """
-  @doc group: "KV API"
-  @callback get_and_update!(key(), (value() -> {current_value, new_value} | :pop), opts()) ::
+  @doc group: "Composite KV API"
+  @callback get_and_update!(key(), get_and_update_fun(), opts()) ::
               {current_value, new_value}
             when current_value: value(), new_value: value()
 
   @doc """
   Same as `c:get_and_update!/4` but raises an exception if an error occurs.
   """
-  @doc group: "KV API"
+  @doc group: "Composite KV API"
   @callback get_and_update!(
               dynamic_cache(),
               key(),
-              (value() -> {current_value, new_value} | :pop),
+              get_and_update_fun(),
               opts()
             ) :: {current_value, new_value}
             when current_value: value(), new_value: value()
@@ -1935,8 +1949,8 @@ defmodule Nebulex.Cache do
       {:ok, 2}
 
   """
-  @doc group: "KV API"
-  @callback update(key(), initial :: value(), (value() -> value()), opts()) ::
+  @doc group: "Composite KV API"
+  @callback update(key(), initial :: value(), update_fun(), opts()) ::
               ok_error_tuple(value())
 
   @doc """
@@ -1952,8 +1966,8 @@ defmodule Nebulex.Cache do
       {:ok, 1}
 
   """
-  @doc group: "KV API"
-  @callback update(dynamic_cache(), key(), initial :: value(), (value() -> value()), opts()) ::
+  @doc group: "Composite KV API"
+  @callback update(dynamic_cache(), key(), initial :: value(), update_fun(), opts()) ::
               ok_error_tuple(value())
 
   @doc """
@@ -1965,14 +1979,14 @@ defmodule Nebulex.Cache do
       1
 
   """
-  @doc group: "KV API"
-  @callback update!(key(), initial :: value(), (value() -> value()), opts()) :: value()
+  @doc group: "Composite KV API"
+  @callback update!(key(), initial :: value(), update_fun(), opts()) :: value()
 
   @doc """
   Same as `c:update/5` but raises an exception if an error occurs.
   """
-  @doc group: "KV API"
-  @callback update!(dynamic_cache(), key(), initial :: value(), (value() -> value()), opts()) ::
+  @doc group: "Composite KV API"
+  @callback update!(dynamic_cache(), key(), initial :: value(), update_fun(), opts()) ::
               value()
 
   @doc """
@@ -2088,7 +2102,7 @@ defmodule Nebulex.Cache do
   For computations that always produce a valid result to cache (even if it's
   an error tuple), consider using `get_or_store/3` instead.
   """
-  @doc group: "KV API"
+  @doc group: "Composite KV API"
   @callback fetch_or_store(key(), fetch_or_store_fun(), opts()) :: ok_error_tuple(value())
 
   @doc """
@@ -2104,7 +2118,7 @@ defmodule Nebulex.Cache do
       {:ok, "value"}
 
   """
-  @doc group: "KV API"
+  @doc group: "Composite KV API"
   @callback fetch_or_store(dynamic_cache(), key(), fetch_or_store_fun(), opts()) ::
               ok_error_tuple(value())
 
@@ -2126,14 +2140,14 @@ defmodule Nebulex.Cache do
       ** (RuntimeError) the supplied lambda function must return ...
 
   """
-  @doc group: "KV API"
+  @doc group: "Composite KV API"
   @callback fetch_or_store!(key(), fetch_or_store_fun(), opts()) :: value()
 
   @doc """
   Same as `c:fetch_or_store!/3` but the command is executed on the cache
   instance given at the first argument `dynamic_cache`.
   """
-  @doc group: "KV API"
+  @doc group: "Composite KV API"
   @callback fetch_or_store!(dynamic_cache(), key(), fetch_or_store_fun(), opts()) :: value()
 
   @doc """
@@ -2293,7 +2307,7 @@ defmodule Nebulex.Cache do
   | Best for | Negative caching, pure computations | Fallible operations |
 
   """
-  @doc group: "KV API"
+  @doc group: "Composite KV API"
   @callback get_or_store(key(), get_or_store_fun(), opts()) :: ok_error_tuple(value())
 
   @doc """
@@ -2309,7 +2323,7 @@ defmodule Nebulex.Cache do
       {:ok, "value"}
 
   """
-  @doc group: "KV API"
+  @doc group: "Composite KV API"
   @callback get_or_store(dynamic_cache(), key(), get_or_store_fun(), opts()) ::
               ok_error_tuple(value())
 
@@ -2346,15 +2360,32 @@ defmodule Nebulex.Cache do
       ** (Nebulex.Error) fetch_or_store command failed with reason: :not_found
 
   """
-  @doc group: "KV API"
+  @doc group: "Composite KV API"
   @callback get_or_store!(key(), get_or_store_fun(), opts()) :: value()
 
   @doc """
   Same as `c:get_or_store!/3` but the command is executed on the cache
   instance given at the first argument `dynamic_cache`.
   """
-  @doc group: "KV API"
+  @doc group: "Composite KV API"
   @callback get_or_store!(dynamic_cache(), key(), get_or_store_fun(), opts()) :: value()
+
+  @optional_callbacks get_and_update: 3,
+                      get_and_update: 4,
+                      get_and_update!: 3,
+                      get_and_update!: 4,
+                      update: 4,
+                      update: 5,
+                      update!: 4,
+                      update!: 5,
+                      fetch_or_store: 3,
+                      fetch_or_store: 4,
+                      fetch_or_store!: 3,
+                      fetch_or_store!: 4,
+                      get_or_store: 3,
+                      get_or_store: 4,
+                      get_or_store!: 3,
+                      get_or_store!: 4
 
   ## Nebulex.Adapter.Queryable
 
