@@ -52,6 +52,36 @@ defmodule Nebulex.Cache do
   > specific options. Therefore, Nebulex recommends reviewing the
   > adapter's documentation.
 
+  ## Composite operations
+
+  The functions `c:get_and_update/3`, `c:update/4`, `c:fetch_or_store/3`, and
+  `c:get_or_store/3` receive a function as an argument. They are composite
+  operations: by default, Nebulex builds them on top of the primitive adapter
+  commands (`fetch`, `put`, and `delete`), and the given function runs in the
+  calling process, on the local node. This holds even when the adapter
+  performs the underlying read and write commands on remote nodes.
+
+  Because they are composite, the default implementation is **not atomic**:
+
+    * For `c:get_and_update/3` and `c:update/4`, concurrent calls on the same
+      key can overwrite each other's changes.
+
+    * For `c:fetch_or_store/3` and `c:get_or_store/3`, concurrent cache misses
+      on the same key can evaluate the function more than once, and the last
+      write wins.
+
+  If atomicity is required and the adapter supports transactions, wrap the
+  call in `c:transaction/2` locking the key with the `:keys` option. Only
+  writers that also go through `c:transaction/2` on the same keys are
+  excluded; plain writes are not.
+
+  > #### Adapter-specific behavior {: .info}
+  >
+  > An adapter may provide its own implementation of these functions (see
+  > `c:Nebulex.Adapter.__before_compile__/1`), which can change where the
+  > given function runs and the atomicity guarantees. Check the adapter's
+  > documentation for its execution model.
+
   ## Telemetry events
 
   There are two types of telemetry events. The ones emitted by Nebulex and the
@@ -1751,8 +1781,10 @@ defmodule Nebulex.Cache do
   @doc group: "KV API"
   @callback decr!(dynamic_cache(), key(), amount :: integer(), opts()) :: integer()
 
+  ## Composite KV API
+
   @doc """
-  Gets the value from `key` and updates it, all in one pass.
+  Gets the value for `key` and updates it using the given function.
 
   `fun` is called with the current cached value under `key` (or `nil` if `key`
   hasn't been cached) and must return a two-element tuple: the current value
@@ -1777,10 +1809,12 @@ defmodule Nebulex.Cache do
 
   > #### `get_and_update` atomicity {: .warning}
   >
-  > This operation is not atomic. It uses `get` and `put` (or `delete` for
-  > `:pop`) under the hood, but the function is executed outside of the cache
-  > transaction. If you need to ensure atomicity, consider wrapping the function
-  > in a `c:transaction/2` call.
+  > This is a composite operation built from `get` and `put` (or `delete` for
+  > `:pop`). The given function runs in the calling process, on the local
+  > node, and the default implementation is not atomic: concurrent calls on
+  > the same key can overwrite each other's changes. See the
+  > ["Composite operations"](#module-composite-operations) section in the
+  > module documentation for more information.
 
   ## Examples
 
@@ -1886,10 +1920,12 @@ defmodule Nebulex.Cache do
 
   > #### `update` atomicity {: .warning}
   >
-  > This operation is not atomic. It uses `fetch` and `put` under the hood,
-  > but the function is executed outside of the cache transaction. If you need
-  > to ensure atomicity, consider wrapping the function in a `c:transaction/2`
-  > call.
+  > This is a composite operation built from `fetch` and `put`. The given
+  > function runs in the calling process, on the local node, and the default
+  > implementation is not atomic: concurrent calls on the same key can
+  > overwrite each other's changes. See the
+  > ["Composite operations"](#module-composite-operations) section in the
+  > module documentation for more information.
 
   ## Examples
 
@@ -1965,10 +2001,12 @@ defmodule Nebulex.Cache do
 
   > #### `fetch_or_store` atomicity {: .warning}
   >
-  > This operation is not atomic. It uses `fetch` and `put` under the hood,
-  > but the function is executed outside of the cache transaction. If you need
-  > to ensure atomicity, consider wrapping the function in a `c:transaction/2`
-  > call.
+  > This is a composite operation built from `fetch` and, on a cache miss,
+  > `put`. The given function runs in the calling process, on the local node,
+  > and the default implementation is not atomic: concurrent misses on the
+  > same key can evaluate the function more than once, and the last write
+  > wins. See the ["Composite operations"](#module-composite-operations)
+  > section in the module documentation for more information.
 
   ## Examples
 
@@ -2120,10 +2158,12 @@ defmodule Nebulex.Cache do
 
   > #### `get_or_store` atomicity {: .warning}
   >
-  > This operation is not atomic. It uses `fetch` and `put` under the hood,
-  > but the function is executed outside of the cache transaction. If you need
-  > to ensure atomicity, consider wrapping the function in a `c:transaction/2`
-  > call.
+  > This is a composite operation built from `fetch` and, on a cache miss,
+  > `put`. The given function runs in the calling process, on the local node,
+  > and the default implementation is not atomic: concurrent misses on the
+  > same key can evaluate the function more than once, and the last write
+  > wins. See the ["Composite operations"](#module-composite-operations)
+  > section in the module documentation for more information.
 
   ## Examples
 
