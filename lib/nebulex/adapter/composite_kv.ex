@@ -33,15 +33,29 @@ defmodule Nebulex.Adapter.CompositeKV do
 
         use Nebulex.Adapter.CompositeKV
 
-        # Override only `get_and_update/6`; the other callbacks fall back to
-        # the default implementation.
+        # Override `get_and_update/6` and `update/7`; the other callbacks
+        # fall back to the default implementation.
         @impl true
         def get_and_update(adapter_meta, key, fun, ttl, keep_ttl?, opts) do
           # Adapter-specific implementation ...
         end
 
+        @impl true
+        def update(adapter_meta, key, initial, fun, ttl, keep_ttl?, opts) do
+          # Adapter-specific implementation ...
+        end
+
         ...
       end
+
+  > #### Callback arities {: .info}
+  >
+  > `c:update/7` takes an extra `initial` argument, so it is the only
+  > callback of the four with arity 7; `c:get_and_update/6`,
+  > `c:fetch_or_store/6`, and `c:get_or_store/6` all take 6 arguments.
+  > Annotate every override with `@impl true`: an override defined with the
+  > wrong arity, or with a mistyped name, silently keeps the default
+  > implementation, and `@impl true` makes the compiler report it.
 
   The default implementation executes the primitive commands through
   `Nebulex.Adapter.run_command/4`, so their Telemetry command events (and
