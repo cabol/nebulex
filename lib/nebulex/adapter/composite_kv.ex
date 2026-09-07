@@ -9,10 +9,24 @@ defmodule Nebulex.Adapter.CompositeKV do
 
   By default, Nebulex builds these operations on top of the
   `Nebulex.Adapter.KV` primitives (`fetch`, `put`, and `delete`), and the
-  given function runs in the calling process, on the local node. Because
-  they are composite, the default implementation is **not atomic**. See the
-  ["Composite operations"](`Nebulex.Cache#module-composite-operations`)
-  section in `Nebulex.Cache` for more information.
+  given function runs in the calling process, on the local node. This holds
+  even when the adapter performs the underlying read and write commands on
+  remote nodes.
+
+  Because the read and the write are separate commands, the default
+  implementation is **not atomic**:
+
+    * For `c:get_and_update/6` and `c:update/7`, concurrent calls on the
+      same key can overwrite each other's changes.
+
+    * For `c:fetch_or_store/6` and `c:get_or_store/6`, concurrent cache
+      misses on the same key can evaluate the function more than once, and
+      the last write wins.
+
+  If atomicity is required and the adapter supports transactions, wrap the
+  call in `c:Nebulex.Cache.transaction/2` locking the key with the `:keys`
+  option. Only writers that also go through `c:Nebulex.Cache.transaction/2`
+  on the same keys are excluded; plain writes are not.
 
   This behaviour is optional, like `Nebulex.Adapter.Queryable`: the cache
   module exposes the composite functions only when the adapter implements
@@ -48,15 +62,6 @@ defmodule Nebulex.Adapter.CompositeKV do
         ...
       end
 
-  > #### Callback arities {: .info}
-  >
-  > `c:update/7` takes an extra `initial` argument, so it is the only
-  > callback of the four with arity 7; `c:get_and_update/6`,
-  > `c:fetch_or_store/6`, and `c:get_or_store/6` all take 6 arguments.
-  > Annotate every override with `@impl true`: an override defined with the
-  > wrong arity, or with a mistyped name, silently keeps the default
-  > implementation, and `@impl true` makes the compiler report it.
-
   The default implementation executes the primitive commands through
   `Nebulex.Adapter.run_command/4`, so their Telemetry command events (and
   therefore the cache entry events and stats built on top of them) are
@@ -90,33 +95,6 @@ defmodule Nebulex.Adapter.CompositeKV do
   @typedoc "Proxy type to the adapter meta"
   @type adapter_meta() :: Nebulex.Adapter.adapter_meta()
 
-  @typedoc "Proxy type to the cache key"
-  @type key() :: Nebulex.Cache.key()
-
-  @typedoc "Proxy type to the cache value"
-  @type value() :: Nebulex.Cache.value()
-
-  @typedoc "Proxy type to the cache options"
-  @type opts() :: Nebulex.Cache.opts()
-
-  @typedoc "TTL for a cache entry"
-  @type ttl() :: timeout()
-
-  @typedoc "Keep TTL flag"
-  @type keep_ttl() :: boolean()
-
-  @typedoc "Proxy type to the get and update function"
-  @type get_and_update_fun() :: Nebulex.Cache.get_and_update_fun()
-
-  @typedoc "Proxy type to the update function"
-  @type update_fun() :: Nebulex.Cache.update_fun()
-
-  @typedoc "Proxy type to the fetch or store function"
-  @type fetch_or_store_fun() :: Nebulex.Cache.fetch_or_store_fun()
-
-  @typedoc "Proxy type to the get or store function"
-  @type get_or_store_fun() :: Nebulex.Cache.get_or_store_fun()
-
   @doc """
   Gets the value for `key` and updates it using the given function.
 
@@ -136,12 +114,12 @@ defmodule Nebulex.Adapter.CompositeKV do
   """
   @callback get_and_update(
               adapter_meta(),
-              key(),
-              get_and_update_fun(),
-              ttl(),
-              keep_ttl(),
-              opts()
-            ) :: Nebulex.Cache.ok_error_tuple({value(), value()})
+              Nebulex.Cache.key(),
+              Nebulex.Cache.get_and_update_fun(),
+              Nebulex.Cache.ttl(),
+              Nebulex.Cache.keep_ttl(),
+              Nebulex.Cache.opts()
+            ) :: Nebulex.Cache.ok_error_tuple({Nebulex.Cache.value(), Nebulex.Cache.value()})
 
   @doc """
   Updates the cached `key` with the given function.
@@ -160,13 +138,13 @@ defmodule Nebulex.Adapter.CompositeKV do
   """
   @callback update(
               adapter_meta(),
-              key(),
-              initial :: value(),
-              update_fun(),
-              ttl(),
-              keep_ttl(),
-              opts()
-            ) :: Nebulex.Cache.ok_error_tuple(value())
+              Nebulex.Cache.key(),
+              initial :: Nebulex.Cache.value(),
+              Nebulex.Cache.update_fun(),
+              Nebulex.Cache.ttl(),
+              Nebulex.Cache.keep_ttl(),
+              Nebulex.Cache.opts()
+            ) :: Nebulex.Cache.ok_error_tuple(Nebulex.Cache.value())
 
   @doc """
   Fetches the value for `key` or, on a cache miss, evaluates `fun` and
@@ -185,12 +163,12 @@ defmodule Nebulex.Adapter.CompositeKV do
   """
   @callback fetch_or_store(
               adapter_meta(),
-              key(),
-              fetch_or_store_fun(),
-              ttl(),
-              keep_ttl(),
-              opts()
-            ) :: Nebulex.Cache.ok_error_tuple(value())
+              Nebulex.Cache.key(),
+              Nebulex.Cache.fetch_or_store_fun(),
+              Nebulex.Cache.ttl(),
+              Nebulex.Cache.keep_ttl(),
+              Nebulex.Cache.opts()
+            ) :: Nebulex.Cache.ok_error_tuple(Nebulex.Cache.value())
 
   @doc """
   Gets the value for `key` or, on a cache miss, evaluates `fun` and stores
@@ -205,12 +183,12 @@ defmodule Nebulex.Adapter.CompositeKV do
   """
   @callback get_or_store(
               adapter_meta(),
-              key(),
-              get_or_store_fun(),
-              ttl(),
-              keep_ttl(),
-              opts()
-            ) :: Nebulex.Cache.ok_error_tuple(value())
+              Nebulex.Cache.key(),
+              Nebulex.Cache.get_or_store_fun(),
+              Nebulex.Cache.ttl(),
+              Nebulex.Cache.keep_ttl(),
+              Nebulex.Cache.opts()
+            ) :: Nebulex.Cache.ok_error_tuple(Nebulex.Cache.value())
 
   @doc false
   defmacro __using__(_opts) do
@@ -242,8 +220,15 @@ defmodule Nebulex.Adapter.CompositeKV do
   @doc """
   Default implementation for `c:get_and_update/6`.
   """
-  @spec get_and_update(adapter_meta(), key(), get_and_update_fun(), ttl(), keep_ttl(), opts()) ::
-          Nebulex.Cache.ok_error_tuple({value(), value()})
+  @spec get_and_update(
+          adapter_meta(),
+          Nebulex.Cache.key(),
+          Nebulex.Cache.get_and_update_fun(),
+          Nebulex.Cache.ttl(),
+          Nebulex.Cache.keep_ttl(),
+          Nebulex.Cache.opts()
+        ) ::
+          Nebulex.Cache.ok_error_tuple({Nebulex.Cache.value(), Nebulex.Cache.value()})
   def get_and_update(adapter_meta, key, fun, ttl, keep_ttl?, opts) do
     with {:ok, current} <- fetch_or_nil(adapter_meta, key, opts) do
       eval_get_and_update_fun(fun.(current), current, adapter_meta, key, ttl, keep_ttl?, opts)
@@ -253,8 +238,15 @@ defmodule Nebulex.Adapter.CompositeKV do
   @doc """
   Default implementation for `c:update/7`.
   """
-  @spec update(adapter_meta(), key(), value(), update_fun(), ttl(), keep_ttl(), opts()) ::
-          Nebulex.Cache.ok_error_tuple(value())
+  @spec update(
+          adapter_meta(),
+          Nebulex.Cache.key(),
+          Nebulex.Cache.value(),
+          Nebulex.Cache.update_fun(),
+          Nebulex.Cache.ttl(),
+          Nebulex.Cache.keep_ttl(),
+          Nebulex.Cache.opts()
+        ) :: Nebulex.Cache.ok_error_tuple(Nebulex.Cache.value())
   def update(adapter_meta, key, initial, fun, ttl, keep_ttl?, opts) do
     with {:ok, value} <- eval_update_fun(adapter_meta, key, initial, fun, opts) do
       put(adapter_meta, key, value, ttl, keep_ttl?, opts)
@@ -266,12 +258,12 @@ defmodule Nebulex.Adapter.CompositeKV do
   """
   @spec fetch_or_store(
           adapter_meta(),
-          key(),
-          fetch_or_store_fun(),
-          ttl(),
-          keep_ttl(),
-          opts()
-        ) :: Nebulex.Cache.ok_error_tuple(value())
+          Nebulex.Cache.key(),
+          Nebulex.Cache.fetch_or_store_fun(),
+          Nebulex.Cache.ttl(),
+          Nebulex.Cache.keep_ttl(),
+          Nebulex.Cache.opts()
+        ) :: Nebulex.Cache.ok_error_tuple(Nebulex.Cache.value())
   def fetch_or_store(adapter_meta, key, fun, ttl, keep_ttl?, opts) do
     with {:error, %Nebulex.KeyError{key: ^key}} <- run(adapter_meta, :fetch, [key], opts) do
       eval_fetch_or_store_fun(fun.(), adapter_meta, key, ttl, keep_ttl?, opts)
@@ -283,12 +275,12 @@ defmodule Nebulex.Adapter.CompositeKV do
   """
   @spec get_or_store(
           adapter_meta(),
-          key(),
-          get_or_store_fun(),
-          ttl(),
-          keep_ttl(),
-          opts()
-        ) :: Nebulex.Cache.ok_error_tuple(value())
+          Nebulex.Cache.key(),
+          Nebulex.Cache.get_or_store_fun(),
+          Nebulex.Cache.ttl(),
+          Nebulex.Cache.keep_ttl(),
+          Nebulex.Cache.opts()
+        ) :: Nebulex.Cache.ok_error_tuple(Nebulex.Cache.value())
   def get_or_store(adapter_meta, key, fun, ttl, keep_ttl?, opts) do
     with {:error, %Nebulex.KeyError{key: ^key}} <- run(adapter_meta, :fetch, [key], opts) do
       put(adapter_meta, key, fun.(), ttl, keep_ttl?, opts)
