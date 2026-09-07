@@ -70,6 +70,17 @@ defmodule Nebulex.Adapter.CompositeKV do
   `:telemetry_event`, and `:telemetry_metadata` options apply to that
   command span and are forwarded to the primitive commands executed by the
   default implementation, so they behave as one unit.
+
+  > #### Overrides and cache entry events {: .warning}
+  >
+  > Cache entry events (`Nebulex.Event.CacheEntryEvent`) and the cache stats
+  > are derived from the primitive command events, not from the composite
+  > one. An implementation that performs its writes without going through
+  > `Nebulex.Adapter.run_command/4` (for example, by running the whole
+  > operation on a remote node) emits only the composite command event, so
+  > registered event listeners and the stats counters will not see those
+  > writes. Adapters overriding these callbacks should document that
+  > consequence, or emit the equivalent primitive command events themselves.
   """
 
   import Nebulex.Utils, only: [wrap_error: 2]
@@ -290,10 +301,6 @@ defmodule Nebulex.Adapter.CompositeKV do
     with {:error, %Nebulex.KeyError{key: ^key}} <- run(adapter_meta, :fetch, [key], opts) do
       {:ok, nil}
     end
-  end
-
-  defp eval_get_and_update_fun({get, nil}, _current, _adapter_meta, _key, _ttl, _keep_ttl?, _opts) do
-    {:ok, {get, get}}
   end
 
   defp eval_get_and_update_fun({get, update}, _current, adapter_meta, key, ttl, keep_ttl?, opts) do

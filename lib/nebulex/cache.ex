@@ -1806,6 +1806,9 @@ defmodule Nebulex.Cache do
   the new value to be stored under `key`. `fun` may also return `:pop`, which
   means the current value shall be removed from the cache and returned.
 
+  Since `nil` is a valid cache value, returning `{current_value, nil}` stores
+  `nil` under `key` like any other value. Use `:pop` to remove the entry.
+
   This function returns:
 
     * `{:ok, {current_value, new_value}}` - The `current_value` is the current
@@ -1846,10 +1849,17 @@ defmodule Nebulex.Cache do
       ...> end)
       {:ok, {"value!", "new value!"}}
 
+  Cache a `nil` value:
+
+      iex> MyCache.get_and_update(:a, fn current_value ->
+      ...>   {current_value, nil}
+      ...> end)
+      {:ok, {"new value!", nil}}
+
   Pop/remove value if it exists:
 
       iex> MyCache.get_and_update(:a, fn _ -> :pop end)
-      {:ok, {"new value!", nil}}
+      {:ok, {nil, nil}}
 
   Pop/remove nonexistent key:
 

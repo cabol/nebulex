@@ -35,8 +35,9 @@ defmodule Nebulex.Adapters.CacheTest do
       assert cache.get_and_update!(1, fun) == {nil, 1}
       assert cache.get_and_update!(1, &{&1, &1 * 2}) == {1, 2}
       assert cache.get_and_update!(1, &{&1, &1 * 3}) == {2, 6}
-      assert cache.get_and_update!(1, &{&1, nil}) == {6, 6}
-      assert cache.get!(1) == 6
+      assert cache.get_and_update!(1, &{&1, nil}) == {6, nil}
+      assert cache.get!(1) == nil
+      assert cache.get_and_update!(1, &{&1, 6}) == {nil, 6}
       assert cache.get_and_update!(1, fn _ -> :pop end) == {6, nil}
       assert cache.get_and_update!(1, fn _ -> :pop end) == {nil, nil}
       assert cache.get_and_update!(3, &{&1, 3}) == {nil, 3}

@@ -9,11 +9,12 @@ defmodule Nebulex.Cache.CompositeKVTest do
         assert cache.fetch!(:counter) == 2
       end
 
-      test "does not write when the function returns {get, nil}", %{cache: cache} do
+      test "stores a nil value when the function returns {get, nil}", %{cache: cache} do
         :ok = cache.put(:counter, 1)
 
-        assert cache.get_and_update(:counter, &{&1, nil}) == {:ok, {1, 1}}
-        assert cache.fetch!(:counter) == 1
+        assert cache.get_and_update(:counter, &{&1, nil}) == {:ok, {1, nil}}
+        assert cache.fetch!(:counter) == nil
+        assert cache.has_key?(:counter) == {:ok, true}
       end
 
       test "pops the key when the function returns :pop", %{cache: cache} do

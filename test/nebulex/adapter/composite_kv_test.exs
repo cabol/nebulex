@@ -179,17 +179,20 @@ defmodule Nebulex.Adapter.CompositeKVTest do
       end
     end
 
-    test "get_and_update/3 does not write when the function returns {get, nil}",
+    test "get_and_update/3 stores a nil value when the function returns {get, nil}",
          %{cache: cache} do
       :ok = cache.put(@key, 1)
 
       with_telemetry_handler @events, fn ->
-        assert cache.get_and_update!(@key, &{&1, nil}) == {1, 1}
+        assert cache.get_and_update!(@key, &{&1, nil}) == {1, nil}
 
-        assert_receive {@stop, _, %{command: :get_and_update, result: {:ok, {1, 1}}}}
+        assert_receive {@stop, _, %{command: :get_and_update, result: {:ok, {1, nil}}}}
         assert_receive {@stop, _, %{command: :fetch}}
-        refute_received {@start, _, %{command: :put}}
+
+        assert_receive {@stop, _, %{command: :put, args: [@key, nil, :put, :infinity, false, []]}}
       end
+
+      assert cache.fetch!(@key) == nil
     end
 
     test "get_and_update/3 deletes the key when the function returns :pop", %{cache: cache} do
