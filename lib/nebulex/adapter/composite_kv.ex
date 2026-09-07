@@ -52,10 +52,10 @@ defmodule Nebulex.Adapter.CompositeKV do
 
   Each composite operation is a cache command itself: a Telemetry span with
   `command: :get_and_update`, `command: :update`, `command: :fetch_or_store`,
-  or `command: :get_or_store` is emitted, and the shared `:telemetry`,
+  or `command: :get_or_store` is emitted. The shared `:telemetry`,
   `:telemetry_event`, and `:telemetry_metadata` options apply to that
-  command span. The primitive commands executed by the default
-  implementation use the cache defaults for those options.
+  command span and are forwarded to the primitive commands executed by the
+  default implementation, so they behave as one unit.
   """
 
   import Nebulex.Utils, only: [wrap_error: 2]

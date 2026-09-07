@@ -147,6 +147,9 @@ defmodule Nebulex.Adapter.CompositeKVTest do
   @stop @telemetry_prefix ++ [:command, :stop]
   @events [@start, @stop]
 
+  # Custom Telemetry event used to verify `:telemetry_event` propagation
+  @custom_event [:nebulex, :composite_kv_test, :custom]
+
   ## Tests
 
   describe "adapter without the behaviour" do
@@ -281,19 +284,45 @@ defmodule Nebulex.Adapter.CompositeKVTest do
       assert_expires(cache)
     end
 
-    test "includes the :telemetry_metadata option in the composite span", %{cache: cache} do
+    test "propagates :telemetry_metadata to the composite and primitive spans", %{cache: cache} do
       fun = fn -> @value end
+      opts = [telemetry_metadata: %{foo: "bar"}]
 
       with_telemetry_handler @events, fn ->
-        assert cache.get_or_store(@key, fun, telemetry_metadata: %{foo: "bar"}) == {:ok, @value}
+        assert cache.get_or_store(@key, fun, opts) == {:ok, @value}
 
         assert_receive {@start, _, %{command: :get_or_store} = metadata}
-        assert metadata[:args] == [@key, fun, :infinity, false, []]
+        assert metadata[:args] == [@key, fun, :infinity, false, opts]
         assert metadata[:extra_metadata] == %{foo: "bar"}
 
         assert_receive {@stop, _, %{command: :get_or_store} = metadata}
-        assert metadata[:args] == [@key, fun, :infinity, false, []]
+        assert metadata[:args] == [@key, fun, :infinity, false, opts]
         assert metadata[:extra_metadata] == %{foo: "bar"}
+
+        assert_receive {@stop, _, %{command: :fetch, extra_metadata: %{foo: "bar"}}}
+        assert_receive {@stop, _, %{command: :put, extra_metadata: %{foo: "bar"}}}
+      end
+    end
+
+    test "honors telemetry: false for the composite and primitive spans", %{cache: cache} do
+      with_telemetry_handler @events, fn ->
+        assert cache.get_and_update!(@key, &get_and_update_fun/1, telemetry: false) == {nil, 1}
+
+        refute_received {@start, _, _}
+        refute_received {@stop, _, _}
+      end
+    end
+
+    test "propagates :telemetry_event to the composite and primitive spans", %{cache: cache} do
+      custom_stop = @custom_event ++ [:stop]
+
+      with_telemetry_handler [custom_stop], fn ->
+        assert cache.get_and_update!(@key, &get_and_update_fun/1, telemetry_event: @custom_event) ==
+                 {nil, 1}
+
+        assert_receive {^custom_stop, _, %{command: :fetch}}
+        assert_receive {^custom_stop, _, %{command: :put}}
+        assert_receive {^custom_stop, _, %{command: :get_and_update}}
       end
     end
   end
