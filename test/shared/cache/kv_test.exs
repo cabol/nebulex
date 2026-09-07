@@ -419,37 +419,6 @@ defmodule Nebulex.Cache.KVTest do
       end
     end
 
-    describe "update!/4" do
-      test "updates an entry under a key applying a function on the value", %{cache: cache} do
-        :ok = cache.put("update_int", "123")
-        :ok = cache.put("update_str", "foo")
-
-        assert cache.update!("update_int", 1, &String.to_integer/1) == 123
-        assert cache.update!("update_str", "str", &String.to_atom/1) == :foo
-      end
-
-      test "creates the entry with the default value if key does not exist", %{cache: cache} do
-        assert cache.update!("k123", "123", &Integer.to_string/1) == "123"
-      end
-
-      test "updates existing value with nil", %{cache: cache} do
-        assert cache.update!("update with nil", nil, &Integer.to_string/1) == nil
-        assert cache.fetch!("update with nil") == nil
-      end
-
-      test "raises because the cache is not started" do
-        defmodule UnknownCache do
-          use Nebulex.Cache,
-            otp_app: :nebulex,
-            adapter: Nebulex.Adapters.Nil
-        end
-
-        assert_raise Nebulex.CacheNotFoundError, ~r"unable to find cache:", fn ->
-          UnknownCache.update!("error", 1, &String.to_integer/1)
-        end
-      end
-    end
-
     describe "incr/3" do
       test "increments a counter by the given amount", %{cache: cache} do
         assert cache.incr(:counter) == {:ok, 1}

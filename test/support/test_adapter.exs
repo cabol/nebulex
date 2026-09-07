@@ -38,6 +38,9 @@ defmodule Nebulex.TestAdapter do
   # Inherit default observable implementation
   use Nebulex.Adapter.Observable
 
+  # Inherit default composite KV implementation
+  use Nebulex.Adapter.CompositeKV
+
   import Nebulex.Utils
 
   alias Nebulex.Adapters.Common.Info.Stats

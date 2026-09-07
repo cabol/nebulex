@@ -4,6 +4,7 @@ defmodule Nebulex.CacheErrorTest do
   # Inherit error tests
   use Nebulex.Cache.KVErrorTest
   use Nebulex.Cache.KVExpirationErrorTest
+  use Nebulex.Cache.CompositeKVErrorTest
   use Nebulex.Cache.QueryableErrorTest
 
   import Mimic, only: [verify_on_exit!: 1, stub: 3]
@@ -27,13 +28,6 @@ defmodule Nebulex.CacheErrorTest do
       assert_raise Nebulex.Error, ~r/#{msg}/, fn ->
         cache.put!(:error, %RuntimeError{})
       end
-    end
-  end
-
-  describe "fetch_or_store/3" do
-    test "returns an error due to a cache command failure", %{cache: cache} do
-      assert cache.fetch_or_store(:error, fn -> {:ok, "value"} end) ==
-               {:error, %Nebulex.Error{reason: :error}}
     end
   end
 

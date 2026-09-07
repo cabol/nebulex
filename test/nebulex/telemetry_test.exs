@@ -146,7 +146,7 @@ defmodule Nebulex.TelemetryTest do
     setup_with_cache Cache
 
     test "ok: emits start and stop events" do
-      expected_opts = Keyword.drop(@custom_opts, [:telemetry_event, :telemetry_metadata])
+      expected_opts = @custom_opts
 
       with_telemetry_handler @custom_events, fn ->
         :ok = Cache.put("foo", "bar", @custom_opts)
@@ -171,7 +171,7 @@ defmodule Nebulex.TelemetryTest do
     end
 
     test "raise: emits start and exception events" do
-      expected_opts = Keyword.drop(@custom_opts, [:telemetry_event, :telemetry_metadata])
+      expected_opts = @custom_opts
 
       with_telemetry_handler @custom_events, fn ->
         key = {:eval, fn -> raise ArgumentError, "error" end}

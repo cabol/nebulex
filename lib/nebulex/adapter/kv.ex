@@ -21,14 +21,14 @@ defmodule Nebulex.Adapter.KV do
   @typedoc "Proxy type to the cache entries"
   @type entries() :: Nebulex.Cache.entries()
 
-  @typedoc "TTL for a cache entry"
-  @type ttl() :: timeout()
+  @typedoc "Proxy type to the cache TTL"
+  @type ttl() :: Nebulex.Cache.ttl()
 
   @typedoc "Write command type"
   @type on_write() :: :put | :put_new | :replace
 
-  @typedoc "Keep TTL flag"
-  @type keep_ttl() :: boolean()
+  @typedoc "Proxy type to the cache keep TTL flag"
+  @type keep_ttl() :: Nebulex.Cache.keep_ttl()
 
   @doc """
   Fetches the value for a specific `key` in the cache.
